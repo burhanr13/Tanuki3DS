@@ -3,43 +3,19 @@
 #include "../3ds.h"
 #include "hostshaders/hostshaders.h"
 
-// #define WIREFRAME
+//#define WIREFRAME
 
 #define BOT_GAP (1 - (float) SCREEN_WIDTH_BOT / (float) SCREEN_WIDTH)
 
-float quads[] = {
-    -1,
-    1,
-    0,
-    0,
-    -1,
-    0,
-    0,
-    1,
-    1,
-    1,
-    1,
-    0,
-    1,
-    0,
-    1,
-    1,
-    -1 + BOT_GAP,
-    0,
-    0,
-    0,
-    -1 + BOT_GAP,
-    -1,
-    0,
-    1,
-    1 - BOT_GAP,
-    0,
-    1,
-    0,
-    1 - BOT_GAP,
-    -1,
-    1,
-    1,
+float quads[][4] = {
+    {-1, 1, 0, 1},
+    {-1, 0, 0, 0},
+    {1, 1, 1, 1},
+    {1, 0, 1, 0}, //
+    {-1 + BOT_GAP, 0, 0, 1},
+    {-1 + BOT_GAP, -1, 0, 0},
+    {1 - BOT_GAP, 0, 1, 1},
+    {1 - BOT_GAP, -1, 1, 0},
 };
 
 GLuint make_shader(const char* vert, const char* frag) {
@@ -90,10 +66,12 @@ void bind_gpu(GLState* state) {
 #endif
 
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    glEnable(GL_DEPTH_TEST);
+    // glEnable(GL_DEPTH_TEST);
 }
 
 void renderer_gl_setup(GLState* state) {
+    state->fb_top = -1;
+    state->fb_bot = -1;
 
     state->main.program = make_shader(mainvertsource, mainfragsource);
     glUseProgram(state->main.program);
@@ -132,7 +110,7 @@ void renderer_gl_setup(GLState* state) {
                           (void*) offsetof(Vertex, color));
     glEnableVertexAttribArray(1);
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < FB_MAX; i++) {
         glGenFramebuffers(1, &state->fbs[i].fbo);
         glBindFramebuffer(GL_FRAMEBUFFER, state->fbs[i].fbo);
 
@@ -175,11 +153,21 @@ void render_gl_main(GLState* state) {
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glBindTexture(GL_TEXTURE_2D, state->fbs[state->fb_top].tex_colorbuf);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glActiveTexture(GL_TEXTURE0);
 
-    glBindTexture(GL_TEXTURE_2D, state->fbs[state->fb_bot].tex_colorbuf);
-    glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
+    if (state->fb_top >= 0) {
+        linfo("drawing top screen fb %d", state->fb_top);
+        glBindTexture(GL_TEXTURE_2D, state->fbs[state->fb_top].tex_colorbuf);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        // state->fb_top = -1;
+    }
+
+    if (state->fb_bot >= 0) {
+        linfo("drawing bot screen fb %d", state->fb_bot);
+        glBindTexture(GL_TEXTURE_2D, state->fbs[state->fb_bot].tex_colorbuf);
+        glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
+        // state->fb_bot = -1;
+    }
 
     bind_gpu(state);
 }

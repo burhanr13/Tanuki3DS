@@ -91,6 +91,8 @@ static inline bool compare(u32 op, float a, float b) {
     }
 }
 
+#define MUL(a, b) ((a != 0) ? a * b : 0)
+
 u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
     PICAInstr instr = gpu->code[pc++];
     OpDesc desc = {gpu->opdescs[instr.desc]};
@@ -112,7 +114,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             SRC1(a, 1);
             SRC2(b, 1);
             fvec res;
-            res[0] = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+            res[0] = MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]);
             res[1] = res[2] = res[3] = res[0];
             DEST(res, 1);
             break;
@@ -122,7 +124,8 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             SRC1(a, 1);
             SRC2(b, 1);
             fvec res;
-            res[0] = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+            res[0] = MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]) +
+                     MUL(a[3], b[3]);
             res[1] = res[2] = res[3] = res[0];
             DEST(res, 1);
             break;
@@ -139,7 +142,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             }
             fvec res;
             res[0] = 1;
-            res[1] = a[1] * b[1];
+            res[1] = MUL(a[1], b[1]);
             res[2] = a[2];
             res[3] = b[3];
             DEST(res, 1);
@@ -150,10 +153,10 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             SRC1(a, 1);
             SRC2(b, 1);
             fvec res;
-            res[0] = a[0] * b[0];
-            res[1] = a[1] * b[1];
-            res[2] = a[2] * b[2];
-            res[3] = a[3] * b[3];
+            res[0] = MUL(a[0], b[0]);
+            res[1] = MUL(a[1], b[1]);
+            res[2] = MUL(a[2], b[2]);
+            res[3] = MUL(a[3], b[3]);
             DEST(res, 1);
             break;
         }
@@ -333,10 +336,10 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             }
 
             fvec res;
-            res[0] = a[0] * b[0] + c[0];
-            res[1] = a[1] * b[1] + c[1];
-            res[2] = a[2] * b[2] + c[2];
-            res[3] = a[3] * b[3] + c[3];
+            res[0] = MUL(a[0], b[0]) + c[0];
+            res[1] = MUL(a[1], b[1]) + c[1];
+            res[2] = MUL(a[2], b[2]) + c[2];
+            res[3] = MUL(a[3], b[3]) + c[3];
             DEST(res, 5);
             break;
         }
@@ -685,12 +688,12 @@ void disasm_block(GPU* gpu, u32 start, u32 num) {
 }
 
 void disasm_vshader(GPU* gpu) {
-    printf("const fvec c95 = ");
-    PRINTFVEC(gpu->cst[95]);
-    printf("\n");
-    printf("const fvec c94 = ");
-    PRINTFVEC(gpu->cst[94]);
-    printf("\n");
+    for (int i = 0; i < 8; i++) {
+        printf("const fvec c%d = ", 95 - i);
+        PRINTFVEC(gpu->cst[95 - i]);
+        printf("\n");
+    }
+
     disasm.depth = 0;
     Vec_init(disasm.calls);
     printf("proc main\n");

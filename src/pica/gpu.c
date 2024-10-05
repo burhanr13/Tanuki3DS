@@ -39,15 +39,16 @@ u32 f31tof32(u32 i) {
 }
 
 void gpu_reset_fbs(GPU* gpu) {
-    for (int i = 0; i < 2; i++) {
+    linfo("reset fbs");
+    for (int i = 0; i < FB_MAX; i++) {
         gpu->fbs[i].paddr = -1;
     }
+    gpu->cur_fb = -1;
 }
 
 void gpu_set_fb_cur(GPU* gpu, u32 paddr) {
-    linfo("cur fb to %08x", paddr);
     int newfb = -1;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs[i].paddr == paddr) {
             newfb = i;
             break;
@@ -66,23 +67,25 @@ void gpu_set_fb_cur(GPU* gpu, u32 paddr) {
     if (newfb == gpu->cur_fb) return;
     gpu->cur_fb = newfb;
 
+    linfo("cur fb at %08x to %d", paddr, newfb);
+
     glBindFramebuffer(GL_FRAMEBUFFER, gpu->gl.fbs[newfb].fbo);
 }
 
 void gpu_set_fb_top(GPU* gpu, u32 paddr) {
-    linfo("top fb to %08x", paddr);
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs[i].paddr == paddr) {
             gpu->gl.fb_top = i;
+            linfo("top fb at %08x to %d", paddr, i);
             break;
         }
     }
 }
 
 void gpu_set_fb_bot(GPU* gpu, u32 paddr) {
-    linfo("bot fb to %08x", paddr);
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs[i].paddr == paddr) {
+            linfo("bot fb at %08x to %d", paddr, i);
             gpu->gl.fb_bot = i;
             break;
         }
@@ -278,6 +281,7 @@ static int prim_mode[4] = {GL_TRIANGLES, GL_TRIANGLE_STRIP, GL_TRIANGLE_FAN,
                            GL_TRIANGLES};
 
 void gpu_drawarrays(GPU* gpu) {
+    linfo("cur fb for drawarrays %d", gpu->cur_fb);
     linfo("drawing arrays nverts=%d", gpu->io.geom.nverts);
     Vertex vbuf[gpu->io.geom.nverts];
     for (int i = 0; i < gpu->io.geom.nverts; i++) {
@@ -292,8 +296,9 @@ void gpu_drawarrays(GPU* gpu) {
 }
 
 void gpu_drawelements(GPU* gpu) {
+    linfo("cur fb for drawelements %d", gpu->cur_fb);
     linfo("drawing elements nverts=%d primmode=%d", gpu->io.geom.nverts,
-          gpu->io.geom.prim_config.mode);
+             gpu->io.geom.prim_config.mode);
     u32 minind = 0xffff, maxind = 0;
     void* indexbuf = PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.indexbufoff);
     for (int i = 0; i < gpu->io.geom.nverts; i++) {
@@ -315,6 +320,7 @@ void gpu_drawelements(GPU* gpu) {
         exec_vshader(gpu);
         store_vtx(gpu, i - minind, vbuf);
     }
+
     glBufferData(GL_ARRAY_BUFFER, (maxind + 1 - minind) * sizeof(Vertex), vbuf,
                  GL_STREAM_DRAW);
     glDrawElementsBaseVertex(

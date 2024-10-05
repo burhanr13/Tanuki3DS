@@ -137,6 +137,8 @@ typedef struct {
     u32 paddr;
 } FBInfo;
 
+#define FB_MAX 6
+
 typedef struct _GPU {
 
     u8* mem;
@@ -163,7 +165,7 @@ typedef struct _GPU {
     u32 loopct;
     bool cmp[2];
 
-    FBInfo fbs[2];
+    FBInfo fbs[FB_MAX];
     int cur_fb;
 
     GLState gl;
@@ -203,7 +205,7 @@ enum {
     (((union {                                                                 \
          float _f;                                                             \
          u32 _i;                                                               \
-     }) {f})                                                                   \
+     }){f})                                                                    \
          ._i)
 
 u32 f24tof32(u32 i);

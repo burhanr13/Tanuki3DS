@@ -15,6 +15,11 @@ DECL_PORT(gsp_gpu) {
             cmd_params[0] = MAKE_IPCHEADER(1, 0);
             cmd_params[1] = 0;
             break;
+        case 0x000b:
+            linfo("LCDForceBlank");
+            cmd_params[0] = MAKE_IPCHEADER(1, 0);
+            cmd_params[1] = 0;
+            break;
         case 0x000c:
             linfo("TriggerCmdReqQueue");
             gsp_handle_command(s);
@@ -71,8 +76,11 @@ DECL_PORT(gsp_gpu) {
 void gsp_handle_event(HLE3DS* s, u32 arg) {
     if (arg == GSPEVENT_VBLANK0) {
         add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / 60);
-        add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK1, CPU_CLK / 60);
 
+        gsp_handle_event(s, GSPEVENT_VBLANK1);
+        if (s->services.dsp.event) event_signal(s, s->services.dsp.event);
+
+        linfo("vblank");
         gpu_reset_fbs(&s->gpu);
 
         s->frame_complete = true;
@@ -171,15 +179,37 @@ void gsp_handle_command(HLE3DS* s) {
             u32 dimin = cmds->d[cmds->cur].args[2];
             u32 dimout = cmds->d[cmds->cur].args[3];
             u32 flags = cmds->d[cmds->cur].args[4];
-            linfo("display transfer from fb at %08x to %08x", addrin, addrout);
+            linfo("display transfer from fb at %08x to %08x flags %x", addrin,
+                  addrout, flags);
 
-            u32 topscreenfb = *(u32*) GSPMEM(0x208);
-            u32 bottomscreenfb = *(u32*) GSPMEM(0x248);
+            struct {
+                u8 idx;
+                u8 flags;
+                u16 _pad;
+                struct {
+                    u32 active;
+                    u32 left_vaddr;
+                    u32 right_vaddr;
+                    u32 stride;
+                    u32 format;
+                    u32 status;
+                    u32 unk;
+                } fbs[2];
+            } *fbtop = GSPMEM(0x200), *fbbot = GSPMEM(0x240);
 
-            if (addrout == topscreenfb) {
-                gpu_set_fb_top(&s->gpu, addrin);
-            } else if (addrout == bottomscreenfb) {
-                gpu_set_fb_bot(&s->gpu, addrin);
+            linfo("top fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
+                  fbtop->idx, fbtop->fbs[0].left_vaddr,
+                  fbtop->fbs[0].right_vaddr, fbtop->fbs[1].left_vaddr,
+                  fbtop->fbs[1].right_vaddr);
+            linfo("bot fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
+                  fbbot->idx, fbbot->fbs[0].left_vaddr,
+                  fbbot->fbs[0].right_vaddr, fbbot->fbs[1].left_vaddr,
+                  fbbot->fbs[1].right_vaddr);
+
+            if (addrout == fbtop->fbs[1 - fbtop->idx].left_vaddr) {
+                gpu_set_fb_top(&s->gpu, vaddr_to_paddr(addrin));
+            } else if (addrout == fbbot->fbs[1 - fbbot->idx].left_vaddr) {
+                gpu_set_fb_bot(&s->gpu, vaddr_to_paddr(addrin));
             }
 
             gsp_handle_event(s, GSPEVENT_PPF);

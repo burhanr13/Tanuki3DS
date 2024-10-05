@@ -8,6 +8,8 @@
 #include <GL/gl.h>
 #endif
 
+#define FB_MAX 6
+
 typedef struct {
     struct {
         GLuint vao;
@@ -18,7 +20,7 @@ typedef struct {
         GLuint fbo;
         GLuint tex_colorbuf;
         GLuint tex_depthbuf;
-    } fbs[2];
+    } fbs[FB_MAX];
     int fb_top;
     int fb_bot;
 } GLState;

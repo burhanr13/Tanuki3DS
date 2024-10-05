@@ -39,7 +39,11 @@ u32 klist_remove_key(KListNode** l, KObject* o) {
 
 void kobject_destroy(KObject* o) {
     switch (o->type) {
-        default:
+        case KOT_SESSION:
+        case KOT_RESLIMIT:
             free(o);
+            break;
+        default:
+            lwarn("unimpl free of a kobject type %d", o->type);
     }
 }
