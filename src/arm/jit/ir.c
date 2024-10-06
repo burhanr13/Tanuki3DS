@@ -359,6 +359,12 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 v[i] = x;
                 break;
             }
+            case IR_REV16: {
+                u32 x = OP(2);
+                x = (x & 0xff00ff00) >> 8 | (x & 0x00ff00ff) << 8;
+                v[i] = x;
+                break;
+            }
             case IR_USAT: {
                 s32 x = OP(2);
                 if (x < 0) x = 0;
@@ -616,6 +622,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
         case IR_CLZ:
             DISASM(clz, 1, 0, 1);
         case IR_REV:
+            DISASM(rev, 1, 0, 1);
+        case IR_REV16:
             DISASM(rev, 1, 0, 1);
         case IR_USAT:
             DISASM(usat, 1, 1, 1);

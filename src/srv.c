@@ -4,13 +4,7 @@
 
 #include "svc.h"
 
-#include "services/apt.h"
-#include "services/cfg.h"
-#include "services/dsp.h"
-#include "services/fs.h"
-#include "services/gsp.h"
-#include "services/hid.h"
-#include "services/ndm.h"
+#include "service_data.h"
 
 void srvobj_init(KObject* hdr, KObjType t) {
     hdr->type = t;
@@ -97,6 +91,8 @@ DECL_PORT(srv) {
                 handler = port_handle_cfg;
             } else if (IS("ndm:u")) {
                 handler = port_handle_ndm;
+            } else if (IS("cecd:u")) {
+                handler = port_handle_cecd;
             } else {
                 lerror("unknown service '%s'", name);
                 cmd_params[1] = -1;

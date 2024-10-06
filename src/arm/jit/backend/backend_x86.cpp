@@ -751,6 +751,21 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(getOp(i), edx);
                 break;
             }
+            case IR_REV16: {
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                mov(ecx, edx);
+                and_(edx, 0xff00ff00);
+                and_(ecx, 0x00ff00ff);
+                shr(edx, 8);
+                shl(ecx, 8);
+                or_(edx, ecx);
+                mov(getOp(i), edx);
+                break;
+            }
             case IR_USAT: {
                 if (inst.imm2) {
                     mov(edx, inst.op2);

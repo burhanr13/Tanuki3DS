@@ -95,6 +95,20 @@ DECL_SVC(SleepThread) {
     thread_reschedule(s);
 }
 
+DECL_SVC(CreateMutex) {
+    MAKE_HANDLE(handle);
+
+    KMutex* dummy = malloc(sizeof *dummy);
+    dummy->hdr.type = KOT_MUTEX;
+    dummy->hdr.refcount = 1;
+    HANDLE_SET(handle, dummy);
+
+    linfo("created mutex with handle %x", handle);
+
+    R(0) = 0;
+    R(1) = handle;
+}
+
 DECL_SVC(ReleaseMutex) {
     R(0) = 0;
 }
@@ -120,9 +134,8 @@ DECL_SVC(SignalEvent) {
         R(0) = -1;
         return;
     }
-    event_signal(s, e);
-
     R(0) = 0;
+    event_signal(s, e);
 }
 
 DECL_SVC(ClearEvent) {
@@ -365,14 +378,14 @@ DECL_SVC(ConnectToPort) {
 DECL_SVC(SendSyncRequest) {
     KSession* session = HANDLE_GET_TYPED(R(0), KOT_SESSION);
     if (!session) {
-        lerror("invalid session handle");
+        lerror("invalid session handle %x", R(0));
         R(0) = 0;
         return;
     }
-    u32 cmd_addr = CUR_TLS + IPC_CMD_OFF;
-    IPCHeader cmd = {*(u32*) PTR(cmd_addr)};
-    session->handler(s, cmd, CUR_TLS + IPC_CMD_OFF);
     R(0) = 0;
+    u32 cmd_addr = CUR_TLS + IPC_CMD_OFF;
+    IPCHeader cmd = *(IPCHeader*) PTR(cmd_addr);
+    session->handler(s, cmd, CUR_TLS + IPC_CMD_OFF);
 }
 
 DECL_SVC(GetProcessId) {

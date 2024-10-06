@@ -5,7 +5,7 @@
 #include "svc.h"
 #include "thread.h"
 
-//#define CPULOG
+// #define CPULOG
 //#define BREAK
 
 void cpu_init(HLE3DS* s) {
@@ -41,7 +41,7 @@ bool cpu_run(HLE3DS* s, int cycles) {
 #ifdef CPULOG
         printf("executing at %08x\n", s->cpu.pc);
         cpu_print_state(&s->cpu);
-        cpu_print_vfp_state(&s->cpu);
+        //cpu_print_vfp_state(&s->cpu);
 #endif
         arm_exec_jit(&s->cpu);
         if (s->cpu.wfe) {

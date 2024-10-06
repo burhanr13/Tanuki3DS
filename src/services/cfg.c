@@ -30,8 +30,11 @@ DECL_PORT(cfg) {
                 case 0xa0002:
                     *(u8*) ptr = 1;
                     break;
+                case 0x130000:
+                    *(u32*) ptr = 0;
+                    break;
                 default:
-                    lerror("unknown blkid");
+                    lerror("unknown blkid %x", blkid);
                     cmd_params[1] = -1;
                     break;
             }

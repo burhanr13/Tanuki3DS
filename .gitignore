@@ -6,6 +6,7 @@
 
 roms
 build
+tools/bin
 *.log
 log*
 *.fs

@@ -6,10 +6,7 @@ layout (location=1) in vec4 color;
 out vec4 outclr;
 
 void main() {
-    gl_Position.x = -pos.y;
-    gl_Position.y = pos.x;
-    gl_Position.z = pos.z;
-    gl_Position.w = pos.w;
+    gl_Position = pos;
     outclr = color;
 }
 

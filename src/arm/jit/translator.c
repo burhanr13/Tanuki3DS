@@ -635,17 +635,30 @@ DECL_ARM_COMPILE(pack_sat) {
             lwarn("unknown xt16 at %08x", addr);
         }
     } else {
-        if (!instr.pack_sat.h && !instr.pack_sat.s && !instr.pack_sat.u &&
-            (instr.pack_sat.shift & 1)) {
-            EMITV_STORE_REG(instr.pack_sat.rd,
-                            EMITVV(MEDIA_SEL, EMIT_LOAD_REG(instr.pack_sat.rn),
-                                   EMIT_LOAD_REG(instr.pack_sat.rm)));
-        } else if (instr.pack_sat.h && instr.pack_sat.s && !instr.pack_sat.u &&
-                   !(instr.pack_sat.shift & 1)) {
-            EMITV_STORE_REG(instr.pack_sat.rd,
-                            EMIT0V(REV, EMIT_LOAD_REG(instr.pack_sat.rm)));
-        } else {
-            lwarn("unknown pack %08x at %08x", instr.w, addr);
+        u32 op1 =
+            instr.pack_sat.u << 2 | instr.pack_sat.s << 1 | instr.pack_sat.h;
+        u32 op2 = instr.pack_sat.shift & 1;
+        switch (op1) {
+            case 0:
+                EMITV_STORE_REG(instr.pack_sat.rd,
+                                EMITVV(MEDIA_SEL,
+                                       EMIT_LOAD_REG(instr.pack_sat.rn),
+                                       EMIT_LOAD_REG(instr.pack_sat.rm)));
+                break;
+            case 3:
+                if (op2) {
+                    EMITV_STORE_REG(
+                        instr.pack_sat.rd,
+                        EMIT0V(REV16, EMIT_LOAD_REG(instr.pack_sat.rm)));
+                } else {
+                    EMITV_STORE_REG(
+                        instr.pack_sat.rd,
+                        EMIT0V(REV, EMIT_LOAD_REG(instr.pack_sat.rm)));
+                }
+                break;
+            default:
+                lwarn("unknown pack %08x at %08x", instr.w, addr);
+                break;
         }
     }
     return true;
@@ -791,6 +804,22 @@ DECL_ARM_COMPILE(half_trans) {
                     EMITI_STORE_REG(instr.half_trans.rd, 0);
                 }
                 return true;
+            case 1:
+                if (instr.half_trans.l) {
+                    EMITV0(LOAD_MEM32, vaddr);
+                    EMITV_STORE_REG(instr.half_trans.rd, LASTV);
+                    vaddr = EMITVI(ADD, vaddr, 4);
+                    EMITV0(LOAD_MEM32, vaddr);
+                    EMITV_STORE_REG(instr.half_trans.rd + 1, LASTV);
+                } else {
+                    EMIT_LOAD_REG(instr.half_trans.offlo);
+                    EMITVV(STORE_MEM32, vaddr, LASTV);
+                    vaddr = EMITVI(ADD, vaddr, 4);
+                    EMIT_LOAD_REG(instr.half_trans.offlo + 1);
+                    EMITVV(STORE_MEM32, vaddr, LASTV);
+                    EMITI_STORE_REG(instr.half_trans.rd, 0);
+                }
+                return true;
             case 2:
                 if (instr.half_trans.l) {
                     EMITV0(LOAD_MEM8, vaddr);
@@ -812,7 +841,6 @@ DECL_ARM_COMPILE(half_trans) {
                 }
                 return true;
             default:
-                lwarn("unknown ldr/str ex");
                 return true;
         }
     }
@@ -1088,7 +1116,7 @@ DECL_ARM_COMPILE(cp_data_trans) {
         u32 vwback = LASTV;
         if (instr.cp_data_trans.p) vaddr = vwback;
 
-        if (instr.cp_data_trans.w || !instr.cp_data_trans.p) {
+        if (instr.cp_data_trans.w) {
             EMITV_STORE_REG(instr.cp_data_trans.rn, vwback);
         }
 

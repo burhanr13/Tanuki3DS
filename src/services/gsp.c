@@ -75,14 +75,15 @@ DECL_PORT(gsp_gpu) {
 
 void gsp_handle_event(HLE3DS* s, u32 arg) {
     if (arg == GSPEVENT_VBLANK0) {
-        add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / 60);
+        add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
 
         gsp_handle_event(s, GSPEVENT_VBLANK1);
         if (s->services.dsp.event) event_signal(s, s->services.dsp.event);
 
         linfo("vblank");
-        gpu_reset_fbs(&s->gpu);
 
+        s->gpu.cur_fb = -1;
+        
         s->frame_complete = true;
     }
 

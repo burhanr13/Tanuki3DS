@@ -83,6 +83,7 @@ typedef enum {
     IR_SMULW,
     IR_CLZ,
     IR_REV,
+    IR_REV16,
     IR_USAT,
 
     IR_MEDIA_UADD8,

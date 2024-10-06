@@ -12,7 +12,7 @@
 #include "thread.h"
 #include "types.h"
 
-#define CPU_CLK BIT(28)
+#define CPU_CLK 268000000
 #define FPS 60
 
 #define SCREEN_WIDTH 400

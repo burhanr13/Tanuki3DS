@@ -3,19 +3,19 @@
 #include "../3ds.h"
 #include "hostshaders/hostshaders.h"
 
-//#define WIREFRAME
+// #define WIREFRAME
 
 #define BOT_GAP (1 - (float) SCREEN_WIDTH_BOT / (float) SCREEN_WIDTH)
 
 float quads[][4] = {
-    {-1, 1, 0, 1},
-    {-1, 0, 0, 0},
-    {1, 1, 1, 1},
-    {1, 0, 1, 0}, //
-    {-1 + BOT_GAP, 0, 0, 1},
-    {-1 + BOT_GAP, -1, 0, 0},
-    {1 - BOT_GAP, 0, 1, 1},
-    {1 - BOT_GAP, -1, 1, 0},
+    {-1, 1, 1, 1},
+    {-1, 0, 0, 1},
+    {1, 1, 1, 0},
+    {1, 0, 0, 0}, //
+    {-1 + BOT_GAP, 0, 1, 1},
+    {-1 + BOT_GAP, -1, 0, 1},
+    {1 - BOT_GAP, 0, 1, 0},
+    {1 - BOT_GAP, -1, 0, 0},
 };
 
 GLuint make_shader(const char* vert, const char* frag) {
@@ -65,7 +65,7 @@ void bind_gpu(GLState* state) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 #endif
 
-    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    glViewport(0, 0, SCREEN_HEIGHT, SCREEN_WIDTH);
     // glEnable(GL_DEPTH_TEST);
 }
 
@@ -116,7 +116,7 @@ void renderer_gl_setup(GLState* state) {
 
         glGenTextures(1, &state->fbs[i].tex_colorbuf);
         glBindTexture(GL_TEXTURE_2D, state->fbs[i].tex_colorbuf);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0,
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT, SCREEN_WIDTH, 0,
                      GL_RGBA, GL_UNSIGNED_BYTE, NULL);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -125,8 +125,8 @@ void renderer_gl_setup(GLState* state) {
 
         glGenTextures(1, &state->fbs[i].tex_depthbuf);
         glBindTexture(GL_TEXTURE_2D, state->fbs[i].tex_depthbuf);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, SCREEN_WIDTH,
-                     SCREEN_HEIGHT, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, SCREEN_HEIGHT,
+                     SCREEN_WIDTH, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
                      NULL);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
                                GL_TEXTURE_2D, state->fbs[i].tex_depthbuf, 0);
@@ -150,7 +150,7 @@ void render_gl_main(GLState* state) {
 
     glViewport(0, 0, SCREEN_WIDTH, 2 * SCREEN_HEIGHT);
 
-    glClearColor(0, 0, 0, 0);
+    glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glActiveTexture(GL_TEXTURE0);
@@ -159,14 +159,12 @@ void render_gl_main(GLState* state) {
         linfo("drawing top screen fb %d", state->fb_top);
         glBindTexture(GL_TEXTURE_2D, state->fbs[state->fb_top].tex_colorbuf);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        // state->fb_top = -1;
     }
 
     if (state->fb_bot >= 0) {
         linfo("drawing bot screen fb %d", state->fb_bot);
         glBindTexture(GL_TEXTURE_2D, state->fbs[state->fb_bot].tex_colorbuf);
         glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
-        // state->fb_bot = -1;
     }
 
     bind_gpu(state);

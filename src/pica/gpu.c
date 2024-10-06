@@ -38,14 +38,6 @@ u32 f31tof32(u32 i) {
     return i;
 }
 
-void gpu_reset_fbs(GPU* gpu) {
-    linfo("reset fbs");
-    for (int i = 0; i < FB_MAX; i++) {
-        gpu->fbs[i].paddr = -1;
-    }
-    gpu->cur_fb = -1;
-}
-
 void gpu_set_fb_cur(GPU* gpu, u32 paddr) {
     int newfb = -1;
     for (int i = 0; i < FB_MAX; i++) {
@@ -53,15 +45,14 @@ void gpu_set_fb_cur(GPU* gpu, u32 paddr) {
             newfb = i;
             break;
         }
-        if (gpu->fbs[i].paddr == -1) {
+        if (gpu->fbs[i].paddr == 0) {
             gpu->fbs[i].paddr = paddr;
             newfb = i;
             break;
         }
     }
     if (newfb < 0) {
-        lerror("using more than 2 fbs %08x %08x", gpu->fbs[0].paddr,
-               gpu->fbs[1].paddr);
+        lerror("ran out of fbs");
         return;
     }
     if (newfb == gpu->cur_fb) return;
@@ -298,7 +289,7 @@ void gpu_drawarrays(GPU* gpu) {
 void gpu_drawelements(GPU* gpu) {
     linfo("cur fb for drawelements %d", gpu->cur_fb);
     linfo("drawing elements nverts=%d primmode=%d", gpu->io.geom.nverts,
-             gpu->io.geom.prim_config.mode);
+          gpu->io.geom.prim_config.mode);
     u32 minind = 0xffff, maxind = 0;
     void* indexbuf = PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.indexbufoff);
     for (int i = 0; i < gpu->io.geom.nverts; i++) {

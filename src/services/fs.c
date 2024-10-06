@@ -18,6 +18,7 @@ DECL_PORT(fs) {
             cmd_params[0] = MAKE_IPCHEADER(1, 2);
             cmd_params[1] = 0;
             cmd_params[2] = 0;
+            lwarn("stubbed OpenFile");
             cmd_params[3] = 0x12345678;
             break;
         case 0x0803: {
@@ -61,6 +62,7 @@ DECL_PORT(fs) {
             linfo("OpenArchive");
             cmd_params[0] = MAKE_IPCHEADER(3, 0);
             cmd_params[1] = 0;
+            lwarn("stubbed OpenArchive");
             cmd_params[2] = 0x12345678;
             cmd_params[3] = 0x12345678;
             break;

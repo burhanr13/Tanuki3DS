@@ -211,7 +211,6 @@ enum {
 u32 f24tof32(u32 i);
 u32 f31tof32(u32 i);
 
-void gpu_reset_fbs(GPU* gpu);
 void gpu_set_fb_cur(GPU* gpu, u32 paddr);
 
 void gpu_set_fb_top(GPU* gpu, u32 paddr);
