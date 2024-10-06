@@ -3,7 +3,7 @@
 #include "../3ds.h"
 #include "hostshaders/hostshaders.h"
 
-// #define WIREFRAME
+//#define WIREFRAME
 
 #define BOT_GAP (1 - (float) SCREEN_WIDTH_BOT / (float) SCREEN_WIDTH)
 

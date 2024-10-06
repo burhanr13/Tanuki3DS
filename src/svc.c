@@ -91,17 +91,31 @@ DECL_SVC(CreateThread) {
 }
 
 DECL_SVC(SleepThread) {
+    s64 timeout = RR(0);
+
     R(0) = 0;
+    thread_sleep(s, CUR_THREAD, timeout);
     thread_reschedule(s);
+}
+
+DECL_SVC(GetThreadPriority) {
+    KThread* t = HANDLE_GET_TYPED(R(1), KOT_THREAD);
+    if (!t) {
+        lerror("not a thread");
+        R(0) = -1;
+    }
+
+    R(0) = 0;
+    R(1) = t->priority;
 }
 
 DECL_SVC(CreateMutex) {
     MAKE_HANDLE(handle);
 
-    KMutex* dummy = malloc(sizeof *dummy);
-    dummy->hdr.type = KOT_MUTEX;
-    dummy->hdr.refcount = 1;
-    HANDLE_SET(handle, dummy);
+    KMutex* mtx = mutex_create();
+    if (R(1)) mtx->locker_thrd = CUR_THREAD;
+    mtx->hdr.refcount = 1;
+    HANDLE_SET(handle, mtx);
 
     linfo("created mutex with handle %x", handle);
 
@@ -110,7 +124,17 @@ DECL_SVC(CreateMutex) {
 }
 
 DECL_SVC(ReleaseMutex) {
+    KMutex* m = HANDLE_GET_TYPED(R(0), KOT_MUTEX);
+    if (!m) {
+        lerror("not a mutex");
+        R(0) = -1;
+        return;
+    }
+
+    linfo("releasing mutex %x", R(0));
+
     R(0) = 0;
+    mutex_release(s, m);
 }
 
 DECL_SVC(CreateEvent) {
@@ -134,6 +158,9 @@ DECL_SVC(SignalEvent) {
         R(0) = -1;
         return;
     }
+
+    linfo("signaling event %x", R(0));
+
     R(0) = 0;
     event_signal(s, e);
 }
@@ -248,7 +275,7 @@ DECL_SVC(ArbitrateAddress) {
                 klist_insert(&CUR_THREAD->waiting_objs, &arbiter->hdr);
                 CUR_THREAD->waiting_addr = addr;
                 linfo("waiting on address %08x", addr);
-                thread_sleep(CUR_THREAD);
+                thread_sleep(s, CUR_THREAD, -1);
                 thread_reschedule(s);
             }
             break;
@@ -277,6 +304,9 @@ DECL_SVC(CloseHandle) {
 
 DECL_SVC(WaitSynchronization1) {
     u32 handle = R(0);
+
+    s64 timeout = RR(2);
+
     KObject* obj = HANDLE_GET(handle);
     if (!obj) {
         lerror("invalid handle");
@@ -288,8 +318,10 @@ DECL_SVC(WaitSynchronization1) {
     if (sync_wait(s, obj)) {
         linfo("waiting on handle %x", handle);
         klist_insert(&CUR_THREAD->waiting_objs, obj);
-        thread_sleep(CUR_THREAD);
+        thread_sleep(s, CUR_THREAD, timeout);
         thread_reschedule(s);
+    } else {
+        linfo("did not need to wait for handle %x", handle);
     }
 }
 
@@ -297,6 +329,7 @@ DECL_SVC(WaitSynchronizationN) {
     u32* handles = PTR(R(1));
     int count = R(2);
     bool waitAll = R(3);
+    s64 timeout = (u64) R(0) | (u64) R(4) << 32;
 
     bool wokeup = false;
     int wokeupi = 0;
@@ -312,6 +345,7 @@ DECL_SVC(WaitSynchronizationN) {
             klist_insert(&CUR_THREAD->waiting_objs, obj);
             CUR_THREAD->waiting_objs->val = i;
         } else {
+            linfo("handle %x already waited", handles[i]);
             wokeup = true;
             wokeupi = i;
             break;
@@ -321,6 +355,7 @@ DECL_SVC(WaitSynchronizationN) {
     R(0) = 0;
 
     if ((!waitAll && wokeup) || !CUR_THREAD->waiting_objs) {
+        linfo("did not need to wait");
         KListNode** cur = &CUR_THREAD->waiting_objs;
         while (*cur) {
             sync_cancel(CUR_THREAD, (*cur)->key);
@@ -330,7 +365,7 @@ DECL_SVC(WaitSynchronizationN) {
     } else {
         linfo("waiting on %d handles", count);
         CUR_THREAD->wait_all = waitAll;
-        thread_sleep(CUR_THREAD);
+        thread_sleep(s, CUR_THREAD, timeout);
         thread_reschedule(s);
     }
 }
@@ -391,6 +426,17 @@ DECL_SVC(SendSyncRequest) {
 DECL_SVC(GetProcessId) {
     R(0) = 0;
     R(1) = 0;
+}
+
+DECL_SVC(GetThreadId) {
+    KThread* t = HANDLE_GET_TYPED(R(1), KOT_THREAD);
+    if (!t) {
+        lerror("not a thread");
+        R(0) = -1;
+    }
+
+    R(0) = 0;
+    R(1) = t->id;
 }
 
 DECL_SVC(GetResourceLimit) {

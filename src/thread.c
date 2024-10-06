@@ -88,9 +88,29 @@ bool thread_reschedule(HLE3DS* s) {
     return true;
 }
 
-void thread_sleep(KThread* t) {
-    linfo("sleeping thread %d", t->id);
-    t->state = THRD_SLEEP;
+void thread_sleep(HLE3DS* s, KThread* t, s64 timeout) {
+    linfo("sleeping thread %d with timeout %ld", t->id, timeout);
+    if (timeout < 0) {
+        t->state = THRD_SLEEP;
+    } else if (timeout > 0) {
+        t->state = THRD_SLEEP;
+        s64 timeCycles = timeout * CPU_CLK / 1000000000;
+        add_event(&s->sched, thread_wakeup_timeout, t->id, timeCycles);
+    }
+}
+
+void thread_wakeup_timeout(HLE3DS* s, u32 tid) {
+    KThread* t = s->process.threads[tid];
+    if (!t) return;
+
+    linfo("waking up thread %d from timeout", t->id);
+    KListNode** cur = &t->waiting_objs;
+    while (*cur) {
+        sync_cancel(t, (*cur)->key);
+        klist_remove(cur);
+    }
+    t->state = THRD_READY;
+    thread_reschedule(s);
 }
 
 bool thread_wakeup(KThread* t, KObject* reason) {
@@ -126,6 +146,38 @@ void event_signal(HLE3DS* s, KEvent* ev) {
     if (ev->sticky) ev->signal = true;
 }
 
+KMutex* mutex_create() {
+    KMutex* mtx = calloc(1, sizeof *mtx);
+    mtx->hdr.type = KOT_MUTEX;
+    return mtx;
+}
+
+void mutex_release(HLE3DS* s, KMutex* mtx) {
+    if (!mtx->waiting_thrds) {
+        mtx->locker_thrd = NULL;
+        return;
+    }
+    if (!mtx->locker_thrd) return;
+
+    int maxprio = THRD_MAX_PRIO;
+    KListNode** cur = &mtx->waiting_thrds;
+    KListNode** toremove = NULL;
+    KThread* wakeupthread = NULL;
+    while (*cur) {
+        KThread* t = (KThread*) (*cur)->key;
+        if (t->priority < maxprio) {
+            maxprio = t->priority;
+            toremove = cur;
+            wakeupthread = t;
+        }
+    }
+    thread_wakeup(wakeupthread, &mtx->hdr);
+    klist_remove(toremove);
+    mtx->locker_thrd = wakeupthread;
+
+    thread_reschedule(s);
+}
+
 bool sync_wait(HLE3DS* s, KObject* o) {
     switch (o->type) {
         case KOT_EVENT: {
@@ -133,9 +185,14 @@ bool sync_wait(HLE3DS* s, KObject* o) {
             if (event->signal) return false;
             klist_insert(&event->waiting_thrds, &CUR_THREAD->hdr);
             return true;
-            break;
         }
         case KOT_MUTEX: {
+            KMutex* mtx = (KMutex*) o;
+            if (mtx->locker_thrd && mtx->locker_thrd != CUR_THREAD) {
+                klist_insert(&mtx->waiting_thrds, &CUR_THREAD->hdr);
+                return true;
+            }
+            mtx->locker_thrd = CUR_THREAD;
             return false;
         }
         case KOT_SEMAPHORE: {
@@ -153,6 +210,11 @@ void sync_cancel(KThread* t, KObject* o) {
         case KOT_EVENT: {
             KEvent* event = (KEvent*) o;
             klist_remove_key(&event->waiting_thrds, &t->hdr);
+            break;
+        }
+        case KOT_MUTEX: {
+            KMutex* mutex = (KMutex*) o;
+            klist_remove_key(&mutex->waiting_thrds, &t->hdr);
             break;
         }
         default:
