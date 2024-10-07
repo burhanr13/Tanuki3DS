@@ -29,11 +29,12 @@ void run_to_present(Scheduler* sched);
 int run_next_event(Scheduler* sched);
 
 #define EVENT_PENDING(sched)                                                   \
-    sched->event_queue.size && sched->now >= FIFO_peek(sched->event_queue).time
+    (sched).event_queue.size &&                                                \
+        (sched).now >= FIFO_peek((sched).event_queue).time
 
 void add_event(Scheduler* sched, SchedEventHandler f, u32 event_arg,
                s64 reltime);
-void remove_event(Scheduler* sched, SchedEventHandler f);
+void remove_event(Scheduler* sched, SchedEventHandler f, u32 event_arg);
 u64 find_event(Scheduler* sched, SchedEventHandler f);
 
 void print_scheduled_events(Scheduler* sched);

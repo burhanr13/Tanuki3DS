@@ -31,6 +31,11 @@ DECL_PORT(dsp) {
             cmd_params[3] = 0;
             cmd_params[4] = 0;
             break;
+        case 0x0013:
+            linfo("FlushDataCache");
+            cmd_params[0] = MAKE_IPCHEADER(1, 0);
+            cmd_params[1] = 0;
+            break;
         case 0x0015:
             linfo("RegisterInterruptEvents with handle %x", cmd_params[4]);
             s->services.dsp.event = HANDLE_GET_TYPED(cmd_params[4], KOT_EVENT);

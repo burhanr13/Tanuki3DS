@@ -51,9 +51,10 @@ void add_event(Scheduler* sched, SchedEventHandler f, u32 event_arg,
     }
 }
 
-void remove_event(Scheduler* sched, SchedEventHandler f) {
+void remove_event(Scheduler* sched, SchedEventHandler f, u32 event_arg) {
     FIFO_foreach(i, sched->event_queue) {
-        if (sched->event_queue.d[i].handler == f) {
+        if (sched->event_queue.d[i].handler == f &&
+            sched->event_queue.d[i].arg == event_arg) {
             sched->event_queue.size--;
             sched->event_queue.tail = (sched->event_queue.tail - 1) % EVENT_MAX;
             for (u32 j = i; j != sched->event_queue.tail;

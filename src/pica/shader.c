@@ -214,6 +214,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             fvec res;
             res[0] = 1 / a[0];
             res[1] = res[2] = res[3] = res[0];
+            DEST(res, 1);
             break;
         }
         case PICA_RSQ: {
@@ -222,6 +223,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             fvec res;
             res[0] = 1 / sqrtf(a[0]);
             res[1] = res[2] = res[3] = res[0];
+            DEST(res, 1);
             break;
         }
         case PICA_MOVA: {
@@ -303,7 +305,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
         case PICA_JMPC:
         case PICA_JMPU: {
             bool cond;
-            if (instr.opcode == PICA_CALLC) {
+            if (instr.opcode == PICA_JMPC) {
                 cond = condop(instr.fmt2.op, gpu->cmp[0], gpu->cmp[1],
                               instr.fmt2.refx, instr.fmt2.refy);
             } else {
@@ -651,18 +653,17 @@ u32 disasm_instr(GPU* gpu, u32 pc) {
             printf("mad ");
             DDEST(5);
             printf(", ");
+            DSRC3(5);
+            printf(", ");
             if (instr.fmt5.opcode & 1) {
-                DSRC1(5);
-                printf(", ");
                 DSRC2(5);
                 printf(", ");
+                DSRC3(5);
             } else {
-                DSRC1(5i);
-                printf(", ");
                 DSRC2(5i);
                 printf(", ");
+                DSRC3(5i);
             }
-            DSRC3(5);
             break;
         }
         default:

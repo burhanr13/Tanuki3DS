@@ -13,6 +13,7 @@ enum {
     THRD_RUNNING,
     THRD_READY,
     THRD_SLEEP,
+    THRD_DEAD,
 };
 
 typedef struct _KThread {
@@ -39,22 +40,12 @@ typedef struct _KThread {
     KListNode* waiting_objs;
     bool wait_all;
 
+    KListNode* waiting_thrds;
+
     u32 id;
     s32 priority;
     u32 state;
 } KThread;
-
-typedef struct _KProcess {
-    KObject hdr;
-
-    VMBlock vmblocks;
-
-    KObject* handles[HANDLE_MAX];
-
-    KThread* threads[THREAD_MAX];
-
-    u32 used_memory;
-} KProcess;
 
 typedef void (*KEventCallback)(HLE3DS*, u32);
 
@@ -99,7 +90,7 @@ bool thread_reschedule(HLE3DS* s);
 
 void thread_sleep(HLE3DS* s, KThread* t, s64 timeout);
 void thread_wakeup_timeout(HLE3DS* s, u32 tid);
-bool thread_wakeup(KThread* t, KObject* reason);
+bool thread_wakeup(HLE3DS* s, KThread* t, KObject* reason);
 
 KEvent* event_create(bool sticky);
 void event_signal(HLE3DS* s, KEvent* ev);

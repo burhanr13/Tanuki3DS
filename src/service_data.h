@@ -5,9 +5,11 @@
 #include "services/cecd.h"
 #include "services/cfg.h"
 #include "services/dsp.h"
+#include "services/frd.h"
 #include "services/fs.h"
 #include "services/gsp.h"
 #include "services/hid.h"
+#include "services/mic.h"
 #include "services/ndm.h"
 #include "thread.h"
 

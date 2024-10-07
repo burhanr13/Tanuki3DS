@@ -35,8 +35,8 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
     hle3ds_vmmap(s, STACK_BASE - STACK_SIZE, STACK_SIZE, PERM_RW, MEMST_PRIVATE,
                  false);
 
-    hle3ds_vmmap(s, DSPMEM, DSPMEMSIZE, PERM_RW, MEMST_STATIC, false);
-    hle3ds_vmmap(s, DSPMEM | DSPBUFBIT, DSPMEMSIZE, PERM_RW, MEMST_STATIC,
+    hle3ds_vmmap(s, DSPMEM, DSPBUFBIT, PERM_RW, MEMST_STATIC, false);
+    hle3ds_vmmap(s, DSPMEM | DSPBUFBIT, DSPBUFBIT, PERM_RW, MEMST_STATIC,
                  false);
 
     hle3ds_vmmap(s, CONFIG_MEM, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
@@ -71,7 +71,7 @@ void hle3ds_run_frame(HLE3DS* s) {
         if (!s->cpu.wfe) {
             cpu_run(s, FIFO_peek(s->sched.event_queue).time - s->sched.now);
         }
-        run_next_event(&s->sched);
+        run_to_present(&s->sched);
         while (s->cpu.wfe && !s->frame_complete) {
             run_next_event(&s->sched);
         }

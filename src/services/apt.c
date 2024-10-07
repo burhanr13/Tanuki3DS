@@ -30,6 +30,15 @@ DECL_PORT(apt) {
             cmd_params[0] = MAKE_IPCHEADER(1, 0);
             cmd_params[1] = 0;
             break;
+        case 0x0006: {
+            u32 appid = cmd_params[1];
+            linfo("GetAppletInfo for 0x%x", appid);
+            cmd_params[0] = MAKE_IPCHEADER(7, 0);
+            cmd_params[1] = 0;
+            cmd_params[5] = 1;
+            cmd_params[6] = 1;
+            break;
+        }
         case 0x000d:
             linfo("ReceiveParameter");
             cmd_params[0] = MAKE_IPCHEADER(4, 4);
@@ -38,7 +47,7 @@ DECL_PORT(apt) {
             break;
         case 0x000e:
             linfo("GlanceParameter");
-            cmd_params[0] = MAKE_IPCHEADER(4,4);
+            cmd_params[0] = MAKE_IPCHEADER(4, 4);
             cmd_params[1] = 0;
             cmd_params[3] = 1;
             break;
@@ -47,16 +56,31 @@ DECL_PORT(apt) {
             cmd_params[0] = MAKE_IPCHEADER(1, 0);
             cmd_params[1] = 0;
             break;
-        case 0x4b:
+        case 0x004b:
             linfo("AppletUtility");
             cmd_params[0] = MAKE_IPCHEADER(2, 0);
             cmd_params[1] = 0;
             cmd_params[2] = 0;
             break;
+        case 0x004f: {
+            int percent = cmd_params[2];
+            linfo("SetApplicationCpuTimeLimit to %d%%", percent);
+            s->services.apt.application_cpu_time_limit = percent;
+            cmd_params[0] = MAKE_IPCHEADER(1, 0);
+            cmd_params[1] = 0;
+            break;
+        }
+        case 0x0050: {
+            linfo("GetApplicationCpuTimeLimit");
+            cmd_params[0] = MAKE_IPCHEADER(2, 0);
+            cmd_params[1] = 0;
+            cmd_params[2] = s->services.apt.application_cpu_time_limit;
+            break;
+        }
         default:
             lwarn("unknown command 0x%04x", cmd.command);
             cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = -1;
+            cmd_params[1] = 0;
             break;
     }
 }

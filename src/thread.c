@@ -79,12 +79,16 @@ bool thread_reschedule(HLE3DS* s) {
         s->cpu.wfe = false;
     }
 
-    linfo("switching thread from %d to %d", CUR_THREAD->id, nexttid);
-    save_context(s);
-    s->process.handles[0]->refcount--;
-    s->process.handles[0] = &s->process.threads[nexttid]->hdr;
-    s->process.handles[0]->refcount++;
-    load_context(s);
+    if (CUR_THREAD->id == nexttid) {
+        linfo("not switching threads");
+    } else {
+        linfo("switching thread from %d to %d", CUR_THREAD->id, nexttid);
+        save_context(s);
+        s->process.handles[0]->refcount--;
+        s->process.handles[0] = &s->process.threads[nexttid]->hdr;
+        s->process.handles[0]->refcount++;
+        load_context(s);
+    }
     return true;
 }
 
@@ -113,7 +117,7 @@ void thread_wakeup_timeout(HLE3DS* s, u32 tid) {
     thread_reschedule(s);
 }
 
-bool thread_wakeup(KThread* t, KObject* reason) {
+bool thread_wakeup(HLE3DS* s, KThread* t, KObject* reason) {
     t->context.r[1] = klist_remove_key(&t->waiting_objs, reason);
     if (!t->waiting_objs || !t->wait_all) {
         linfo("waking up thread %d", t->id);
@@ -122,6 +126,7 @@ bool thread_wakeup(KThread* t, KObject* reason) {
             sync_cancel(t, (*cur)->key);
             klist_remove(cur);
         }
+        remove_event(&s->sched, thread_wakeup_timeout, t->id);
         t->state = THRD_READY;
         return true;
     }
@@ -138,7 +143,7 @@ KEvent* event_create(bool sticky) {
 void event_signal(HLE3DS* s, KEvent* ev) {
     KListNode** cur = &ev->waiting_thrds;
     while (*cur) {
-        thread_wakeup((KThread*) (*cur)->key, &ev->hdr);
+        thread_wakeup(s, (KThread*) (*cur)->key, &ev->hdr);
         klist_remove(cur);
     }
     if (ev->callback) ev->callback(s, 0);
@@ -170,8 +175,9 @@ void mutex_release(HLE3DS* s, KMutex* mtx) {
             toremove = cur;
             wakeupthread = t;
         }
+        cur = &(*cur)->next;
     }
-    thread_wakeup(wakeupthread, &mtx->hdr);
+    thread_wakeup(s, wakeupthread, &mtx->hdr);
     klist_remove(toremove);
     mtx->locker_thrd = wakeupthread;
 
@@ -180,6 +186,12 @@ void mutex_release(HLE3DS* s, KMutex* mtx) {
 
 bool sync_wait(HLE3DS* s, KObject* o) {
     switch (o->type) {
+        case KOT_THREAD: {
+            KThread* thr = (KThread*) o;
+            if (thr->state == THRD_DEAD) return false;
+            klist_insert(&thr->waiting_thrds, &CUR_THREAD->hdr);
+            return true;
+        }
         case KOT_EVENT: {
             KEvent* event = (KEvent*) o;
             if (event->signal) return false;
@@ -215,6 +227,11 @@ void sync_cancel(KThread* t, KObject* o) {
         case KOT_MUTEX: {
             KMutex* mutex = (KMutex*) o;
             klist_remove_key(&mutex->waiting_thrds, &t->hdr);
+            break;
+        }
+        case KOT_THREAD: {
+            KThread* thread = (KThread*) o;
+            klist_remove_key(&thread->waiting_thrds, &t->hdr);
             break;
         }
         default:

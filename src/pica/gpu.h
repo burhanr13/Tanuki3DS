@@ -2,8 +2,8 @@
 #define GPU_H
 
 #include "../types.h"
-#include "shader.h"
 #include "renderer_gl.h"
+#include "shader.h"
 
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
@@ -47,9 +47,37 @@ typedef union {
         } tex;
         union {
             struct {
-                u32 _100[0x1c];
-                u32 depthbuffer_loc;
-                u32 colorbuffer_loc;
+                u32 color_op;
+                u32 blend_func;
+                u32 logic_op;
+                u32 blend_color;
+                u32 alpha_test;
+                u32 stencil_test;
+                u32 stencil_op;
+                struct {
+                    u32 depthtest : 4;
+                    u32 depthfunc : 4;
+                    u32 red : 1;
+                    u32 green : 1;
+                    u32 blue : 1;
+                    u32 alpha : 1;
+                    u32 depth : 1;
+                    u32 unused : 19;
+                } color_mask;
+                u32 _108[8];
+                u32 fb_invalidate;
+                u32 fb_flush;
+                struct {
+                    struct {
+                        u32 read;
+                        u32 write;
+                    } colorbuf, depthbuf;
+                } perms;
+                u32 depthbuf_fmt;
+                u32 colorbuf_fmt;
+                u32 _118[4];
+                u32 depthbuf_loc;
+                u32 colorbuf_loc;
             };
             u32 w[0x40];
         } fb;
@@ -185,20 +213,13 @@ typedef union {
     };
 } GPUCommand;
 
-enum {
-    ATTR_S8,
-    ATTR_U8,
-    ATTR_S16,
-    ATTR_F32,
-};
-
 #define PRINTFVEC(v) printf("[%f,%f,%f,%f] ", (v)[0], (v)[1], (v)[2], (v)[3])
 
 #define I2F(i)                                                                 \
     (((union {                                                                 \
          u32 _i;                                                               \
          float _f;                                                             \
-     }) {i})                                                                   \
+     }){i})                                                                    \
          ._f)
 
 #define F2I(f)                                                                 \
@@ -218,7 +239,7 @@ void gpu_set_fb_bot(GPU* gpu, u32 paddr);
 
 void gpu_clear_fb(GPU* gpu, u32 color);
 
-void gpu_run_command_list(GPU* gpu, u32* addr, u32 size);
+void gpu_run_command_list(GPU* gpu, u32* cmds, u32 size);
 
 void gpu_drawarrays(GPU* gpu);
 void gpu_drawelements(GPU* gpu);

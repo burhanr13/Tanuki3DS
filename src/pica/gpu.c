@@ -6,6 +6,17 @@
 
 #define PTR(addr) ((void*) &gpu->mem[addr])
 
+static const GLenum depth_func[8] = {
+    GL_NEVER, GL_ALWAYS, GL_EQUAL,   GL_NOTEQUAL,
+    GL_LESS,  GL_LEQUAL, GL_GREATER, GL_GEQUAL,
+};
+static const GLenum prim_mode[4] = {
+    GL_TRIANGLES,
+    GL_TRIANGLE_STRIP,
+    GL_TRIANGLE_FAN,
+    GL_TRIANGLES,
+};
+
 u32 f24tof32(u32 i) {
     u32 sgn = (i >> 23) & 1;
     u32 exp = (i >> 16) & MASK(7);
@@ -26,7 +37,7 @@ u32 f31tof32(u32 i) {
     i >>= 1;
     u32 sgn = (i >> 30) & 1;
     u32 exp = (i >> 23) & MASK(7);
-    u32 mantissa = i & 0x7fffff;
+    u32 mantissa = i & MASK(23);
     if (exp == 0 && mantissa == 0) {
         exp = 0;
     } else if (exp == MASK(7)) {
@@ -91,7 +102,25 @@ void gpu_clear_fb(GPU* gpu, u32 color) {
 
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     linfo("command %03x (0x%08x) & %08x (%f)", id, param, mask, I2F(param));
+    gpu->io.w[id] &= ~mask;
+    gpu->io.w[id] |= param & mask;
     switch (id) {
+        case GPUREG(fb.color_mask):
+            if (gpu->io.fb.color_mask.depthtest) {
+                glEnable(GL_DEPTH_TEST);
+                glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
+            } else {
+                glDisable(GL_DEPTH_TEST);
+            }
+            glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
+                        gpu->io.fb.color_mask.blue,
+                        gpu->io.fb.color_mask.alpha);
+            glDepthMask(gpu->io.fb.color_mask.depth);
+            break;
+        case GPUREG(fb.colorbuf_loc):
+            linfo("colorbuf %08x", gpu->io.fb.colorbuf_loc << 3);
+            gpu_set_fb_cur(gpu, gpu->io.fb.colorbuf_loc << 3);
+            break;
         case GPUREG(geom.drawarrays):
             gpu_drawarrays(gpu);
             break;
@@ -170,20 +199,12 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
         case GPUREG(VSH.opdescs_data[0])... GPUREG(VSH.opdescs_data[8]):
             gpu->opdescs[gpu->io.VSH.opdescs_idx++] = param;
             break;
-        default:
-            gpu->io.w[id] &= ~mask;
-            gpu->io.w[id] |= param & mask;
-            break;
-    }
-    if (id == GPUREG(fb.colorbuffer_loc)) {
-        linfo("colorbuf %08x", gpu->io.fb.colorbuffer_loc << 3);
-        gpu_set_fb_cur(gpu, gpu->io.fb.colorbuffer_loc << 3);
     }
 }
 
-void gpu_run_command_list(GPU* gpu, u32* addr, u32 size) {
-    u32* cur = addr;
-    u32* end = addr + size;
+void gpu_run_command_list(GPU* gpu, u32* cmds, u32 size) {
+    u32* cur = cmds;
+    u32* end = cmds + size;
     while (cur < end) {
         GPUCommand c = {cur[1]};
         u32 mask = 0;
@@ -214,12 +235,12 @@ void load_vtx(GPU* gpu, int i) {
                 vtx += 4 * (attr - 0xb);
                 continue;
             }
-            attr = (gpu->io.VSH.permutation >> 4 * attr) & 0xf;
             int type = (gpu->io.geom.attr_format >> 4 * attr) & 0xf;
+            attr = (gpu->io.VSH.permutation >> 4 * attr) & 0xf;
             int size = (type >> 2) + 1;
             type &= 3;
             switch (type) {
-                case ATTR_S8: {
+                case 0: {
                     s8* ptr = vtx;
                     for (int k = 0; k < size; k++) {
                         gpu->in[attr][k] = *ptr++;
@@ -227,7 +248,7 @@ void load_vtx(GPU* gpu, int i) {
                     vtx = ptr;
                     break;
                 }
-                case ATTR_U8: {
+                case 1: {
                     u8* ptr = vtx;
                     for (int k = 0; k < size; k++) {
                         gpu->in[attr][k] = *ptr++;
@@ -235,7 +256,7 @@ void load_vtx(GPU* gpu, int i) {
                     vtx = ptr;
                     break;
                 }
-                case ATTR_S16: {
+                case 2: {
                     s16* ptr = vtx;
                     for (int k = 0; k < size; k++) {
                         gpu->in[attr][k] = *ptr++;
@@ -243,7 +264,7 @@ void load_vtx(GPU* gpu, int i) {
                     vtx = ptr;
                     break;
                 }
-                case ATTR_F32: {
+                case 3: {
                     float* ptr = vtx;
                     for (int k = 0; k < size; k++) {
                         gpu->in[attr][k] = *ptr++;
@@ -267,9 +288,6 @@ void store_vtx(GPU* gpu, int i, Vertex* vbuf) {
         }
     }
 }
-
-static int prim_mode[4] = {GL_TRIANGLES, GL_TRIANGLE_STRIP, GL_TRIANGLE_FAN,
-                           GL_TRIANGLES};
 
 void gpu_drawarrays(GPU* gpu) {
     linfo("cur fb for drawarrays %d", gpu->cur_fb);

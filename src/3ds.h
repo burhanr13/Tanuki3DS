@@ -6,6 +6,7 @@
 #include "loader.h"
 #include "memory.h"
 #include "pica/gpu.h"
+#include "process.h"
 #include "scheduler.h"
 #include "service_data.h"
 #include "srv.h"

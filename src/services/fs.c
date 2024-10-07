@@ -13,15 +13,8 @@ DECL_PORT(fs) {
             cmd_params[0] = MAKE_IPCHEADER(1, 0);
             cmd_params[1] = 0;
             break;
-        case 0x0802:
-            linfo("OpenFile %s", PTR(cmd_params[9]));
-            cmd_params[0] = MAKE_IPCHEADER(1, 2);
-            cmd_params[1] = 0;
-            cmd_params[2] = 0;
-            lwarn("stubbed OpenFile");
-            cmd_params[3] = 0x12345678;
-            break;
         case 0x0803: {
+            linfo("OpenFileDirectly");
             u32 archive = cmd_params[2];
             u32 archivepathtype = cmd_params[3];
             u32 filepathtype = cmd_params[5];
@@ -53,24 +46,14 @@ DECL_PORT(fs) {
                     }
                     break;
                 default:
-                    lerror("unknown archive %d", archive);
-                    cmd_params[1] = -1;
+                    lwarn("unknown archive %d", archive);
             }
-            break;
-        }
-        case 0x080c: {
-            linfo("OpenArchive");
-            cmd_params[0] = MAKE_IPCHEADER(3, 0);
-            cmd_params[1] = 0;
-            lwarn("stubbed OpenArchive");
-            cmd_params[2] = 0x12345678;
-            cmd_params[3] = 0x12345678;
             break;
         }
         default:
             lwarn("unknown command 0x%04x", cmd.command);
             cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = -1;
+            cmd_params[1] = 0;
             break;
     }
 }
@@ -100,7 +83,7 @@ DECL_PORT(fs_romfs) {
         default:
             lwarn("unknown command 0x%04x", cmd.command);
             cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = -1;
+            cmd_params[1] = 0;
             break;
     }
 }

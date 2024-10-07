@@ -93,6 +93,10 @@ DECL_PORT(srv) {
                 handler = port_handle_ndm;
             } else if (IS("cecd:u")) {
                 handler = port_handle_cecd;
+            } else if (IS("mic:u")) {
+                handler = port_handle_mic;
+            } else if (IS("frd:u")) {
+                handler = port_handle_frd;
             } else {
                 lerror("unknown service '%s'", name);
                 cmd_params[1] = -1;
@@ -114,6 +118,8 @@ DECL_PORT(srv) {
             break;
         default:
             lwarn("unknown command 0x%04x", cmd.command);
+            cmd_params[1] = 0;
+            cmd_params[2] = 0;
             break;
     }
 #undef IS

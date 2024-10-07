@@ -3,7 +3,7 @@
 #include "../3ds.h"
 #include "hostshaders/hostshaders.h"
 
-//#define WIREFRAME
+// #define WIREFRAME
 
 #define BOT_GAP (1 - (float) SCREEN_WIDTH_BOT / (float) SCREEN_WIDTH)
 
@@ -66,7 +66,6 @@ void bind_gpu(GLState* state) {
 #endif
 
     glViewport(0, 0, SCREEN_HEIGHT, SCREEN_WIDTH);
-    // glEnable(GL_DEPTH_TEST);
 }
 
 void renderer_gl_setup(GLState* state) {
@@ -142,11 +141,11 @@ void render_gl_main(GLState* state) {
     glUseProgram(state->main.program);
     glBindVertexArray(state->main.vao);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glColorMask(true, true, true, true);
+    glDisable(GL_DEPTH_TEST);
 #ifdef WIREFRAME
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 #endif
-
-    glDisable(GL_DEPTH_TEST);
 
     glViewport(0, 0, SCREEN_WIDTH, 2 * SCREEN_HEIGHT);
 

@@ -90,6 +90,19 @@ DECL_SVC(CreateThread) {
     if (priority < CUR_THREAD->priority) thread_reschedule(s);
 }
 
+DECL_SVC(ExitThread) {
+    linfo("thread %d exiting", CUR_THREAD->id);
+
+    CUR_THREAD->state = THRD_DEAD;
+    KListNode** cur = &CUR_THREAD->waiting_thrds;
+    while (*cur) {
+        thread_wakeup(s, (KThread*) (*cur)->key, &CUR_THREAD->hdr);
+        klist_remove(cur);
+    }
+
+    thread_reschedule(s);
+}
+
 DECL_SVC(SleepThread) {
     s64 timeout = RR(0);
 
@@ -103,10 +116,24 @@ DECL_SVC(GetThreadPriority) {
     if (!t) {
         lerror("not a thread");
         R(0) = -1;
+        return;
     }
 
     R(0) = 0;
     R(1) = t->priority;
+}
+
+DECL_SVC(SetThreadPriority) {
+    KThread* t = HANDLE_GET_TYPED(R(0), KOT_THREAD);
+    if (!t) {
+        lerror("not a thread");
+        R(0) = -1;
+        return;
+    }
+
+    R(0) = 0;
+    t->priority = R(1);
+    thread_reschedule(s);
 }
 
 DECL_SVC(CreateMutex) {
@@ -237,7 +264,7 @@ DECL_SVC(ArbitrateAddress) {
                 while (*cur) {
                     KThread* t = (KThread*) (*cur)->key;
                     if (t->waiting_addr == addr) {
-                        thread_wakeup(t, &arbiter->hdr);
+                        thread_wakeup(s, t, &arbiter->hdr);
                         klist_remove(cur);
                     } else {
                         cur = &(*cur)->next;
@@ -260,7 +287,7 @@ DECL_SVC(ArbitrateAddress) {
                     }
                     if (!toRemove) break;
                     KThread* t = (KThread*) (*toRemove)->key;
-                    thread_wakeup(t, &arbiter->hdr);
+                    thread_wakeup(s, t, &arbiter->hdr);
                     klist_remove(toRemove);
                 }
             }

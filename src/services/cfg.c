@@ -30,12 +30,26 @@ DECL_PORT(cfg) {
                 case 0xa0002:
                     *(u8*) ptr = 1;
                     break;
+                case 0xb0000:
+                    ((u8*) ptr)[2] = 1;
+                    ((u8*) ptr)[3] = 49;
+                    break;
+                case 0xc0000:
+                    ((u32*) ptr)[0] = 0;
+                    ((u32*) ptr)[1] = 0;
+                    ((u32*) ptr)[2] = 0;
+                    ((u32*) ptr)[3] = 0;
+                    ((u32*) ptr)[4] = 0;
+                    break;
+                case 0xd0000:
+                    ((u16*) ptr)[0] = 1;
+                    ((u16*) ptr)[1] = 1;
+                    break;
                 case 0x130000:
                     *(u32*) ptr = 0;
                     break;
                 default:
-                    lerror("unknown blkid %x", blkid);
-                    cmd_params[1] = -1;
+                    lwarn("unknown blkid %x", blkid);
                     break;
             }
             break;
@@ -46,10 +60,17 @@ DECL_PORT(cfg) {
             cmd_params[1] = 0;
             cmd_params[2] = 1;
             break;
+        case 0x0003:
+            linfo("GenHashConsoleUnique");
+            cmd_params[0] = MAKE_IPCHEADER(3, 0);
+            cmd_params[1] = 0;
+            cmd_params[2] = 0x69696969;
+            cmd_params[3] = 0x69696969;
+            break;
         default:
             lwarn("unknown command 0x%04x", cmd.command);
             cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = -1;
+            cmd_params[1] = 0;
             break;
     }
 }
