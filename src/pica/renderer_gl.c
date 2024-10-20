@@ -4,19 +4,6 @@
 #include "gpu.h"
 #include "hostshaders/hostshaders.h"
 
-#define BOT_GAP (1 - (float) SCREEN_WIDTH_BOT / (float) SCREEN_WIDTH)
-
-float quads[][4] = {
-    {-1, 1, 1, 1},
-    {-1, 0, 0, 1},
-    {1, 1, 1, 0},
-    {1, 0, 0, 0}, //
-    {-1 + BOT_GAP, 0, 1, 1},
-    {-1 + BOT_GAP, -1, 0, 1},
-    {1 - BOT_GAP, 0, 1, 0},
-    {1 - BOT_GAP, -1, 0, 0},
-};
-
 GLuint make_shader(const char* vert, const char* frag) {
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vert, NULL);
@@ -56,12 +43,6 @@ GLuint make_shader(const char* vert, const char* frag) {
     return program;
 }
 
-void bind_gpu(GLState* state) {
-    glUseProgram(state->gpuprogram);
-    glBindVertexArray(state->gpuvao);
-    // glEnable(GL_DEPTH_TEST);
-}
-
 void renderer_gl_setup(GLState* state, GPU* gpu) {
     state->gpu = gpu;
 
@@ -75,18 +56,11 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     GLuint vbo;
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof quads, quads, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
-                          (void*) 0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
-                          (void*) (2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    glBufferData(GL_ARRAY_BUFFER, 0, NULL, GL_STATIC_DRAW);
 
     state->gpuprogram = make_shader(gpuvertsource, gpufragsource);
-    //glUseProgram(state->gpuprogram);
-    //glUniform1i(glGetUniformLocation(state->mainprogram, "tex0"), 0);
+    // glUseProgram(state->gpuprogram);
+    // glUniform1i(glGetUniformLocation(state->mainprogram, "tex0"), 0);
 
     glGenVertexArrays(1, &state->gpuvao);
     glBindVertexArray(state->gpuvao);
@@ -135,7 +109,9 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
         gpu->fbs.d[i].depth_tex = depthbufs[i];
     }
 
-    bind_gpu(state);
+    glUseProgram(state->gpuprogram);
+    glBindVertexArray(state->gpuvao);
+    // glEnable(GL_DEPTH_TEST);
 }
 
 void render_gl_main(GLState* state) {
@@ -153,10 +129,16 @@ void render_gl_main(GLState* state) {
 
     glActiveTexture(GL_TEXTURE0);
 
+    glViewport(0, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT);
     glBindTexture(GL_TEXTURE_2D, state->textop);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindTexture(GL_TEXTURE_2D, state->texbot);
-    glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
 
-    bind_gpu(state);
+    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2, 0, SCREEN_WIDTH_BOT,
+               SCREEN_HEIGHT);
+    glBindTexture(GL_TEXTURE_2D, state->texbot);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    glUseProgram(state->gpuprogram);
+    glBindVertexArray(state->gpuvao);
+    // glEnable(GL_DEPTH_TEST);
 }
