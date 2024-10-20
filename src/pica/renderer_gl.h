@@ -8,24 +8,22 @@
 #include <GL/gl.h>
 #endif
 
-#define FB_MAX 6
+typedef struct _GPU GPU;
 
 typedef struct {
-    struct {
-        GLuint vao;
-        GLuint program;
-    } main, gpu;
+    GPU* gpu;
 
-    struct {
-        GLuint fbo;
-        GLuint tex_colorbuf;
-        GLuint tex_depthbuf;
-    } fbs[FB_MAX];
-    int fb_top;
-    int fb_bot;
+    GLuint mainvao;
+    GLuint mainprogram;
+    GLuint gpuvao;
+    GLuint gpuprogram;
+
+    GLuint textop;
+    GLuint texbot;
+
 } GLState;
 
-void renderer_gl_setup(GLState* state);
+void renderer_gl_setup(GLState* state, GPU* gpu);
 
 void render_gl_main(GLState* state);
 

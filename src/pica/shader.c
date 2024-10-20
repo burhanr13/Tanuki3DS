@@ -269,7 +269,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
                 cond = condop(instr.fmt2.op, gpu->cmp[0], gpu->cmp[1],
                               instr.fmt2.refx, instr.fmt2.refy);
             } else if (instr.opcode == PICA_CALLU) {
-                cond = gpu->io.VSH.booluniform & BIT(instr.fmt3.c);
+                cond = gpu->io.vsh.booluniform & BIT(instr.fmt3.c);
             } else cond = true;
             if (cond) {
                 exec_block(gpu, instr.fmt3.dest, instr.fmt3.num);
@@ -280,7 +280,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
         case PICA_IFC: {
             bool cond;
             if (instr.opcode == PICA_IFU) {
-                cond = gpu->io.VSH.booluniform & BIT(instr.fmt3.c);
+                cond = gpu->io.vsh.booluniform & BIT(instr.fmt3.c);
             } else {
                 cond = condop(instr.fmt2.op, gpu->cmp[0], gpu->cmp[1],
                               instr.fmt2.refx, instr.fmt2.refy);
@@ -294,10 +294,10 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             break;
         }
         case PICA_LOOP: {
-            gpu->loopct = gpu->io.VSH.intuniform[instr.fmt3.c].y;
-            for (int i = 0; i <= gpu->io.VSH.intuniform[instr.fmt3.c].x; i++) {
+            gpu->loopct = gpu->io.vsh.intuniform[instr.fmt3.c].y;
+            for (int i = 0; i <= gpu->io.vsh.intuniform[instr.fmt3.c].x; i++) {
                 exec_block(gpu, pc, instr.fmt3.dest + 1 - pc);
-                gpu->loopct += gpu->io.VSH.intuniform[instr.fmt3.c].z;
+                gpu->loopct += gpu->io.vsh.intuniform[instr.fmt3.c].z;
             }
             pc = instr.fmt3.dest + 1;
             break;
@@ -309,7 +309,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
                 cond = condop(instr.fmt2.op, gpu->cmp[0], gpu->cmp[1],
                               instr.fmt2.refx, instr.fmt2.refy);
             } else {
-                cond = gpu->io.VSH.booluniform & BIT(instr.fmt3.c);
+                cond = gpu->io.vsh.booluniform & BIT(instr.fmt3.c);
                 if (instr.fmt3.num & 1) cond = !cond;
             }
             if (cond) {
@@ -361,7 +361,7 @@ void exec_block(GPU* gpu, u32 start, u32 num) {
 }
 
 void exec_vshader(GPU* gpu) {
-    exec_block(gpu, gpu->io.VSH.entrypoint, BIT(12));
+    exec_block(gpu, gpu->io.vsh.entrypoint, BIT(12));
 }
 
 static char coordnames[4][2] = {"x", "y", "z", "w"};
@@ -698,7 +698,7 @@ void disasm_vshader(GPU* gpu) {
     disasm.depth = 0;
     Vec_init(disasm.calls);
     printf("proc main\n");
-    disasm_block(gpu, gpu->io.VSH.entrypoint, BIT(12));
+    disasm_block(gpu, gpu->io.vsh.entrypoint, BIT(12));
     printf("end proc\n");
     Vec_foreach(c, disasm.calls) {
         u32 start = c->fmt3.dest;

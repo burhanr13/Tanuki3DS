@@ -3,8 +3,8 @@
 
 #include <stdlib.h>
 
+#include "../../common.h"
 #include "../arm_core.h"
-#include "../../types.h"
 
 enum { NF, ZF, CF, VF, QF };
 

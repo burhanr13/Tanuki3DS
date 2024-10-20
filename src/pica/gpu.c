@@ -1,9 +1,10 @@
 #include "gpu.h"
 
+#include "../3ds.h"
 #include "renderer_gl.h"
-
 #include "shader.h"
 
+#undef PTR
 #define PTR(addr) ((void*) &gpu->mem[addr])
 
 static const GLenum depth_func[8] = {
@@ -49,55 +50,75 @@ u32 f31tof32(u32 i) {
     return i;
 }
 
-void gpu_set_fb_cur(GPU* gpu, u32 paddr) {
-    int newfb = -1;
+FBInfo* fbcache_get(GPU* gpu, u32 color_paddr) {
+    FBInfo* newfb = NULL;
     for (int i = 0; i < FB_MAX; i++) {
-        if (gpu->fbs[i].paddr == paddr) {
-            newfb = i;
-            break;
-        }
-        if (gpu->fbs[i].paddr == 0) {
-            gpu->fbs[i].paddr = paddr;
-            newfb = i;
-            break;
+        if (gpu->fbs.d[i].color_paddr == color_paddr ||
+            gpu->fbs.d[i].color_paddr == 0) {
+            newfb = &gpu->fbs.d[i];
         }
     }
-    if (newfb < 0) {
-        lerror("ran out of fbs");
+    if (!newfb) newfb = LRU_eject(gpu->fbs);
+    newfb->color_paddr = color_paddr;
+    LRU_use(gpu->fbs, newfb);
+    return newfb;
+}
+
+void gpu_update_cur_fb(GPU* gpu) {
+    if (gpu->cur_fb && gpu->cur_fb->color_paddr == gpu->io.fb.colorbuf_loc)
         return;
-    }
-    if (newfb == gpu->cur_fb) return;
-    gpu->cur_fb = newfb;
 
-    linfo("cur fb at %08x to %d", paddr, newfb);
+    gpu->cur_fb = fbcache_get(gpu, gpu->io.fb.colorbuf_loc << 3);
+    gpu->cur_fb->depth_paddr = gpu->io.fb.depthbuf_loc << 3;
 
-    glBindFramebuffer(GL_FRAMEBUFFER, gpu->gl.fbs[newfb].fbo);
+    u32 w = gpu->io.fb.dim.width;
+    u32 h = gpu->io.fb.dim.height + 1;
+
+    if (w != gpu->cur_fb->width || h != gpu->cur_fb->height) {
+        gpu->cur_fb->width = w;
+        gpu->cur_fb->height = h;
+
+        glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->color_tex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gpu->cur_fb->width,
+                     gpu->cur_fb->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->depth_tex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, gpu->cur_fb->width,
+                     gpu->cur_fb->height, 0, GL_DEPTH_STENCIL,
+                     GL_UNSIGNED_INT_24_8, NULL);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    } else glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
 }
 
-void gpu_set_fb_top(GPU* gpu, u32 paddr) {
+void gpu_display_transfer(GPU* gpu, u32 paddr, bool top) {
+    FBInfo* fb = fbcache_get(gpu, paddr);
+
+    GLuint dst = top ? gpu->gl.textop : gpu->gl.texbot;
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
+    glBindTexture(GL_TEXTURE_2D, dst);
+    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, fb->width, fb->height, 0);
+}
+
+void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
     for (int i = 0; i < FB_MAX; i++) {
-        if (gpu->fbs[i].paddr == paddr) {
-            gpu->gl.fb_top = i;
-            linfo("top fb at %08x to %d", paddr, i);
-            break;
+        if (gpu->fbs.d[i].color_paddr == paddr) {
+            LRU_use(gpu->fbs, &gpu->fbs.d[i]);
+            glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
+            glClearColor((color >> 24) / 256.f, ((color >> 16) & 0xff) / 256.f,
+                         ((color >> 8) & 0xff) / 256.f, (color & 0xff) / 256.f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            return;
+        }
+        if (gpu->fbs.d[i].depth_paddr == paddr) {
+            LRU_use(gpu->fbs, &gpu->fbs.d[i]);
+            glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            return;
         }
     }
-}
-
-void gpu_set_fb_bot(GPU* gpu, u32 paddr) {
-    for (int i = 0; i < FB_MAX; i++) {
-        if (gpu->fbs[i].paddr == paddr) {
-            linfo("bot fb at %08x to %d", paddr, i);
-            gpu->gl.fb_bot = i;
-            break;
-        }
-    }
-}
-
-void gpu_clear_fb(GPU* gpu, u32 color) {
-    glClearColor((color >> 24) / 256.f, ((color >> 16) & 0xff) / 256.f,
-                 ((color >> 8) & 0xff) / 256.f, (color & 0xff) / 256.f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
@@ -105,26 +126,12 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     gpu->io.w[id] &= ~mask;
     gpu->io.w[id] |= param & mask;
     switch (id) {
-        case GPUREG(fb.color_mask):
-            if (gpu->io.fb.color_mask.depthtest) {
-                glEnable(GL_DEPTH_TEST);
-                glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
-            } else {
-                glDisable(GL_DEPTH_TEST);
-            }
-            glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
-                        gpu->io.fb.color_mask.blue,
-                        gpu->io.fb.color_mask.alpha);
-            glDepthMask(gpu->io.fb.color_mask.depth);
-            break;
-        case GPUREG(fb.colorbuf_loc):
-            linfo("colorbuf %08x", gpu->io.fb.colorbuf_loc << 3);
-            gpu_set_fb_cur(gpu, gpu->io.fb.colorbuf_loc << 3);
-            break;
         case GPUREG(geom.drawarrays):
+            gpu_update_gl_state(gpu);
             gpu_drawarrays(gpu);
             break;
         case GPUREG(geom.drawelements):
+            gpu_update_gl_state(gpu);
             gpu_drawelements(gpu);
             break;
         case GPUREG(geom.fixattr_data[0])... GPUREG(geom.fixattr_data[2]): {
@@ -157,14 +164,14 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             }
             break;
         }
-        case GPUREG(VSH.floatuniform_data[0])... GPUREG(
-            VSH.floatuniform_data[7]): {
-            fvec* uniform = &gpu->cst[gpu->io.VSH.floatuniform_idx];
-            if (gpu->io.VSH.floatuniform_mode) {
+        case GPUREG(vsh.floatuniform_data[0])... GPUREG(
+            vsh.floatuniform_data[7]): {
+            fvec* uniform = &gpu->cst[gpu->io.vsh.floatuniform_idx];
+            if (gpu->io.vsh.floatuniform_mode) {
                 (*uniform)[3 - gpu->curunifi] = I2F(param);
                 if (++gpu->curunifi == 4) {
                     gpu->curunifi = 0;
-                    gpu->io.VSH.floatuniform_idx++;
+                    gpu->io.vsh.floatuniform_idx++;
                 }
             } else {
                 switch (gpu->curunifi) {
@@ -186,23 +193,25 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
                             I2F(f24tof32(param >> 24 | gpu->curuniform));
                         (*uniform)[0] = I2F(f24tof32(param & MASK(24)));
                         gpu->curunifi = 0;
-                        gpu->io.VSH.floatuniform_idx++;
+                        gpu->io.vsh.floatuniform_idx++;
                         break;
                     }
                 }
             }
             break;
         }
-        case GPUREG(VSH.codetrans_data[0])... GPUREG(VSH.codetrans_data[8]):
-            gpu->progdata[gpu->io.VSH.codetrans_idx++] = param;
+        case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
+            gpu->progdata[gpu->io.vsh.codetrans_idx++] = param;
             break;
-        case GPUREG(VSH.opdescs_data[0])... GPUREG(VSH.opdescs_data[8]):
-            gpu->opdescs[gpu->io.VSH.opdescs_idx++] = param;
+        case GPUREG(vsh.opdescs_data[0])... GPUREG(vsh.opdescs_data[8]):
+            gpu->opdescs[gpu->io.vsh.opdescs_idx++] = param;
             break;
     }
 }
 
 void gpu_run_command_list(GPU* gpu, u32* cmds, u32 size) {
+    gpu->cur_fb = NULL;
+
     u32* cur = cmds;
     u32* end = cmds + size;
     while (cur < end) {
@@ -236,7 +245,7 @@ void load_vtx(GPU* gpu, int i) {
                 continue;
             }
             int type = (gpu->io.geom.attr_format >> 4 * attr) & 0xf;
-            attr = (gpu->io.VSH.permutation >> 4 * attr) & 0xf;
+            attr = (gpu->io.vsh.permutation >> 4 * attr) & 0xf;
             int size = (type >> 2) + 1;
             type &= 3;
             switch (type) {
@@ -290,8 +299,8 @@ void store_vtx(GPU* gpu, int i, Vertex* vbuf) {
 }
 
 void gpu_drawarrays(GPU* gpu) {
-    linfo("cur fb for drawarrays %d", gpu->cur_fb);
-    linfo("drawing arrays nverts=%d", gpu->io.geom.nverts);
+    linfo("drawing arrays nverts=%d primmode=%d curfb=%d", gpu->io.geom.nverts,
+          gpu->io.geom.prim_config.mode, gpu->cur_fb);
     Vertex vbuf[gpu->io.geom.nverts];
     for (int i = 0; i < gpu->io.geom.nverts; i++) {
         load_vtx(gpu, i + gpu->io.geom.vtx_off);
@@ -305,9 +314,9 @@ void gpu_drawarrays(GPU* gpu) {
 }
 
 void gpu_drawelements(GPU* gpu) {
-    linfo("cur fb for drawelements %d", gpu->cur_fb);
-    linfo("drawing elements nverts=%d primmode=%d", gpu->io.geom.nverts,
-          gpu->io.geom.prim_config.mode);
+    linfo("drawing elements nverts=%d primmode=%d curfb=%d",
+          gpu->io.geom.nverts, gpu->io.geom.prim_config.mode, gpu->cur_fb);
+
     u32 minind = 0xffff, maxind = 0;
     void* indexbuf = PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.indexbufoff);
     for (int i = 0; i < gpu->io.geom.nverts; i++) {
@@ -323,6 +332,7 @@ void gpu_drawelements(GPU* gpu) {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                  gpu->io.geom.nverts * (gpu->io.geom.indexfmt ? 2 : 1),
                  indexbuf, GL_STREAM_DRAW);
+
     Vertex vbuf[maxind + 1 - minind];
     for (int i = minind; i <= maxind; i++) {
         load_vtx(gpu, i - minind);
@@ -330,10 +340,53 @@ void gpu_drawelements(GPU* gpu) {
         store_vtx(gpu, i - minind, vbuf);
     }
 
+#ifdef WIREFRAME
+    if (gpu->io.geom.nverts != 4) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
+#endif
+
     glBufferData(GL_ARRAY_BUFFER, (maxind + 1 - minind) * sizeof(Vertex), vbuf,
                  GL_STREAM_DRAW);
     glDrawElementsBaseVertex(
         prim_mode[gpu->io.geom.prim_config.mode & 3], gpu->io.geom.nverts,
         gpu->io.geom.indexfmt ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE, 0,
         -minind);
+
+#ifdef WIREFRAME
+    if (gpu->io.geom.nverts != 4) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
+#endif
+}
+
+void gpu_update_gl_state(GPU* gpu) {
+    switch (gpu->io.raster.facecull_config & 3) {
+        case 0:
+        case 3:
+            glDisable(GL_CULL_FACE);
+            break;
+        case 1:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            break;
+        case 2:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            break;
+    }
+
+    glViewport(0, 0, I2F(f24tof32(gpu->io.raster.view_w)),
+               I2F(f24tof32(gpu->io.raster.view_h)));
+
+    if (gpu->io.fb.color_mask.depthtest) {
+        glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
+    } else {
+        glDepthFunc(GL_ALWAYS);
+    }
+    glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
+                gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
+    glDepthMask(gpu->io.fb.color_mask.depth);
+
+    gpu_update_cur_fb(gpu);
 }

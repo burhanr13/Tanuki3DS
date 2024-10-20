@@ -2,7 +2,7 @@
 #define EMULATOR_STATE_H
 
 #include "3ds.h"
-#include "types.h"
+#include "common.h"
 
 typedef struct {
     char* romfile;

@@ -1,7 +1,7 @@
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 
-#include "../../types.h"
+#include "../../common.h"
 #include "ir.h"
 
 void optimize_loadstore(IRBlock* block);

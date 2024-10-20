@@ -1,9 +1,9 @@
 #include "gsp.h"
 
+#include "../3ds.h"
 #include "../kernel.h"
 #include "../pica/gpu.h"
 #include "../scheduler.h"
-#include "../svc.h"
 
 #define GSPMEM(off) PTR(s->services.gsp.sharedmem.vaddr + off)
 
@@ -82,8 +82,6 @@ void gsp_handle_event(HLE3DS* s, u32 arg) {
 
         linfo("vblank");
 
-        s->gpu.cur_fb = -1;
-        
         s->frame_complete = true;
     }
 
@@ -140,7 +138,12 @@ void gsp_handle_command(HLE3DS* s) {
 
     switch (cmds->d[cmds->cur].id) {
         case 0x00: {
-            linfo("dma request");
+            u32 src = cmds->d[cmds->cur].args[0];
+            u32 dest = cmds->d[cmds->cur].args[1];
+            u32 size = cmds->d[cmds->cur].args[2];
+            linfo("dma request from %08x to %08x of size 0x%x", src, dest,
+                  size);
+            memcpy(PTR(dest), PTR(src), size);
             gsp_handle_event(s, GSPEVENT_DMA);
             break;
         }
@@ -167,8 +170,8 @@ void gsp_handle_command(HLE3DS* s) {
                 if (cmd->buf[i].st) {
                     linfo("memory fill at fb %08x-%08x with %x", cmd->buf[i].st,
                           cmd->buf[i].end, cmd->buf[i].val);
-                    gpu_set_fb_cur(&s->gpu, vaddr_to_paddr(cmd->buf[i].st));
-                    gpu_clear_fb(&s->gpu, cmd->buf[i].val);
+                    gpu_clear_fb(&s->gpu, vaddr_to_paddr(cmd->buf[i].st),
+                                 cmd->buf[i].val);
                     gsp_handle_event(s, GSPEVENT_PSC0 + i);
                 }
             }
@@ -208,9 +211,9 @@ void gsp_handle_command(HLE3DS* s) {
                   fbbot->fbs[1].right_vaddr);
 
             if (addrout == fbtop->fbs[1 - fbtop->idx].left_vaddr) {
-                gpu_set_fb_top(&s->gpu, vaddr_to_paddr(addrin));
+                gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), true);
             } else if (addrout == fbbot->fbs[1 - fbbot->idx].left_vaddr) {
-                gpu_set_fb_bot(&s->gpu, vaddr_to_paddr(addrin));
+                gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), false);
             }
 
             gsp_handle_event(s, GSPEVENT_PPF);

@@ -1,7 +1,7 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
-#include "types.h"
+#include "common.h"
 
 #define EVENT_MAX BIT(8)
 

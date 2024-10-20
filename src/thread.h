@@ -1,9 +1,9 @@
 #ifndef THREAD_H
 #define THREAD_H
 
+#include "common.h"
 #include "kernel.h"
 #include "memory.h"
-#include "types.h"
 
 #define THREAD_MAX 32
 

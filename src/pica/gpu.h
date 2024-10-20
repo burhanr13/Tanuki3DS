@@ -1,14 +1,12 @@
 #ifndef GPU_H
 #define GPU_H
 
-#include "../types.h"
+#include "../common.h"
 #include "renderer_gl.h"
 #include "shader.h"
 
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
-#define GSH sh[0]
-#define VSH sh[1]
 
 typedef float fvec[4];
 typedef float fvec2[2];
@@ -28,6 +26,29 @@ typedef union {
     };
 } Vertex;
 
+typedef struct {
+    struct {
+        u8 r, g, b, a;
+    } border;
+    u16 height;
+    u16 width;
+    struct {
+        u32 _0 : 1;
+        u32 mag_filter : 1;
+        u32 min_filter : 1;
+        u32 _3 : 1;
+        u32 etc1 : 4;
+        u32 wrap_t : 4;
+        u32 wrap_s : 4;
+        u32 _16_20 : 4;
+        u32 shadow : 4;
+        u32 mipmap : 4;
+        u32 type : 4;
+    } param;
+    u32 lod;
+    u32 addr;
+} TexUnitRegs;
+
 #pragma pack(push, 1)
 typedef union {
     u32 w[GPUREG_MAX];
@@ -37,12 +58,25 @@ typedef union {
         } misc;
         union {
             struct {
-                u32 _040[16];
+                u32 facecull_config;
+                u32 view_w;
+                u32 view_invw;
+                u32 view_h;
+                u32 view_invh;
+                u32 _045[11];
                 u8 sh_outmap[7][4];
             };
             u32 w[0x40];
         } raster;
         union {
+            struct {
+                u32 texunit_cfg;
+                TexUnitRegs tex0;
+                u32 tex0_cubeaddr[5];
+                u32 tex0_shadow;
+                u32 _08c[2];
+                u32 tex0_fmt;
+            };
             u32 w[0x80];
         } tex;
         union {
@@ -78,6 +112,11 @@ typedef union {
                 u32 _118[4];
                 u32 depthbuf_loc;
                 u32 colorbuf_loc;
+                struct {
+                    u32 width : 12;
+                    u32 height : 12;
+                    u32 _24_31 : 8;
+                } dim;
             };
             u32 w[0x40];
         } fb;
@@ -155,17 +194,37 @@ typedef union {
                 u32 opdescs_data[8];
             };
             u32 w[0x30];
-        } sh[2];
+        } gsh, vsh;
         u32 undoc[0x20];
     };
 } GPURegs;
 #pragma pack(pop)
 
-typedef struct {
-    u32 paddr;
+typedef struct _FBInfo {
+    u32 color_paddr;
+    u32 depth_paddr;
+    u32 width, height;
+
+    struct _FBInfo* next;
+    struct _FBInfo* prev;
+
+    u32 fbo;
+    u32 color_tex;
+    u32 depth_tex;
 } FBInfo;
 
-#define FB_MAX 6
+typedef struct _TexInfo {
+    u32 paddr;
+    u32 width, height;
+
+    struct _TexInfo* next;
+    struct _TexInfo* prev;
+
+    u32 tex;
+} TexInfo;
+
+#define FB_MAX 8
+#define TEX_MAX 128
 
 typedef struct _GPU {
 
@@ -193,8 +252,10 @@ typedef struct _GPU {
     u32 loopct;
     bool cmp[2];
 
-    FBInfo fbs[FB_MAX];
-    int cur_fb;
+    LRUCache(FBInfo, FB_MAX) fbs;
+    FBInfo* cur_fb;
+
+    LRUCache(TexInfo, TEX_MAX) textures;
 
     GLState gl;
 
@@ -232,16 +293,16 @@ typedef union {
 u32 f24tof32(u32 i);
 u32 f31tof32(u32 i);
 
-void gpu_set_fb_cur(GPU* gpu, u32 paddr);
 
-void gpu_set_fb_top(GPU* gpu, u32 paddr);
-void gpu_set_fb_bot(GPU* gpu, u32 paddr);
+void gpu_display_transfer(GPU* gpu, u32 paddr, bool top);
 
-void gpu_clear_fb(GPU* gpu, u32 color);
+void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
 
 void gpu_run_command_list(GPU* gpu, u32* cmds, u32 size);
 
 void gpu_drawarrays(GPU* gpu);
 void gpu_drawelements(GPU* gpu);
+
+void gpu_update_gl_state(GPU* gpu);
 
 #endif

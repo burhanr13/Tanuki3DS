@@ -108,7 +108,7 @@ void update_input(HLE3DS* s) {
     btn.cleft = keys[SDL_SCANCODE_A];
     btn.cright = keys[SDL_SCANCODE_D];
 
-    s16 cx = (btn.cleft - btn.cright) * INT16_MAX;
+    s16 cx = (btn.cright - btn.cleft) * INT16_MAX;
     s16 cy = (btn.cup - btn.cdown) * INT16_MAX;
 
     hid_update_pad(s, btn.w, cx, cy);

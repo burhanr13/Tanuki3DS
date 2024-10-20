@@ -1,7 +1,7 @@
 #ifndef SHADER_H
 #define SHADER_H
 
-#include "../types.h"
+#include "../common.h"
 
 typedef struct _GPU GPU;
 

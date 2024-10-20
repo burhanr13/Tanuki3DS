@@ -1,7 +1,7 @@
 #ifndef SVC_DEFS_H
 #define SVC_DEFS_H
 
-#include "types.h"
+#include "common.h"
 
 enum {
     MEMOP_ALLOC = 3,

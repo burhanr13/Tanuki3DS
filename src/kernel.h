@@ -1,7 +1,7 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include "types.h"
+#include "common.h"
 
 #define HANDLE_MAX BIT(10)
 #define HANDLE_BASE 0xffff8000

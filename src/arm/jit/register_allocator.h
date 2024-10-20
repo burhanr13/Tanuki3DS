@@ -1,7 +1,7 @@
 #ifndef REGISTER_ALLOCATOR_H
 #define REGISTER_ALLOCATOR_H
 
-#include "../../types.h"
+#include "../../common.h"
 #include "ir.h"
 
 typedef enum {

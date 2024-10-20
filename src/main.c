@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
     }
     glewInit();
 
-    renderer_gl_setup(&ctremu.system.gpu.gl);
+    renderer_gl_setup(&ctremu.system.gpu.gl, &ctremu.system.gpu);
 
     Uint64 prev_time = SDL_GetPerformanceCounter();
     Uint64 prev_fps_update = prev_time;
@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
                 ctremu.running = false;
                 break;
             }
-            if (e.type == SDL_KEYDOWN) {
+            if (e.type == SDL_KEYDOWN && (e.key.keysym.mod & KMOD_CTRL)) {
                 hotkey_press(e.key.keysym.sym);
             }
         }
@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
             Sint64 wait = frame_ticks - elapsed;
             Sint64 waitMS =
                 wait * 1000 / (Sint64) SDL_GetPerformanceFrequency();
-            if (waitMS > 1 && !ctremu.uncap) {
+            if (waitMS > 10) {
                 SDL_Delay(waitMS);
             }
         }

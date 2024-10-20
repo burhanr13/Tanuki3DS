@@ -2,9 +2,9 @@
 #define GSP_H
 
 #include "../memory.h"
-#include "../thread.h"
 #include "../srv.h"
 #include "../svc_types.h"
+#include "../thread.h"
 
 enum {
     GSPEVENT_PSC0,

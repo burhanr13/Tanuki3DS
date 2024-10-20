@@ -1,9 +1,9 @@
 #ifndef RECOMPILER_H
 #define RECOMPILER_H
 
+#include "../../common.h"
 #include "../arm.h"
 #include "../arm_core.h"
-#include "../../types.h"
 #include "ir.h"
 
 void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr);

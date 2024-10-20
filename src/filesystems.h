@@ -1,7 +1,7 @@
 #ifndef FILESYSTEMS_H
 #define FILESYSTEMS_H
 
-#include "types.h"
+#include "common.h"
 
 typedef struct {
     u8 signature[0x100];

@@ -1,9 +1,8 @@
 #include "renderer_gl.h"
 
 #include "../3ds.h"
+#include "gpu.h"
 #include "hostshaders/hostshaders.h"
-
-// #define WIREFRAME
 
 #define BOT_GAP (1 - (float) SCREEN_WIDTH_BOT / (float) SCREEN_WIDTH)
 
@@ -58,26 +57,20 @@ GLuint make_shader(const char* vert, const char* frag) {
 }
 
 void bind_gpu(GLState* state) {
-    glUseProgram(state->gpu.program);
-    glBindVertexArray(state->gpu.vao);
-
-#ifdef WIREFRAME
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-#endif
-
-    glViewport(0, 0, SCREEN_HEIGHT, SCREEN_WIDTH);
+    glUseProgram(state->gpuprogram);
+    glBindVertexArray(state->gpuvao);
+    // glEnable(GL_DEPTH_TEST);
 }
 
-void renderer_gl_setup(GLState* state) {
-    state->fb_top = -1;
-    state->fb_bot = -1;
+void renderer_gl_setup(GLState* state, GPU* gpu) {
+    state->gpu = gpu;
 
-    state->main.program = make_shader(mainvertsource, mainfragsource);
-    glUseProgram(state->main.program);
-    glUniform1i(glGetUniformLocation(state->main.program, "screen"), 0);
+    state->mainprogram = make_shader(mainvertsource, mainfragsource);
+    glUseProgram(state->mainprogram);
+    glUniform1i(glGetUniformLocation(state->mainprogram, "screen"), 0);
 
-    glGenVertexArrays(1, &state->main.vao);
-    glBindVertexArray(state->main.vao);
+    glGenVertexArrays(1, &state->mainvao);
+    glBindVertexArray(state->mainvao);
 
     GLuint vbo;
     glGenBuffers(1, &vbo);
@@ -91,10 +84,12 @@ void renderer_gl_setup(GLState* state) {
                           (void*) (2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    state->gpu.program = make_shader(gpuvertsource, gpufragsource);
+    state->gpuprogram = make_shader(gpuvertsource, gpufragsource);
+    //glUseProgram(state->gpuprogram);
+    //glUniform1i(glGetUniformLocation(state->mainprogram, "tex0"), 0);
 
-    glGenVertexArrays(1, &state->gpu.vao);
-    glBindVertexArray(state->gpu.vao);
+    glGenVertexArrays(1, &state->gpuvao);
+    glBindVertexArray(state->gpuvao);
 
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -108,63 +103,66 @@ void renderer_gl_setup(GLState* state) {
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                           (void*) offsetof(Vertex, color));
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, texcoord0));
+    glEnableVertexAttribArray(2);
+
+    glGenTextures(1, &state->textop);
+    glBindTexture(GL_TEXTURE_2D, state->textop);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT, SCREEN_WIDTH, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenTextures(1, &state->texbot);
+    glBindTexture(GL_TEXTURE_2D, state->textop);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT, SCREEN_WIDTH_BOT, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    GLuint fbos[FB_MAX];
+    glGenFramebuffers(FB_MAX, fbos);
+    GLuint colorbufs[FB_MAX];
+    glGenTextures(FB_MAX, colorbufs);
+    GLuint depthbufs[FB_MAX];
+    glGenTextures(FB_MAX, depthbufs);
+
+    LRU_init(gpu->fbs);
 
     for (int i = 0; i < FB_MAX; i++) {
-        glGenFramebuffers(1, &state->fbs[i].fbo);
-        glBindFramebuffer(GL_FRAMEBUFFER, state->fbs[i].fbo);
+        gpu->fbs.d[i].fbo = fbos[i];
+        gpu->fbs.d[i].color_tex = colorbufs[i];
+        gpu->fbs.d[i].depth_tex = depthbufs[i];
 
-        glGenTextures(1, &state->fbs[i].tex_colorbuf);
-        glBindTexture(GL_TEXTURE_2D, state->fbs[i].tex_colorbuf);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT, SCREEN_WIDTH, 0,
-                     GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbos[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               GL_TEXTURE_2D, state->fbs[i].tex_colorbuf, 0);
-
-        glGenTextures(1, &state->fbs[i].tex_depthbuf);
-        glBindTexture(GL_TEXTURE_2D, state->fbs[i].tex_depthbuf);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, SCREEN_HEIGHT,
-                     SCREEN_WIDTH, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
-                     NULL);
+                               GL_TEXTURE_2D, colorbufs[i], 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
-                               GL_TEXTURE_2D, state->fbs[i].tex_depthbuf, 0);
-
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                               GL_TEXTURE_2D, depthbufs[i], 0);
     }
 
     bind_gpu(state);
 }
 
 void render_gl_main(GLState* state) {
-    glUseProgram(state->main.program);
-    glBindVertexArray(state->main.vao);
+    glUseProgram(state->mainprogram);
+    glBindVertexArray(state->mainvao);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_CULL_FACE);
     glColorMask(true, true, true, true);
     glDisable(GL_DEPTH_TEST);
-#ifdef WIREFRAME
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-#endif
 
     glViewport(0, 0, SCREEN_WIDTH, 2 * SCREEN_HEIGHT);
 
-    glClearColor(0, 0, 0, 1);
+    glClearColor(1, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glActiveTexture(GL_TEXTURE0);
 
-    if (state->fb_top >= 0) {
-        linfo("drawing top screen fb %d", state->fb_top);
-        glBindTexture(GL_TEXTURE_2D, state->fbs[state->fb_top].tex_colorbuf);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    }
-
-    if (state->fb_bot >= 0) {
-        linfo("drawing bot screen fb %d", state->fb_bot);
-        glBindTexture(GL_TEXTURE_2D, state->fbs[state->fb_bot].tex_colorbuf);
-        glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
-    }
+    glBindTexture(GL_TEXTURE_2D, state->textop);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindTexture(GL_TEXTURE_2D, state->texbot);
+    glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
 
     bind_gpu(state);
 }

@@ -1,7 +1,7 @@
 #ifndef LOADER_H
 #define LOADER_H
 
-#include "types.h"
+#include "common.h"
 
 typedef struct _3DS HLE3DS;
 

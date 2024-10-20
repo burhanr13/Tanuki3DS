@@ -74,7 +74,7 @@ void hid_update_pad(HLE3DS* s, u32 btns, s16 cx, s16 cy) {
     HIDMEM->pad.cy = cy;
 
     HIDMEM->pad.entries[curidx].cx = cx;
-    HIDMEM->pad.entries[curidx].cx = cy;
+    HIDMEM->pad.entries[curidx].cy = cy;
 
     HIDMEM->pad.entries[curidx].held = btns;
     HIDMEM->pad.entries[curidx].pressed = btns & ~prevbtn;

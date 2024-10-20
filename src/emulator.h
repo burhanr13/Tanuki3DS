@@ -3,8 +3,8 @@
 
 #include <SDL2/SDL.h>
 
+#include "common.h"
 #include "emulator_state.h"
-#include "types.h"
 
 int emulator_init(int argc, char** argv);
 void emulator_quit();

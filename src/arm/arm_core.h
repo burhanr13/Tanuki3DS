@@ -3,8 +3,8 @@
 
 #include <stdio.h>
 
+#include "../common.h"
 #include "arm.h"
-#include "../types.h"
 
 typedef enum { B_USER, B_FIQ, B_SVC, B_ABT, B_IRQ, B_UND, B_CT } RegBank;
 typedef enum {

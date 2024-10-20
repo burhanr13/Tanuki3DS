@@ -3,7 +3,7 @@
 
 #include "3ds.h"
 #include "arm/arm_core.h"
-#include "types.h"
+#include "common.h"
 
 void cpu_init(HLE3DS* s);
 void cpu_free(HLE3DS* s);

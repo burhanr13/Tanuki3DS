@@ -9,9 +9,9 @@
 #include <unistd.h>
 
 #include "3ds.h"
+#include "common.h"
 #include "emulator_state.h"
 #include "svc_types.h"
-#include "types.h"
 
 #ifdef __APPLE__
 #define memfd_create(name, x)                                                  \

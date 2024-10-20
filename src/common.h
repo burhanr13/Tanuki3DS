@@ -1,7 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -105,5 +104,33 @@ typedef int64_t s64;
 #define Vec_foreach(e, v)                                                      \
     for (typeof((v).d[0])* e = (v).d; e < (v).d + (v).size; e++)
 #define SVec_foreach Vec_remove
+
+#define LRUCache(T, N)                                                         \
+    struct {                                                                   \
+        T d[N];                                                             \
+        T root;                                                                \
+        size_t size;                                                           \
+    }
+
+#define LRU_init(c) ((c).root.next = (c).root.prev = &(c).root)
+
+#define LRU_use(c, e)                                                          \
+    ({                                                                         \
+        if ((e)->prev) (e)->prev->next = (e)->next;                            \
+        if ((e)->next) (e)->next->prev = (e)->prev;                            \
+        (e)->next = (c).root.next;                                             \
+        (e)->next->prev = (e);                                                 \
+        (c).root.next = (e);                                                   \
+        (e)->prev = &(c).root;                                                 \
+    })
+
+#define LRU_eject(c)                                                           \
+    ({                                                                         \
+        typeof(&(c).root) e = (c).root.prev;                                   \
+        (c).root.prev = (c).root.prev->prev;                                   \
+        (c).root.prev->next = &(c).root;                                       \
+        e->next = e->prev = NULL;                                              \
+        e;                                                                     \
+    })
 
 #endif

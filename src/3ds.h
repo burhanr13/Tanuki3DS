@@ -2,6 +2,7 @@
 #define _3DS_H
 
 #include "arm/arm_core.h"
+#include "common.h"
 #include "kernel.h"
 #include "loader.h"
 #include "memory.h"
@@ -11,7 +12,6 @@
 #include "service_data.h"
 #include "srv.h"
 #include "thread.h"
-#include "types.h"
 
 #define CPU_CLK 268000000
 #define FPS 60

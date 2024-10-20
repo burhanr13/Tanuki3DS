@@ -1,8 +1,8 @@
 #ifndef PORT_H
 #define PORT_H
 
+#include "common.h"
 #include "kernel.h"
-#include "types.h"
 
 typedef struct _3DS HLE3DS;
 
