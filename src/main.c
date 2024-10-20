@@ -7,6 +7,13 @@
 
 char wintitle[200];
 
+#ifdef GLDEBUGCTX
+void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
+                   GLsizei length, const char* message, const void* userParam) {
+    printfln("[GLDEBUG]%d %d %d %d %s", source, type, id, severity, message);
+}
+#endif
+
 int main(int argc, char** argv) {
 
     if (emulator_init(argc, argv) < 0) return -1;
@@ -17,6 +24,9 @@ int main(int argc, char** argv) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
                         SDL_GL_CONTEXT_PROFILE_CORE);
+#ifdef GLDEBUGCTX
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+#endif
     SDL_Window* window = SDL_CreateWindow("ctremu", SDL_WINDOWPOS_UNDEFINED,
                                           SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH,
                                           2 * SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
@@ -27,6 +37,14 @@ int main(int argc, char** argv) {
         return 1;
     }
     glewInit();
+
+#ifdef GLDEBUGCTX
+    glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(glDebugOutput, NULL);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL,
+                          GL_TRUE);
+#endif
 
     renderer_gl_setup(&ctremu.system.gpu.gl, &ctremu.system.gpu);
 

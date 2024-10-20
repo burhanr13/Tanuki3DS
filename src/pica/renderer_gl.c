@@ -114,7 +114,7 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glGenTextures(1, &state->texbot);
-    glBindTexture(GL_TEXTURE_2D, state->textop);
+    glBindTexture(GL_TEXTURE_2D, state->texbot);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT, SCREEN_WIDTH_BOT, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -133,12 +133,6 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
         gpu->fbs.d[i].fbo = fbos[i];
         gpu->fbs.d[i].color_tex = colorbufs[i];
         gpu->fbs.d[i].depth_tex = depthbufs[i];
-
-        glBindFramebuffer(GL_FRAMEBUFFER, fbos[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               GL_TEXTURE_2D, colorbufs[i], 0);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
-                               GL_TEXTURE_2D, depthbufs[i], 0);
     }
 
     bind_gpu(state);
@@ -154,7 +148,7 @@ void render_gl_main(GLState* state) {
 
     glViewport(0, 0, SCREEN_WIDTH, 2 * SCREEN_HEIGHT);
 
-    glClearColor(1, 0, 0, 1);
+    glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glActiveTexture(GL_TEXTURE0);

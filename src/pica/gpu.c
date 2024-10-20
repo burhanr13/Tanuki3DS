@@ -1,6 +1,5 @@
 #include "gpu.h"
 
-#include "../3ds.h"
 #include "renderer_gl.h"
 #include "shader.h"
 
@@ -71,6 +70,8 @@ void gpu_update_cur_fb(GPU* gpu) {
     gpu->cur_fb = fbcache_get(gpu, gpu->io.fb.colorbuf_loc << 3);
     gpu->cur_fb->depth_paddr = gpu->io.fb.depthbuf_loc << 3;
 
+    linfo("drawing on fb at %x", gpu->cur_fb->color_paddr);
+
     u32 w = gpu->io.fb.dim.width;
     u32 h = gpu->io.fb.dim.height + 1;
 
@@ -87,6 +88,11 @@ void gpu_update_cur_fb(GPU* gpu) {
                      GL_UNSIGNED_INT_24_8, NULL);
 
         glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_2D, gpu->cur_fb->color_tex, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                               GL_TEXTURE_2D, gpu->cur_fb->depth_tex, 0);
+
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     } else glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
@@ -94,6 +100,8 @@ void gpu_update_cur_fb(GPU* gpu) {
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, bool top) {
     FBInfo* fb = fbcache_get(gpu, paddr);
+
+    linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
 
     GLuint dst = top ? gpu->gl.textop : gpu->gl.texbot;
 
@@ -376,8 +384,8 @@ void gpu_update_gl_state(GPU* gpu) {
             break;
     }
 
-    glViewport(0, 0, I2F(f24tof32(gpu->io.raster.view_w)),
-               I2F(f24tof32(gpu->io.raster.view_h)));
+    glViewport(0, 0, 2 * I2F(f24tof32(gpu->io.raster.view_w)),
+               2 * I2F(f24tof32(gpu->io.raster.view_h)));
 
     if (gpu->io.fb.color_mask.depthtest) {
         glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
