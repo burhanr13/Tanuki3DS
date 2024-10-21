@@ -59,8 +59,10 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glBufferData(GL_ARRAY_BUFFER, 0, NULL, GL_STATIC_DRAW);
 
     state->gpuprogram = make_shader(gpuvertsource, gpufragsource);
-    // glUseProgram(state->gpuprogram);
-    // glUniform1i(glGetUniformLocation(state->mainprogram, "tex0"), 0);
+    glUseProgram(state->gpuprogram);
+    glUniform1i(glGetUniformLocation(state->gpuprogram, "tex0"), 0);
+    state->uniforms.tex0enable =
+        glGetUniformLocation(state->gpuprogram, "tex0enable");
 
     glGenVertexArrays(1, &state->gpuvao);
     glBindVertexArray(state->gpuvao);
@@ -94,6 +96,8 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    LRU_init(gpu->fbs);
+
     GLuint fbos[FB_MAX];
     glGenFramebuffers(FB_MAX, fbos);
     GLuint colorbufs[FB_MAX];
@@ -101,13 +105,22 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     GLuint depthbufs[FB_MAX];
     glGenTextures(FB_MAX, depthbufs);
 
-    LRU_init(gpu->fbs);
-
     for (int i = 0; i < FB_MAX; i++) {
         gpu->fbs.d[i].fbo = fbos[i];
         gpu->fbs.d[i].color_tex = colorbufs[i];
         gpu->fbs.d[i].depth_tex = depthbufs[i];
     }
+
+    LRU_init(gpu->textures);
+
+    GLuint textures[TEX_MAX];
+    glGenTextures(TEX_MAX, textures);
+    for (int i = 0; i < TEX_MAX; i++) {
+        gpu->textures.d[i].tex = textures[i];
+    }
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
@@ -121,8 +134,6 @@ void render_gl_main(GLState* state) {
     glDisable(GL_CULL_FACE);
     glColorMask(true, true, true, true);
     glDisable(GL_DEPTH_TEST);
-
-    glViewport(0, 0, SCREEN_WIDTH, 2 * SCREEN_HEIGHT);
 
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);

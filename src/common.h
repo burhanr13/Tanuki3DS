@@ -107,15 +107,16 @@ typedef int64_t s64;
 
 #define LRUCache(T, N)                                                         \
     struct {                                                                   \
-        T d[N];                                                             \
+        T d[N];                                                                \
         T root;                                                                \
         size_t size;                                                           \
     }
 
-#define LRU_init(c) ((c).root.next = (c).root.prev = &(c).root)
+#define LRU_init(c) ((c).root.next = (c).root.prev = &(c).root, (c).size = 0)
 
 #define LRU_use(c, e)                                                          \
     ({                                                                         \
+        if (!(e)->prev && !(e)->next) (c).size++;                              \
         if ((e)->prev) (e)->prev->next = (e)->next;                            \
         if ((e)->next) (e)->next->prev = (e)->prev;                            \
         (e)->next = (c).root.next;                                             \
@@ -130,6 +131,7 @@ typedef int64_t s64;
         (c).root.prev = (c).root.prev->prev;                                   \
         (c).root.prev->next = &(c).root;                                       \
         e->next = e->prev = NULL;                                              \
+        (c).size--;                                                            \
         e;                                                                     \
     })
 

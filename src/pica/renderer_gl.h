@@ -21,6 +21,10 @@ typedef struct {
     GLuint textop;
     GLuint texbot;
 
+    struct {
+        GLuint tex0enable;
+    } uniforms;
+
 } GLState;
 
 void renderer_gl_setup(GLState* state, GPU* gpu);

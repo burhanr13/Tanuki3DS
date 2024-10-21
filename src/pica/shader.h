@@ -10,6 +10,8 @@ enum {
     PICA_DP3 = 0x01,
     PICA_DP4 = 0x02,
     PICA_DST = 0x04,
+    PICA_EX2 = 0x05,
+    PICA_LG2 = 0x06,
     PICA_MUL = 0x08,
     PICA_SGE = 0x09,
     PICA_SLT = 0x0a,

@@ -148,6 +148,24 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             DEST(res, 1);
             break;
         }
+        case PICA_EX2: {
+            fvec a;
+            SRC1(a, 1);
+            fvec res;
+            res[0] = exp2f(a[0]);
+            res[1] = res[2] = res[3] = res[0];
+            DEST(res, 1);
+            break;
+        }
+        case PICA_LG2: {
+            fvec a;
+            SRC1(a, 1);
+            fvec res;
+            res[0] = log2f(a[0]);
+            res[1] = res[2] = res[3] = res[0];
+            DEST(res, 1);
+            break;
+        }
         case PICA_MUL: {
             fvec a, b;
             SRC1(a, 1);
@@ -346,7 +364,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             break;
         }
         default:
-            lerror("unknown PICA instruction %08x", instr.w);
+            lerror("unknown PICA instruction %08x (opcode %x)", instr.w, instr.opcode);
             break;
     }
     return pc;
@@ -518,6 +536,10 @@ u32 disasm_instr(GPU* gpu, u32 pc) {
             DISASMFMT1(dst);
         case PICA_DSTI:
             DISASMFMT1I(dst);
+        case PICA_EX2:
+            DISASMFMT1U(ex2);
+        case PICA_LG2:
+            DISASMFMT1U(lg2);
         case PICA_MUL:
             DISASMFMT1(mul);
         case PICA_SGE:

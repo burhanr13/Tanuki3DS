@@ -216,6 +216,7 @@ typedef struct _FBInfo {
 typedef struct _TexInfo {
     u32 paddr;
     u32 width, height;
+    u32 fmt;
 
     struct _TexInfo* next;
     struct _TexInfo* prev;

@@ -1,11 +1,19 @@
 #include "gpu.h"
 
+#include "etc1.h"
 #include "renderer_gl.h"
 #include "shader.h"
 
 #undef PTR
 #define PTR(addr) ((void*) &gpu->mem[addr])
 
+static const GLenum texfilter[2] = {GL_NEAREST, GL_LINEAR};
+static const GLenum texwrap[4] = {
+    GL_CLAMP_TO_EDGE,
+    GL_CLAMP_TO_BORDER,
+    GL_REPEAT,
+    GL_MIRRORED_REPEAT,
+};
 static const GLenum depth_func[8] = {
     GL_NEVER, GL_ALWAYS, GL_EQUAL,   GL_NOTEQUAL,
     GL_LESS,  GL_LEQUAL, GL_GREATER, GL_GEQUAL,
@@ -49,15 +57,33 @@ u32 f31tof32(u32 i) {
     return i;
 }
 
-FBInfo* fbcache_get(GPU* gpu, u32 color_paddr) {
+FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
+    FBInfo* newfb = NULL;
+    for (int i = 0; i < FB_MAX; i++) {
+        if (gpu->fbs.d[i].color_paddr == color_paddr) {
+            newfb = &gpu->fbs.d[i];
+            break;
+        }
+    }
+    if (newfb) LRU_use(gpu->fbs, newfb);
+    return newfb;
+}
+
+FBInfo* fbcache_load(GPU* gpu, u32 color_paddr) {
     FBInfo* newfb = NULL;
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr == color_paddr ||
             gpu->fbs.d[i].color_paddr == 0) {
             newfb = &gpu->fbs.d[i];
+            break;
         }
     }
-    if (!newfb) newfb = LRU_eject(gpu->fbs);
+    if (!newfb) {
+        newfb = LRU_eject(gpu->fbs);
+        newfb->depth_paddr = 0;
+        newfb->width = 0;
+        newfb->height = 0;
+    }
     newfb->color_paddr = color_paddr;
     LRU_use(gpu->fbs, newfb);
     return newfb;
@@ -67,10 +93,12 @@ void gpu_update_cur_fb(GPU* gpu) {
     if (gpu->cur_fb && gpu->cur_fb->color_paddr == gpu->io.fb.colorbuf_loc)
         return;
 
-    gpu->cur_fb = fbcache_get(gpu, gpu->io.fb.colorbuf_loc << 3);
+    gpu->cur_fb = fbcache_load(gpu, gpu->io.fb.colorbuf_loc << 3);
     gpu->cur_fb->depth_paddr = gpu->io.fb.depthbuf_loc << 3;
 
     linfo("drawing on fb at %x", gpu->cur_fb->color_paddr);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
 
     u32 w = gpu->io.fb.dim.width;
     u32 h = gpu->io.fb.dim.height + 1;
@@ -87,7 +115,6 @@ void gpu_update_cur_fb(GPU* gpu) {
                      gpu->cur_fb->height, 0, GL_DEPTH_STENCIL,
                      GL_UNSIGNED_INT_24_8, NULL);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_2D, gpu->cur_fb->color_tex, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
@@ -95,11 +122,13 @@ void gpu_update_cur_fb(GPU* gpu) {
 
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    } else glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
+    }
 }
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, bool top) {
-    FBInfo* fb = fbcache_get(gpu, paddr);
+    FBInfo* fb = fbcache_find(gpu, paddr);
+
+    if (!fb) return;
 
     linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
 
@@ -127,6 +156,120 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
             return;
         }
     }
+}
+
+TexInfo* texcache_load(GPU* gpu, u32 paddr) {
+    TexInfo* tex = NULL;
+    for (int i = 0; i < TEX_MAX; i++) {
+        if (gpu->textures.d[i].paddr == paddr ||
+            gpu->textures.d[i].paddr == 0) {
+            tex = &gpu->textures.d[i];
+            break;
+        }
+    }
+    if (!tex) {
+        tex = LRU_eject(gpu->textures);
+        tex->width = 0;
+        tex->height = 0;
+    }
+    tex->paddr = paddr;
+    LRU_use(gpu->textures, tex);
+    return tex;
+}
+
+u32 morton_swizzle(u32 w, u32 x, u32 y) {
+    u32 swizzle[8] = {
+        0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15,
+    };
+
+    u32 tx = x >> 3;
+    u32 fx = x & 7;
+    u32 ty = y >> 3;
+    u32 fy = y & 7;
+
+    return (ty * (w >> 3) + tx) * 64 + (swizzle[fx] | swizzle[fy] << 1);
+}
+
+#define LOAD_TEX(t, glfmt, gltype)                                             \
+    ({                                                                         \
+        t* data = rawdata;                                                     \
+                                                                               \
+        t* pixels = malloc(sizeof(t) * tex->width * tex->height);              \
+                                                                               \
+        for (int x = 0; x < tex->width; x++) {                                 \
+            for (int y = 0; y < tex->height; y++) {                            \
+                pixels[y * tex->width + x] =                                   \
+                    data[morton_swizzle(tex->width, x, y)];                    \
+            }                                                                  \
+        }                                                                      \
+                                                                               \
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->width, tex->height, 0,    \
+                     glfmt, gltype, pixels);                                   \
+        free(pixels);                                                          \
+        break;                                                                 \
+    })
+
+typedef struct {
+    u8 d[3];
+} u24;
+
+void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
+    FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
+    glActiveTexture(GL_TEXTURE0 + id);
+    if (fb) {
+        glBindTexture(GL_TEXTURE_2D, fb->color_tex);
+    } else {
+        TexInfo* tex = texcache_load(gpu, regs->addr << 3);
+
+        void* rawdata = PTR(tex->paddr);
+
+        glBindTexture(GL_TEXTURE_2D, tex->tex);
+
+        if (tex->width != regs->width || tex->height != regs->height ||
+            tex->fmt != fmt) {
+            tex->width = regs->width;
+            tex->height = regs->height;
+            tex->fmt = fmt;
+
+            switch (fmt) {
+                case 0:
+                    LOAD_TEX(u32, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8);
+                case 1:
+                    LOAD_TEX(u24, GL_RGB, GL_UNSIGNED_BYTE);
+                case 2:
+                    LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1);
+                case 3:
+                    LOAD_TEX(u16, GL_RGB, GL_UNSIGNED_SHORT_5_6_5);
+                case 4:
+                    LOAD_TEX(u16, GL_RGB, GL_UNSIGNED_SHORT_4_4_4_4);
+                case 5:
+                    LOAD_TEX(u8, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE);
+                case 7:
+                    LOAD_TEX(u8, GL_LUMINANCE, GL_UNSIGNED_BYTE);
+                case 8:
+                    LOAD_TEX(u8, GL_ALPHA, GL_UNSIGNED_BYTE);
+                case 12: {
+                    u8* dec = etc1_decompress_texture(rawdata, tex->width,
+                                                      tex->height);
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->width,
+                                 tex->height, 0, GL_RGB, GL_UNSIGNED_BYTE, dec);
+                    free(dec);
+                    break;
+                }
+                default:
+                    lwarn("unknown texture format %d", fmt);
+            }
+        }
+    }
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    texfilter[regs->param.min_filter]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                    texfilter[regs->param.mag_filter]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                    texwrap[regs->param.wrap_s & 3]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
+                    texwrap[regs->param.wrap_t & 3]);
 }
 
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
@@ -307,8 +450,8 @@ void store_vtx(GPU* gpu, int i, Vertex* vbuf) {
 }
 
 void gpu_drawarrays(GPU* gpu) {
-    linfo("drawing arrays nverts=%d primmode=%d curfb=%d", gpu->io.geom.nverts,
-          gpu->io.geom.prim_config.mode, gpu->cur_fb);
+    linfo("drawing arrays nverts=%d primmode=%d", gpu->io.geom.nverts,
+          gpu->io.geom.prim_config.mode);
     Vertex vbuf[gpu->io.geom.nverts];
     for (int i = 0; i < gpu->io.geom.nverts; i++) {
         load_vtx(gpu, i + gpu->io.geom.vtx_off);
@@ -322,8 +465,8 @@ void gpu_drawarrays(GPU* gpu) {
 }
 
 void gpu_drawelements(GPU* gpu) {
-    linfo("drawing elements nverts=%d primmode=%d curfb=%d",
-          gpu->io.geom.nverts, gpu->io.geom.prim_config.mode, gpu->cur_fb);
+    linfo("drawing elements nverts=%d primmode=%d", gpu->io.geom.nverts,
+          gpu->io.geom.prim_config.mode);
 
     u32 minind = 0xffff, maxind = 0;
     void* indexbuf = PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.indexbufoff);
@@ -348,24 +491,12 @@ void gpu_drawelements(GPU* gpu) {
         store_vtx(gpu, i - minind, vbuf);
     }
 
-#ifdef WIREFRAME
-    if (gpu->io.geom.nverts != 4) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-#endif
-
     glBufferData(GL_ARRAY_BUFFER, (maxind + 1 - minind) * sizeof(Vertex), vbuf,
                  GL_STREAM_DRAW);
     glDrawElementsBaseVertex(
         prim_mode[gpu->io.geom.prim_config.mode & 3], gpu->io.geom.nverts,
         gpu->io.geom.indexfmt ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE, 0,
         -minind);
-
-#ifdef WIREFRAME
-    if (gpu->io.geom.nverts != 4) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    }
-#endif
 }
 
 void gpu_update_gl_state(GPU* gpu) {
@@ -386,6 +517,13 @@ void gpu_update_gl_state(GPU* gpu) {
 
     glViewport(0, 0, 2 * I2F(f24tof32(gpu->io.raster.view_w)),
                2 * I2F(f24tof32(gpu->io.raster.view_h)));
+
+    if (gpu->io.tex.texunit_cfg & 1) {
+        glUniform1i(gpu->gl.uniforms.tex0enable, true);
+        gpu_load_texture(gpu, 0, &gpu->io.tex.tex0, gpu->io.tex.tex0_fmt);
+    } else {
+        glUniform1i(gpu->gl.uniforms.tex0enable, false);
+    }
 
     if (gpu->io.fb.color_mask.depthtest) {
         glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
