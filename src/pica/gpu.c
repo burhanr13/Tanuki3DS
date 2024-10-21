@@ -278,11 +278,11 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                 case 7:
                     glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
                                      texswizzle_luminance);
-                    LOAD_TEX(u8, GL_R, GL_UNSIGNED_BYTE);
+                    LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
                 case 8:
                     glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
                                      texswizzle_alpha);
-                    LOAD_TEX(u8, GL_R, GL_UNSIGNED_BYTE);
+                    LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
                 case 12: {
                     u8* dec = etc1_decompress_texture(tex->width, tex->height,
                                                       rawdata);
