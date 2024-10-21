@@ -235,6 +235,10 @@ typedef struct {
     u8 d[3];
 } u24;
 
+const GLint texswizzle_lum_alpha[4] = {GL_RED, GL_RED, GL_RED, GL_GREEN};
+const GLint texswizzle_luminance[4] = {GL_RED, GL_RED, GL_RED, GL_ONE};
+const GLint texswizzle_alpha[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
+
 void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
     glActiveTexture(GL_TEXTURE0 + id);
@@ -254,13 +258,13 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
             tex->fmt = fmt;
 
             linfo("creating texture from %x with dims %dx%d and fmt=%d",
-                     tex->paddr, tex->width, tex->height, tex->fmt);
+                  tex->paddr, tex->width, tex->height, tex->fmt);
 
             switch (fmt) {
                 case 0:
                     LOAD_TEX(u32, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8);
                 case 1:
-                    LOAD_TEX(u24, GL_RGB, GL_UNSIGNED_BYTE);
+                    LOAD_TEX(u24, GL_BGR, GL_UNSIGNED_BYTE);
                 case 2:
                     LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1);
                 case 3:
@@ -268,11 +272,17 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                 case 4:
                     LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
                 case 5:
-                    LOAD_TEX(u8, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE);
+                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                                     texswizzle_lum_alpha);
+                    LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
                 case 7:
-                    LOAD_TEX(u8, GL_LUMINANCE, GL_UNSIGNED_BYTE);
+                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                                     texswizzle_luminance);
+                    LOAD_TEX(u8, GL_R, GL_UNSIGNED_BYTE);
                 case 8:
-                    LOAD_TEX(u8, GL_ALPHA, GL_UNSIGNED_BYTE);
+                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                                     texswizzle_alpha);
+                    LOAD_TEX(u8, GL_R, GL_UNSIGNED_BYTE);
                 case 12: {
                     u8* dec = etc1_decompress_texture(tex->width, tex->height,
                                                       rawdata);
