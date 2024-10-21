@@ -11,7 +11,8 @@ out vec2 texcoord0;
 void main() {
     gl_Position = a_pos;
     color = a_color;
-    texcoord0 = a_texcoord0;
+    texcoord0.x = a_texcoord0.x;
+    texcoord0.y = 1 - a_texcoord0.y;
 }
 
 )";

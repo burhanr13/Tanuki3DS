@@ -10,6 +10,7 @@ tools/bin
 *.log
 log*
 *.fs
+*.toml
 
 ctremu*
 

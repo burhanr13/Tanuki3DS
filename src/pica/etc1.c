@@ -1,13 +1,14 @@
 #include "etc1.h"
 
-const int etc1table[8][4] = {
-    {2, 8, -2, -8},       {5, 17, -5, -17},     //
-    {9, 29, -9, -29},     {13, 42, -13, -42},   //
-    {18, 60, -18, -60},   {24, 80, -24, -80},   //
-    {33, 106, -33, -106}, {47, 183, -47, -183}, //
+const u8 etc1table[8][2] = {
+    {2, 8},   {5, 17},  {9, 29},   {13, 42},
+    {18, 60}, {24, 80}, {33, 106}, {47, 183},
 };
 
-void etc1_decompress_block(u64 block, u8* dst, u32 width) {
+#define CLAMP(x) ((x) < 0 ? 0 : (x) > 255 ? 255 : (x))
+
+void etc1_decompress_block(u64 block, u32 width, int Bpp,
+                           u8 (*dst)[width][Bpp]) {
     etc1block blk = {block};
 
     u8 r1, r2, g1, g2, b1, b2;
@@ -37,12 +38,16 @@ void etc1_decompress_block(u64 block, u8* dst, u32 width) {
             y = i % 4;
         }
         int pixel = y + x * 4;
-        int idx = ((blk.idxlo & BIT(pixel)) != 0) |
-                  ((blk.idxhi & BIT(pixel)) != 0) << 1;
-        int diff = etc1table[blk.table1][idx];
-        dst[3 * (y * width + x) + 0] = r1 + diff;
-        dst[3 * (y * width + x) + 1] = g1 + diff;
-        dst[3 * (y * width + x) + 2] = b1 + diff;
+        int mod = etc1table[blk.table1][(blk.modidx >> pixel) & 1];
+        if ((blk.modneg >> pixel) & 1) {
+            dst[y][x][0] = CLAMP(r1 - mod);
+            dst[y][x][1] = CLAMP(g1 - mod);
+            dst[y][x][2] = CLAMP(b1 - mod);
+        } else {
+            dst[y][x][0] = CLAMP(r1 + mod);
+            dst[y][x][1] = CLAMP(g1 + mod);
+            dst[y][x][2] = CLAMP(b1 + mod);
+        }
     }
     for (int i = 0; i < 8; i++) {
         int x, y;
@@ -54,24 +59,63 @@ void etc1_decompress_block(u64 block, u8* dst, u32 width) {
             y = i % 4;
         }
         int pixel = y + x * 4;
-        int idx = ((blk.idxlo & BIT(pixel)) != 0) |
-                  ((blk.idxhi & BIT(pixel)) != 0) << 1;
-        int diff = etc1table[blk.table2][idx];
-        dst[3 * (y * width + x) + 0] = r2 + diff;
-        dst[3 * (y * width + x) + 1] = g2 + diff;
-        dst[3 * (y * width + x) + 2] = b2 + diff;
+        int mod = etc1table[blk.table2][(blk.modidx >> pixel) & 1];
+        if ((blk.modneg >> pixel) & 1) {
+            dst[y][x][0] = CLAMP(r2 - mod);
+            dst[y][x][1] = CLAMP(g2 - mod);
+            dst[y][x][2] = CLAMP(b2 - mod);
+        } else {
+            dst[y][x][0] = CLAMP(r2 + mod);
+            dst[y][x][1] = CLAMP(g2 + mod);
+            dst[y][x][2] = CLAMP(b2 + mod);
+        }
     }
 }
 
-u8* etc1_decompress_texture(u64* src, u32 width, u32 height) {
-    u8* dst = malloc(3 * width * height);
+u8* etc1_decompress_texture(u32 width, u32 height,
+                            u64 (*src)[width / 8][2][2]) {
+    u8(*dst)[width][3] = malloc(height * sizeof *dst);
 
-    for (int tx = 0; tx < width / 4; tx++) {
-        for (int ty = 0; ty < height / 4; ty++) {
-            etc1_decompress_block(src[ty * (width / 4) + tx],
-                                  dst + 4 * 3 * (ty * width + tx), width);
+    for (int tx = 0; tx < width / 8; tx++) {
+        for (int ty = 0; ty < height / 8; ty++) {
+            for (int ttx = 0; ttx < 2; ttx++) {
+                for (int tty = 0; tty < 2; tty++) {
+                    etc1_decompress_block(
+                        src[ty][tx][tty][ttx], width, 3,
+                        (void*) &dst[8 * ty + 4 * tty][8 * tx + 4 * ttx]);
+                }
+            }
         }
     }
 
-    return dst;
+    return (u8*) dst;
+}
+
+u8* etc1a4_decompress_texture(u32 width, u32 height,
+                              u64 (*src)[width / 8][2][2][2]) {
+    u8(*dst)[width][4] = malloc(height * sizeof *dst);
+
+    for (int tx = 0; tx < width / 8; tx++) {
+        for (int ty = 0; ty < height / 8; ty++) {
+            for (int ttx = 0; ttx < 2; ttx++) {
+                for (int tty = 0; tty < 2; tty++) {
+                    u64 etcblk = src[ty][tx][tty][ttx][1];
+                    u64 ablk = src[ty][tx][tty][ttx][0];
+                    etc1_decompress_block(
+                        etcblk, width, 4,
+                        (void*) &dst[8 * ty + 4 * tty][8 * tx + 4 * ttx]);
+                    for (int fx = 0; fx < 4; fx++) {
+                        for (int fy = 0; fy < 4; fy++) {
+                            int pixel = fy + fx * 4;
+                            u8 a = ((ablk >> (pixel * 4)) & 0xf) * 0x11;
+                            dst[8 * ty + 4 * tty + fy][8 * tx + 4 * ttx + fx]
+                               [3] = a;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return (u8*) dst;
 }

@@ -12,7 +12,7 @@ uniform bool tex0enable;
 void main() {
     if (tex0enable) {
         fragclr = color * texture(tex0, texcoord0);
-        // if (fragclr == 0) {
+        // if (fragclr == vec4(0)) {
         //     fragclr = color;
         // }
     } else {

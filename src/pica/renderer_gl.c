@@ -119,21 +119,17 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
         gpu->textures.d[i].tex = textures[i];
     }
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
     glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
-    // glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    //glEnable(GL_DEPTH_TEST);
 }
 
 void render_gl_main(GLState* state) {
     glUseProgram(state->mainprogram);
     glBindVertexArray(state->mainvao);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glDisable(GL_CULL_FACE);
     glColorMask(true, true, true, true);
-    glDisable(GL_DEPTH_TEST);
 
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -151,5 +147,4 @@ void render_gl_main(GLState* state) {
 
     glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
-    // glEnable(GL_DEPTH_TEST);
 }

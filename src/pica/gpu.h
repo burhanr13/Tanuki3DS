@@ -81,8 +81,21 @@ typedef union {
         } tex;
         union {
             struct {
-                u32 color_op;
-                u32 blend_func;
+                struct {
+                    u8 frag_mode;
+                    u8 blend_mode;
+                    u16 unused;
+                } color_op;
+                struct {
+                    u8 rgb_eq;
+                    u8 a_eq;
+                    struct {
+                        u16 rgb_src : 4;
+                        u16 rgb_dst : 4;
+                        u16 a_src : 4;
+                        u16 a_dst : 4;
+                    };
+                } blend_func;
                 u32 logic_op;
                 u32 blend_color;
                 u32 alpha_test;

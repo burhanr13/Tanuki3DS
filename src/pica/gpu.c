@@ -14,6 +14,29 @@ static const GLenum texwrap[4] = {
     GL_REPEAT,
     GL_MIRRORED_REPEAT,
 };
+static const GLenum blend_eq[8] = {
+    GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT,
+    GL_MIN,      GL_MAX,           GL_FUNC_ADD,
+    GL_FUNC_ADD, GL_FUNC_ADD,
+};
+static const GLenum blend_func[16] = {
+    GL_ZERO,
+    GL_ONE,
+    GL_SRC_COLOR,
+    GL_ONE_MINUS_SRC_COLOR,
+    GL_DST_COLOR,
+    GL_ONE_MINUS_DST_COLOR,
+    GL_SRC_ALPHA,
+    GL_ONE_MINUS_SRC_ALPHA,
+    GL_DST_ALPHA,
+    GL_ONE_MINUS_DST_ALPHA,
+    GL_CONSTANT_COLOR,
+    GL_ONE_MINUS_CONSTANT_COLOR,
+    GL_CONSTANT_ALPHA,
+    GL_ONE_MINUS_CONSTANT_ALPHA,
+    GL_SRC_ALPHA_SATURATE,
+    GL_ZERO,
+};
 static const GLenum depth_func[8] = {
     GL_NEVER, GL_ALWAYS, GL_EQUAL,   GL_NOTEQUAL,
     GL_LESS,  GL_LEQUAL, GL_GREATER, GL_GEQUAL,
@@ -133,9 +156,8 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, bool top) {
     linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
 
     GLuint dst = top ? gpu->gl.textop : gpu->gl.texbot;
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     glBindTexture(GL_TEXTURE_2D, dst);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, fb->width, fb->height, 0);
 }
 
@@ -231,6 +253,9 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
             tex->height = regs->height;
             tex->fmt = fmt;
 
+            linfo("creating texture from %x with dims %dx%d and fmt=%d",
+                     tex->paddr, tex->width, tex->height, tex->fmt);
+
             switch (fmt) {
                 case 0:
                     LOAD_TEX(u32, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8);
@@ -241,7 +266,7 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                 case 3:
                     LOAD_TEX(u16, GL_RGB, GL_UNSIGNED_SHORT_5_6_5);
                 case 4:
-                    LOAD_TEX(u16, GL_RGB, GL_UNSIGNED_SHORT_4_4_4_4);
+                    LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
                 case 5:
                     LOAD_TEX(u8, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE);
                 case 7:
@@ -249,10 +274,19 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                 case 8:
                     LOAD_TEX(u8, GL_ALPHA, GL_UNSIGNED_BYTE);
                 case 12: {
-                    u8* dec = etc1_decompress_texture(rawdata, tex->width,
-                                                      tex->height);
+                    u8* dec = etc1_decompress_texture(tex->width, tex->height,
+                                                      rawdata);
                     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->width,
                                  tex->height, 0, GL_RGB, GL_UNSIGNED_BYTE, dec);
+                    free(dec);
+                    break;
+                }
+                case 13: {
+                    u8* dec = etc1a4_decompress_texture(tex->width, tex->height,
+                                                        rawdata);
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->width,
+                                 tex->height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                                 dec);
                     free(dec);
                     break;
                 }
@@ -524,6 +558,19 @@ void gpu_update_gl_state(GPU* gpu) {
     } else {
         glUniform1i(gpu->gl.uniforms.tex0enable, false);
     }
+
+    if (gpu->io.fb.color_op.frag_mode != 0) {
+        lwarn("using frag op %d", gpu->io.fb.color_op.frag_mode);
+    }
+    if (gpu->io.fb.color_op.blend_mode != 1) {
+        lwarn("using logic ops");
+    }
+    glBlendEquationSeparate(blend_eq[gpu->io.fb.blend_func.rgb_eq & 7],
+                            blend_eq[gpu->io.fb.blend_func.a_eq & 7]);
+    glBlendFuncSeparate(blend_func[gpu->io.fb.blend_func.rgb_src],
+                        blend_func[gpu->io.fb.blend_func.rgb_dst],
+                        blend_func[gpu->io.fb.blend_func.a_src],
+                        blend_func[gpu->io.fb.blend_func.a_dst]);
 
     if (gpu->io.fb.color_mask.depthtest) {
         glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
