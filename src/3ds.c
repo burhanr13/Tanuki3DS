@@ -71,6 +71,7 @@ void hle3ds_run_frame(HLE3DS* s) {
         if (!s->cpu.wfe) {
             cpu_run(s, FIFO_peek(s->sched.event_queue).time - s->sched.now);
         }
+        run_next_event(&s->sched);
         run_to_present(&s->sched);
         while (s->cpu.wfe && !s->frame_complete) {
             run_next_event(&s->sched);
