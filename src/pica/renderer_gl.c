@@ -85,14 +85,10 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
 
     glGenTextures(1, &state->textop);
     glBindTexture(GL_TEXTURE_2D, state->textop);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT, SCREEN_WIDTH, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glGenTextures(1, &state->texbot);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT, SCREEN_WIDTH_BOT, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -137,12 +133,13 @@ void render_gl_main(GLState* state) {
 
     glActiveTexture(GL_TEXTURE0);
 
-    glViewport(0, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT);
+    glViewport(0, SCREEN_HEIGHT * SCALE, SCREEN_WIDTH * SCALE,
+               SCREEN_HEIGHT * SCALE);
     glBindTexture(GL_TEXTURE_2D, state->textop);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2, 0, SCREEN_WIDTH_BOT,
-               SCREEN_HEIGHT);
+    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * SCALE, 0,
+               SCREEN_WIDTH_BOT * SCALE, SCREEN_HEIGHT * SCALE);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

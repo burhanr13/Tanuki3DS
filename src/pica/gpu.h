@@ -8,6 +8,8 @@
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
 
+#define SCALE 1
+
 typedef float fvec[4];
 typedef float fvec2[2];
 

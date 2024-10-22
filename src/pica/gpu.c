@@ -133,12 +133,13 @@ void gpu_update_cur_fb(GPU* gpu) {
         gpu->cur_fb->height = h;
 
         glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->color_tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gpu->cur_fb->width,
-                     gpu->cur_fb->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gpu->cur_fb->width * SCALE,
+                     gpu->cur_fb->height * SCALE, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                     NULL);
         glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->depth_tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, gpu->cur_fb->width,
-                     gpu->cur_fb->height, 0, GL_DEPTH_STENCIL,
-                     GL_UNSIGNED_INT_24_8, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8,
+                     gpu->cur_fb->width * SCALE, gpu->cur_fb->height * SCALE, 0,
+                     GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_2D, gpu->cur_fb->color_tex, 0);
@@ -160,7 +161,8 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, bool top) {
     GLuint dst = top ? gpu->gl.textop : gpu->gl.texbot;
     glBindTexture(GL_TEXTURE_2D, dst);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
-    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, fb->width, fb->height, 0);
+    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, fb->width * SCALE,
+                     fb->height * SCALE, 0);
 }
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
@@ -616,9 +618,9 @@ void gpu_update_gl_state(GPU* gpu) {
             break;
     }
 
-    glViewport(gpu->io.raster.view_x, gpu->io.raster.view_y,
-               2 * I2F(f24tof32(gpu->io.raster.view_w)),
-               2 * I2F(f24tof32(gpu->io.raster.view_h)));
+    glViewport(gpu->io.raster.view_x * SCALE, gpu->io.raster.view_y * SCALE,
+               2 * I2F(f24tof32(gpu->io.raster.view_w)) * SCALE,
+               2 * I2F(f24tof32(gpu->io.raster.view_h)) * SCALE);
 
     if (gpu->io.raster.depthmap_enable) {
         float offset = I2F(f24tof32(gpu->io.raster.depthmap_offset));

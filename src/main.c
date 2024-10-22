@@ -28,8 +28,8 @@ int main(int argc, char** argv) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
     SDL_Window* window = SDL_CreateWindow("ctremu", SDL_WINDOWPOS_UNDEFINED,
-                                          SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH,
-                                          2 * SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
+                                          SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * SCALE,
+                                          2 * SCREEN_HEIGHT * SCALE, SDL_WINDOW_OPENGL);
 
     SDL_GLContext glcontext = SDL_GL_CreateContext(window);
     if (!glcontext) {
