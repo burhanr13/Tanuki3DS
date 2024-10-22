@@ -87,17 +87,20 @@ typedef union {
                     u16 unused;
                 } color_op;
                 struct {
-                    u8 rgb_eq;
-                    u8 a_eq;
-                    struct {
-                        u16 rgb_src : 4;
-                        u16 rgb_dst : 4;
-                        u16 a_src : 4;
-                        u16 a_dst : 4;
-                    };
+                    u32 rgb_eq : 8;
+                    u32 a_eq : 8;
+                    u32 rgb_src : 4;
+                    u32 rgb_dst : 4;
+                    u32 a_src : 4;
+                    u32 a_dst : 4;
                 } blend_func;
                 u32 logic_op;
-                u32 blend_color;
+                struct {
+                    u8 r;
+                    u8 g;
+                    u8 b;
+                    u8 a;
+                } blend_color;
                 u32 alpha_test;
                 u32 stencil_test;
                 u32 stencil_op;
@@ -306,7 +309,6 @@ typedef union {
 
 u32 f24tof32(u32 i);
 u32 f31tof32(u32 i);
-
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, bool top);
 
