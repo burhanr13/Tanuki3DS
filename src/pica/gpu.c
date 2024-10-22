@@ -113,13 +113,15 @@ FBInfo* fbcache_load(GPU* gpu, u32 color_paddr) {
 }
 
 void gpu_update_cur_fb(GPU* gpu) {
-    if (gpu->cur_fb && gpu->cur_fb->color_paddr == gpu->io.fb.colorbuf_loc)
+    if (gpu->cur_fb &&
+        gpu->cur_fb->color_paddr == (gpu->io.fb.colorbuf_loc << 3))
         return;
 
     gpu->cur_fb = fbcache_load(gpu, gpu->io.fb.colorbuf_loc << 3);
     gpu->cur_fb->depth_paddr = gpu->io.fb.depthbuf_loc << 3;
 
-    linfo("drawing on fb at %x", gpu->cur_fb->color_paddr);
+    linfo("drawing on fb %d at %x", gpu->cur_fb - gpu->fbs.d,
+          gpu->cur_fb->color_paddr);
 
     glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
 
@@ -169,12 +171,17 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
             glClearColor((color >> 24) / 256.f, ((color >> 16) & 0xff) / 256.f,
                          ((color >> 8) & 0xff) / 256.f, (color & 0xff) / 256.f);
             glClear(GL_COLOR_BUFFER_BIT);
+            linfo("cleared color buffer at %x of fb %d with value %x", paddr, i,
+                  color);
             return;
         }
         if (gpu->fbs.d[i].depth_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
+            glClearDepthf((color & MASK(24)) / (float) (1 << 24));
             glClear(GL_DEPTH_BUFFER_BIT);
+            linfo("cleared depth buffer at %x of fb %d with value %x", paddr, i,
+                  color);
             return;
         }
     }
@@ -592,6 +599,8 @@ void gpu_drawelements(GPU* gpu) {
 }
 
 void gpu_update_gl_state(GPU* gpu) {
+    gpu_update_cur_fb(gpu);
+
     switch (gpu->io.raster.facecull_config & 3) {
         case 0:
         case 3:
@@ -607,8 +616,17 @@ void gpu_update_gl_state(GPU* gpu) {
             break;
     }
 
-    glViewport(0, 0, 2 * I2F(f24tof32(gpu->io.raster.view_w)),
+    glViewport(gpu->io.raster.view_x, gpu->io.raster.view_y,
+               2 * I2F(f24tof32(gpu->io.raster.view_w)),
                2 * I2F(f24tof32(gpu->io.raster.view_h)));
+
+    if (gpu->io.raster.depthmap_enable) {
+        float offset = I2F(f24tof32(gpu->io.raster.depthmap_offset));
+        float scale = I2F(f24tof32(gpu->io.raster.depthmap_scale));
+        glDepthRangef((offset - scale + 1) / 2, (offset + scale + 1) / 2);
+    } else {
+        glDepthRangef(0, 1);
+    }
 
     if (gpu->io.tex.texunit_cfg & 1) {
         glUniform1i(gpu->gl.uniforms.tex0enable, true);
@@ -636,15 +654,13 @@ void gpu_update_gl_state(GPU* gpu) {
         lwarn("using logic ops");
     }
 
-    //glEnable(GL_DEPTH_TEST);
+    glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
+                gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
+    glDepthMask(gpu->io.fb.color_mask.depth);
+    glEnable(GL_DEPTH_TEST);
     if (gpu->io.fb.color_mask.depthtest) {
         glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
     } else {
         glDepthFunc(GL_ALWAYS);
     }
-    glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
-                gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
-    glDepthMask(gpu->io.fb.color_mask.depth);
-
-    gpu_update_cur_fb(gpu);
 }
