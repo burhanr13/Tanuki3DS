@@ -620,19 +620,23 @@ void gpu_update_gl_state(GPU* gpu) {
     if (gpu->io.fb.color_op.frag_mode != 0) {
         lwarn("using frag op %d", gpu->io.fb.color_op.frag_mode);
     }
-    if (gpu->io.fb.color_op.blend_mode != 1) {
+    if (gpu->io.fb.color_op.blend_mode == 1) {
+        glEnable(GL_BLEND);
+        glBlendEquationSeparate(blend_eq[gpu->io.fb.blend_func.rgb_eq & 7],
+                                blend_eq[gpu->io.fb.blend_func.a_eq & 7]);
+        glBlendFuncSeparate(blend_func[gpu->io.fb.blend_func.rgb_src],
+                            blend_func[gpu->io.fb.blend_func.rgb_dst],
+                            blend_func[gpu->io.fb.blend_func.a_src],
+                            blend_func[gpu->io.fb.blend_func.a_dst]);
+        glBlendColor(
+            gpu->io.fb.blend_color.r / 255.f, gpu->io.fb.blend_color.g / 255.f,
+            gpu->io.fb.blend_color.b / 255.f, gpu->io.fb.blend_color.a / 255.f);
+    } else {
+        glDisable(GL_BLEND);
         lwarn("using logic ops");
     }
-    glBlendEquationSeparate(blend_eq[gpu->io.fb.blend_func.rgb_eq & 7],
-                            blend_eq[gpu->io.fb.blend_func.a_eq & 7]);
-    glBlendFuncSeparate(blend_func[gpu->io.fb.blend_func.rgb_src],
-                        blend_func[gpu->io.fb.blend_func.rgb_dst],
-                        blend_func[gpu->io.fb.blend_func.a_src],
-                        blend_func[gpu->io.fb.blend_func.a_dst]);
-    glBlendColor(
-        gpu->io.fb.blend_color.r / 255.f, gpu->io.fb.blend_color.g / 255.f,
-        gpu->io.fb.blend_color.b / 255.f, gpu->io.fb.blend_color.a / 255.f);
 
+    //glEnable(GL_DEPTH_TEST);
     if (gpu->io.fb.color_mask.depthtest) {
         glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
     } else {

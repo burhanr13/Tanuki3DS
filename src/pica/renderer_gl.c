@@ -121,8 +121,6 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
 
     glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
-    glEnable(GL_BLEND);
-    //glEnable(GL_DEPTH_TEST);
 }
 
 void render_gl_main(GLState* state) {
@@ -130,6 +128,9 @@ void render_gl_main(GLState* state) {
     glBindVertexArray(state->mainvao);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glColorMask(true, true, true, true);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
 
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
