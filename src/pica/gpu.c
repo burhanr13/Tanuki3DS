@@ -247,7 +247,7 @@ typedef struct {
 } u24;
 
 const GLint texswizzle_default[4] = {GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA};
-const GLint texswizzle_lum_alpha[4] = {GL_RED, GL_RED, GL_RED, GL_GREEN};
+const GLint texswizzle_lum_alpha[4] = {GL_GREEN, GL_GREEN, GL_GREEN, GL_RED};
 const GLint texswizzle_luminance[4] = {GL_RED, GL_RED, GL_RED, GL_ONE};
 const GLint texswizzle_alpha[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
 
