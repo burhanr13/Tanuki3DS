@@ -8,38 +8,38 @@
 #define GSPMEM(off) PTR(s->services.gsp.sharedmem.vaddr + off)
 
 DECL_PORT(gsp_gpu) {
-    u32* cmd_params = PTR(cmd_addr);
+    u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0008:
             linfo("FlushDataCache");
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x000b:
             linfo("LCDForceBlank");
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x000c:
             linfo("TriggerCmdReqQueue");
             gsp_handle_command(s);
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x0013: {
-            cmd_params[0] = MAKE_IPCHEADER(2, 2);
+            cmdbuf[0] = IPCHDR(2, 2);
 
             u32 shmemhandle =
                 srvobj_make_handle(s, &s->services.gsp.sharedmem.hdr);
             if (!shmemhandle) {
-                cmd_params[1] = -1;
+                cmdbuf[1] = -1;
                 return;
             }
 
-            KEvent* event = HANDLE_GET_TYPED(cmd_params[3], KOT_EVENT);
+            KEvent* event = HANDLE_GET_TYPED(cmdbuf[3], KOT_EVENT);
             if (!event) {
                 lerror("invalid event handle");
-                cmd_params[1] = -1;
+                cmdbuf[1] = -1;
                 return;
             }
 
@@ -49,26 +49,27 @@ DECL_PORT(gsp_gpu) {
 
             linfo("RegisterInterruptRelayQueue with event handle=%x, "
                   "shmemhandle=%x",
-                  cmd_params[3], shmemhandle);
-            cmd_params[1] = 0;
-            cmd_params[2] = 0;
-            cmd_params[3] = 0;
-            cmd_params[4] = shmemhandle;
+                  cmdbuf[3], shmemhandle);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 0;
+            cmdbuf[3] = 0;
+            cmdbuf[4] = shmemhandle;
             break;
         }
         case 0x0016:
             linfo("AcquireRight");
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x001e:
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         default:
-            lwarn("unknown command 0x%04x", cmd.command);
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = -1;
+            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
+                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
     }
 }

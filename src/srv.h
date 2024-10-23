@@ -16,7 +16,7 @@ typedef union {
     };
 } IPCHeader;
 
-#define MAKE_IPCHEADER(normal, translate)                                      \
+#define IPCHDR(normal, translate)                                              \
     ((IPCHeader){.paramsize_normal = normal, .paramsize_translate = translate} \
          .w)
 

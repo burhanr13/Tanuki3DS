@@ -13,6 +13,7 @@
 #include "services/hid.h"
 
 EmulatorState ctremu;
+bool g_infologs = false;
 
 const char usage[] = "ctremu [options] <romfile>\n"
                      "-h -- print help\n";
@@ -57,6 +58,10 @@ void read_args(int argc, char** argv) {
                     case 'h':
                         eprintf(usage);
                         exit(0);
+                        break;
+                    case 'l':
+                        g_infologs = true;
+                        break;
                     default:
                         eprintf("Invalid argument\n");
                 }

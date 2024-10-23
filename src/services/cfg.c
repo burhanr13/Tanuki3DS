@@ -3,14 +3,14 @@
 #include "../3ds.h"
 
 DECL_PORT(cfg) {
-    u32* cmd_params = PTR(cmd_addr);
+    u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0001: {
-            int blkid = cmd_params[2];
-            void* ptr = PTR(cmd_params[4]);
+            int blkid = cmdbuf[2];
+            void* ptr = PTR(cmdbuf[4]);
             linfo("GetConfigInfoBlk2 with blkid %x", blkid);
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             switch (blkid) {
                 case 0x50005: {
                     float* block = ptr;
@@ -56,21 +56,22 @@ DECL_PORT(cfg) {
         }
         case 0x0002:
             linfo("GetRegion");
-            cmd_params[0] = MAKE_IPCHEADER(2, 0);
-            cmd_params[1] = 0;
-            cmd_params[2] = 1;
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 1;
             break;
         case 0x0003:
             linfo("GenHashConsoleUnique");
-            cmd_params[0] = MAKE_IPCHEADER(3, 0);
-            cmd_params[1] = 0;
-            cmd_params[2] = 0x69696969;
-            cmd_params[3] = 0x69696969;
+            cmdbuf[0] = IPCHDR(3, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 0x69696969;
+            cmdbuf[3] = 0x69696969;
             break;
         default:
-            lwarn("unknown command 0x%04x", cmd.command);
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
+                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
     }
 }

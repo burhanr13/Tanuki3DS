@@ -6,8 +6,8 @@ CXX := g++
 CSTD := -std=gnu17
 CXXSTD := -std=gnu++20
 CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unused-result -Werror
-CFLAGS_RELEASE := -O3 -flto -DNOINFO
-CFLAGS_DEBUG := -g -fsanitize=address -DNOINFO
+CFLAGS_RELEASE := -O3 -flto
+CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE
 

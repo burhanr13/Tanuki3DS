@@ -92,6 +92,8 @@ static inline bool compare(u32 op, float a, float b) {
 }
 
 #define MUL(a, b) ((a != 0) ? a * b : 0)
+#define MAX(a, b) (isinf(b) ? b : fmaxf(b, a))
+#define MIN(a, b) (fminf(b, a))
 
 u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
     PICAInstr instr = gpu->code[pc++];
@@ -207,10 +209,10 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             SRC1(a, 1);
             SRC2(b, 1);
             fvec res;
-            res[0] = fmaxf(a[0], b[0]);
-            res[1] = fmaxf(a[1], b[1]);
-            res[2] = fmaxf(a[2], b[2]);
-            res[3] = fmaxf(a[3], b[3]);
+            res[0] = MAX(a[0], b[0]);
+            res[1] = MAX(a[1], b[1]);
+            res[2] = MAX(a[2], b[2]);
+            res[3] = MAX(a[3], b[3]);
             DEST(res, 1);
             break;
         }
@@ -219,10 +221,10 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             SRC1(a, 1);
             SRC2(b, 1);
             fvec res;
-            res[0] = fminf(a[0], b[0]);
-            res[1] = fminf(a[1], b[1]);
-            res[2] = fminf(a[2], b[2]);
-            res[3] = fminf(a[3], b[3]);
+            res[0] = MIN(a[0], b[0]);
+            res[1] = MIN(a[1], b[1]);
+            res[2] = MIN(a[2], b[2]);
+            res[3] = MIN(a[3], b[3]);
             DEST(res, 1);
             break;
         }
@@ -230,6 +232,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             fvec a;
             SRC1(a, 1);
             fvec res;
+            if (a[0] == -0.f) a[0] = 0;
             res[0] = 1 / a[0];
             res[1] = res[2] = res[3] = res[0];
             DEST(res, 1);
@@ -239,6 +242,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             fvec a;
             SRC1(a, 1);
             fvec res;
+            if (a[0] == -0.f) a[0] = 0;
             res[0] = 1 / sqrtf(a[0]);
             res[1] = res[2] = res[3] = res[0];
             DEST(res, 1);

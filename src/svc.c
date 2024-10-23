@@ -313,20 +313,19 @@ DECL_SVC(ArbitrateAddress) {
 }
 
 DECL_SVC(CloseHandle) {
-    KObject* obj = HANDLE_GET(R(0));
+    u32 handle = R(0);
+    KObject* obj = HANDLE_GET(handle);
     if (!obj) {
         lerror("invalid handle");
-        R(0) = -1;
+        R(0) = 0;
         return;
     }
-
-    if (!--obj->refcount) {
-        linfo("destroying object of handle %x", R(0));
-        kobject_destroy(obj);
-        HANDLE_SET(R(0), NULL);
-    }
-
     R(0) = 0;
+    if (!--obj->refcount) {
+        linfo("destroying object of handle %x", handle);
+        HANDLE_SET(handle, NULL);
+        kobject_destroy(s, obj);
+    }
 }
 
 DECL_SVC(WaitSynchronization1) {
@@ -413,6 +412,7 @@ DECL_SVC(DuplicateHandle) {
 
 DECL_SVC(GetSystemTick) {
     RR(0) = s->sched.now;
+    s->sched.now += 200;
 }
 
 DECL_SVC(ConnectToPort) {

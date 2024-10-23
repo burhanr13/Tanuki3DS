@@ -105,7 +105,7 @@ void thread_sleep(HLE3DS* s, KThread* t, s64 timeout) {
 
 void thread_wakeup_timeout(HLE3DS* s, u32 tid) {
     KThread* t = s->process.threads[tid];
-    if (!t) return;
+    if (!t || t->state != THRD_SLEEP) return;
 
     linfo("waking up thread %d from timeout", t->id);
     KListNode** cur = &t->waiting_objs;
@@ -118,6 +118,7 @@ void thread_wakeup_timeout(HLE3DS* s, u32 tid) {
 }
 
 bool thread_wakeup(HLE3DS* s, KThread* t, KObject* reason) {
+    if (t->state != THRD_SLEEP) return false;
     t->context.r[1] = klist_remove_key(&t->waiting_objs, reason);
     if (!t->waiting_objs || !t->wait_all) {
         linfo("waking up thread %d", t->id);

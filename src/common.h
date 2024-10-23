@@ -12,13 +12,13 @@
 #define println() printf("\n")
 #define printfln(format, ...) printf(format "\n"__VA_OPT__(, ) __VA_ARGS__)
 
-#ifndef NOINFO
+extern bool g_infologs;
+
 #define linfo(format, ...)                                                     \
-    printf("\e[32m[INFO](%s) " format "\e[0m\n",                               \
-           __func__ __VA_OPT__(, ) __VA_ARGS__)
-#else
-#define linfo(format, ...)
-#endif
+    (g_infologs ? printf("\e[32m[INFO](%s) " format "\e[0m\n",                   \
+                       __func__ __VA_OPT__(, ) __VA_ARGS__)                    \
+              : (void) 0)
+
 #define lwarn(format, ...)                                                     \
     printf("\e[43;30m[WARNING](%s) " format "\e[0m\n",                         \
            __func__ __VA_OPT__(, ) __VA_ARGS__)

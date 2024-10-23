@@ -51,30 +51,30 @@ KSession* session_create(PortRequestHandler f) {
 
 DECL_PORT(srv) {
 #define IS(_name) (!strcmp(name, _name))
-    u32* cmd_params = PTR(cmd_addr);
+    u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0001: {
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         }
         case 0x0002: {
-            cmd_params[0] = MAKE_IPCHEADER(1, 2);
+            cmdbuf[0] = IPCHDR(1, 2);
             u32 h = srvobj_make_handle(s, &s->services.notif_sem.hdr);
             if (h) {
-                cmd_params[3] = h;
-                cmd_params[1] = 0;
+                cmdbuf[3] = h;
+                cmdbuf[1] = 0;
             } else {
-                cmd_params[1] = -1;
+                cmdbuf[1] = -1;
             }
             break;
         }
         case 0x0005: {
             char name[9];
-            memcpy(name, &cmd_params[1], cmd_params[3]);
-            name[cmd_params[3]] = '\0';
-            cmd_params[0] = MAKE_IPCHEADER(3, 0);
-            cmd_params[1] = 0;
+            memcpy(name, &cmdbuf[1], cmdbuf[3]);
+            name[cmdbuf[3]] = '\0';
+            cmdbuf[0] = IPCHDR(3, 0);
+            cmdbuf[1] = 0;
 
             PortRequestHandler handler;
             if (IS("APT:U") || IS("APT:A") || IS("APT:S")) {
@@ -99,34 +99,35 @@ DECL_PORT(srv) {
                 handler = port_handle_frd;
             } else {
                 lerror("unknown service '%s'", name);
-                cmd_params[1] = -1;
+                cmdbuf[1] = -1;
             }
-            if (cmd_params[1] == 0) {
+            if (cmdbuf[1] == 0) {
                 u32 handle = handle_new(s);
                 KSession* session = session_create(handler);
                 HANDLE_SET(handle, session);
                 session->hdr.refcount = 1;
-                cmd_params[3] = handle;
+                cmdbuf[3] = handle;
                 linfo("connected to service '%s' with handle %x", name, handle);
             }
             break;
         }
         case 0x000b:
-            cmd_params[0] = MAKE_IPCHEADER(2, 0);
-            cmd_params[1] = 0;
-            cmd_params[2] = 0;
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 0;
             break;
         default:
-            lwarn("unknown command 0x%04x", cmd.command);
-            cmd_params[1] = 0;
-            cmd_params[2] = 0;
+            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
+                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
     }
 #undef IS
 }
 
 DECL_PORT(errf) {
-    u32* cmd_params = PTR(cmd_addr);
+    u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0001: {
             struct {
@@ -142,20 +143,21 @@ DECL_PORT(errf) {
                 union {
                     char message[0x60];
                 };
-            }* errinfo = (void*) cmd_params;
+            }* errinfo = (void*) cmdbuf;
 
             lerror("fatal error type %d, result %08x, pc %08x, message: %s",
                    errinfo->type, errinfo->resultcode, errinfo->pc,
                    errinfo->message);
 
-            cmd_params[0] = 0;
-            cmd_params[1] = 1;
+            cmdbuf[0] = 0;
+            cmdbuf[1] = 1;
             break;
         }
         default:
-            lwarn("unknown command 0x%04x", cmd.command);
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = -1;
+            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
+                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
     }
 }

@@ -49,6 +49,6 @@ void klist_insert(KListNode** l, KObject* o);
 void klist_remove(KListNode** l);
 u32 klist_remove_key(KListNode** l, KObject* o);
 
-void kobject_destroy(KObject* o);
+void kobject_destroy(HLE3DS* s, KObject* o);
 
 #endif

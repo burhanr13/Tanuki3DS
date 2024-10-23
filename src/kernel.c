@@ -37,8 +37,20 @@ u32 klist_remove_key(KListNode** l, KObject* o) {
     return 0;
 }
 
-void kobject_destroy(KObject* o) {
+void kobject_destroy(HLE3DS* s, KObject* o) {
     switch (o->type) {
+        case KOT_THREAD:{
+            KThread* t = (KThread*)o;
+            t->state = THRD_DEAD;
+            KListNode** cur = &t->waiting_thrds;
+            while (*cur) {
+                thread_wakeup(s, (KThread*) (*cur)->key, &t->hdr);
+                klist_remove(cur);
+            }
+
+            thread_reschedule(s);
+            break;
+        }
         case KOT_SESSION:
         case KOT_RESLIMIT:
             free(o);

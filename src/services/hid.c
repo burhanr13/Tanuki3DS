@@ -5,50 +5,50 @@
 #define HIDMEM ((HIDSharedMem*) PTR(s->services.hid.sharedmem.vaddr))
 
 DECL_PORT(hid) {
-    u32* cmd_params = PTR(cmd_addr);
+    u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x000a:
-            cmd_params[0] = MAKE_IPCHEADER(1, 7);
-            cmd_params[1] = 0;
-            cmd_params[2] = 0x14000000;
-            cmd_params[3] =
-                srvobj_make_handle(s, &s->services.hid.sharedmem.hdr);
+            cmdbuf[0] = IPCHDR(1, 7);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 0x14000000;
+            cmdbuf[3] = srvobj_make_handle(s, &s->services.hid.sharedmem.hdr);
             for (int i = 0; i < HIDEVENT_MAX; i++) {
-                cmd_params[4 + i] =
+                cmdbuf[4 + i] =
                     srvobj_make_handle(s, &s->services.hid.events[i].hdr);
             }
-            linfo("GetIPCHandles with sharedmem %x", cmd_params[3]);
+            linfo("GetIPCHandles with sharedmem %x", cmdbuf[3]);
             break;
         case 0x0011:
             linfo("EnableAccelerometer");
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x0013:
             linfo("EnableGyroscopeLow");
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = 0;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x0015:
             linfo("GetGyroscopeLowRawToDpsCoefficient");
-            cmd_params[0] = MAKE_IPCHEADER(2, 0);
-            cmd_params[1] = 0;
-            *(float*) &cmd_params[2] = 1.0f;
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            *(float*) &cmdbuf[2] = 1.0f;
             break;
         case 0x0016:
             linfo("GetGyroscopeLowCalibrateParam");
-            cmd_params[0] = MAKE_IPCHEADER(6, 0);
-            cmd_params[1] = 0;
-            cmd_params[2] = -1;
-            cmd_params[3] = -1;
-            cmd_params[4] = -1;
-            cmd_params[5] = -1;
-            cmd_params[6] = -1;
+            cmdbuf[0] = IPCHDR(6, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = -1;
+            cmdbuf[3] = -1;
+            cmdbuf[4] = -1;
+            cmdbuf[5] = -1;
+            cmdbuf[6] = -1;
             break;
         default:
-            lwarn("unknown command 0x%04x", cmd.command);
-            cmd_params[0] = MAKE_IPCHEADER(1, 0);
-            cmd_params[1] = -1;
+            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
+                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
     }
 }
