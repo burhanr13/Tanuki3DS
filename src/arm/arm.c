@@ -79,7 +79,7 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
         return ARM_MULTIPLYSHORT;
     } else if (instr.multiply.c1 == 0b000000 && instr.multiply.c2 == 0b1001) {
         return ARM_MULTIPLY;
-    } else if (instr.multiply_long.c1 == 0b00001 &&
+    } else if (instr.multiply_long.c1 == 0b0000 &&
                instr.multiply_long.c2 == 0b1001) {
         return ARM_MULTIPLYLONG;
     } else if (instr.half_trans.c1 == 0b000 && instr.half_trans.c2 == 1 &&

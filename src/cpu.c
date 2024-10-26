@@ -5,7 +5,7 @@
 #include "svc.h"
 #include "thread.h"
 
-// #define CPULOG
+//#define CPULOG
 //#define BREAK
 
 void cpu_init(HLE3DS* s) {

@@ -474,7 +474,8 @@ void optimize_constprop(IRBlock* block) {
         }
         if (iropc_ispure(inst->opcode) &&
             !(inst[1].opcode == IR_ADC || inst[1].opcode == IR_GETC ||
-              inst[3].opcode == IR_GETV)) {
+              (inst + 3 < block->code.d + block->code.size &&
+               inst[3].opcode == IR_GETV))) {
             for (int j = 0; j < i; j++) {
                 if (notcurcond[j]) continue;
                 if (!memcmp(&block->code.d[j], inst, sizeof(IRInstr))) {

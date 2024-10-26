@@ -22,12 +22,12 @@ typedef struct {
 
 DECL_PORT(fs);
 
-DECL_PORT(fs_romfs);
+DECL_PORT_ARG(fs_selfncch, base);
 
 DECL_PORT_ARG(fs_file, fd);
 
 u64 fs_open_archive(u32 id, u32 path_type, void* path);
-u32 fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
+KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
                  u32 pathsize, u32 flags);
 
 #endif

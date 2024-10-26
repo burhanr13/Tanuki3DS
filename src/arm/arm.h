@@ -117,7 +117,8 @@ typedef union {
         u32 s : 1;
         u32 a : 1;
         u32 u : 1;
-        u32 c1 : 5; // 00001
+        u32 aa : 1;
+        u32 c1 : 4; // 0000
         u32 cond : 4;
     } multiply_long;
     struct {

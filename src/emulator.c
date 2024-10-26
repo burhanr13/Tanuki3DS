@@ -41,6 +41,7 @@ int emulator_init(int argc, char** argv) {
     mkdir("system", S_IRWXU);
     mkdir("system/savedata", S_IRWXU);
     mkdir("system/extdata", S_IRWXU);
+    mkdir("system/sdmc", S_IRWXU);
 
     return 0;
 }

@@ -7,6 +7,7 @@
 
 #include "../3ds.h"
 #include "../emulator_state.h"
+#include "../filesystems.h"
 #include "../srv.h"
 
 DECL_PORT(fs) {
@@ -24,11 +25,26 @@ DECL_PORT(fs) {
             u32 pathsize = cmdbuf[5];
             u32 flags = cmdbuf[6];
             void* path = PTR(cmdbuf[9]);
-            u32 handle =
-                fs_open_file(s, archivehandle, pathtype, path, pathsize, flags);
+
             cmdbuf[0] = IPCHDR(1, 2);
-            cmdbuf[1] = handle ? 0 : 0xC8804478;
-            cmdbuf[3] = handle;
+
+            u32 h = handle_new(s);
+            if (!h) {
+                cmdbuf[1] = -1;
+                return;
+            }
+            KSession* ses =
+                fs_open_file(s, archivehandle, pathtype, path, pathsize, flags);
+            if (!ses) {
+                cmdbuf[1] = 0xC8804478;
+                return;
+            }
+            HANDLE_SET(h, ses);
+            ses->hdr.refcount = 1;
+            linfo("opened file with handle %x", h);
+            cmdbuf[0] = IPCHDR(1, 2);
+            cmdbuf[1] = 0;
+            cmdbuf[3] = h;
             break;
         case 0x0803: {
             linfo("OpenFileDirectly");
@@ -42,10 +58,22 @@ DECL_PORT(fs) {
             cmdbuf[0] = IPCHDR(1, 2);
             u64 ahandle =
                 fs_open_archive(archive, archivepathtype, archivepath);
-            u32 fhandle = fs_open_file(s, ahandle, filepathtype, filepath,
-                                       filepathsize, flags);
-            cmdbuf[1] = fhandle ? 0 : -1;
-            cmdbuf[3] = fhandle;
+            u32 h = handle_new(s);
+            if (!h) {
+                cmdbuf[1] = -1;
+                return;
+            }
+            KSession* ses = fs_open_file(s, ahandle, filepathtype, filepath,
+                                         filepathsize, flags);
+            if (!ses) {
+                cmdbuf[1] = 0xC8804478;
+                return;
+            }
+            HANDLE_SET(h, ses);
+            ses->hdr.refcount = 1;
+            linfo("opened file with handle %x", h);
+            cmdbuf[1] = 0;
+            cmdbuf[3] = h;
             break;
         }
         case 0x080c: {
@@ -95,7 +123,7 @@ DECL_PORT(fs) {
     }
 }
 
-DECL_PORT(fs_romfs) {
+DECL_PORT_ARG(fs_selfncch, base) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0802: {
@@ -108,8 +136,7 @@ DECL_PORT(fs_romfs) {
 
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            fseek(s->gamecard.fp, s->gamecard.romfs_off + 0x1000 + offset,
-                  SEEK_SET);
+            fseek(s->gamecard.fp, base + offset, SEEK_SET);
             cmdbuf[2] = fread(data, 1, size, s->gamecard.fp);
             break;
         }
@@ -209,6 +236,11 @@ char* archive_basepath(u64 archive) {
             asprintf(&basepath, "system/extdata/%08x", archive >> 32);
             return basepath;
         }
+        case 9: {
+            char* basepath;
+            asprintf(&basepath, "system/sdmc");
+            return basepath;
+        }
     }
     return NULL;
 }
@@ -251,6 +283,17 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
             }
             break;
         }
+        case 9: {
+            if (pathtype == FSPATH_EMPTY) {
+                linfo("opening sd card");
+                char* apath = archive_basepath(9);
+                free(apath);
+                return 9;
+            } else {
+                lwarn("unknown path type");
+                return -1;
+            }
+        }
         case 0x2345678a:
             return 0x2345678a;
         default:
@@ -259,37 +302,52 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
     }
 }
 
-u32 open_romfs(HLE3DS* s) {
-    u32 h = handle_new(s);
-    KSession* ses = session_create(port_handle_fs_romfs);
-    HANDLE_SET(h, ses);
-    ses->hdr.refcount = 1;
-    linfo("opened romfs with handle %x", h);
-    return h;
-}
-
-u32 fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
-                 u32 pathsize, u32 flags) {
+KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
+                       u32 pathsize, u32 flags) {
     switch (archive << 32 >> 32) {
         case 3: {
             if (pathtype == FSPATH_BINARY) {
                 u32* path = rawpath;
                 switch (path[0]) {
                     case 0: {
-                        return open_romfs(s);
+                        linfo("opening romfs");
+                        return session_create_arg(port_handle_fs_selfncch,
+                                                  s->gamecard.romfs_off +
+                                                      0x1000);
+                    }
+                    case 2: {
+                        char* filename = (char*) &path[1];
+                        ExeFSHeader hdr;
+                        fseek(s->gamecard.fp, s->gamecard.exefs_off, SEEK_SET);
+                        fread(&hdr, sizeof hdr, 1, s->gamecard.fp);
+                        u32 offset = 0;
+                        for (int i = 0; i < 10; i++) {
+                            if (!strcmp(hdr.file[i].name, filename)) {
+                                offset = hdr.file[i].offset;
+                            }
+                        }
+                        if (offset == 0) {
+                            lerror("no such exefs file %s", filename);
+                            return NULL;
+                        }
+                        linfo("opening exefs file %s", filename);
+                        return session_create_arg(port_handle_fs_selfncch,
+                                                  s->gamecard.exefs_off +
+                                                      offset);
                     }
                     default:
                         lerror("unknown selfNCCH file");
-                        return 0;
+                        return NULL;
                 }
             } else {
                 lerror("unknown selfNCCH file path type");
-                return 0;
+                return NULL;
             }
             break;
         }
         case 4:
-        case 7: {
+        case 7:
+        case 9: {
             char* basepath = archive_basepath(archive);
 
             char* filepath = NULL;
@@ -306,7 +364,7 @@ u32 fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
                 asprintf(&filepath, "%s%s", basepath, path);
             } else {
                 lerror("unknown file path type");
-                return 0;
+                return NULL;
             }
             int fd = -1;
             for (int i = 0; i < FS_FILE_MAX; i++) {
@@ -317,7 +375,7 @@ u32 fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
             }
             if (fd == -1) {
                 lerror("ran out of files");
-                return 0;
+                return NULL;
             }
 
             int mode = 0;
@@ -337,7 +395,7 @@ u32 fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
             int hostfd = open(filepath, mode, S_IRUSR | S_IWUSR);
             if (hostfd < 0) {
                 linfo("opening file which does not exist");
-                return 0;
+                return NULL;
             }
 
             char* fopenmode = "r";
@@ -357,39 +415,38 @@ u32 fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
             if (!fp) {
                 lerror("failed to open file %s", filepath);
                 perror("fdopen");
-                return 0;
+                return NULL;
             }
             s->services.fs.files[fd] = fp;
 
-            u32 h = handle_new(s);
             KSession* ses = session_create_arg(port_handle_fs_file, fd);
-            HANDLE_SET(h, ses);
-            ses->hdr.refcount = 1;
-            linfo("opened file %s with fd %d and handle %x", filepath, fd, h);
+            linfo("opened file %s with fd %d", filepath, fd);
 
             free(filepath);
             free(basepath);
 
-            return h;
+            return ses;
             break;
         }
         case 0x2345678a: {
             if (pathtype == FSPATH_BINARY) {
                 u32* path = rawpath;
                 if (path[0] == 0 && path[2] == 0) {
-                    return open_romfs(s);
+                    linfo("opening romfs");
+                    return session_create_arg(port_handle_fs_selfncch,
+                                              s->gamecard.romfs_off + 0x1000);
                 } else {
                     lwarn("unknown path for archive 0x2345678a");
                     return 0;
                 }
             } else {
                 lerror("unknown selfNCCH(0x234578a) file path type");
-                return 0;
+                return NULL;
             }
             break;
         }
         default:
             lerror("unknown archive %llx", archive);
-            return 0;
+            return NULL;
     }
 }

@@ -105,7 +105,7 @@ DECL_PORT(srv) {
                 handler = port_handle_mic;
             } else if (IS("frd:u")) {
                 handler = port_handle_frd;
-            } else if (IS("ptm:u")) {
+            } else if (IS("ptm:u") || IS("ptm:sysm")) {
                 handler = port_handle_ptm;
             } else if (IS("boss:U")) {
                 handler = port_handle_boss;

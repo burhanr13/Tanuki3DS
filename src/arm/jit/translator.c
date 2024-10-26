@@ -80,6 +80,9 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
         bool can_continue = arm_compile_instr(block, cpu, addr, instr);
         addr += INSTRLEN;
         block->numinstr++;
+#ifdef DEBUG_PC
+        EMITI_STORE_REG(15, addr);
+#endif
         if (!can_continue) break;
     }
     EMITI_STORE_REG(15, addr);
@@ -461,6 +464,11 @@ DECL_ARM_COMPILE(multiply) {
 }
 
 DECL_ARM_COMPILE(multiply_long) {
+    if (!instr.multiply_long.aa) {
+        lwarn("unknown umaal");
+        return true;
+    }
+
     u32 op1 = EMIT_LOAD_REG(instr.multiply_long.rm);
     u32 op2 = EMIT_LOAD_REG(instr.multiply_long.rs);
     u32 vreslo = EMITVV(MUL, op1, op2);
@@ -593,26 +601,38 @@ DECL_ARM_COMPILE(sat_arith) {
 
 DECL_ARM_COMPILE(pack_sat) {
     if (!instr.pack_sat.p) {
-        if (instr.pack_sat.u) {
-            u32 shamt = instr.pack_sat.shift;
-            u32 satamt = instr.pack_sat.rn | instr.pack_sat.h << 4;
-            EMIT_LOAD_REG(instr.pack_sat.rm);
-            if (instr.pack_sat.x) {
-                if (shamt) {
-                    EMITVI(ASR, LASTV, shamt);
-                } else {
-                    EMITVI(ASR, LASTV, 31);
-                }
+        u32 shamt = instr.pack_sat.shift;
+        EMIT_LOAD_REG(instr.pack_sat.rm);
+        if (instr.pack_sat.x) {
+            if (shamt) {
+                EMITVI(ASR, LASTV, shamt);
             } else {
-                if (shamt) {
-                    EMITVI(LSL, LASTV, shamt);
-                }
+                EMITVI(ASR, LASTV, 31);
             }
-            // set q flag
-            EMITIV(USAT, satamt, LASTV);
-            EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
         } else {
+            if (shamt) {
+                EMITVI(LSL, LASTV, shamt);
+            }
+        }
+        u32 vop2 = LASTV;
+        if (instr.pack_sat.u) {
+            u32 satamt = instr.pack_sat.rn | instr.pack_sat.h << 4;
+            // set q flag
+            EMITIV(USAT, satamt, vop2);
+            EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
+        } else if (instr.pack_sat.s) {
             lwarn("unknown sat %08x at %08x", instr.w, addr);
+        } else {
+            u32 vop1 = EMIT_LOAD_REG(instr.pack_sat.rn);
+            if (instr.pack_sat.x) {
+                vop2 = EMITVI(AND, vop2, MASK(16));
+                vop1 = EMITVI(AND, vop1, MASK(16) << 16);
+            } else {
+                vop2 = EMITVI(AND, vop2, MASK(16) << 16);
+                vop1 = EMITVI(AND, vop1, MASK(16));
+            }
+            EMITVV(OR, vop1, vop2);
+            EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
         }
     } else if (instr.pack_sat.x) {
         if (instr.pack_sat.s) {
