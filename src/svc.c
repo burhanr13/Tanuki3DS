@@ -203,6 +203,27 @@ DECL_SVC(ClearEvent) {
     e->signal = false;
 }
 
+DECL_SVC(CreateMemoryBlock) {
+    MAKE_HANDLE(handle);
+
+    u32 addr = R(1);
+    u32 size = R(2);
+    u32 perm = R(3);
+
+    KSharedMem* shm = calloc(1, sizeof *shm);
+    shm->vaddr = addr;
+    shm->mapped = true;
+    shm->hdr.refcount = 1;
+    HANDLE_SET(handle, shm);
+
+    linfo("created memory block with handle %x at addr %x", handle, addr);
+
+    hle3ds_vmmap(s, addr, size, perm, MEMST_SHARED, false);
+
+    R(0) = 0;
+    R(1) = handle;
+}
+
 DECL_SVC(MapMemoryBlock) {
     u32 memblock = R(0);
     u32 addr = R(1);
@@ -447,7 +468,7 @@ DECL_SVC(SendSyncRequest) {
     R(0) = 0;
     u32 cmd_addr = CUR_TLS + IPC_CMD_OFF;
     IPCHeader cmd = *(IPCHeader*) PTR(cmd_addr);
-    session->handler(s, cmd, CUR_TLS + IPC_CMD_OFF);
+    session->handler(s, cmd, CUR_TLS + IPC_CMD_OFF, session->arg);
 }
 
 DECL_SVC(GetProcessId) {

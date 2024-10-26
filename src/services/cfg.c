@@ -1,5 +1,7 @@
 #include "cfg.h"
 
+#include <wchar.h>
+
 #include "../3ds.h"
 
 DECL_PORT(cfg) {
@@ -27,12 +29,44 @@ DECL_PORT(cfg) {
                 case 0x70001:
                     *(u8*) ptr = 0;
                     break;
+                case 0xa0000: {
+                    u8 name[] = "ctremu";
+                    u16* dst = ptr;
+                    for (int i = 0; i < sizeof name; i++) {
+                        dst[i] = name[i];
+                    }
+                    break;
+                }
                 case 0xa0002:
                     *(u8*) ptr = 1;
                     break;
                 case 0xb0000:
                     ((u8*) ptr)[2] = 1;
                     ((u8*) ptr)[3] = 49;
+                    break;
+                case 0xb0001: {
+                    u16(*tbl)[0x40] = ptr;
+                    u8 name[] = "some country";
+                    for (int i = 0; i < 16; i++) {
+                        for (int j = 0; j < sizeof name; j++) {
+                            tbl[i][j] = name[j];
+                        }
+                    }
+                    break;
+                }
+                case 0xb0002: {
+                    u16(*tbl)[0x40] = ptr;
+                    u8 name[] = "some state";
+                    for (int i = 0; i < 16; i++) {
+                        for (int j = 0; j < sizeof name; j++) {
+                            tbl[i][j] = name[j];
+                        }
+                    }
+                    break;
+                }
+                case 0xb0003:
+                    ((s16*) ptr)[0] = 0;
+                    ((s16*) ptr)[1] = 0;
                     break;
                 case 0xc0000:
                     ((u32*) ptr)[0] = 0;

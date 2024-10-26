@@ -21,19 +21,25 @@ typedef union {
          .w)
 
 typedef void (*PortRequestHandler)(HLE3DS* s, IPCHeader cmd, u32 cmd_addr);
+typedef void (*PortRequestHandlerArg)(HLE3DS* s, IPCHeader cmd, u32 cmd_addr, u32 arg);
 
 typedef struct {
     KObject hdr;
 
-    PortRequestHandler handler;
+    PortRequestHandlerArg handler;
+    u32 arg;
 } KSession;
 
 void init_services(HLE3DS* s);
 
 KSession* session_create(PortRequestHandler f);
+KSession* session_create_arg(PortRequestHandlerArg f, u32 arg);
 
 #define DECL_PORT(name)                                                        \
     void port_handle_##name(HLE3DS* s, IPCHeader cmd, u32 cmd_addr)
+
+#define DECL_PORT_ARG(name, arg)                                                        \
+    void port_handle_##name(HLE3DS* s, IPCHeader cmd, u32 cmd_addr, u32 arg)
 
 u32 srvobj_make_handle(HLE3DS* s, KObject* o);
 

@@ -33,6 +33,15 @@ int emulator_init(int argc, char** argv) {
     ctremu.romfilenodir = strrchr(ctremu.romfile, '/');
     if (ctremu.romfilenodir) ctremu.romfilenodir++;
     else ctremu.romfilenodir = ctremu.romfile;
+    ctremu.romfilenoext = strdup(ctremu.romfilenodir);
+
+    char* c = strrchr(ctremu.romfilenoext, '.');
+    if (c) *c = '\0';
+
+    mkdir("system", S_IRWXU);
+    mkdir("system/savedata", S_IRWXU);
+    mkdir("system/extdata", S_IRWXU);
+
     return 0;
 }
 

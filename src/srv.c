@@ -45,7 +45,15 @@ void init_services(HLE3DS* s) {
 KSession* session_create(PortRequestHandler f) {
     KSession* session = calloc(1, sizeof *session);
     session->hdr.type = KOT_SESSION;
+    session->handler = (PortRequestHandlerArg) f;
+    return session;
+}
+
+KSession* session_create_arg(PortRequestHandlerArg f, u32 arg) {
+    KSession* session = calloc(1, sizeof *session);
+    session->hdr.type = KOT_SESSION;
     session->handler = f;
+    session->arg = arg;
     return session;
 }
 
@@ -97,6 +105,14 @@ DECL_PORT(srv) {
                 handler = port_handle_mic;
             } else if (IS("frd:u")) {
                 handler = port_handle_frd;
+            } else if (IS("ptm:u")) {
+                handler = port_handle_ptm;
+            } else if (IS("boss:U")) {
+                handler = port_handle_boss;
+            } else if (IS("am:app")) {
+                handler = port_handle_am;
+            } else if (IS("nim:aoc")) {
+                handler = port_handle_nim;
             } else {
                 lerror("unknown service '%s'", name);
                 cmdbuf[1] = -1;
@@ -111,7 +127,13 @@ DECL_PORT(srv) {
             }
             break;
         }
+        case 0x0009:
+            linfo("Subscribe to notification %x", cmdbuf[1]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
         case 0x000b:
+            linfo("RecieveNotiifcation");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;

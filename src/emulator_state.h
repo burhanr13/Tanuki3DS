@@ -6,6 +6,7 @@
 typedef struct {
     char* romfile;
     char* romfilenodir;
+    char* romfilenoext;
 
     bool initialized;
     bool running;

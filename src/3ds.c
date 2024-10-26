@@ -40,7 +40,8 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
                  false);
 
     hle3ds_vmmap(s, CONFIG_MEM, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
-    ((u32*) PTR(CONFIG_MEM))[0x10] = FCRAMSIZE;
+    *(u8*) PTR(CONFIG_MEM + 0x14) = 1;
+    *(u32*) PTR(CONFIG_MEM + 0x40) = FCRAMSIZE;
 
     hle3ds_vmmap(s, SHARED_PAGE, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
 

@@ -1,8 +1,11 @@
 #ifndef FS_H
 #define FS_H
 
+#include <stdio.h>
+
 #include "../srv.h"
-#include "../svc_types.h"
+
+#define FS_FILE_MAX 32
 
 enum {
     FSPATH_INVALID,
@@ -12,12 +15,19 @@ enum {
     FSPATH_UTF16
 };
 
+typedef struct {
+    FILE* files[FS_FILE_MAX];
+    u32 priority;
+} FSData;
+
 DECL_PORT(fs);
 
 DECL_PORT(fs_romfs);
 
+DECL_PORT_ARG(fs_file, fd);
+
 u64 fs_open_archive(u32 id, u32 path_type, void* path);
 u32 fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
-                 u32 flags);
+                 u32 pathsize, u32 flags);
 
 #endif

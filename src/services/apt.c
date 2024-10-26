@@ -58,6 +58,14 @@ DECL_PORT(apt) {
             cmdbuf[1] = 0;
             cmdbuf[3] = 1;
             break;
+        case 0x0016: {
+            u32 appid = cmdbuf[1];
+            linfo("PreloadLibraryApplet 0x%x", appid);
+            if (appid == 0x406) lerror("trying to launch ErrDisp applet");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
         case 0x0043:
             linfo("NotifyToWait");
             cmdbuf[0] = IPCHDR(1, 0);
