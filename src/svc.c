@@ -100,6 +100,8 @@ DECL_SVC(ExitThread) {
         klist_remove(cur);
     }
 
+    s->process.threads[CUR_THREAD->id] = NULL;
+
     thread_reschedule(s);
 }
 
@@ -384,7 +386,7 @@ DECL_SVC(WaitSynchronizationN) {
     for (int i = 0; i < count; i++) {
         KObject* obj = HANDLE_GET(handles[i]);
         if (!obj) {
-            lerror("invalid handle");
+            lerror("invalid handle %x", handles[i]);
             continue;
         }
         if (sync_wait(s, obj)) {

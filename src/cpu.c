@@ -5,8 +5,10 @@
 #include "svc.h"
 #include "thread.h"
 
-//#define CPULOG
-//#define BREAK
+// #define CPULOG
+// #define BREAK
+// #define WATCH
+#define PATCHFN 0x13828c
 
 void cpu_init(HLE3DS* s) {
     s->cpu.read8 = (void*) cpu_read8;
@@ -41,7 +43,10 @@ bool cpu_run(HLE3DS* s, int cycles) {
 #ifdef CPULOG
         printf("executing at %08x\n", s->cpu.pc);
         cpu_print_state(&s->cpu);
-        //cpu_print_vfp_state(&s->cpu);
+        // cpu_print_vfp_state(&s->cpu);
+#endif
+#ifdef PATCHFN
+        if (s->cpu.pc == PATCHFN) s->cpu.pc = s->cpu.lr;
 #endif
         arm_exec_jit(&s->cpu);
         if (s->cpu.wfe) {
@@ -64,12 +69,30 @@ u32 cpu_read32(HLE3DS* s, u32 addr) {
 }
 
 void cpu_write8(HLE3DS* s, u32 addr, u8 b) {
+#ifdef WATCH
+    if (addr == WATCH) {
+        printfln("write8 [%08x] = %x", addr, b);
+        cpu_print_state(&s->cpu);
+    }
+#endif
     *(u8*) PTR(addr) = b;
 }
 void cpu_write16(HLE3DS* s, u32 addr, u16 h) {
+#ifdef WATCH
+    if (addr == WATCH) {
+        printfln("write16 [%08x] = %x", addr, h);
+        cpu_print_state(&s->cpu);
+    }
+#endif
     *(u16*) PTR(addr) = h;
 }
 void cpu_write32(HLE3DS* s, u32 addr, u32 w) {
+#ifdef WATCH
+    if (addr == WATCH) {
+        printfln("write32 [%08x] = %x", addr, w);
+        cpu_print_state(&s->cpu);
+    }
+#endif
     *(u32*) PTR(addr) = w;
 }
 

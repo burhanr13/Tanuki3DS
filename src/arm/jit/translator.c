@@ -191,7 +191,7 @@ u32 compile_shifter(IRBlock* block, ArmCore* cpu, u8 op, u32 operand, u32 shamt,
                         EMITVI(LSR, operand, shamt - 1);
                     } else {
                         EMITVI(SUB, shamt, 1);
-                        EMITVV(LSR, operand, LASTV);
+                        EMITVV(ROR, operand, LASTV);
                     }
                     *carry = EMITVI(AND, LASTV, 1);
                 }
@@ -408,7 +408,7 @@ DECL_ARM_COMPILE(psr_trans) {
         if (instr.psr_trans.s) mask |= 0x00ff0000;
         if (instr.psr_trans.x) mask |= 0x0000ff00;
         if (instr.psr_trans.c) mask |= 0x000000ff;
-        if (cpu->cpsr.m == M_USER) mask &= 0xf0000000;
+        if (cpu->cpsr.m == M_USER) mask &= 0xffff0000;
 
         if (imm) op2 &= mask;
         else op2 = EMITVI(AND, op2, mask);
@@ -464,11 +464,6 @@ DECL_ARM_COMPILE(multiply) {
 }
 
 DECL_ARM_COMPILE(multiply_long) {
-    if (!instr.multiply_long.aa) {
-        lwarn("unknown umaal");
-        return true;
-    }
-
     u32 op1 = EMIT_LOAD_REG(instr.multiply_long.rm);
     u32 op2 = EMIT_LOAD_REG(instr.multiply_long.rs);
     u32 vreslo = EMITVV(MUL, op1, op2);
@@ -482,8 +477,15 @@ DECL_ARM_COMPILE(multiply_long) {
         u32 aclo = EMIT_LOAD_REG(instr.multiply_long.rdlo);
         u32 achi = EMIT_LOAD_REG(instr.multiply_long.rdhi);
 
-        vreslo = EMITVV(ADD, vreslo, aclo);
-        vreshi = EMITVV(ADC, vreshi, achi);
+        if (instr.multiply_long.aa) {
+            vreslo = EMITVV(ADD, vreslo, aclo);
+            vreshi = EMITVV(ADC, vreshi, achi);
+        } else {
+            vreslo = EMITVV(ADD, vreslo, aclo);
+            vreshi = EMITVI(ADC, vreshi, 0);
+            vreslo = EMITVV(ADD, vreslo, achi);
+            vreshi = EMITVI(ADC, vreshi, 0);
+        }
     }
     if (instr.multiply_long.s) {
         u32 zlo = EMIT0V(GETZ, vreslo);

@@ -31,7 +31,7 @@ DECL_PORT(apt) {
             break;
         case 0x0006: {
             u32 appid = cmdbuf[1];
-            linfo("GetAppletInfo for 0x%x", appid);
+            printfln("GetAppletInfo for 0x%x", appid);
             cmdbuf[0] = IPCHDR(7, 0);
             cmdbuf[1] = 0;
             cmdbuf[5] = 1;
@@ -71,12 +71,19 @@ DECL_PORT(apt) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
-        case 0x004b:
-            linfo("AppletUtility");
+        case 0x004b: {
+            u32 utility = cmdbuf[1];
+            u32 insize = cmdbuf[2];
+            u32 outsize = cmdbuf[3];
+            void* input = PTR(cmdbuf[5]);
+            void* output = PTR(cmdbuf[0x41]);
+            linfo("AppletUtility %d in at %08x size %x out at %08x size %x",
+                     utility, cmdbuf[5], insize, cmdbuf[0x41], outsize);
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;
             break;
+        }
         case 0x004f: {
             int percent = cmdbuf[2];
             linfo("SetApplicationCpuTimeLimit to %d%%", percent);

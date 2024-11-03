@@ -109,12 +109,14 @@ u32 load_ncsd(HLE3DS* s, char* filename) {
                  PERM_RX, MEMST_CODE, false);
     void* text = PTR(exhdr.sci.text.vaddr);
     memcpy(text, code, exhdr.sci.text.size);
+    mprotect(text, exhdr.sci.text.pages * PAGE_SIZE, PROT_READ);
 
     hle3ds_vmmap(s, exhdr.sci.rodata.vaddr, exhdr.sci.rodata.pages * PAGE_SIZE,
                  PERM_R, MEMST_CODE, false);
     void* rodata = PTR(exhdr.sci.rodata.vaddr);
     memcpy(rodata, code + exhdr.sci.text.pages * PAGE_SIZE,
            exhdr.sci.rodata.size);
+    mprotect(rodata, exhdr.sci.rodata.pages * PAGE_SIZE, PROT_READ);
 
     hle3ds_vmmap(s, exhdr.sci.data.vaddr,
                  exhdr.sci.data.pages * PAGE_SIZE + exhdr.sci.bss, PERM_RW,

@@ -3,6 +3,10 @@
 
 #include "../srv.h"
 
+typedef struct {
+    u8 gain;
+} MicData;
+
 DECL_PORT(mic);
 
 #endif

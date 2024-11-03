@@ -11,7 +11,7 @@ CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE
 
-LDFLAGS := -lm -lSDL2 -lreadline -lcapstone
+LDFLAGS := -lm -lSDL2 -lcapstone
 
 ifeq ($(shell uname),Darwin)
 	CFLAGS += -arch x86_64
@@ -48,31 +48,38 @@ debug: CFLAGS += $(CFLAGS_DEBUG)
 debug: $(DEBUG_DIR)/$(TARGET_EXEC)
 
 $(RELEASE_DIR)/$(TARGET_EXEC): $(OBJS_RELEASE)
-	$(CXX) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
-	cp $@ $(TARGET_EXEC)
+	@echo $@
+	@$(CXX) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
+	@cp $@ $(TARGET_EXEC)
 
 $(RELEASE_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
+	@echo $<
+	@$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
 
 $(RELEASE_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS) $(CXXSTD) $(CFLAGS) -c $< -o $@
+	@echo $<
+	@$(CXX) $(CPPFLAGS) $(CXXSTD) $(CFLAGS) -c $< -o $@
 
 $(DEBUG_DIR)/$(TARGET_EXEC): $(OBJS_DEBUG)
-	$(CXX) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
-	cp $@ $(TARGET_EXEC)d
+	@echo $@
+	@$(CXX) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
+	@cp $@ $(TARGET_EXEC)d
 
 $(DEBUG_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
+	@echo $<
+	@$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
 
 $(DEBUG_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS) $(CXXSTD) $(CFLAGS) -c $< -o $@
+	@echo $<
+	@$(CXX) $(CPPFLAGS) $(CXXSTD) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET_EXEC) $(TARGET_EXEC)d
+	@echo clean
+	@rm -rf $(BUILD_DIR) $(TARGET_EXEC) $(TARGET_EXEC)d
 
 -include $(DEPS_DEBUG)
 -include $(DEPS_RELEASE)

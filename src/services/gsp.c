@@ -62,6 +62,7 @@ DECL_PORT(gsp_gpu) {
             cmdbuf[1] = 0;
             break;
         case 0x001e:
+            linfo("SetInternalPriorities");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -215,6 +216,35 @@ void gsp_handle_command(HLE3DS* s) {
                 gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), true);
             } else if (addrout == fbbot->fbs[1 - fbbot->idx].left_vaddr) {
                 gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), false);
+            }
+
+            gsp_handle_event(s, GSPEVENT_PPF);
+            break;
+        }
+        case 0x04: {
+            u32 addrin = cmds->d[cmds->cur].args[0];
+            u32 addrout = cmds->d[cmds->cur].args[1];
+            u32 copysize = cmds->d[cmds->cur].args[2];
+            u32 pitchin = cmds->d[cmds->cur].args[3] & 0xffff;
+            u32 gapin = cmds->d[cmds->cur].args[3] >> 16;
+            u32 pitchout = cmds->d[cmds->cur].args[4] & 0xffff;
+            u32 gapout = cmds->d[cmds->cur].args[4] >> 16;
+            u32 flags = cmds->d[cmds->cur].args[5];
+
+            linfo("texture copy from %x(pitch=%d,gap=%d) to "
+                     "%x(pitch=%d,gap=%d), size=%d, flags=%x",
+                     addrin, pitchin, gapin, addrout, pitchout, gapout,
+                     copysize, flags);
+
+            u8* src = PTR(addrin);
+            u8* dst = PTR(addrout);
+
+            int cnt = 0;
+            while (cnt < copysize) {
+                memcpy(dst, src, pitchin);
+                cnt += pitchin;
+                src += pitchin + gapin;
+                dst += pitchout + gapout;
             }
 
             gsp_handle_event(s, GSPEVENT_PPF);

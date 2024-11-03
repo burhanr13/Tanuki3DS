@@ -4,7 +4,7 @@
 
 #include "svc.h"
 
-#include "service_data.h"
+#include "services.h"
 
 void srvobj_init(KObject* hdr, KObjType t) {
     hdr->type = t;
@@ -113,6 +113,8 @@ DECL_PORT(srv) {
                 handler = port_handle_am;
             } else if (IS("nim:aoc")) {
                 handler = port_handle_nim;
+            } else if (IS("y2r:u")) {
+                handler = port_handle_y2r;
             } else {
                 lerror("unknown service '%s'", name);
                 cmdbuf[1] = -1;

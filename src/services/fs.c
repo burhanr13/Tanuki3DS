@@ -10,6 +10,51 @@
 #include "../filesystems.h"
 #include "../srv.h"
 
+char* archive_basepath(u64 archive) {
+    switch (archive << 32 >> 32) {
+        case 4: {
+            char* basepath;
+            asprintf(&basepath, "system/savedata/%s", ctremu.romfilenoext);
+            return basepath;
+        }
+        case 7: {
+            char* basepath;
+            asprintf(&basepath, "system/extdata/%08x", archive >> 32);
+            return basepath;
+        }
+        case 9: {
+            char* basepath;
+            asprintf(&basepath, "system/sdmc");
+            return basepath;
+        }
+        default:
+            lerror("invalid archive");
+            return NULL;
+    }
+}
+
+char* create_text_path(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
+    char* basepath = archive_basepath(archive);
+    if (!basepath) return NULL;
+
+    char* filepath = NULL;
+    if (pathtype == FSPATH_ASCII) {
+        asprintf(&filepath, "%s%s", basepath, rawpath);
+    } else if (pathtype == FSPATH_UTF16) {
+        u16* path16 = rawpath;
+        u8 path[pathsize];
+        for (int i = 0; i < pathsize / 2; i++) {
+            path[i] = path16[i];
+        }
+        asprintf(&filepath, "%s%s", basepath, path);
+    } else {
+        lerror("unknown text file path type");
+        return NULL;
+    }
+    free(basepath);
+    return filepath;
+}
+
 DECL_PORT(fs) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
@@ -18,7 +63,7 @@ DECL_PORT(fs) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
-        case 0x0802:
+        case 0x0802: {
             linfo("OpenFile");
             u64 archivehandle = cmdbuf[2] | (u64) cmdbuf[3] << 32;
             u32 pathtype = cmdbuf[4];
@@ -36,7 +81,7 @@ DECL_PORT(fs) {
             KSession* ses =
                 fs_open_file(s, archivehandle, pathtype, path, pathsize, flags);
             if (!ses) {
-                cmdbuf[1] = 0xC8804478;
+                cmdbuf[1] = FSERR_OPEN;
                 return;
             }
             HANDLE_SET(h, ses);
@@ -46,6 +91,7 @@ DECL_PORT(fs) {
             cmdbuf[1] = 0;
             cmdbuf[3] = h;
             break;
+        }
         case 0x0803: {
             linfo("OpenFileDirectly");
             u32 archive = cmdbuf[2];
@@ -66,12 +112,73 @@ DECL_PORT(fs) {
             KSession* ses = fs_open_file(s, ahandle, filepathtype, filepath,
                                          filepathsize, flags);
             if (!ses) {
-                cmdbuf[1] = 0xC8804478;
+                cmdbuf[1] = FSERR_OPEN;
                 return;
             }
             HANDLE_SET(h, ses);
             ses->hdr.refcount = 1;
             linfo("opened file with handle %x", h);
+            cmdbuf[1] = 0;
+            cmdbuf[3] = h;
+            break;
+        }
+        case 0x0808: {
+            linfo("CreateFile");
+            u64 archivehandle = cmdbuf[2] | (u64) cmdbuf[3] << 32;
+            u32 pathtype = cmdbuf[4];
+            u32 pathsize = cmdbuf[5];
+            u32 flags = cmdbuf[6];
+            u64 filesize = cmdbuf[7] | (u64) cmdbuf[8] << 32;
+            void* path = PTR(cmdbuf[10]);
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            if (fs_create_file(archivehandle, pathtype, path, pathsize, flags,
+                               filesize)) {
+                cmdbuf[1] = 0;
+            } else {
+                cmdbuf[1] = FSERR_CREATE;
+            }
+            break;
+        }
+        case 0x0809: {
+            linfo("CreateDirectory");
+            u64 archivehandle = cmdbuf[2] | (u64) cmdbuf[3] << 32;
+            u32 pathtype = cmdbuf[4];
+            u32 pathsize = cmdbuf[5];
+            void* path = PTR(cmdbuf[8]);
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            if (fs_create_dir(archivehandle, pathtype, path, pathsize)) {
+                cmdbuf[1] = 0;
+            } else {
+                cmdbuf[1] = FSERR_CREATE;
+            }
+            break;
+        }
+        case 0x080b: {
+            linfo("OpenDirectory");
+            u64 archivehandle = cmdbuf[1] | (u64) cmdbuf[2] << 32;
+            u32 pathtype = cmdbuf[3];
+            u32 pathsize = cmdbuf[4];
+            void* path = PTR(cmdbuf[6]);
+
+            cmdbuf[0] = IPCHDR(1, 2);
+
+            u32 h = handle_new(s);
+            if (!h) {
+                cmdbuf[1] = -1;
+                return;
+            }
+            KSession* ses =
+                fs_open_dir(s, archivehandle, pathtype, path, pathsize);
+            if (!ses) {
+                cmdbuf[1] = FSERR_OPEN;
+                return;
+            }
+            HANDLE_SET(h, ses);
+            ses->hdr.refcount = 1;
+            linfo("opened dir with handle %x", h);
+            cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
             cmdbuf[3] = h;
             break;
@@ -92,6 +199,41 @@ DECL_PORT(fs) {
             linfo("CloseArchive");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
+            break;
+        }
+        case 0x0817:
+            linfo("IsSdmcDetected");
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = true;
+            break;
+        case 0x0818:
+            linfo("IsSdmcWritable");
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = true;
+            break;
+        case 0x845: {
+            u32 archive = cmdbuf[1];
+            u32 pathtype = cmdbuf[2];
+            void* path = PTR(cmdbuf[5]);
+
+            char* basepath =
+                archive_basepath(fs_open_archive(archive, pathtype, path));
+
+            linfo("GetFormatInfo for %s", basepath);
+
+            cmdbuf[0] = IPCHDR(5, 0);
+            if (!basepath) {
+                lerror("unknown archive %x", archive);
+                cmdbuf[1] = -1;
+                return;
+            }
+            free(basepath);
+            cmdbuf[2] = 0;
+            cmdbuf[3] = 0;
+            cmdbuf[4] = 0;
+            cmdbuf[5] = 0;
             break;
         }
         case 0x0861: {
@@ -161,6 +303,7 @@ DECL_PORT_ARG(fs_file, fd) {
     FILE* fp = s->services.fs.files[fd];
 
     if (!fp) {
+        lerror("invalid fd");
         cmdbuf[0] = IPCHDR(1, 0);
         cmdbuf[1] = -1;
         return;
@@ -224,25 +367,66 @@ DECL_PORT_ARG(fs_file, fd) {
     }
 }
 
-char* archive_basepath(u64 archive) {
-    switch (archive << 32 >> 32) {
-        case 4: {
-            char* basepath;
-            asprintf(&basepath, "system/savedata/%s", ctremu.romfilenoext);
-            return basepath;
-        }
-        case 7: {
-            char* basepath;
-            asprintf(&basepath, "system/extdata/%08x", archive >> 32);
-            return basepath;
-        }
-        case 9: {
-            char* basepath;
-            asprintf(&basepath, "system/sdmc");
-            return basepath;
-        }
+DECL_PORT_ARG(fs_dir, fd) {
+    u32* cmdbuf = PTR(cmd_addr);
+
+    DIR* dp = s->services.fs.dirs[fd];
+
+    if (!dp) {
+        lerror("invalid fd");
+        cmdbuf[0] = IPCHDR(1, 0);
+        cmdbuf[1] = -1;
+        return;
     }
-    return NULL;
+
+    linfo("fd is %d", fd);
+
+    switch (cmd.command) {
+        case 0x0801: {
+            u32 count = cmdbuf[1];
+            FSDirent* ents = PTR(cmdbuf[3]);
+
+            linfo("reading %d ents", count);
+
+            struct dirent* ent;
+            int i = 0;
+            for (; i < count; i++) {
+                ent = readdir(dp);
+                if (!ent) break;
+
+                int namelen = ent->d_namlen;
+                if (namelen > 0x105) namelen = 0x105;
+                for (int j = 0; j < namelen; j++) {
+                    ents[i].name[j] = ent->d_name[j];
+                }
+                ents[i]._21a[0] = 1;
+
+                struct stat st;
+                fstatat(dirfd(dp), ent->d_name, &st, 0);
+
+                ents[i].size = st.st_size;
+            }
+
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = i;
+            break;
+        }
+        case 0x0802: {
+            linfo("closing dir");
+            closedir(dp);
+            s->services.fs.dirs[fd] = NULL;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
+        default:
+            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
+                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+    }
 }
 
 u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
@@ -268,6 +452,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
                 return -1;
             }
         }
+        case 6:
         case 7: {
             if (pathtype == FSPATH_BINARY) {
                 u32* lowpath = path;
@@ -348,24 +533,7 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
         case 4:
         case 7:
         case 9: {
-            char* basepath = archive_basepath(archive);
 
-            char* filepath = NULL;
-            if (pathtype == FSPATH_ASCII) {
-                linfo("archive %lx, opening file %s", archive, rawpath);
-                asprintf(&filepath, "%s%s", basepath, rawpath);
-            } else if (pathtype == FSPATH_UTF16) {
-                u16* path16 = rawpath;
-                u8 path[pathsize];
-                for (int i = 0; i < pathsize / 2; i++) {
-                    path[i] = path16[i];
-                }
-                linfo("archive %lx, opening file %s", archive, path);
-                asprintf(&filepath, "%s%s", basepath, path);
-            } else {
-                lerror("unknown file path type");
-                return NULL;
-            }
             int fd = -1;
             for (int i = 0; i < FS_FILE_MAX; i++) {
                 if (s->services.fs.files[i] == NULL) {
@@ -377,6 +545,9 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
                 lerror("ran out of files");
                 return NULL;
             }
+
+            char* filepath =
+                create_text_path(archive, pathtype, rawpath, pathsize);
 
             int mode = 0;
             switch (flags & 3) {
@@ -395,6 +566,7 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
             int hostfd = open(filepath, mode, S_IRUSR | S_IWUSR);
             if (hostfd < 0) {
                 linfo("opening file which does not exist");
+                free(filepath);
                 return NULL;
             }
 
@@ -415,6 +587,7 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
             if (!fp) {
                 lerror("failed to open file %s", filepath);
                 perror("fdopen");
+                free(filepath);
                 return NULL;
             }
             s->services.fs.files[fd] = fp;
@@ -423,7 +596,6 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
             linfo("opened file %s with fd %d", filepath, fd);
 
             free(filepath);
-            free(basepath);
 
             return ses;
             break;
@@ -448,5 +620,102 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
         default:
             lerror("unknown archive %llx", archive);
             return NULL;
+    }
+}
+
+bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
+                    u32 flags, u64 filesize) {
+    switch (archive << 32 >> 32) {
+        case 4:
+        case 7:
+        case 9: {
+            char* filepath =
+                create_text_path(archive, pathtype, rawpath, pathsize);
+
+            linfo("creating file %s with size %x", filepath, filesize);
+
+            int hostfd =
+                open(filepath, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+            free(filepath);
+            if (hostfd < 0) {
+                linfo("cannot create file");
+                return false;
+            }
+            ftruncate(hostfd, filesize);
+            close(hostfd);
+
+            return true;
+        }
+        default:
+            lerror("unknown archive %llx", archive);
+            return false;
+    }
+}
+
+KSession* fs_open_dir(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
+                      u32 pathsize) {
+    switch (archive << 32 >> 32) {
+        case 4:
+        case 7:
+        case 9: {
+
+            int fd = -1;
+            for (int i = 0; i < FS_FILE_MAX; i++) {
+                if (s->services.fs.dirs[i] == NULL) {
+                    fd = i;
+                    break;
+                }
+            }
+            if (fd == -1) {
+                lerror("ran out of dirs");
+                return NULL;
+            }
+
+            char* filepath =
+                create_text_path(archive, pathtype, rawpath, pathsize);
+
+            DIR* dp = opendir(filepath);
+            if (!dp) {
+                linfo("failed to open directory %s", filepath);
+                free(filepath);
+                return NULL;
+            }
+            s->services.fs.dirs[fd] = dp;
+
+            KSession* ses = session_create_arg(port_handle_fs_dir, fd);
+            linfo("opened directory %s with fd %d", filepath, fd);
+
+            free(filepath);
+
+            return ses;
+            break;
+        }
+        default:
+            lerror("unknown archive %llx", archive);
+            return NULL;
+    }
+}
+
+bool fs_create_dir(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
+    switch (archive << 32 >> 32) {
+        case 4:
+        case 7:
+        case 9: {
+            char* filepath =
+                create_text_path(archive, pathtype, rawpath, pathsize);
+
+            linfo("creating directory %s", filepath);
+
+            if (mkdir(filepath, S_IRWXU) < 0) {
+                linfo("cannot create directory");
+                free(filepath);
+                return false;
+            }
+            free(filepath);
+            return true;
+        }
+        default:
+            lerror("unknown archive %llx", archive);
+            return false;
     }
 }

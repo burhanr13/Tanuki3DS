@@ -11,7 +11,7 @@ uniform bool tex0enable;
 
 void main() {
     if (tex0enable) {
-        fragclr = color * texture(tex0, texcoord0);
+        fragclr = texture(tex0, texcoord0);
     } else {
         fragclr = color;
     }

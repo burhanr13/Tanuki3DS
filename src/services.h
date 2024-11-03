@@ -15,6 +15,7 @@
 #include "services/ndm.h"
 #include "services/nim.h"
 #include "services/ptm.h"
+#include "services/y2r.h"
 
 #include "thread.h"
 
@@ -27,6 +28,7 @@ typedef struct {
     HIDData hid;
     DSPData dsp;
     FSData fs;
+    MicData mic;
 
 } ServiceData;
 

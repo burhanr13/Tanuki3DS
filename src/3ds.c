@@ -35,8 +35,8 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
     hle3ds_vmmap(s, STACK_BASE - STACK_SIZE, STACK_SIZE, PERM_RW, MEMST_PRIVATE,
                  false);
 
-    hle3ds_vmmap(s, DSPMEM, DSPBUFBIT, PERM_RW, MEMST_STATIC, false);
-    hle3ds_vmmap(s, DSPMEM | DSPBUFBIT, DSPBUFBIT, PERM_RW, MEMST_STATIC,
+    hle3ds_vmmap(s, DSPMEM, DSPMEMSIZE, PERM_RW, MEMST_STATIC, false);
+    hle3ds_vmmap(s, DSPMEM | DSPBUFBIT, DSPMEMSIZE, PERM_RW, MEMST_STATIC,
                  false);
 
     hle3ds_vmmap(s, CONFIG_MEM, PAGE_SIZE, PERM_R, MEMST_STATIC, false);

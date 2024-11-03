@@ -48,6 +48,8 @@ void kobject_destroy(HLE3DS* s, KObject* o) {
                 klist_remove(cur);
             }
 
+            s->process.threads[t->id] = NULL;
+
             thread_reschedule(s);
             break;
         }
