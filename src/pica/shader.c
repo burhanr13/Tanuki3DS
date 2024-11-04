@@ -180,10 +180,16 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             DEST(res, 1);
             break;
         }
-        case PICA_SGE: {
+        case PICA_SGE:
+        case PICA_SGEI: {
             fvec a, b;
-            SRC1(a, 1);
-            SRC2(b, 1);
+            if (instr.opcode == PICA_SGE) {
+                SRC1(a, 1);
+                SRC2(b, 1);
+            } else {
+                SRC1(a, 1i);
+                SRC2(b, 1i);
+            }
             fvec res;
             res[0] = a[0] >= b[0];
             res[1] = a[1] >= b[1];
@@ -192,15 +198,32 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             DEST(res, 1);
             break;
         }
-        case PICA_SLT: {
+        case PICA_SLT:
+        case PICA_SLTI: {
             fvec a, b;
-            SRC1(a, 1);
-            SRC2(b, 1);
+            if (instr.opcode == PICA_SLT) {
+                SRC1(a, 1);
+                SRC2(b, 1);
+            } else {
+                SRC1(a, 1i);
+                SRC2(b, 1i);
+            }
             fvec res;
             res[0] = a[0] < b[0];
             res[1] = a[1] < b[1];
             res[2] = a[2] < b[2];
             res[3] = a[3] < b[3];
+            DEST(res, 1);
+            break;
+        }
+        case PICA_FLR: {
+            fvec a;
+            SRC1(a, 1);
+            fvec res;
+            res[0] = floorf(a[0]);
+            res[1] = floorf(a[1]);
+            res[2] = floorf(a[2]);
+            res[3] = floorf(a[3]);
             DEST(res, 1);
             break;
         }
@@ -368,7 +391,8 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             break;
         }
         default:
-            lerror("unknown PICA instruction %08x (opcode %x)", instr.w, instr.opcode);
+            lerror("unknown PICA instruction %08x (opcode %x)", instr.w,
+                   instr.opcode);
             break;
     }
     return pc;
@@ -550,6 +574,12 @@ u32 disasm_instr(GPU* gpu, u32 pc) {
             DISASMFMT1(sge);
         case PICA_SLT:
             DISASMFMT1(slt);
+        case PICA_SGEI:
+            DISASMFMT1I(sge);
+        case PICA_SLTI:
+            DISASMFMT1I(slt);
+        case PICA_FLR:
+            DISASMFMT1U(flr);
         case PICA_MAX:
             DISASMFMT1(max);
         case PICA_MIN:

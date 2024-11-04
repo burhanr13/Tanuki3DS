@@ -71,6 +71,14 @@ DECL_PORT(apt) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        case 0x0044: {
+            linfo("GetSharedFont");
+            cmdbuf[0] = IPCHDR(2, 2);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = s->services.apt.shared_font.vaddr;
+            cmdbuf[4] = srvobj_make_handle(s, &s->services.apt.shared_font.hdr);
+            break;
+        }
         case 0x004b: {
             u32 utility = cmdbuf[1];
             u32 insize = cmdbuf[2];
@@ -78,7 +86,7 @@ DECL_PORT(apt) {
             void* input = PTR(cmdbuf[5]);
             void* output = PTR(cmdbuf[0x41]);
             linfo("AppletUtility %d in at %08x size %x out at %08x size %x",
-                     utility, cmdbuf[5], insize, cmdbuf[0x41], outsize);
+                  utility, cmdbuf[5], insize, cmdbuf[0x41], outsize);
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;

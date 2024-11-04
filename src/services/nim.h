@@ -3,6 +3,6 @@
 
 #include "../srv.h"
 
-DECL_PORT(nim);
+DECL_PORT(nim_aoc);
 
 #endif

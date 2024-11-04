@@ -1,5 +1,6 @@
 #include "gpu.h"
 
+#include "../3ds.h"
 #include "etc1.h"
 #include "renderer_gl.h"
 #include "shader.h"
@@ -37,7 +38,7 @@ static const GLenum blend_func[16] = {
     GL_SRC_ALPHA_SATURATE,
     GL_ZERO,
 };
-static const GLenum depth_func[8] = {
+static const GLenum compare_func[8] = {
     GL_NEVER, GL_ALWAYS, GL_EQUAL,   GL_NOTEQUAL,
     GL_LESS,  GL_LEQUAL, GL_GREATER, GL_GEQUAL,
 };
@@ -47,6 +48,127 @@ static const GLenum prim_mode[4] = {
     GL_TRIANGLE_FAN,
     GL_TRIANGLES,
 };
+
+void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
+    linfo("command %03x (0x%08x) & %08x (%f)", id, param, mask, I2F(param));
+    gpu->io.w[id] &= ~mask;
+    gpu->io.w[id] |= param & mask;
+    switch (id) {
+        case GPUREG(geom.drawarrays):
+            gpu_update_gl_state(gpu);
+            gpu_drawarrays(gpu);
+            break;
+        case GPUREG(geom.drawelements):
+            gpu_update_gl_state(gpu);
+            gpu_drawelements(gpu);
+            break;
+        case GPUREG(geom.fixattr_data[0])... GPUREG(geom.fixattr_data[2]): {
+            fvec* fattr;
+            if (gpu->io.geom.fixattr_idx == 0xf) {
+                lwarn("immediate mode");
+                break;
+            } else {
+                fattr = &gpu->fixattrs[gpu->io.geom.fixattr_idx];
+            }
+            switch (gpu->curfixi) {
+                case 0: {
+                    (*fattr)[3] = I2F(f24tof32(param >> 8));
+                    gpu->curfixattr = (param & 0xff) << 16;
+                    gpu->curfixi = 1;
+                    break;
+                }
+                case 1: {
+                    (*fattr)[2] = I2F(f24tof32(param >> 16 | gpu->curfixattr));
+                    gpu->curfixattr = (param & MASK(16)) << 8;
+                    gpu->curfixi = 2;
+                    break;
+                }
+                case 2: {
+                    (*fattr)[1] = I2F(f24tof32(param >> 24 | gpu->curfixattr));
+                    (*fattr)[0] = I2F(f24tof32(param & MASK(24)));
+                    gpu->curfixi = 0;
+                    break;
+                }
+            }
+            break;
+        }
+        case GPUREG(geom.cmdbuf.jmp[0]):
+            gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[0] << 3,
+                                 gpu->io.geom.cmdbuf.size[0]);
+            break;
+        case GPUREG(geom.cmdbuf.jmp[1]):
+            gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[1] << 3,
+                                 gpu->io.geom.cmdbuf.size[1]);
+            break;
+        case GPUREG(vsh.floatuniform_data[0])... GPUREG(
+            vsh.floatuniform_data[7]): {
+            fvec* uniform = &gpu->cst[gpu->io.vsh.floatuniform_idx];
+            if (gpu->io.vsh.floatuniform_mode) {
+                (*uniform)[3 - gpu->curunifi] = I2F(param);
+                if (++gpu->curunifi == 4) {
+                    gpu->curunifi = 0;
+                    gpu->io.vsh.floatuniform_idx++;
+                }
+            } else {
+                switch (gpu->curunifi) {
+                    case 0: {
+                        (*uniform)[3] = I2F(f24tof32(param >> 8));
+                        gpu->curuniform = (param & 0xff) << 16;
+                        gpu->curunifi = 1;
+                        break;
+                    }
+                    case 1: {
+                        (*uniform)[2] =
+                            I2F(f24tof32(param >> 16 | gpu->curuniform));
+                        gpu->curuniform = (param & MASK(16)) << 8;
+                        gpu->curunifi = 2;
+                        break;
+                    }
+                    case 2: {
+                        (*uniform)[1] =
+                            I2F(f24tof32(param >> 24 | gpu->curuniform));
+                        (*uniform)[0] = I2F(f24tof32(param & MASK(24)));
+                        gpu->curunifi = 0;
+                        gpu->io.vsh.floatuniform_idx++;
+                        break;
+                    }
+                }
+            }
+            break;
+        }
+        case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
+            gpu->progdata[gpu->io.vsh.codetrans_idx++] = param;
+            break;
+        case GPUREG(vsh.opdescs_data[0])... GPUREG(vsh.opdescs_data[8]):
+            gpu->opdescs[gpu->io.vsh.opdescs_idx++] = param;
+            break;
+    }
+}
+
+void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
+    gpu->cur_fb = NULL;
+
+    u32* cmds = PTR(paddr);
+
+    u32* cur = cmds;
+    u32* end = cmds + size;
+    while (cur < end) {
+        GPUCommand c = {cur[1]};
+        u32 mask = 0;
+        if (c.mask & BIT(0)) mask |= 0xff << 0;
+        if (c.mask & BIT(1)) mask |= 0xff << 8;
+        if (c.mask & BIT(2)) mask |= 0xff << 16;
+        if (c.mask & BIT(3)) mask |= 0xff << 24;
+        gpu_write_internalreg(gpu, c.id, cur[0], mask);
+        cur += 2;
+        if (c.incmode) c.id++;
+        for (int i = 0; i < c.nparams; i++) {
+            gpu_write_internalreg(gpu, c.id, *cur++, mask);
+            if (c.incmode) c.id++;
+        }
+        if (c.nparams & 1) cur++;
+    }
+}
 
 u32 f24tof32(u32 i) {
     u32 sgn = (i >> 23) & 1;
@@ -251,6 +373,11 @@ void* expand_nibbles(u8* src, u32 count) {
     return dst;
 }
 
+bool is_valid_physmem(u32 addr) {
+    return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAMSIZE) ||
+           (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAMSIZE);
+}
+
 typedef struct {
     u8 d[3];
 } u24;
@@ -265,6 +392,11 @@ const GLint texswizzle_dbg_green[4] = {GL_ZERO, GL_ONE, GL_ZERO, GL_ALPHA};
 const GLint texswizzle_dbg_blue[4] = {GL_ZERO, GL_ZERO, GL_ONE, GL_ALPHA};
 
 void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
+    if (!is_valid_physmem(regs->addr << 3)) {
+        linfo("reading textures from invalid memory");
+        return;
+    }
+
     FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
     glActiveTexture(GL_TEXTURE0 + id);
     if (fb) {
@@ -373,120 +505,14 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                     texwrap[regs->param.wrap_t & 3]);
 }
 
-void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
-    linfo("command %03x (0x%08x) & %08x (%f)", id, param, mask, I2F(param));
-    gpu->io.w[id] &= ~mask;
-    gpu->io.w[id] |= param & mask;
-    switch (id) {
-        case GPUREG(geom.drawarrays):
-            gpu_update_gl_state(gpu);
-            gpu_drawarrays(gpu);
-            break;
-        case GPUREG(geom.drawelements):
-            gpu_update_gl_state(gpu);
-            gpu_drawelements(gpu);
-            break;
-        case GPUREG(geom.fixattr_data[0])... GPUREG(geom.fixattr_data[2]): {
-            fvec* fattr;
-            if (gpu->io.geom.fixattr_idx == 0xf) {
-                lwarn("immediate mode");
-                break;
-            } else {
-                fattr = &gpu->fixattrs[gpu->io.geom.fixattr_idx];
-            }
-            switch (gpu->curfixi) {
-                case 0: {
-                    (*fattr)[3] = I2F(f24tof32(param >> 8));
-                    gpu->curfixattr = (param & 0xff) << 16;
-                    gpu->curfixi = 1;
-                    break;
-                }
-                case 1: {
-                    (*fattr)[2] = I2F(f24tof32(param >> 16 | gpu->curfixattr));
-                    gpu->curfixattr = (param & MASK(16)) << 8;
-                    gpu->curfixi = 2;
-                    break;
-                }
-                case 2: {
-                    (*fattr)[1] = I2F(f24tof32(param >> 24 | gpu->curfixattr));
-                    (*fattr)[0] = I2F(f24tof32(param & MASK(24)));
-                    gpu->curfixi = 0;
-                    break;
-                }
-            }
-            break;
-        }
-        case GPUREG(vsh.floatuniform_data[0])... GPUREG(
-            vsh.floatuniform_data[7]): {
-            fvec* uniform = &gpu->cst[gpu->io.vsh.floatuniform_idx];
-            if (gpu->io.vsh.floatuniform_mode) {
-                (*uniform)[3 - gpu->curunifi] = I2F(param);
-                if (++gpu->curunifi == 4) {
-                    gpu->curunifi = 0;
-                    gpu->io.vsh.floatuniform_idx++;
-                }
-            } else {
-                switch (gpu->curunifi) {
-                    case 0: {
-                        (*uniform)[3] = I2F(f24tof32(param >> 8));
-                        gpu->curuniform = (param & 0xff) << 16;
-                        gpu->curunifi = 1;
-                        break;
-                    }
-                    case 1: {
-                        (*uniform)[2] =
-                            I2F(f24tof32(param >> 16 | gpu->curuniform));
-                        gpu->curuniform = (param & MASK(16)) << 8;
-                        gpu->curunifi = 2;
-                        break;
-                    }
-                    case 2: {
-                        (*uniform)[1] =
-                            I2F(f24tof32(param >> 24 | gpu->curuniform));
-                        (*uniform)[0] = I2F(f24tof32(param & MASK(24)));
-                        gpu->curunifi = 0;
-                        gpu->io.vsh.floatuniform_idx++;
-                        break;
-                    }
-                }
-            }
-            break;
-        }
-        case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
-            gpu->progdata[gpu->io.vsh.codetrans_idx++] = param;
-            break;
-        case GPUREG(vsh.opdescs_data[0])... GPUREG(vsh.opdescs_data[8]):
-            gpu->opdescs[gpu->io.vsh.opdescs_idx++] = param;
-            break;
-    }
-}
-
-void gpu_run_command_list(GPU* gpu, u32* cmds, u32 size) {
-    gpu->cur_fb = NULL;
-
-    u32* cur = cmds;
-    u32* end = cmds + size;
-    while (cur < end) {
-        GPUCommand c = {cur[1]};
-        u32 mask = 0;
-        if (c.mask & BIT(0)) mask |= 0xff << 0;
-        if (c.mask & BIT(1)) mask |= 0xff << 8;
-        if (c.mask & BIT(2)) mask |= 0xff << 16;
-        if (c.mask & BIT(3)) mask |= 0xff << 24;
-        gpu_write_internalreg(gpu, c.id, cur[0], mask);
-        cur += 2;
-        if (c.incmode) c.id++;
-        for (int i = 0; i < c.nparams; i++) {
-            gpu_write_internalreg(gpu, c.id, *cur++, mask);
-            if (c.incmode) c.id++;
-        }
-        if (c.nparams & 1) cur++;
-    }
-}
-
 void load_vtx(GPU* gpu, int i) {
     memcpy(gpu->in, gpu->fixattrs, sizeof gpu->in);
     for (int vbo = 0; vbo < 12; vbo++) {
+        if (!is_valid_physmem(gpu->io.geom.attr_base * 8 +
+                              gpu->io.geom.attrbuf[vbo].offset +
+                              i * gpu->io.geom.attrbuf[vbo].size)) {
+            continue;
+        }
         void* vtx =
             PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.attrbuf[vbo].offset +
                 i * gpu->io.geom.attrbuf[vbo].size);
@@ -568,6 +594,12 @@ void gpu_drawarrays(GPU* gpu) {
 void gpu_drawelements(GPU* gpu) {
     linfo("drawing elements nverts=%d primmode=%d", gpu->io.geom.nverts,
           gpu->io.geom.prim_config.mode);
+
+    if (!is_valid_physmem(gpu->io.geom.attr_base * 8 +
+                          gpu->io.geom.indexbufoff)) {
+        linfo("reading index buffer from invalid memory");
+        return;
+    }
 
     u32 minind = 0xffff, maxind = 0;
     void* indexbuf = PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.indexbufoff);
@@ -655,13 +687,20 @@ void gpu_update_gl_state(GPU* gpu) {
         glDisable(GL_BLEND);
         lwarn("using logic ops");
     }
+    if (gpu->io.fb.alpha_test.enable) {
+        glEnable(GL_ALPHA_TEST);
+        glAlphaFunc(compare_func[gpu->io.fb.alpha_test.func & 7],
+                    (float) gpu->io.fb.alpha_test.ref / 255);
+    } else {
+        glDisable(GL_ALPHA_TEST);
+    }
 
     glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
                 gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
     glDepthMask(gpu->io.fb.color_mask.depth);
     glEnable(GL_DEPTH_TEST);
     if (gpu->io.fb.color_mask.depthtest) {
-        glDepthFunc(depth_func[gpu->io.fb.color_mask.depthfunc & 7]);
+        glDepthFunc(compare_func[gpu->io.fb.color_mask.depthfunc & 7]);
     } else {
         glDepthFunc(GL_ALWAYS);
     }

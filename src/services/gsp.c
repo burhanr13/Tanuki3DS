@@ -66,6 +66,11 @@ DECL_PORT(gsp_gpu) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        case 0x001f:
+            linfo("StoreDataCache");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;  
         default:
             lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
                   cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
@@ -154,7 +159,7 @@ void gsp_handle_command(HLE3DS* s) {
             u32 bufsize = cmds->d[cmds->cur].args[1];
             linfo("sending command list at %08x with size 0x%x", bufaddr,
                   bufsize);
-            gpu_run_command_list(&s->gpu, PTR(bufaddr & ~7), bufsize / 4);
+            gpu_run_command_list(&s->gpu, vaddr_to_paddr(bufaddr & ~7), bufsize / 4);
             gsp_handle_event(s, GSPEVENT_P3D);
             break;
         }
@@ -232,9 +237,9 @@ void gsp_handle_command(HLE3DS* s) {
             u32 flags = cmds->d[cmds->cur].args[5];
 
             linfo("texture copy from %x(pitch=%d,gap=%d) to "
-                     "%x(pitch=%d,gap=%d), size=%d, flags=%x",
-                     addrin, pitchin, gapin, addrout, pitchout, gapout,
-                     copysize, flags);
+                  "%x(pitch=%d,gap=%d), size=%d, flags=%x",
+                  addrin, pitchin, gapin, addrout, pitchout, gapout, copysize,
+                  flags);
 
             u8* src = PTR(addrin);
             u8* dst = PTR(addrout);

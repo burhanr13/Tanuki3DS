@@ -6,6 +6,8 @@
 
 #include "services.h"
 
+#include "sys_files/shared_font.app.romfs.h"
+
 void srvobj_init(KObject* hdr, KObjType t) {
     hdr->type = t;
     hdr->refcount = 1;
@@ -28,6 +30,10 @@ void init_services(HLE3DS* s) {
     srvobj_init(&s->services.apt.resume_event.hdr, KOT_EVENT);
     s->services.apt.resume_event.sticky = true;
     s->services.apt.resume_event.signal = true;
+    srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
+    s->services.apt.shared_font.defaultdata = SHARED_FONT_DATA;
+    s->services.apt.shared_font.defaultdatalen = SHARED_FONT_DATA_len;
+    s->services.apt.shared_font.vaddr = LINEAR_HEAP_BASE - 0x1000;
 
     s->services.gsp.event = NULL;
     srvobj_init(&s->services.gsp.sharedmem.hdr, KOT_SHAREDMEM);
@@ -112,9 +118,13 @@ DECL_PORT(srv) {
             } else if (IS("am:app")) {
                 handler = port_handle_am;
             } else if (IS("nim:aoc")) {
-                handler = port_handle_nim;
+                handler = port_handle_nim_aoc;
             } else if (IS("y2r:u")) {
                 handler = port_handle_y2r;
+            } else if (IS("ac:u")) {
+                handler = port_handle_ac;
+            } else if (IS("cam:u")) {
+                handler = port_handle_cam;
             } else {
                 lerror("unknown service '%s'", name);
                 cmdbuf[1] = -1;
@@ -172,9 +182,7 @@ DECL_PORT(errf) {
             lerror("fatal error type %d, result %08x, pc %08x, message: %s",
                    errinfo->type, errinfo->resultcode, errinfo->pc,
                    errinfo->message);
-
-            cmdbuf[0] = 0;
-            cmdbuf[1] = 1;
+            exit(1);
             break;
         }
         default:

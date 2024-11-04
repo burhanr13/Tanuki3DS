@@ -71,4 +71,18 @@ typedef struct {
     } file[10];
 } ExeFSHeader;
 
+typedef struct __attribute__((packed)) {
+    u8 magic[4];
+    u32 magic2;
+    u32 masterhashsize;
+    struct {
+        u64 offset;
+        u64 size;
+        u32 blksize;
+        u32 res;
+    } lvl[3];
+    u32 _54;
+    u32 infosize;
+} IVFCHeader;
+
 #endif

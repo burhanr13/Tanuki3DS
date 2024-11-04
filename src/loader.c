@@ -132,7 +132,7 @@ u32 load_ncsd(HLE3DS* s, char* filename) {
     s->gamecard.fp = fp;
     s->gamecard.exheader_off = ncchbase + 0x200;
     s->gamecard.exefs_off = ncchbase + hdrncch.exefs.offset * 0x200;
-    s->gamecard.romfs_off = ncchbase + hdrncch.romfs.offset * 0x200;
+    s->gamecard.romfs_off = ncchbase + hdrncch.romfs.offset * 0x200 + 0x1000;
 
     return exhdr.sci.text.vaddr;
 }

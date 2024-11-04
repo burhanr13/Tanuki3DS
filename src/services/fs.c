@@ -10,6 +10,12 @@
 #include "../filesystems.h"
 #include "../srv.h"
 
+#include "../sys_files/mii.app.romfs.h"
+
+enum {
+    SYSFILE_MIIDATA = 1,
+};
+
 char* archive_basepath(u64 archive) {
     switch (archive << 32 >> 32) {
         case 4: {
@@ -279,7 +285,81 @@ DECL_PORT_ARG(fs_selfncch, base) {
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             fseek(s->gamecard.fp, base + offset, SEEK_SET);
+
             cmdbuf[2] = fread(data, 1, size, s->gamecard.fp);
+            break;
+        }
+        case 0x0808: {
+            linfo("close");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
+        case 0x080c: {
+            linfo("OpenLinkFile");
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            u32 h = handle_new(s);
+            if (!h) {
+                cmdbuf[1] = -1;
+                return;
+            }
+            KSession* ses = session_create_arg(port_handle_fs_selfncch, base);
+            HANDLE_SET(h, ses);
+            ses->hdr.refcount = 1;
+            linfo("opened link file with handle %x", h);
+            cmdbuf[3] = h;
+            break;
+        }
+        default:
+            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
+                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+    }
+}
+
+DECL_PORT_ARG(fs_sysfile, file) {
+    u32* cmdbuf = PTR(cmd_addr);
+
+    void* srcdata = NULL;
+    u64 srcsize = 0;
+    switch (file) {
+        case SYSFILE_MIIDATA:
+            srcdata = MII_DATA;
+            srcsize = MII_DATA_len;
+            linfo("accessing mii data");
+            break;
+        default:
+            lerror("unknown system file %x", file);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = -1;
+            return;
+    }
+
+    switch (cmd.command) {
+        case 0x0802: {
+            u64 offset = cmdbuf[1];
+            offset |= (u64) cmdbuf[2] << 32;
+            u32 dstsize = cmdbuf[3];
+            void* dstdata = PTR(cmdbuf[5]);
+
+            linfo("reading at offset 0x%lx, size 0x%x", offset, dstsize);
+
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+
+            if (offset > srcsize) {
+                cmdbuf[2] = 0;
+            } else {
+                if (offset + dstsize > srcsize) {
+                    dstsize = srcsize - offset;
+                }
+                cmdbuf[2] = dstsize;
+                memcpy(dstdata, srcdata + offset, dstsize);
+            }
+
             break;
         }
         case 0x0808: {
@@ -480,7 +560,32 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
             }
         }
         case 0x2345678a:
-            return 0x2345678a;
+            if (pathtype == FSPATH_BINARY) {
+                u64* lowpath = path;
+                switch (*lowpath) {
+                    case 0x0004009b00010202:
+                        linfo("opening mii data archive");
+                        return (u64) 0x2345678a | (u64) SYSFILE_MIIDATA << 32;
+                    default:
+                        lwarn("unknown ncch archive %lx", *lowpath);
+                        return -1;
+                }
+            } else {
+                lwarn("unknown path type");
+                return -1;
+            }
+        case 0x567890b4: {
+            if (pathtype == FSPATH_BINARY) {
+                linfo("opening save data");
+                char* apath = archive_basepath(4);
+                mkdir(apath, S_IRWXU);
+                free(apath);
+                return 4;
+            } else {
+                lwarn("unknown path type");
+                return -1;
+            }
+        }
         default:
             lwarn("unknown archive %x", id);
             return -1;
@@ -497,8 +602,7 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
                     case 0: {
                         linfo("opening romfs");
                         return session_create_arg(port_handle_fs_selfncch,
-                                                  s->gamecard.romfs_off +
-                                                      0x1000);
+                                                  s->gamecard.romfs_off);
                     }
                     case 2: {
                         char* filename = (char*) &path[1];
@@ -565,7 +669,7 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
 
             int hostfd = open(filepath, mode, S_IRUSR | S_IWUSR);
             if (hostfd < 0) {
-                linfo("opening file which does not exist");
+                lwarn("file %s not found", filepath);
                 free(filepath);
                 return NULL;
             }
@@ -585,7 +689,6 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
 
             FILE* fp = fdopen(hostfd, fopenmode);
             if (!fp) {
-                lerror("failed to open file %s", filepath);
                 perror("fdopen");
                 free(filepath);
                 return NULL;
@@ -605,8 +708,8 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
                 u32* path = rawpath;
                 if (path[0] == 0 && path[2] == 0) {
                     linfo("opening romfs");
-                    return session_create_arg(port_handle_fs_selfncch,
-                                              s->gamecard.romfs_off + 0x1000);
+                    return session_create_arg(port_handle_fs_sysfile,
+                                              archive >> 32);
                 } else {
                     lwarn("unknown path for archive 0x2345678a");
                     return 0;

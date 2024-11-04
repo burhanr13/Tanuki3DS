@@ -3,6 +3,10 @@
 
 #include "../srv.h"
 
+typedef struct {
+    s8 optoutflag;
+} BOSSData;
+
 DECL_PORT(boss);
 
 #endif

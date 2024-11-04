@@ -239,12 +239,26 @@ DECL_SVC(MapMemoryBlock) {
         return;
     }
 
-    linfo("mapping shared mem block %x at %08x", memblock, addr);
+    if (addr && shmem->vaddr) lwarn("remapping a shared mem block");
 
-    shmem->vaddr = addr;
+    if (addr) {
+        shmem->vaddr = addr;
+    } else if (shmem->vaddr) {
+        addr = shmem->vaddr;
+    } else {
+        lwarn("trying to map at NULL");
+        R(0) = -1;
+        return;
+    }
     shmem->mapped = true;
 
+    linfo("mapping shared mem block %x at %08x", memblock, addr);
+
     hle3ds_vmmap(s, addr, PAGE_SIZE, perm, MEMST_SHARED, false);
+
+    if (shmem->defaultdata) {
+        memcpy(PTR(addr), shmem->defaultdata, shmem->defaultdatalen);
+    }
 
     R(0) = 0;
 }

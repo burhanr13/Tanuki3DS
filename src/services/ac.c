@@ -1,8 +1,8 @@
-#include "nim.h"
+#include "ac.h"
 
 #include "../3ds.h"
 
-DECL_PORT(nim_aoc) {
+DECL_PORT(ac) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         default:

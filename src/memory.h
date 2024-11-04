@@ -20,6 +20,9 @@ typedef struct {
 
     u32 vaddr;
     bool mapped;
+
+    void* defaultdata;
+    u32 defaultdatalen;
 } KSharedMem;
 
 void hle3ds_memory_init(HLE3DS* s);

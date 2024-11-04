@@ -1,9 +1,11 @@
 #ifndef SERVICE_DATA_H
 #define SERVICE_DATA_H
 
+#include "services/ac.h"
 #include "services/am.h"
 #include "services/apt.h"
 #include "services/boss.h"
+#include "services/cam.h"
 #include "services/cecd.h"
 #include "services/cfg.h"
 #include "services/dsp.h"
@@ -29,6 +31,7 @@ typedef struct {
     DSPData dsp;
     FSData fs;
     MicData mic;
+    BOSSData boss;
 
 } ServiceData;
 

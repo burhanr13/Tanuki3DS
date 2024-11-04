@@ -6,9 +6,9 @@
 #include "thread.h"
 
 // #define CPULOG
-// #define BREAK
+//#define BREAK
 // #define WATCH
-#define PATCHFN 0x13828c
+//#define PATCHFN
 
 void cpu_init(HLE3DS* s) {
     s->cpu.read8 = (void*) cpu_read8;

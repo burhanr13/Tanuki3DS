@@ -120,7 +120,12 @@ typedef union {
                     u8 b;
                     u8 a;
                 } blend_color;
-                u32 alpha_test;
+                struct {
+                    u32 enable : 4;
+                    u32 func : 4;
+                    u32 ref : 8;
+                    u32 _16_31 : 16;
+                } alpha_test;
                 u32 stencil_test;
                 u32 stencil_op;
                 struct {
@@ -188,7 +193,13 @@ typedef union {
                 u32 _230[2];
                 u32 fixattr_idx;
                 u32 fixattr_data[3];
-                u32 _236[0x28];
+                u32 _236[2];
+                struct {
+                    u32 size[2];
+                    u32 addr[2];
+                    u32 jmp[2];
+                } cmdbuf;
+                u32 _23e[0x20];
                 struct {
                     u32 outmapcount : 8;
                     u32 mode : 8;
@@ -333,7 +344,7 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, bool top);
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
 
-void gpu_run_command_list(GPU* gpu, u32* cmds, u32 size);
+void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 
 void gpu_drawarrays(GPU* gpu);
 void gpu_drawelements(GPU* gpu);
