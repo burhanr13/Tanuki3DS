@@ -70,7 +70,7 @@ DECL_PORT(gsp_gpu) {
             linfo("StoreDataCache");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
-            break;  
+            break;
         default:
             lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
                   cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
@@ -159,7 +159,8 @@ void gsp_handle_command(HLE3DS* s) {
             u32 bufsize = cmds->d[cmds->cur].args[1];
             linfo("sending command list at %08x with size 0x%x", bufaddr,
                   bufsize);
-            gpu_run_command_list(&s->gpu, vaddr_to_paddr(bufaddr & ~7), bufsize / 4);
+            gpu_run_command_list(&s->gpu, vaddr_to_paddr(bufaddr & ~7),
+                                 bufsize / 4);
             gsp_handle_event(s, GSPEVENT_P3D);
             break;
         }
@@ -217,9 +218,14 @@ void gsp_handle_command(HLE3DS* s) {
                   fbbot->fbs[0].right_vaddr, fbbot->fbs[1].left_vaddr,
                   fbbot->fbs[1].right_vaddr);
 
-            if (addrout == fbtop->fbs[1 - fbtop->idx].left_vaddr) {
+            s32 difft = addrout - fbtop->fbs[1 - fbtop->idx].left_vaddr;
+            s32 diffb = addrout - fbbot->fbs[1 - fbbot->idx].left_vaddr;
+            difft = abs(difft);
+            diffb = abs(diffb);
+
+            if (difft < diffb) {
                 gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), true);
-            } else if (addrout == fbbot->fbs[1 - fbbot->idx].left_vaddr) {
+            } else if (diffb < difft) {
                 gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), false);
             }
 

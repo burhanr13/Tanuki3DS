@@ -31,7 +31,7 @@ DECL_PORT(apt) {
             break;
         case 0x0006: {
             u32 appid = cmdbuf[1];
-            printfln("GetAppletInfo for 0x%x", appid);
+            linfo("GetAppletInfo for 0x%x", appid);
             cmdbuf[0] = IPCHDR(7, 0);
             cmdbuf[1] = 0;
             cmdbuf[5] = 1;

@@ -49,6 +49,11 @@ static const GLenum prim_mode[4] = {
     GL_TRIANGLES,
 };
 
+bool is_valid_physmem(u32 addr) {
+    return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAMSIZE) ||
+           (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAMSIZE);
+}
+
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     linfo("command %03x (0x%08x) & %08x (%f)", id, param, mask, I2F(param));
     gpu->io.w[id] &= ~mask;
@@ -147,6 +152,11 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
 
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
     gpu->cur_fb = NULL;
+
+    if (!is_valid_physmem(paddr)) {
+        lwarn("command list in invalid memory");
+        return;
+    }
 
     u32* cmds = PTR(paddr);
 
@@ -373,11 +383,6 @@ void* expand_nibbles(u8* src, u32 count) {
     return dst;
 }
 
-bool is_valid_physmem(u32 addr) {
-    return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAMSIZE) ||
-           (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAMSIZE);
-}
-
 typedef struct {
     u8 d[3];
 } u24;
@@ -393,7 +398,7 @@ const GLint texswizzle_dbg_blue[4] = {GL_ZERO, GL_ZERO, GL_ONE, GL_ALPHA};
 
 void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     if (!is_valid_physmem(regs->addr << 3)) {
-        linfo("reading textures from invalid memory");
+        lwarn("reading textures from invalid memory");
         return;
     }
 
@@ -511,6 +516,7 @@ void load_vtx(GPU* gpu, int i) {
         if (!is_valid_physmem(gpu->io.geom.attr_base * 8 +
                               gpu->io.geom.attrbuf[vbo].offset +
                               i * gpu->io.geom.attrbuf[vbo].size)) {
+            lwarn("vbo in invalid memory");
             continue;
         }
         void* vtx =
@@ -597,7 +603,7 @@ void gpu_drawelements(GPU* gpu) {
 
     if (!is_valid_physmem(gpu->io.geom.attr_base * 8 +
                           gpu->io.geom.indexbufoff)) {
-        linfo("reading index buffer from invalid memory");
+        lwarn("reading index buffer from invalid memory");
         return;
     }
 
