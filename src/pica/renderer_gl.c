@@ -129,6 +129,8 @@ void render_gl_main(GLState* state) {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -146,4 +148,5 @@ void render_gl_main(GLState* state) {
 
     glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 }

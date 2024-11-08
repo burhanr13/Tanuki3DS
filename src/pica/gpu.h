@@ -199,7 +199,12 @@ typedef union {
                     u32 addr[2];
                     u32 jmp[2];
                 } cmdbuf;
-                u32 _23e[0x20];
+                u32 _23e[4];
+                u32 vsh_num_attr;
+                u32 _243;
+                u32 vsh_com_mode;
+                u32 start_draw_func0;
+                u32 _246[0x18];
                 struct {
                     u32 outmapcount : 8;
                     u32 mode : 8;
@@ -287,6 +292,7 @@ typedef struct _GPU {
     fvec fixattrs[16];
     u32 curfixattr;
     int curfixi;
+    Vector(fvec) immattrs;
 
     u32 curuniform;
     int curunifi;
@@ -348,6 +354,7 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 
 void gpu_drawarrays(GPU* gpu);
 void gpu_drawelements(GPU* gpu);
+void gpu_drawimmediate(GPU* gpu);
 
 void gpu_update_gl_state(GPU* gpu);
 

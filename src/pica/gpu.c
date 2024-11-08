@@ -69,9 +69,16 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         case GPUREG(geom.fixattr_data[0])... GPUREG(geom.fixattr_data[2]): {
             fvec* fattr;
+            bool immediatemode = false;
             if (gpu->io.geom.fixattr_idx == 0xf) {
-                lwarn("immediate mode");
-                break;
+                if (gpu->immattrs.size == gpu->immattrs.cap) {
+                    gpu->immattrs.cap =
+                        gpu->immattrs.cap ? 2 * gpu->immattrs.cap : 8;
+                    gpu->immattrs.d = realloc(gpu->immattrs.d,
+                                              gpu->immattrs.cap * sizeof(fvec));
+                }
+                fattr = &gpu->immattrs.d[gpu->immattrs.size];
+                immediatemode = true;
             } else {
                 fattr = &gpu->fixattrs[gpu->io.geom.fixattr_idx];
             }
@@ -92,11 +99,18 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
                     (*fattr)[1] = I2F(f24tof32(param >> 24 | gpu->curfixattr));
                     (*fattr)[0] = I2F(f24tof32(param & MASK(24)));
                     gpu->curfixi = 0;
+                    if (immediatemode) gpu->immattrs.size++;
                     break;
                 }
             }
             break;
         }
+        case GPUREG(geom.start_draw_func0):
+            if (gpu->immattrs.size) {
+                gpu_update_gl_state(gpu);
+                gpu_drawimmediate(gpu);
+            }
+            break;
         case GPUREG(geom.cmdbuf.jmp[0]):
             gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[0] << 3,
                                  gpu->io.geom.cmdbuf.size[0]);
@@ -340,7 +354,7 @@ TexInfo* texcache_load(GPU* gpu, u32 paddr) {
     return tex;
 }
 
-u32 morton_swizzle(u32 w, u32 x, u32 y) {
+u32 morton_swizzle(u32 h, u32 w, u32 x, u32 y) {
     u32 swizzle[8] = {
         0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15,
     };
@@ -362,7 +376,7 @@ u32 morton_swizzle(u32 w, u32 x, u32 y) {
         for (int x = 0; x < tex->width; x++) {                                 \
             for (int y = 0; y < tex->height; y++) {                            \
                 pixels[y * tex->width + x] =                                   \
-                    data[morton_swizzle(tex->width, x, y)];                    \
+                    data[morton_swizzle(tex->height, tex->width, x, y)];       \
             }                                                                  \
         }                                                                      \
                                                                                \
@@ -457,7 +471,8 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                     LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
                     break;
                 case 9:
-                    rawdata = expand_nibbles(rawdata, tex->width * tex->height);
+                    rawdata =
+                        expand_nibbles(rawdata, 2 * tex->width * tex->height);
                     glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
                                      texswizzle_lum_alpha);
                     LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
@@ -566,11 +581,13 @@ void load_vtx(GPU* gpu, int i) {
                     break;
                 }
             }
-            if (size < 2) gpu->in[attr][1] = 0.0f;
-            if (size < 3) gpu->in[attr][2] = 0.0f;
-            if (size < 4) gpu->in[attr][3] = 1.0f;
         }
     }
+}
+
+void load_vtx_imm(GPU* gpu, int i) {
+    u32 nattrs = gpu->io.geom.vsh_num_attr + 1;
+    memcpy(gpu->in, &gpu->immattrs.d[i * nattrs], nattrs * sizeof(fvec));
 }
 
 void store_vtx(GPU* gpu, int i, Vertex* vbuf) {
@@ -636,6 +653,26 @@ void gpu_drawelements(GPU* gpu) {
         prim_mode[gpu->io.geom.prim_config.mode & 3], gpu->io.geom.nverts,
         gpu->io.geom.indexfmt ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE, 0,
         -minind);
+}
+
+void gpu_drawimmediate(GPU* gpu) {
+    u32 nattrs = gpu->io.geom.vsh_num_attr + 1;
+    u32 nverts = gpu->immattrs.size / nattrs;
+
+    linfo("drawing immediate mode nverts=%d primmode=%d", nverts,
+          gpu->io.geom.prim_config.mode);
+    Vertex vbuf[nverts];
+    for (int i = 0; i < nverts; i++) {
+        load_vtx_imm(gpu, i);
+        exec_vshader(gpu);
+        store_vtx(gpu, i, vbuf);
+        //PRINTFVEC(vbuf[i].pos);
+    }
+    glBufferData(GL_ARRAY_BUFFER, nverts * sizeof(Vertex), vbuf,
+                 GL_STREAM_DRAW);
+    glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode & 3], 0, nverts);
+
+    Vec_free(gpu->immattrs);
 }
 
 void gpu_update_gl_state(GPU* gpu) {

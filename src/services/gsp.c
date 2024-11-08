@@ -209,24 +209,41 @@ void gsp_handle_command(HLE3DS* s) {
                 } fbs[2];
             } *fbtop = GSPMEM(0x200), *fbbot = GSPMEM(0x240);
 
-            linfo("top fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
-                  fbtop->idx, fbtop->fbs[0].left_vaddr,
-                  fbtop->fbs[0].right_vaddr, fbtop->fbs[1].left_vaddr,
-                  fbtop->fbs[1].right_vaddr);
-            linfo("bot fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
-                  fbbot->idx, fbbot->fbs[0].left_vaddr,
-                  fbbot->fbs[0].right_vaddr, fbbot->fbs[1].left_vaddr,
-                  fbbot->fbs[1].right_vaddr);
+            if (fbtop->flags & 1) {
+                linfo("top fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
+                      fbtop->idx, fbtop->fbs[0].left_vaddr,
+                      fbtop->fbs[0].right_vaddr, fbtop->fbs[1].left_vaddr,
+                      fbtop->fbs[1].right_vaddr);
 
-            s32 difft = addrout - fbtop->fbs[1 - fbtop->idx].left_vaddr;
-            s32 diffb = addrout - fbbot->fbs[1 - fbbot->idx].left_vaddr;
-            difft = abs(difft);
-            diffb = abs(diffb);
+                FIFO_push(s->services.gsp.toplcdfbs,
+                          fbtop->fbs[1 - fbtop->idx].left_vaddr);
+                fbtop->flags &= ~1;
+            }
+            if (fbbot->flags & 1) {
+                linfo("bot fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
+                      fbbot->idx, fbbot->fbs[0].left_vaddr,
+                      fbbot->fbs[0].right_vaddr, fbbot->fbs[1].left_vaddr,
+                      fbbot->fbs[1].right_vaddr);
 
-            if (difft < diffb) {
-                gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), true);
-            } else if (diffb < difft) {
-                gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), false);
+                FIFO_push(s->services.gsp.botlcdfbs,
+                          fbbot->fbs[1 - fbbot->idx].left_vaddr);
+                fbbot->flags &= ~1;
+            }
+
+            for (int i = 0; i < 4; i++) {
+                if (addrout - s->services.gsp.toplcdfbs.d[i] <= 0x2000 ||
+                    s->services.gsp.toplcdfbs.d[i] - addrout <= 0x2000) {
+                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), true);
+                    break;
+                }
+            }
+            for (int i = 0; i < 4; i++) {
+                if (addrout - s->services.gsp.botlcdfbs.d[i] <= 0x2000 ||
+                    s->services.gsp.botlcdfbs.d[i] - addrout <= 0x2000) {
+                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin),
+                                         false);
+                    break;
+                }
             }
 
             gsp_handle_event(s, GSPEVENT_PPF);

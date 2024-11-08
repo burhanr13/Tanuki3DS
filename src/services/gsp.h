@@ -19,6 +19,9 @@ enum {
 typedef struct {
     KEvent* event;
     KSharedMem sharedmem;
+
+    FIFO(u32, 4) toplcdfbs;
+    FIFO(u32, 4) botlcdfbs;
 } GSPData;
 
 DECL_PORT(gsp_gpu);

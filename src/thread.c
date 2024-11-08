@@ -82,7 +82,7 @@ bool thread_reschedule(HLE3DS* s) {
     if (CUR_THREAD->id == nexttid) {
         linfo("not switching threads");
     } else {
-        linfo("switching thread from %d to %d", CUR_THREAD->id, nexttid);
+        linfo("switching from thread %d to thread %d", CUR_THREAD->id, nexttid);
         save_context(s);
         s->process.handles[0]->refcount--;
         s->process.handles[0] = &s->process.threads[nexttid]->hdr;

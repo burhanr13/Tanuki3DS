@@ -103,7 +103,7 @@ typedef int64_t s64;
 #define SVec_remove Vec_remove
 #define Vec_foreach(e, v)                                                      \
     for (typeof((v).d[0])* e = (v).d; e < (v).d + (v).size; e++)
-#define SVec_foreach Vec_remove
+#define SVec_foreach Vec_foreach
 
 #define LRUCache(T, N)                                                         \
     struct {                                                                   \
