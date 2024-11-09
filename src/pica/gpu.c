@@ -303,6 +303,7 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool top) {
     FBInfo* fb = NULL;
     int yoffsrc;
     for (int i = 0; i < FB_MAX; i++) {
+        if (gpu->fbs.d[i].width == 0) continue;
         yoffsrc = gpu->fbs.d[i].color_paddr - paddr;
         yoffsrc /= (int) (gpu->fbs.d[i].color_Bpp * gpu->fbs.d[i].width);
         if (abs(yoffsrc) < gpu->fbs.d[i].height / 2) {
