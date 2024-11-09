@@ -125,7 +125,6 @@ void render_gl_main(GLState* state) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glColorMask(true, true, true, true);
     glDisable(GL_BLEND);
-    glDisable(GL_ALPHA_TEST);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 

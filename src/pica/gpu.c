@@ -730,13 +730,6 @@ void gpu_update_gl_state(GPU* gpu) {
         glDisable(GL_BLEND);
         lwarn("using logic ops");
     }
-    if (gpu->io.fb.alpha_test.enable) {
-        glEnable(GL_ALPHA_TEST);
-        glAlphaFunc(compare_func[gpu->io.fb.alpha_test.func & 7],
-                    (float) gpu->io.fb.alpha_test.ref / 255);
-    } else {
-        glDisable(GL_ALPHA_TEST);
-    }
 
     glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
                 gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
