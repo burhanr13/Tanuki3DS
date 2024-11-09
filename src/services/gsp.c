@@ -160,7 +160,7 @@ void gsp_handle_command(HLE3DS* s) {
             linfo("sending command list at %08x with size 0x%x", bufaddr,
                   bufsize);
             gpu_run_command_list(&s->gpu, vaddr_to_paddr(bufaddr & ~7),
-                                 bufsize / 4);
+                                 bufsize);
             gsp_handle_event(s, GSPEVENT_P3D);
             break;
         }

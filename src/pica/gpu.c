@@ -113,11 +113,11 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         case GPUREG(geom.cmdbuf.jmp[0]):
             gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[0] << 3,
-                                 gpu->io.geom.cmdbuf.size[0]);
+                                 gpu->io.geom.cmdbuf.size[0] << 3);
             break;
         case GPUREG(geom.cmdbuf.jmp[1]):
             gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[1] << 3,
-                                 gpu->io.geom.cmdbuf.size[1]);
+                                 gpu->io.geom.cmdbuf.size[1] << 3);
             break;
         case GPUREG(vsh.floatuniform_data[0])... GPUREG(
             vsh.floatuniform_data[7]): {
@@ -175,7 +175,7 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
     u32* cmds = PTR(paddr);
 
     u32* cur = cmds;
-    u32* end = cmds + size;
+    u32* end = cmds + (size / 4);
     while (cur < end) {
         GPUCommand c = {cur[1]};
         u32 mask = 0;
@@ -666,7 +666,6 @@ void gpu_drawimmediate(GPU* gpu) {
         load_vtx_imm(gpu, i);
         exec_vshader(gpu);
         store_vtx(gpu, i, vbuf);
-        //PRINTFVEC(vbuf[i].pos);
     }
     glBufferData(GL_ARRAY_BUFFER, nverts * sizeof(Vertex), vbuf,
                  GL_STREAM_DRAW);

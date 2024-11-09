@@ -53,6 +53,9 @@ u32 load_elf(HLE3DS* s, char* filename) {
 
     s->gamecard.fp = NULL;
 
+    hle3ds_vmmap(s, STACK_BASE - STACK_SIZE, STACK_SIZE, PERM_RW, MEMST_PRIVATE,
+                 false);
+
     return ehdr.e_entry;
 }
 
@@ -133,6 +136,9 @@ u32 load_ncsd(HLE3DS* s, char* filename) {
     s->gamecard.exheader_off = ncchbase + 0x200;
     s->gamecard.exefs_off = ncchbase + hdrncch.exefs.offset * 0x200;
     s->gamecard.romfs_off = ncchbase + hdrncch.romfs.offset * 0x200 + 0x1000;
+
+    hle3ds_vmmap(s, STACK_BASE - exhdr.sci.stacksz, exhdr.sci.stacksz, PERM_RW,
+                 MEMST_PRIVATE, false);
 
     return exhdr.sci.text.vaddr;
 }
