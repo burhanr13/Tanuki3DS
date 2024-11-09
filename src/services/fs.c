@@ -474,7 +474,7 @@ DECL_PORT_ARG(fs_dir, fd) {
                 ent = readdir(dp);
                 if (!ent) break;
 
-                int namelen = ent->d_namlen;
+                int namelen = strlen(ent->d_name);
                 if (namelen > 0x105) namelen = 0x105;
                 for (int j = 0; j < namelen; j++) {
                     ents[i].name[j] = ent->d_name[j];
