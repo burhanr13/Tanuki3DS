@@ -346,7 +346,7 @@ typedef union {
 u32 f24tof32(u32 i);
 u32 f31tof32(u32 i);
 
-void gpu_display_transfer(GPU* gpu, u32 paddr, bool top);
+void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool top);
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
 

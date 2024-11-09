@@ -189,10 +189,19 @@ void gsp_handle_command(HLE3DS* s) {
             u32 addrin = cmds->d[cmds->cur].args[0];
             u32 addrout = cmds->d[cmds->cur].args[1];
             u32 dimin = cmds->d[cmds->cur].args[2];
+            u16 win = dimin & 0xffff;
+            u16 hin = dimin >> 16;
             u32 dimout = cmds->d[cmds->cur].args[3];
+            u16 wout = dimout & 0xffff;
+            u16 hout = dimout >> 16;
             u32 flags = cmds->d[cmds->cur].args[4];
-            linfo("display transfer from fb at %08x to %08x flags %x", addrin,
-                  addrout, flags);
+            u8 fmtin = (flags >> 8) & 7;
+            u8 fmtout = (flags >> 12) & 7;
+            static int fmtBpp[8] = {4, 3, 2, 2, 2, 4, 4, 4};
+
+            linfo("display transfer from fb at %08x (%dx%d) to %08x (%dx%d) "
+                  "flags %x",
+                  addrin, win, hin, addrout, wout, hout, flags);
 
             struct {
                 u8 idx;
@@ -231,16 +240,19 @@ void gsp_handle_command(HLE3DS* s) {
             }
 
             for (int i = 0; i < 4; i++) {
-                if (addrout - s->services.gsp.toplcdfbs.d[i] <= 0x2000 ||
-                    s->services.gsp.toplcdfbs.d[i] - addrout <= 0x2000) {
-                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), true);
+                int yoff = (addrout - s->services.gsp.toplcdfbs.d[i]) /
+                           (wout * fmtBpp[fmtout]);
+                if (abs(yoff) < hout / 2) {
+                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
+                                         true);
                     break;
                 }
             }
             for (int i = 0; i < 4; i++) {
-                if (addrout - s->services.gsp.botlcdfbs.d[i] <= 0x2000 ||
-                    s->services.gsp.botlcdfbs.d[i] - addrout <= 0x2000) {
-                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin),
+                int yoff = (addrout - s->services.gsp.botlcdfbs.d[i]) /
+                           (wout * fmtBpp[fmtout]);
+                if (abs(yoff) < hout / 2) {
+                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
                                          false);
                     break;
                 }

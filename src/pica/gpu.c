@@ -297,18 +297,19 @@ void gpu_update_cur_fb(GPU* gpu) {
     }
 }
 
-void gpu_display_transfer(GPU* gpu, u32 paddr, bool top) {
+void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool top) {
     FBInfo* fb = fbcache_find(gpu, paddr);
 
     if (!fb) return;
 
-    linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
+    printfln("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
 
     GLuint dst = top ? gpu->gl.textop : gpu->gl.texbot;
     glBindTexture(GL_TEXTURE_2D, dst);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
-    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, fb->width * SCALE,
-                     fb->height * SCALE, 0);
+    u32 scwidth = top ? SCREEN_WIDTH : SCREEN_WIDTH_BOT;
+    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, fb->height - scwidth + yoff,
+                     SCREEN_HEIGHT * SCALE, scwidth * SCALE, 0);
 }
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
