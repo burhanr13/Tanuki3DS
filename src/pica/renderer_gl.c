@@ -125,8 +125,13 @@ void render_gl_main(GLState* state) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glColorMask(true, true, true, true);
     glDisable(GL_BLEND);
+    glDisable(GL_COLOR_LOGIC_OP);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
+
+#ifdef WIREFRAME
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+#endif
 
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -142,6 +147,10 @@ void render_gl_main(GLState* state) {
                SCREEN_WIDTH_BOT * SCALE, SCREEN_HEIGHT * SCALE);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+#ifdef WIREFRAME
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+#endif
 
     glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);

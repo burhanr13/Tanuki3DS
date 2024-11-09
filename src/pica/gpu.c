@@ -38,6 +38,12 @@ static const GLenum blend_func[16] = {
     GL_SRC_ALPHA_SATURATE,
     GL_ZERO,
 };
+static const GLenum logic_ops[16] = {
+    GL_CLEAR,         GL_AND,  GL_AND_REVERSE, GL_COPY,         GL_SET,
+    GL_COPY_INVERTED, GL_NOOP, GL_INVERT,      GL_NAND,         GL_OR,
+    GL_NOR,           GL_XOR,  GL_EQUIV,       GL_AND_INVERTED, GL_OR_REVERSE,
+    GL_OR_INVERTED,
+};
 static const GLenum compare_func[8] = {
     GL_NEVER, GL_ALWAYS, GL_EQUAL,   GL_NOTEQUAL,
     GL_LESS,  GL_LEQUAL, GL_GREATER, GL_GEQUAL,
@@ -729,6 +735,7 @@ void gpu_update_gl_state(GPU* gpu) {
         lwarn("using frag op %d", gpu->io.fb.color_op.frag_mode);
     }
     if (gpu->io.fb.color_op.blend_mode == 1) {
+        glDisable(GL_COLOR_LOGIC_OP);
         glEnable(GL_BLEND);
         glBlendEquationSeparate(blend_eq[gpu->io.fb.blend_func.rgb_eq & 7],
                                 blend_eq[gpu->io.fb.blend_func.a_eq & 7]);
@@ -741,7 +748,8 @@ void gpu_update_gl_state(GPU* gpu) {
             gpu->io.fb.blend_color.b / 255.f, gpu->io.fb.blend_color.a / 255.f);
     } else {
         glDisable(GL_BLEND);
-        lwarn("using logic ops");
+        glEnable(GL_COLOR_LOGIC_OP);
+        glLogicOp(logic_ops[gpu->io.fb.logic_op & 0xf]);
     }
 
     glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,

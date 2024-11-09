@@ -27,9 +27,9 @@ int main(int argc, char** argv) {
 #ifdef GLDEBUGCTX
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
-    SDL_Window* window = SDL_CreateWindow("ctremu", SDL_WINDOWPOS_UNDEFINED,
-                                          SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * SCALE,
-                                          2 * SCREEN_HEIGHT * SCALE, SDL_WINDOW_OPENGL);
+    SDL_Window* window = SDL_CreateWindow(
+        "ctremu", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+        SCREEN_WIDTH * SCALE, 2 * SCREEN_HEIGHT * SCALE, SDL_WINDOW_OPENGL);
 
     SDL_GLContext glcontext = SDL_GL_CreateContext(window);
     if (!glcontext) {
@@ -101,8 +101,13 @@ int main(int argc, char** argv) {
         if (elapsed >= SDL_GetPerformanceFrequency() / 2) {
             double fps = (double) SDL_GetPerformanceFrequency() *
                          (frame - prev_fps_frame) / elapsed;
-            snprintf(wintitle, 199, "ctremu | %s | %.2lf FPS",
-                     ctremu.romfilenodir, fps);
+            if (ctremu.pause) {
+                snprintf(wintitle, 199, "ctremu | %s | paused",
+                         ctremu.romfilenodir, fps);
+            } else {
+                snprintf(wintitle, 199, "ctremu | %s | %.2lf FPS",
+                         ctremu.romfilenodir, fps);
+            }
             SDL_SetWindowTitle(window, wintitle);
             prev_fps_update = cur_time;
             prev_fps_frame = frame;
