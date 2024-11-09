@@ -265,6 +265,8 @@ void gpu_update_cur_fb(GPU* gpu) {
 
     gpu->cur_fb = fbcache_load(gpu, gpu->io.fb.colorbuf_loc << 3);
     gpu->cur_fb->depth_paddr = gpu->io.fb.depthbuf_loc << 3;
+    gpu->cur_fb->color_fmt = gpu->io.fb.colorbuf_fmt.fmt & 7;
+    gpu->cur_fb->color_Bpp = gpu->io.fb.colorbuf_fmt.size + 2;
 
     linfo("drawing on fb %d at %x", gpu->cur_fb - gpu->fbs.d,
           gpu->cur_fb->color_paddr);
@@ -298,17 +300,27 @@ void gpu_update_cur_fb(GPU* gpu) {
 }
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool top) {
-    FBInfo* fb = fbcache_find(gpu, paddr);
-
+    FBInfo* fb = NULL;
+    int yoffsrc;
+    for (int i = 0; i < FB_MAX; i++) {
+        yoffsrc = gpu->fbs.d[i].color_paddr - paddr;
+        yoffsrc /= (int) (gpu->fbs.d[i].color_Bpp * gpu->fbs.d[i].width);
+        if (abs(yoffsrc) < gpu->fbs.d[i].height / 2) {
+            fb = &gpu->fbs.d[i];
+            break;
+        }
+    }
     if (!fb) return;
+    LRU_use(gpu->fbs, fb);
 
-    printfln("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
+    linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
 
     GLuint dst = top ? gpu->gl.textop : gpu->gl.texbot;
     glBindTexture(GL_TEXTURE_2D, dst);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     u32 scwidth = top ? SCREEN_WIDTH : SCREEN_WIDTH_BOT;
-    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, fb->height - scwidth + yoff,
+    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
+                     fb->height - scwidth + yoff + yoffsrc,
                      SCREEN_HEIGHT * SCALE, scwidth * SCALE, 0);
 }
 

@@ -240,8 +240,8 @@ void gsp_handle_command(HLE3DS* s) {
             }
 
             for (int i = 0; i < 4; i++) {
-                int yoff = (addrout - s->services.gsp.toplcdfbs.d[i]) /
-                           (wout * fmtBpp[fmtout]);
+                int yoff = addrout - s->services.gsp.toplcdfbs.d[i];
+                yoff /= wout * fmtBpp[fmtout];
                 if (abs(yoff) < hout / 2) {
                     gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
                                          true);
@@ -249,8 +249,8 @@ void gsp_handle_command(HLE3DS* s) {
                 }
             }
             for (int i = 0; i < 4; i++) {
-                int yoff = (addrout - s->services.gsp.botlcdfbs.d[i]) /
-                           (wout * fmtBpp[fmtout]);
+                int yoff = addrout - s->services.gsp.botlcdfbs.d[i];
+                yoff /= wout * fmtBpp[fmtout];
                 if (abs(yoff) < hout / 2) {
                     gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
                                          false);

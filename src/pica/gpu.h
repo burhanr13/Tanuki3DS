@@ -148,7 +148,10 @@ typedef union {
                     } colorbuf, depthbuf;
                 } perms;
                 u32 depthbuf_fmt;
-                u32 colorbuf_fmt;
+                struct {
+                    u16 size;
+                    u16 fmt;
+                } colorbuf_fmt;
                 u32 _118[4];
                 u32 depthbuf_loc;
                 u32 colorbuf_loc;
@@ -255,6 +258,8 @@ typedef struct _FBInfo {
     u32 color_paddr;
     u32 depth_paddr;
     u32 width, height;
+    u32 color_fmt;
+    u32 color_Bpp;
 
     struct _FBInfo* next;
     struct _FBInfo* prev;
