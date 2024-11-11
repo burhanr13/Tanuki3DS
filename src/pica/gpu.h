@@ -8,7 +8,7 @@
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
 
-#define SCALE 1
+#define UPSCALE 1
 
 typedef union {
     float semantics[24];

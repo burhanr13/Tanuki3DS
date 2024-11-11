@@ -143,13 +143,13 @@ void render_gl_main(GLState* state) {
 
     glActiveTexture(GL_TEXTURE0);
 
-    glViewport(0, SCREEN_HEIGHT * SCALE, SCREEN_WIDTH * SCALE,
-               SCREEN_HEIGHT * SCALE);
+    glViewport(0, SCREEN_HEIGHT * UPSCALE, SCREEN_WIDTH * UPSCALE,
+               SCREEN_HEIGHT * UPSCALE);
     glBindTexture(GL_TEXTURE_2D, state->textop);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * SCALE, 0,
-               SCREEN_WIDTH_BOT * SCALE, SCREEN_HEIGHT * SCALE);
+    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * UPSCALE, 0,
+               SCREEN_WIDTH_BOT * UPSCALE, SCREEN_HEIGHT * UPSCALE);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

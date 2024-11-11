@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
 #endif
     SDL_Window* window = SDL_CreateWindow(
         "ctremu", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        SCREEN_WIDTH * SCALE, 2 * SCREEN_HEIGHT * SCALE, SDL_WINDOW_OPENGL);
+        SCREEN_WIDTH * UPSCALE, 2 * SCREEN_HEIGHT * UPSCALE, SDL_WINDOW_OPENGL);
 
     SDL_GLContext glcontext = SDL_GL_CreateContext(window);
     if (!glcontext) {
