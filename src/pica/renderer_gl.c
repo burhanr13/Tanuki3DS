@@ -132,6 +132,7 @@ void render_gl_main(GLState* state) {
     glDisable(GL_BLEND);
     glDisable(GL_COLOR_LOGIC_OP);
     glDisable(GL_DEPTH_TEST);
+    glDisable(GL_STENCIL_TEST);
     glDisable(GL_CULL_FACE);
 
 #ifdef WIREFRAME

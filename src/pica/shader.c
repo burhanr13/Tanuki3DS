@@ -93,7 +93,7 @@ static inline bool compare(u32 op, float a, float b) {
 #define MAX(a, b) (isinf(b) ? b : fmaxf(b, a))
 #define MIN(a, b) (fminf(b, a))
 
-u32 exec_instr(ShaderUnit* shu, u32 pc, bool* end) {
+u32 exec_instr(ShaderUnit* shu, u32 pc) {
     PICAInstr instr = shu->code[pc++];
     OpDesc desc = shu->opdescs[instr.desc];
     switch (instr.opcode) {
@@ -301,7 +301,6 @@ u32 exec_instr(ShaderUnit* shu, u32 pc, bool* end) {
             break;
         }
         case PICA_END:
-            *end = true;
             pc = -1;
             break;
         case PICA_CALL:
@@ -397,11 +396,9 @@ u32 exec_instr(ShaderUnit* shu, u32 pc, bool* end) {
 }
 
 void exec_block(ShaderUnit* shu, u32 start, u32 num) {
-    bool shader_end = false;
     u32 end = SHADER_CODE_SIZE;
     if (start + num < end) end = start + num;
-    for (u32 pc = start; !shader_end && pc < end;
-         pc = exec_instr(shu, pc, &shader_end));
+    for (u32 pc = start; pc < end; pc = exec_instr(shu, pc));
 }
 
 void pica_shader_exec(ShaderUnit* shu) {

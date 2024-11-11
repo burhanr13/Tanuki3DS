@@ -123,8 +123,19 @@ typedef union {
                     u32 ref : 8;
                     u32 _16_31 : 16;
                 } alpha_test;
-                u32 stencil_test;
-                u32 stencil_op;
+                struct {
+                    u32 enable : 4;
+                    u32 func : 4;
+                    u32 bufmask : 8;
+                    u32 ref : 8;
+                    u32 mask : 8;
+                } stencil_test;
+                struct {
+                    u32 fail : 4;
+                    u32 zfail : 4;
+                    u32 zpass : 4;
+                    u32 unused : 20;
+                } stencil_op;
                 struct {
                     u32 depthtest : 4;
                     u32 depthfunc : 4;
@@ -331,7 +342,8 @@ typedef union {
 u32 f24tof32(u32 i);
 u32 f31tof32(u32 i);
 
-void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex, bool scaley, bool top);
+void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
+                          bool scaley, bool top);
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 

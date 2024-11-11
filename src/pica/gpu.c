@@ -48,6 +48,10 @@ static const GLenum compare_func[8] = {
     GL_NEVER, GL_ALWAYS, GL_EQUAL,   GL_NOTEQUAL,
     GL_LESS,  GL_LEQUAL, GL_GREATER, GL_GEQUAL,
 };
+static const GLenum stencil_op[8] = {
+    GL_KEEP, GL_ZERO,   GL_REPLACE,   GL_INCR,
+    GL_DECR, GL_INVERT, GL_INCR_WRAP, GL_DECR_WRAP,
+};
 static const GLenum prim_mode[4] = {
     GL_TRIANGLES,
     GL_TRIANGLE_STRIP,
@@ -345,7 +349,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
             glClearDepthf((color & MASK(24)) / (float) (1 << 24));
-            glClear(GL_DEPTH_BUFFER_BIT);
+            glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
             linfo("cleared depth buffer at %x of fb %d with value %x", paddr, i,
                   color);
             return;
@@ -751,6 +755,25 @@ void gpu_update_gl_state(GPU* gpu) {
         glLogicOp(logic_ops[gpu->io.fb.logic_op & 0xf]);
     }
 
+    glUniform1i(gpu->gl.uniformlocs.alphatest,
+                gpu->io.fb.alpha_test.enable & 1);
+    glUniform1i(gpu->gl.uniformlocs.alphafunc, gpu->io.fb.alpha_test.func & 7);
+    glUniform1f(gpu->gl.uniformlocs.alpharef,
+                (float) gpu->io.fb.alpha_test.ref / 255);
+
+    if (gpu->io.fb.stencil_test.enable) {
+        glEnable(GL_STENCIL_TEST);
+        glStencilMask(gpu->io.fb.stencil_test.bufmask);
+        glStencilFunc(compare_func[gpu->io.fb.stencil_test.func & 7],
+                      gpu->io.fb.stencil_test.ref,
+                      gpu->io.fb.stencil_test.mask);
+        glStencilOp(stencil_op[gpu->io.fb.stencil_op.fail & 7],
+                    stencil_op[gpu->io.fb.stencil_op.zfail & 7],
+                    stencil_op[gpu->io.fb.stencil_op.zpass & 7]);
+    } else {
+        glDisable(GL_STENCIL_TEST);
+    }
+
     glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
                 gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
     glDepthMask(gpu->io.fb.color_mask.depth);
@@ -760,10 +783,4 @@ void gpu_update_gl_state(GPU* gpu) {
     } else {
         glDepthFunc(GL_ALWAYS);
     }
-
-    glUniform1i(gpu->gl.uniformlocs.alphatest,
-                gpu->io.fb.alpha_test.enable & 1);
-    glUniform1i(gpu->gl.uniformlocs.alphafunc, gpu->io.fb.alpha_test.func & 7);
-    glUniform1f(gpu->gl.uniformlocs.alpharef,
-                (float) gpu->io.fb.alpha_test.ref / 255);
 }
