@@ -300,7 +300,8 @@ void gpu_update_cur_fb(GPU* gpu) {
     }
 }
 
-void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool top) {
+void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
+                          bool scaley, bool top) {
     FBInfo* fb = NULL;
     int yoffsrc;
     for (int i = 0; i < FB_MAX; i++) {
@@ -321,9 +322,9 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool top) {
     glBindTexture(GL_TEXTURE_2D, dst);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     u32 scwidth = top ? SCREEN_WIDTH : SCREEN_WIDTH_BOT;
-    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
-                     fb->height - scwidth + yoff + yoffsrc,
-                     SCREEN_HEIGHT * SCALE, scwidth * SCALE, 0);
+    glCopyTexImage2D(
+        GL_TEXTURE_2D, 0, GL_RGBA, 0, fb->height - scwidth + yoff + yoffsrc,
+        (SCREEN_HEIGHT << scalex) * SCALE, (scwidth << scaley) * SCALE, 0);
 }
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {

@@ -210,6 +210,10 @@ void gsp_handle_command(HLE3DS* s) {
             u32 flags = cmds->d[cmds->cur].args[4];
             u8 fmtin = (flags >> 8) & 7;
             u8 fmtout = (flags >> 12) & 7;
+            u8 scalemode = (flags >> 24) & 3;
+            bool scalex = scalemode >= 1;
+            bool scaley = scalemode >= 2;
+
             static int fmtBpp[8] = {4, 3, 2, 2, 2, 4, 4, 4};
 
             linfo("display transfer from fb at %08x (%dx%d) to %08x (%dx%d) "
@@ -256,8 +260,8 @@ void gsp_handle_command(HLE3DS* s) {
                 int yoff = addrout - s->services.gsp.toplcdfbs.d[i];
                 yoff /= wout * fmtBpp[fmtout];
                 if (abs(yoff) < hout / 2) {
-                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
-                                         true);
+                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff, 
+                                         scalex, scaley, true);
                     break;
                 }
             }
@@ -266,7 +270,7 @@ void gsp_handle_command(HLE3DS* s) {
                 yoff /= wout * fmtBpp[fmtout];
                 if (abs(yoff) < hout / 2) {
                     gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
-                                         false);
+                                         scalex, scaley, false);
                     break;
                 }
             }
