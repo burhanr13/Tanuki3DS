@@ -61,8 +61,13 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     state->gpuprogram = make_shader(gpuvertsource, gpufragsource);
     glUseProgram(state->gpuprogram);
     glUniform1i(glGetUniformLocation(state->gpuprogram, "tex0"), 0);
-    state->uniforms.tex0enable =
-        glGetUniformLocation(state->gpuprogram, "tex0enable");
+#define SETUNIFORMLOC(u)                                                       \
+    state->uniformlocs.u = glGetUniformLocation(state->gpuprogram, #u)
+    SETUNIFORMLOC(tex0enable);
+    SETUNIFORMLOC(alphatest);
+    SETUNIFORMLOC(alphafunc);
+    SETUNIFORMLOC(alpharef);
+#undef SETUNIFORMLOC
 
     glGenVertexArrays(1, &state->gpuvao);
     glBindVertexArray(state->gpuvao);

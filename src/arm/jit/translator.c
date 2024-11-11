@@ -272,7 +272,7 @@ DECL_ARM_COMPILE(data_proc) {
                                   instr.data_proc.s ? &shiftc : NULL);
         }
     }
-    if (instr.data_proc.rn == 15 && instr.data_proc.rd != 15 && cpu->cpsr.t) {
+    if (usingop1 && instr.data_proc.rn == 15 && instr.data_proc.rd != 15 && cpu->cpsr.t) {
         op1 = EMITVI(AND, op1, ~3);
     }
 

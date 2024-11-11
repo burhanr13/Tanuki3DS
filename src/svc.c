@@ -214,6 +214,7 @@ DECL_SVC(CreateMemoryBlock) {
 
     KSharedMem* shm = calloc(1, sizeof *shm);
     shm->vaddr = addr;
+    shm->size = size;
     shm->mapped = true;
     shm->hdr.refcount = 1;
     HANDLE_SET(handle, shm);
@@ -254,7 +255,8 @@ DECL_SVC(MapMemoryBlock) {
 
     linfo("mapping shared mem block %x at %08x", memblock, addr);
 
-    hle3ds_vmmap(s, addr, PAGE_SIZE, perm, MEMST_SHARED, false);
+    hle3ds_vmmap(s, addr, shmem->size ? shmem->size : PAGE_SIZE, perm,
+                 MEMST_SHARED, false);
 
     if (shmem->defaultdata) {
         memcpy(PTR(addr), shmem->defaultdata, shmem->defaultdatalen);

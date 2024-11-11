@@ -11,6 +11,10 @@ void thumb_generate_lookup() {
 ArmInstr thumb_decode_instr(ThumbInstr instr) {
     ArmInstr dec = {};
     dec.cond = C_AL;
+    dec.undefined.c1 = 0b011;
+    dec.undefined.c2 = 1;
+    dec.undefined.u1 = -1;
+    dec.undefined.u2 = -1;
 
     switch (instr.n3) {
         case 0:
@@ -247,7 +251,7 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
                 dec.data_proc.rd = 13;
                 dec.data_proc.rn = 13;
                 dec.data_proc.op2 = instr.add_sp.offset << 2;
-            } else {
+            } else if (instr.push_pop.c2 == 0b10) {
                 dec.block_trans.c1 = 0b100;
                 dec.block_trans.p = (instr.push_pop.l) ? 0 : 1;
                 dec.block_trans.u = instr.push_pop.l;
@@ -280,8 +284,8 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
                 dec.cond = instr.b_cond.cond;
                 dec.branch.c1 = 0b101;
                 dec.branch.l = 0;
-                u32 offset = instr.b_cond.offset;
-                if (offset & BIT(7)) offset |= 0xffffff00;
+                s32 offset = instr.b_cond.offset;
+                offset = offset << 24 >> 24;
                 dec.branch.offset = offset;
             } else {
                 dec.sw_intr.c1 = 0b1111;
@@ -293,8 +297,8 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
             dec.branch.c1 = 0b101;
             if (instr.branch.c1 == 0b11100) {
                 dec.branch.l = 0;
-                u32 offset = instr.branch.offset;
-                if (offset & BIT(10)) offset |= 0xfffff800;
+                s32 offset = instr.branch.offset;
+                offset = offset << 21 >> 21;
                 dec.branch.offset = offset;
             } else {
                 dec.branch.l = 1;

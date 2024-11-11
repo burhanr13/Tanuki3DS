@@ -22,8 +22,11 @@ typedef struct {
     GLuint texbot;
 
     struct {
-        GLuint tex0enable;
-    } uniforms;
+        GLint tex0enable;
+        GLint alphatest;
+        GLint alphafunc;
+        GLint alpharef;
+    } uniformlocs;
 
 } GLState;
 

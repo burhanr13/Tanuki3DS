@@ -3,7 +3,8 @@
 
 #include "../common.h"
 
-typedef struct _GPU GPU;
+#define SHADER_CODE_SIZE 512
+#define SHADER_OPDESC_SIZE 128
 
 enum {
     PICA_ADD = 0x00,
@@ -122,8 +123,28 @@ typedef union {
     };
 } OpDesc;
 
-void exec_vshader(GPU* gpu);
+typedef struct {
+    PICAInstr* code;
+    OpDesc* opdescs;
+    u32 entrypoint;
 
-void disasm_vshader(GPU* gpu);
+    fvec v[16];
+    fvec o[16];
+
+    fvec r[16];
+
+    fvec* c;
+    u8 (*i)[4];
+    u16 b;
+
+    u32 a[2];
+    u32 al;
+    bool cmp[2];
+
+} ShaderUnit;
+
+void pica_shader_exec(ShaderUnit* shu);
+
+void pica_shader_disasm(ShaderUnit* shu);
 
 #endif

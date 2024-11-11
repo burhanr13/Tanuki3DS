@@ -19,6 +19,7 @@ typedef struct {
     KObject hdr;
 
     u32 vaddr;
+    u32 size;
     bool mapped;
 
     void* defaultdata;

@@ -10,9 +10,6 @@
 
 #define SCALE 1
 
-typedef float fvec[4];
-typedef float fvec2[2];
-
 typedef union {
     float semantics[24];
     struct {
@@ -219,12 +216,7 @@ typedef union {
         union {
             struct {
                 u32 booluniform;
-                struct {
-                    u8 x;
-                    u8 y;
-                    u8 z;
-                    u8 unused;
-                } intuniform[4];
+                u8 intuniform[4][4];
                 u32 _285[4];
                 u32 inconfig;
                 struct {
@@ -287,11 +279,8 @@ typedef struct _GPU {
 
     u8* mem;
 
-    union {
-        u32 progdata[BIT(12)];
-        PICAInstr code[BIT(12)];
-    };
-    u32 opdescs[128];
+    u32 progdata[SHADER_CODE_SIZE];
+    u32 opdescs[SHADER_OPDESC_SIZE];
     u32 sh_idx;
 
     fvec fixattrs[16];
@@ -301,14 +290,7 @@ typedef struct _GPU {
 
     u32 curuniform;
     int curunifi;
-
-    fvec cst[96];
-    fvec in[16];
-    fvec out[16];
-    fvec reg[16];
-    u32 addr[2];
-    u32 loopct;
-    bool cmp[2];
+    fvec floatuniform[96];
 
     LRUCache(FBInfo, FB_MAX) fbs;
     FBInfo* cur_fb;
@@ -331,8 +313,6 @@ typedef union {
         u32 incmode : 1;
     };
 } GPUCommand;
-
-#define PRINTFVEC(v) printf("[%f,%f,%f,%f] ", (v)[0], (v)[1], (v)[2], (v)[3])
 
 #define I2F(i)                                                                 \
     (((union {                                                                 \

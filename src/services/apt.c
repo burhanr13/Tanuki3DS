@@ -46,22 +46,73 @@ DECL_PORT(apt) {
             cmdbuf[2] = 1;
             break;
         }
+        case 0x000c: {
+            u32 appid = cmdbuf[2];
+            u32 appcommand = cmdbuf[3];
+            u32 handleparam = cmdbuf[6];
+            linfo("SendParameter to app %x, command=%x, handleparam=%x", appid,
+                  appcommand, handleparam);
+
+            if (appcommand == APTCMD_REQUEST) {
+                s->services.apt.nextparam.appid = appid;
+                s->services.apt.nextparam.cmd = APTCMD_RESPONSE;
+                s->services.apt.nextparam.kobj =
+                    &s->services.apt.capture_block.hdr;
+                event_signal(s, &s->services.apt.resume_event);
+            } else {
+                lwarn("unknown appcommand %x", appcommand);
+            }
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
         case 0x000d:
             linfo("ReceiveParameter");
             cmdbuf[0] = IPCHDR(4, 4);
             cmdbuf[1] = 0;
-            cmdbuf[3] = 1;
+            cmdbuf[2] = s->services.apt.nextparam.appid;
+            cmdbuf[3] = s->services.apt.nextparam.cmd;
+            if (s->services.apt.nextparam.kobj) {
+                cmdbuf[6] =
+                    srvobj_make_handle(s, s->services.apt.nextparam.kobj);
+            } else {
+                cmdbuf[6] = 0;
+            }
+            cmdbuf[8] = cmdbuf[0x41];
             break;
         case 0x000e:
             linfo("GlanceParameter");
             cmdbuf[0] = IPCHDR(4, 4);
             cmdbuf[1] = 0;
-            cmdbuf[3] = 1;
+            cmdbuf[2] = s->services.apt.nextparam.appid;
+            cmdbuf[3] = s->services.apt.nextparam.cmd;
+            if (s->services.apt.nextparam.kobj) {
+                cmdbuf[6] =
+                    srvobj_make_handle(s, s->services.apt.nextparam.kobj);
+            } else {
+                cmdbuf[6] = 0;
+            }
+            cmdbuf[8] = cmdbuf[0x41];
             break;
         case 0x0016: {
             u32 appid = cmdbuf[1];
-            linfo("PreloadLibraryApplet 0x%x", appid);
-            if (appid == 0x406) lerror("trying to launch ErrDisp applet");
+            linfo("PreloadLibraryApplet %x", appid);
+            if (appid == APPID_ERRDISP)
+                lerror("trying to launch ErrDisp applet");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
+        case 0x001e: {
+            u32 appid = cmdbuf[1];
+            linfo("StartLibraryApplet %x", appid);
+
+            s->services.apt.nextparam.appid = appid;
+            s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
+            s->services.apt.nextparam.kobj = NULL;
+            event_signal(s, &s->services.apt.resume_event);
+
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;

@@ -26,6 +26,8 @@ extern bool g_infologs;
     printf("\e[41m[ERROR](%s) " format "\e[0m\n",                              \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
 
+#define print_fvec(v) printf("[%f,%f,%f,%f] ", (v)[0], (v)[1], (v)[2], (v)[3])
+
 typedef uint8_t u8;
 typedef int8_t s8;
 typedef uint16_t u16;
@@ -34,6 +36,9 @@ typedef uint32_t u32;
 typedef int32_t s32;
 typedef uint64_t u64;
 typedef int64_t s64;
+
+typedef float fvec[4];
+typedef float fvec2[2];
 
 #define BIT(n) (1U << (n))
 #define BITL(n) (1UL << (n))

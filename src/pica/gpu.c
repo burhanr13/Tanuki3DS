@@ -127,7 +127,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         case GPUREG(vsh.floatuniform_data[0])... GPUREG(
             vsh.floatuniform_data[7]): {
-            fvec* uniform = &gpu->cst[gpu->io.vsh.floatuniform_idx];
+            fvec* uniform = &gpu->floatuniform[gpu->io.vsh.floatuniform_idx];
             if (gpu->io.vsh.floatuniform_mode) {
                 (*uniform)[3 - gpu->curunifi] = I2F(param);
                 if (++gpu->curunifi == 4) {
@@ -172,11 +172,6 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
 
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
     gpu->cur_fb = NULL;
-
-    if (!is_valid_physmem(paddr)) {
-        lwarn("command list in invalid memory");
-        return;
-    }
 
     u32* cmds = PTR(paddr);
 
@@ -431,11 +426,6 @@ const GLint texswizzle_dbg_green[4] = {GL_ZERO, GL_ONE, GL_ZERO, GL_ALPHA};
 const GLint texswizzle_dbg_blue[4] = {GL_ZERO, GL_ZERO, GL_ONE, GL_ALPHA};
 
 void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
-    if (!is_valid_physmem(regs->addr << 3)) {
-        lwarn("reading textures from invalid memory");
-        return;
-    }
-
     FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
     glActiveTexture(GL_TEXTURE0 + id);
     if (fb) {
@@ -545,15 +535,9 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                     texwrap[regs->param.wrap_t & 3]);
 }
 
-void load_vtx(GPU* gpu, int i) {
-    memcpy(gpu->in, gpu->fixattrs, sizeof gpu->in);
+void load_vtx(GPU* gpu, int i, fvec* dst) {
+    memcpy(dst, gpu->fixattrs, sizeof gpu->fixattrs);
     for (int vbo = 0; vbo < 12; vbo++) {
-        if (!is_valid_physmem(gpu->io.geom.attr_base * 8 +
-                              gpu->io.geom.attrbuf[vbo].offset +
-                              i * gpu->io.geom.attrbuf[vbo].size)) {
-            lwarn("vbo in invalid memory");
-            continue;
-        }
         void* vtx =
             PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.attrbuf[vbo].offset +
                 i * gpu->io.geom.attrbuf[vbo].size);
@@ -571,7 +555,7 @@ void load_vtx(GPU* gpu, int i) {
                 case 0: {
                     s8* ptr = vtx;
                     for (int k = 0; k < size; k++) {
-                        gpu->in[attr][k] = *ptr++;
+                        dst[attr][k] = *ptr++;
                     }
                     vtx = ptr;
                     break;
@@ -579,7 +563,7 @@ void load_vtx(GPU* gpu, int i) {
                 case 1: {
                     u8* ptr = vtx;
                     for (int k = 0; k < size; k++) {
-                        gpu->in[attr][k] = *ptr++;
+                        dst[attr][k] = *ptr++;
                     }
                     vtx = ptr;
                     break;
@@ -587,7 +571,7 @@ void load_vtx(GPU* gpu, int i) {
                 case 2: {
                     s16* ptr = vtx;
                     for (int k = 0; k < size; k++) {
-                        gpu->in[attr][k] = *ptr++;
+                        dst[attr][k] = *ptr++;
                     }
                     vtx = ptr;
                     break;
@@ -595,7 +579,7 @@ void load_vtx(GPU* gpu, int i) {
                 case 3: {
                     float* ptr = vtx;
                     for (int k = 0; k < size; k++) {
-                        gpu->in[attr][k] = *ptr++;
+                        dst[attr][k] = *ptr++;
                     }
                     vtx = ptr;
                     break;
@@ -605,28 +589,40 @@ void load_vtx(GPU* gpu, int i) {
     }
 }
 
-void load_vtx_imm(GPU* gpu, int i) {
+void load_vtx_imm(GPU* gpu, int i, fvec* dst) {
     u32 nattrs = gpu->io.geom.vsh_num_attr + 1;
-    memcpy(gpu->in, &gpu->immattrs.d[i * nattrs], nattrs * sizeof(fvec));
+    memcpy(dst, &gpu->immattrs.d[i * nattrs], nattrs * sizeof(fvec));
 }
 
-void store_vtx(GPU* gpu, int i, Vertex* vbuf) {
+void store_vtx(GPU* gpu, int i, Vertex* vbuf, fvec* src) {
     for (int o = 0; o < 7; o++) {
         for (int j = 0; j < 4; j++) {
             u8 sem = gpu->io.raster.sh_outmap[o][j];
-            if (sem < 0x18) vbuf[i].semantics[sem] = gpu->out[o][j];
+            if (sem < 0x18) vbuf[i].semantics[sem] = src[o][j];
         }
     }
+}
+
+void init_vsh(GPU* gpu, ShaderUnit* shu) {
+    shu->code = (PICAInstr*) gpu->progdata;
+    shu->opdescs = (OpDesc*) gpu->opdescs;
+    shu->entrypoint = gpu->io.vsh.entrypoint;
+    shu->c = gpu->floatuniform;
+    shu->i = gpu->io.vsh.intuniform;
+    shu->b = gpu->io.vsh.booluniform;
 }
 
 void gpu_drawarrays(GPU* gpu) {
     linfo("drawing arrays nverts=%d primmode=%d", gpu->io.geom.nverts,
           gpu->io.geom.prim_config.mode);
     Vertex vbuf[gpu->io.geom.nverts];
+
+    ShaderUnit vsh;
+    init_vsh(gpu, &vsh);
     for (int i = 0; i < gpu->io.geom.nverts; i++) {
-        load_vtx(gpu, i + gpu->io.geom.vtx_off);
-        exec_vshader(gpu);
-        store_vtx(gpu, i, vbuf);
+        load_vtx(gpu, i + gpu->io.geom.vtx_off, vsh.v);
+        pica_shader_exec(&vsh);
+        store_vtx(gpu, i, vbuf, vsh.o);
     }
     glBufferData(GL_ARRAY_BUFFER, gpu->io.geom.nverts * sizeof(Vertex), vbuf,
                  GL_STREAM_DRAW);
@@ -637,12 +633,6 @@ void gpu_drawarrays(GPU* gpu) {
 void gpu_drawelements(GPU* gpu) {
     linfo("drawing elements nverts=%d primmode=%d", gpu->io.geom.nverts,
           gpu->io.geom.prim_config.mode);
-
-    if (!is_valid_physmem(gpu->io.geom.attr_base * 8 +
-                          gpu->io.geom.indexbufoff)) {
-        lwarn("reading index buffer from invalid memory");
-        return;
-    }
 
     u32 minind = 0xffff, maxind = 0;
     void* indexbuf = PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.indexbufoff);
@@ -661,10 +651,13 @@ void gpu_drawelements(GPU* gpu) {
                  indexbuf, GL_STREAM_DRAW);
 
     Vertex vbuf[maxind + 1 - minind];
+
+    ShaderUnit vsh;
+    init_vsh(gpu, &vsh);
     for (int i = minind; i <= maxind; i++) {
-        load_vtx(gpu, i - minind);
-        exec_vshader(gpu);
-        store_vtx(gpu, i - minind, vbuf);
+        load_vtx(gpu, i - minind, vsh.v);
+        pica_shader_exec(&vsh);
+        store_vtx(gpu, i - minind, vbuf, vsh.o);
     }
 
     glBufferData(GL_ARRAY_BUFFER, (maxind + 1 - minind) * sizeof(Vertex), vbuf,
@@ -682,10 +675,13 @@ void gpu_drawimmediate(GPU* gpu) {
     linfo("drawing immediate mode nverts=%d primmode=%d", nverts,
           gpu->io.geom.prim_config.mode);
     Vertex vbuf[nverts];
+
+    ShaderUnit vsh;
+    init_vsh(gpu, &vsh);
     for (int i = 0; i < nverts; i++) {
-        load_vtx_imm(gpu, i);
-        exec_vshader(gpu);
-        store_vtx(gpu, i, vbuf);
+        load_vtx_imm(gpu, i, vsh.v);
+        pica_shader_exec(&vsh);
+        store_vtx(gpu, i, vbuf, vsh.o);
     }
     glBufferData(GL_ARRAY_BUFFER, nverts * sizeof(Vertex), vbuf,
                  GL_STREAM_DRAW);
@@ -725,10 +721,10 @@ void gpu_update_gl_state(GPU* gpu) {
     }
 
     if (gpu->io.tex.texunit_cfg & 1) {
-        glUniform1i(gpu->gl.uniforms.tex0enable, true);
+        glUniform1i(gpu->gl.uniformlocs.tex0enable, true);
         gpu_load_texture(gpu, 0, &gpu->io.tex.tex0, gpu->io.tex.tex0_fmt);
     } else {
-        glUniform1i(gpu->gl.uniforms.tex0enable, false);
+        glUniform1i(gpu->gl.uniformlocs.tex0enable, false);
     }
 
     if (gpu->io.fb.color_op.frag_mode != 0) {
@@ -761,4 +757,10 @@ void gpu_update_gl_state(GPU* gpu) {
     } else {
         glDepthFunc(GL_ALWAYS);
     }
+
+    glUniform1i(gpu->gl.uniformlocs.alphatest,
+                gpu->io.fb.alpha_test.enable & 1);
+    glUniform1i(gpu->gl.uniformlocs.alphafunc, gpu->io.fb.alpha_test.func & 7);
+    glUniform1f(gpu->gl.uniformlocs.alpharef,
+                (float) gpu->io.fb.alpha_test.ref / 255);
 }

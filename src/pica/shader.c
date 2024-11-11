@@ -2,34 +2,32 @@
 
 #include <math.h>
 
-#include "gpu.h"
-
-void readsrc(GPU* gpu, fvec src, u32 n, u8 idx, u8 swizzle, bool neg) {
+void readsrc(ShaderUnit* shu, fvec src, u32 n, u8 idx, u8 swizzle, bool neg) {
     fvec* rn;
-    if (n < 0x10) rn = &gpu->in[n];
-    else if (n < 0x20) rn = &gpu->reg[n - 0x10];
+    if (n < 0x10) rn = &shu->v[n];
+    else if (n < 0x20) rn = &shu->r[n - 0x10];
     else {
         n -= 0x20;
         if (idx) {
             switch (idx) {
                 case 1:
-                    n += gpu->addr[0];
+                    n += shu->a[0];
                     break;
                 case 2:
-                    n += gpu->addr[1];
+                    n += shu->a[1];
                     break;
                 case 3:
-                    n += gpu->loopct;
+                    n += shu->al;
                     break;
             }
             n &= 0x7f;
             if (n < 0x60) {
-                rn = &gpu->cst[n];
+                rn = &shu->c[n];
             } else {
                 static fvec dummy = {1, 1, 1, 1};
                 rn = &dummy;
             }
-        } else rn = &gpu->cst[n];
+        } else rn = &shu->c[n];
     }
 
     for (int i = 0; i < 4; i++) {
@@ -38,24 +36,24 @@ void readsrc(GPU* gpu, fvec src, u32 n, u8 idx, u8 swizzle, bool neg) {
     }
 }
 
-void writedest(GPU* gpu, fvec dest, u32 n, u8 mask) {
+void writedest(ShaderUnit* shu, fvec dest, u32 n, u8 mask) {
     fvec* rn;
-    if (n < 0x10) rn = &gpu->out[n];
-    else rn = &gpu->reg[n - 0x10];
+    if (n < 0x10) rn = &shu->o[n];
+    else rn = &shu->r[n - 0x10];
     for (int i = 0; i < 4; i++) {
         if (mask & BIT(3 - i)) (*rn)[i] = dest[i];
     }
 }
 
 #define SRC(v, i, _fmt)                                                        \
-    readsrc(gpu, v, instr.fmt##_fmt.src##i, instr.fmt##_fmt.idx,               \
+    readsrc(shu, v, instr.fmt##_fmt.src##i, instr.fmt##_fmt.idx,               \
             desc.src##i##swizzle, desc.src##i##neg)
 #define SRC1(v, fmt) SRC(v, 1, fmt)
 #define SRC2(v, fmt) SRC(v, 2, fmt)
 #define SRC3(v, fmt) SRC(v, 3, fmt)
-#define DEST(v, _fmt) writedest(gpu, v, instr.fmt##_fmt.dest, desc.destmask)
+#define DEST(v, _fmt) writedest(shu, v, instr.fmt##_fmt.dest, desc.destmask)
 
-void exec_block(GPU* gpu, u32 start, u32 num);
+void exec_block(ShaderUnit* shu, u32 start, u32 num);
 
 static inline bool condop(u32 op, bool x, bool y, bool refx, bool refy) {
     switch (op) {
@@ -95,9 +93,9 @@ static inline bool compare(u32 op, float a, float b) {
 #define MAX(a, b) (isinf(b) ? b : fmaxf(b, a))
 #define MIN(a, b) (fminf(b, a))
 
-u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
-    PICAInstr instr = gpu->code[pc++];
-    OpDesc desc = {gpu->opdescs[instr.desc]};
+u32 exec_instr(ShaderUnit* shu, u32 pc, bool* end) {
+    PICAInstr instr = shu->code[pc++];
+    OpDesc desc = shu->opdescs[instr.desc];
     switch (instr.opcode) {
         case PICA_ADD: {
             fvec a, b;
@@ -275,10 +273,10 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             fvec a;
             SRC1(a, 1);
             if (desc.destmask & BIT(3 - 0)) {
-                gpu->addr[0] = a[0];
+                shu->a[0] = a[0];
             }
             if (desc.destmask & BIT(3 - 1)) {
-                gpu->addr[1] = a[1];
+                shu->a[1] = a[1];
             }
             break;
         }
@@ -294,7 +292,7 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
         case PICA_BREAKC: {
             bool cond;
             if (instr.opcode == PICA_BREAKC) {
-                cond = condop(instr.fmt2.op, gpu->cmp[0], gpu->cmp[1],
+                cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
                               instr.fmt2.refx, instr.fmt2.refy);
             } else {
                 cond = true;
@@ -311,13 +309,13 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
         case PICA_CALLU: {
             bool cond;
             if (instr.opcode == PICA_CALLC) {
-                cond = condop(instr.fmt2.op, gpu->cmp[0], gpu->cmp[1],
+                cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
                               instr.fmt2.refx, instr.fmt2.refy);
             } else if (instr.opcode == PICA_CALLU) {
-                cond = gpu->io.vsh.booluniform & BIT(instr.fmt3.c);
+                cond = shu->b & BIT(instr.fmt3.c);
             } else cond = true;
             if (cond) {
-                exec_block(gpu, instr.fmt3.dest, instr.fmt3.num);
+                exec_block(shu, instr.fmt3.dest, instr.fmt3.num);
             }
             break;
         }
@@ -325,24 +323,24 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
         case PICA_IFC: {
             bool cond;
             if (instr.opcode == PICA_IFU) {
-                cond = gpu->io.vsh.booluniform & BIT(instr.fmt3.c);
+                cond = shu->b & BIT(instr.fmt3.c);
             } else {
-                cond = condop(instr.fmt2.op, gpu->cmp[0], gpu->cmp[1],
+                cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
                               instr.fmt2.refx, instr.fmt2.refy);
             }
             if (cond) {
-                exec_block(gpu, pc, instr.fmt2.dest - pc);
+                exec_block(shu, pc, instr.fmt2.dest - pc);
             } else {
-                exec_block(gpu, instr.fmt2.dest, instr.fmt2.num);
+                exec_block(shu, instr.fmt2.dest, instr.fmt2.num);
             }
             pc = instr.fmt2.dest + instr.fmt2.num;
             break;
         }
         case PICA_LOOP: {
-            gpu->loopct = gpu->io.vsh.intuniform[instr.fmt3.c].y;
-            for (int i = 0; i <= gpu->io.vsh.intuniform[instr.fmt3.c].x; i++) {
-                exec_block(gpu, pc, instr.fmt3.dest + 1 - pc);
-                gpu->loopct += gpu->io.vsh.intuniform[instr.fmt3.c].z;
+            shu->al = shu->i[instr.fmt3.c & 3][1];
+            for (int i = 0; i <= shu->i[instr.fmt3.c & 3][0]; i++) {
+                exec_block(shu, pc, instr.fmt3.dest + 1 - pc);
+                shu->al += shu->i[instr.fmt3.c & 3][2];
             }
             pc = instr.fmt3.dest + 1;
             break;
@@ -351,10 +349,10 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
         case PICA_JMPU: {
             bool cond;
             if (instr.opcode == PICA_JMPC) {
-                cond = condop(instr.fmt2.op, gpu->cmp[0], gpu->cmp[1],
+                cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
                               instr.fmt2.refx, instr.fmt2.refy);
             } else {
-                cond = gpu->io.vsh.booluniform & BIT(instr.fmt3.c);
+                cond = shu->b & BIT(instr.fmt3.c);
                 if (instr.fmt3.num & 1) cond = !cond;
             }
             if (cond) {
@@ -366,12 +364,12 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
             fvec a, b;
             SRC1(a, 1c);
             SRC2(b, 1c);
-            gpu->cmp[0] = compare(instr.fmt1c.cmpx, a[0], b[0]);
-            gpu->cmp[1] = compare(instr.fmt1c.cmpy, a[1], b[1]);
+            shu->cmp[0] = compare(instr.fmt1c.cmpx, a[0], b[0]);
+            shu->cmp[1] = compare(instr.fmt1c.cmpy, a[1], b[1]);
             break;
         }
         case PICA_MAD ... PICA_MAD + 0xf: {
-            desc.w = gpu->opdescs[instr.fmt5.desc];
+            desc = shu->opdescs[instr.fmt5.desc];
             fvec a, b, c;
             SRC1(a, 5);
             if (instr.fmt5.opcode & 1) {
@@ -398,16 +396,16 @@ u32 exec_instr(GPU* gpu, u32 pc, bool* end) {
     return pc;
 }
 
-void exec_block(GPU* gpu, u32 start, u32 num) {
+void exec_block(ShaderUnit* shu, u32 start, u32 num) {
     bool shader_end = false;
-    u32 end = BIT(12);
+    u32 end = SHADER_CODE_SIZE;
     if (start + num < end) end = start + num;
     for (u32 pc = start; !shader_end && pc < end;
-         pc = exec_instr(gpu, pc, &shader_end));
+         pc = exec_instr(shu, pc, &shader_end));
 }
 
-void exec_vshader(GPU* gpu) {
-    exec_block(gpu, gpu->io.vsh.entrypoint, BIT(12));
+void pica_shader_exec(ShaderUnit* shu) {
+    exec_block(shu, shu->entrypoint, SHADER_CODE_SIZE);
 }
 
 static char coordnames[4][2] = {"x", "y", "z", "w"};
@@ -475,7 +473,7 @@ void disasmdest(u32 n, u8 mask) {
 #define DSRC3(fmt) DSRC(3, fmt)
 #define DDEST(_fmt) disasmdest(instr.fmt##_fmt.dest, desc.destmask)
 
-void disasm_block(GPU* gpu, u32 start, u32 num);
+void disasm_block(ShaderUnit* shu, u32 start, u32 num);
 
 static inline void disasmcondop(u32 op, bool refx, bool refy) {
     switch (op) {
@@ -550,9 +548,9 @@ static struct {
     u32 depth;
 } disasm;
 
-u32 disasm_instr(GPU* gpu, u32 pc) {
-    PICAInstr instr = gpu->code[pc++];
-    OpDesc desc = {gpu->opdescs[instr.desc]};
+u32 disasm_instr(ShaderUnit* shu, u32 pc) {
+    PICAInstr instr = shu->code[pc++];
+    OpDesc desc = shu->opdescs[instr.desc];
     switch (instr.opcode) {
         case PICA_ADD:
             DISASMFMT1(add);
@@ -650,14 +648,14 @@ u32 disasm_instr(GPU* gpu, u32 pc) {
                 disasmcondop(instr.fmt2.op, instr.fmt2.refx, instr.fmt2.refy);
             }
             printf("\n");
-            disasm_block(gpu, pc, instr.fmt2.dest - pc);
+            disasm_block(shu, pc, instr.fmt2.dest - pc);
             if (instr.fmt2.num) {
                 printf("%14s", "");
                 for (int i = 0; i < disasm.depth; i++) {
                     printf("%4s", "");
                 }
                 printf("else\n");
-                disasm_block(gpu, instr.fmt2.dest, instr.fmt2.num);
+                disasm_block(shu, instr.fmt2.dest, instr.fmt2.num);
             }
             printf("%14s", "");
             for (int i = 0; i < disasm.depth; i++) {
@@ -669,7 +667,7 @@ u32 disasm_instr(GPU* gpu, u32 pc) {
         }
         case PICA_LOOP: {
             printf("loop i%d\n", instr.fmt3.c);
-            disasm_block(gpu, pc, instr.fmt3.dest + 1 - pc);
+            disasm_block(shu, pc, instr.fmt3.dest + 1 - pc);
             printf("%14s", "");
             for (int i = 0; i < disasm.depth; i++) {
                 printf("%4s", "");
@@ -705,7 +703,7 @@ u32 disasm_instr(GPU* gpu, u32 pc) {
             break;
         }
         case PICA_MAD ... PICA_MAD + 0xf: {
-            desc.w = gpu->opdescs[instr.fmt5.desc];
+            desc = shu->opdescs[instr.fmt5.desc];
             printf("mad ");
             DDEST(5);
             printf(", ");
@@ -729,38 +727,38 @@ u32 disasm_instr(GPU* gpu, u32 pc) {
     return pc;
 }
 
-void disasm_block(GPU* gpu, u32 start, u32 num) {
+void disasm_block(ShaderUnit* shu, u32 start, u32 num) {
     disasm.depth++;
-    u32 end = BIT(12);
+    u32 end = SHADER_CODE_SIZE;
     if (start + num < end) end = start + num;
     for (u32 pc = start; pc < end;) {
-        printf("%03x: %08x ", pc, gpu->code[pc].w);
+        printf("%03x: %08x ", pc, shu->code[pc].w);
         for (int i = 0; i < disasm.depth; i++) {
             printf("%4s", "");
         }
-        pc = disasm_instr(gpu, pc);
+        pc = disasm_instr(shu, pc);
         printf("\n");
     }
     disasm.depth--;
 }
 
-void disasm_vshader(GPU* gpu) {
+void pica_shader_disasm(ShaderUnit* shu) {
     for (int i = 0; i < 8; i++) {
         printf("const fvec c%d = ", 95 - i);
-        PRINTFVEC(gpu->cst[95 - i]);
+        print_fvec(shu->c[95 - i]);
         printf("\n");
     }
 
     disasm.depth = 0;
     Vec_init(disasm.calls);
     printf("proc main\n");
-    disasm_block(gpu, gpu->io.vsh.entrypoint, BIT(12));
+    disasm_block(shu, shu->entrypoint, SHADER_CODE_SIZE);
     printf("end proc\n");
-    Vec_foreach(c, disasm.calls) {
-        u32 start = c->fmt3.dest;
-        u32 num = c->fmt3.num;
+    for (int i = 0; i < disasm.calls.size; i++) {
+        u32 start = disasm.calls.d[i].fmt3.dest;
+        u32 num = disasm.calls.d[i].fmt3.num;
         printf("proc proc_%03x\n", start);
-        disasm_block(gpu, start, num);
+        disasm_block(shu, start, num);
         printf("end proc\n");
     }
     Vec_free(disasm.calls);

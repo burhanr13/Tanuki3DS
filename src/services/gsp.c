@@ -61,6 +61,19 @@ DECL_PORT(gsp_gpu) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        case 0x0018:
+            linfo("ImportDisplayCaptureInfo");
+            cmdbuf[0] = IPCHDR(9, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = LINEAR_HEAP_BASE;
+            cmdbuf[3] = LINEAR_HEAP_BASE;
+            cmdbuf[4] = 0;
+            cmdbuf[5] = 0;
+            cmdbuf[6] = LINEAR_HEAP_BASE;
+            cmdbuf[7] = 0;
+            cmdbuf[8] = 0;
+            cmdbuf[9] = 0;
+            break;
         case 0x001e:
             linfo("SetInternalPriorities");
             cmdbuf[0] = IPCHDR(1, 0);
