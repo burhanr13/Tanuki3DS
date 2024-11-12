@@ -32,6 +32,8 @@ layout (std140) uniform UberUniforms {
     float alpharef;
 };
 
+vec4 cur_color = vec4(1);
+
 vec4 tev_source(int src, int op, int i) {
     vec4 v = vec4(1);
     switch (src) {
@@ -40,7 +42,7 @@ vec4 tev_source(int src, int op, int i) {
         case 4: v = texture(tex1, texcoord1); break;
         case 5: v = texture(tex2, texcoord2); break;
         case 14: v = tev[i].color;
-        case 15: v = fragclr;
+        case 15: v = cur_color;
     }
     switch (op) {
         case 0: return v;
@@ -77,7 +79,7 @@ vec4 tev_combine_rgb(int i) {
 
 vec4 tev_combine_alpha(int i) {
 #define SRC(_i) tev_source(tev[i].a.src##_i, tev[i].a.op##_i, i)
-    switch (tev[i].rgb.combiner) {
+    switch (tev[i].a.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
         case 2: return SRC(0) + SRC(1);
@@ -111,11 +113,13 @@ bool run_alphatest() {
 
 void main() {
     for (int i = 0; i < 6; i++) {
-        fragclr = vec4(
+        cur_color = vec4(
             clamp(tev[i].rgb.scale * tev_combine_rgb(i).rgb, 0, 1),
             clamp(tev[i].a.scale * tev_combine_alpha(i).a, 0, 1)
         );
     }
+
+    fragclr = cur_color;
 
     if (!run_alphatest()) discard;
 }
