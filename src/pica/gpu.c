@@ -478,6 +478,9 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                                      texswizzle_lum_alpha);
                     LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
                     break;
+                case 6:
+                    LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
+                    break;
                 case 7:
                     glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
                                      texswizzle_luminance);

@@ -34,33 +34,50 @@ layout (std140) uniform UberUniforms {
 
 vec4 cur_color = vec4(1);
 
-vec4 tev_source(int src, int op, int i) {
+vec4 tev_source(int src, int i) {
     vec4 v = vec4(1);
     switch (src) {
-        case 0: v = color; break;
-        case 3: v = texture(tex0, texcoord0); break;
-        case 4: v = texture(tex1, texcoord1); break;
-        case 5: v = texture(tex2, texcoord2); break;
-        case 14: v = tev[i].color;
-        case 15: v = cur_color;
-    }
-    switch (op) {
-        case 0: return v;
-        case 1: return 1 - v;
-        case 2: return v.aaaa;
-        case 3: return 1 - v.aaaa;
-        case 4: return v.rrrr;
-        case 5: return 1 - v.rrrr;
-        case 8: return v.gggg;
-        case 9: return 1 - v.gggg;
-        case 12: return v.bbbb;
-        case 13: return 1 - v.bbbb;
-        default: return v;
+        case 0: return color; break;
+        case 3: return texture(tex0, texcoord0); break;
+        case 4: return texture(tex1, texcoord1); break;
+        case 5: return texture(tex2, texcoord2); break;
+        case 14: return tev[i].color;
+        case 15: return cur_color;
     }
 }
 
-vec4 tev_combine_rgb(int i) {
-#define SRC(_i) tev_source(tev[i].rgb.src##_i, tev[i].rgb.op##_i, i)
+vec3 tev_operand_rgb(vec4 v, int op) {
+    switch (op) {
+        case 0: return v.rgb;
+        case 1: return 1 - v.rgb;
+        case 2: return vec3(v.a);
+        case 3: return vec3(1 - v.a);
+        case 4: return vec3(v.r);
+        case 5: return vec3(1 - v.r);
+        case 8: return vec3(v.g);
+        case 9: return vec3(1 - v.g);
+        case 12: return vec3(v.b);
+        case 13: return vec3(1 - v.b);
+        default: return v.rgb;
+    }
+}
+
+float tev_operand_alpha(vec4 v, int op) {
+    switch (op) {
+        case 0: return v.a;
+        case 1: return 1 - v.a;
+        case 2: return v.r;
+        case 3: return 1 - v.r;
+        case 4: return v.g;
+        case 5: return 1 - v.g;
+        case 6: return v.b;
+        case 7: return 1 - v.b;
+        default: return v.a;
+    }
+}
+
+vec3 tev_combine_rgb(int i) {
+#define SRC(_i) tev_operand_rgb(tev_source(tev[i].rgb.src##_i, i), tev[i].rgb.op##_i)
     switch (tev[i].rgb.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
@@ -68,8 +85,8 @@ vec4 tev_combine_rgb(int i) {
         case 3: return SRC(0) + SRC(1) - 0.5;
         case 4: return mix(SRC(1), SRC(0), SRC(2));
         case 5: return SRC(0) - SRC(1);
-        case 6: return 4 * vec4(vec3(dot(SRC(0).rgb - 0.5, SRC(1).rgb - 0.5)), 0.25);
-        case 7: return 4 * vec4(dot(SRC(0).rgb - 0.5, SRC(1).rgb - 0.5));
+        case 6:
+        case 7: return vec3(4 * dot(SRC(0) - 0.5, SRC(1) - 0.5));
         case 8: return SRC(0) * SRC(1) + SRC(2);
         case 9: return (SRC(0) + SRC(1)) * SRC(2);
         default: return SRC(0);
@@ -77,8 +94,8 @@ vec4 tev_combine_rgb(int i) {
 #undef SRC
 }
 
-vec4 tev_combine_alpha(int i) {
-#define SRC(_i) tev_source(tev[i].a.src##_i, tev[i].a.op##_i, i)
+float tev_combine_alpha(int i) {
+#define SRC(_i) tev_operand_alpha(tev_source(tev[i].a.src##_i, i), tev[i].a.op##_i)
     switch (tev[i].a.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
@@ -86,8 +103,8 @@ vec4 tev_combine_alpha(int i) {
         case 3: return SRC(0) + SRC(1) - 0.5;
         case 4: return mix(SRC(1), SRC(0), SRC(2));
         case 5: return SRC(0) - SRC(1);
-        case 6: return 4 * vec4(vec3(dot(SRC(0).rgb - 0.5, SRC(1).rgb - 0.5)), 0.25);
-        case 7: return 4 * vec4(dot(SRC(0).rgb - 0.5, SRC(1).rgb - 0.5));
+        case 6: 
+        case 7: return 4 * (SRC(0) - 0.5) * (SRC(1) - 0.5);
         case 8: return SRC(0) * SRC(1) + SRC(2);
         case 9: return (SRC(0) + SRC(1)) * SRC(2);
         default: return SRC(0);
@@ -96,32 +113,37 @@ vec4 tev_combine_alpha(int i) {
 }
 
 bool run_alphatest() {
-    if (alphatest) {
-        switch (alphafunc) {
-            case 0: return false;
-            case 1: return true;
-            case 2: return fragclr.a == alpharef;
-            case 3: return fragclr.a != alpharef;
-            case 4: return fragclr.a < alpharef;
-            case 5: return fragclr.a <= alpharef;
-            case 6: return fragclr.a > alpharef;
-            case 7: return fragclr.a >= alpharef;
-        }
+    switch (alphafunc) {
+        case 0: return false;
+        case 1: return true;
+        case 2: return fragclr.a == alpharef;
+        case 3: return fragclr.a != alpharef;
+        case 4: return fragclr.a < alpharef;
+        case 5: return fragclr.a <= alpharef;
+        case 6: return fragclr.a > alpharef;
+        case 7: return fragclr.a >= alpharef;
+        default: return true;
     }
-    return true;
 }
 
 void main() {
     for (int i = 0; i < 6; i++) {
-        cur_color = vec4(
-            clamp(tev[i].rgb.scale * tev_combine_rgb(i).rgb, 0, 1),
-            clamp(tev[i].a.scale * tev_combine_alpha(i).a, 0, 1)
-        );
+        vec4 res;
+        res.rgb = tev_combine_rgb(i);
+        if (tev[i].rgb.combiner == 7) {
+            res.a = res.r;
+        } else {
+            res.a = tev_combine_alpha(i);
+        }
+        res.rgb *= tev[i].rgb.scale;
+        res.a *= tev[i].a.scale;
+        cur_color = clamp(res, 0, 1);
     }
 
     fragclr = cur_color;
 
-    if (!run_alphatest()) discard;
+    if (alphatest && !run_alphatest()) discard;
+
 }
 
 )";
