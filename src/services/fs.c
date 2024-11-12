@@ -10,7 +10,7 @@
 #include "../filesystems.h"
 #include "../srv.h"
 
-#include "../sys_files/mii.app.romfs.h"
+#include "../../sys_files/mii.app.romfs.h"
 
 enum {
     SYSFILE_MIIDATA = 1,

@@ -2,9 +2,10 @@
 
 #include "../3ds.h"
 
-u16 dsp_addrs[15] = {0xBFFF, 0x9E92, 0x8680, 0xA792, 0x9430,
-                     0x8400, 0x8540, 0x9492, 0x8710, 0x8410,
-                     0xA912, 0xAA12, 0xAAD2, 0xAC52, 0xAC5C};
+u16 dsp_addrs[15] = {
+    0xBFFF, 0x9E92, 0x8680, 0xA792, 0x9430, 0x8400, 0x8540, 0x9492,
+    0x8710, 0x8410, 0xA912, 0xAA12, 0xAAD2, 0xAC52, 0xAC5C,
+};
 
 DECL_PORT(dsp) {
     u32* cmdbuf = PTR(cmd_addr);
@@ -40,6 +41,11 @@ DECL_PORT(dsp) {
             break;
         case 0x0013:
             linfo("FlushDataCache");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        case 0x0014:
+            linfo("InvalidateDCache");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;

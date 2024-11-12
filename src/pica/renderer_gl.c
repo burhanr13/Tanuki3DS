@@ -14,6 +14,7 @@ GLuint make_shader(const char* vert, const char* frag) {
         char infolog[512];
         glGetShaderInfoLog(vertexShader, 512, NULL, infolog);
         printf("Error compiling vertex shader: %s\n", infolog);
+        exit(1);
     }
 
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -24,6 +25,7 @@ GLuint make_shader(const char* vert, const char* frag) {
         char infolog[512];
         glGetShaderInfoLog(fragmentShader, 512, NULL, infolog);
         printf("Error compiling fragment shader: %s\n", infolog);
+        exit(1);
     }
 
     GLuint program = glCreateProgram();
@@ -53,30 +55,31 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glGenVertexArrays(1, &state->mainvao);
     glBindVertexArray(state->mainvao);
 
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glGenBuffers(1, &state->mainvbo);
+    glBindBuffer(GL_ARRAY_BUFFER, state->mainvbo);
     glBufferData(GL_ARRAY_BUFFER, 0, NULL, GL_STATIC_DRAW);
 
     state->gpuprogram = make_shader(gpuvertsource, gpufragsource);
     glUseProgram(state->gpuprogram);
     glUniform1i(glGetUniformLocation(state->gpuprogram, "tex0"), 0);
-#define SETUNIFORMLOC(u)                                                       \
-    state->uniformlocs.u = glGetUniformLocation(state->gpuprogram, #u)
-    SETUNIFORMLOC(tex0enable);
-    SETUNIFORMLOC(alphatest);
-    SETUNIFORMLOC(alphafunc);
-    SETUNIFORMLOC(alpharef);
-#undef SETUNIFORMLOC
+    glUniform1i(glGetUniformLocation(state->gpuprogram, "tex1"), 1);
+    glUniform1i(glGetUniformLocation(state->gpuprogram, "tex2"), 2);
+
+    glUniformBlockBinding(
+        state->gpuprogram,
+        glGetUniformBlockIndex(state->gpuprogram, "UberUniforms"), 0);
+
+    glGenBuffers(1, &state->ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, state->ubo);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, state->ubo);
 
     glGenVertexArrays(1, &state->gpuvao);
     glBindVertexArray(state->gpuvao);
 
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    GLuint ebo;
-    glGenBuffers(1, &ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glGenBuffers(1, &state->gpuvbo);
+    glBindBuffer(GL_ARRAY_BUFFER, state->gpuvbo);
+    glGenBuffers(1, &state->gpuebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state->gpuebo);
 
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                           (void*) offsetof(Vertex, pos));
@@ -88,14 +91,28 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
                           (void*) offsetof(Vertex, texcoord0));
     glEnableVertexAttribArray(2);
 
+    glGenFramebuffers(1, &state->fbotop);
+    glBindFramebuffer(GL_FRAMEBUFFER, state->fbotop);
     glGenTextures(1, &state->textop);
     glBindTexture(GL_TEXTURE_2D, state->textop);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * UPSCALE,
+                 SCREEN_WIDTH * UPSCALE, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           state->textop, 0);
+    glGenFramebuffers(1, &state->fbobot);
+    glBindFramebuffer(GL_FRAMEBUFFER, state->fbobot);
     glGenTextures(1, &state->texbot);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * UPSCALE,
+                 SCREEN_WIDTH_BOT * UPSCALE, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           state->texbot, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     LRU_init(gpu->fbs);
 

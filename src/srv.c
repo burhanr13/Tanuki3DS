@@ -6,7 +6,7 @@
 
 #include "services.h"
 
-#include "sys_files/shared_font.app.romfs.h"
+#include "../sys_files/shared_font.app.romfs.h"
 
 void srvobj_init(KObject* hdr, KObjType t) {
     hdr->type = t;

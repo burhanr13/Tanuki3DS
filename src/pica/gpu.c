@@ -323,14 +323,15 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
 
     linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
 
-    GLuint dst = top ? gpu->gl.textop : gpu->gl.texbot;
-    glBindTexture(GL_TEXTURE_2D, dst);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,
+                      top ? gpu->gl.fbotop : gpu->gl.fbobot);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     u32 scwidth = top ? SCREEN_WIDTH : SCREEN_WIDTH_BOT;
-    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
-                     (fb->height - scwidth + yoff + yoffsrc) * UPSCALE,
-                     (SCREEN_HEIGHT << scalex) * UPSCALE,
-                     (scwidth << scaley) * UPSCALE, 0);
+    glBlitFramebuffer(
+        0, (fb->height - scwidth + yoff + yoffsrc) * UPSCALE,
+        (SCREEN_HEIGHT << scalex) * UPSCALE,
+        (fb->height - scwidth + yoff + yoffsrc + (scwidth << scaley)) * UPSCALE,
+        0, 0, SCREEN_HEIGHT, scwidth, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 }
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
@@ -376,7 +377,7 @@ TexInfo* texcache_load(GPU* gpu, u32 paddr) {
     return tex;
 }
 
-u32 morton_swizzle(u32 h, u32 w, u32 x, u32 y) {
+u32 morton_swizzle(u32 w, u32 x, u32 y) {
     u32 swizzle[8] = {
         0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15,
     };
@@ -397,8 +398,8 @@ u32 morton_swizzle(u32 h, u32 w, u32 x, u32 y) {
                                                                                \
         for (int x = 0; x < tex->width; x++) {                                 \
             for (int y = 0; y < tex->height; y++) {                            \
-                pixels[y * tex->width + x] =                                   \
-                    data[morton_swizzle(tex->height, tex->width, x, y)];       \
+                pixels[(tex->height - 1 - y) * tex->width + x] =               \
+                    data[morton_swizzle(tex->width, x, y)];                    \
             }                                                                  \
         }                                                                      \
                                                                                \
@@ -697,8 +698,33 @@ void gpu_drawimmediate(GPU* gpu) {
     Vec_free(gpu->immattrs);
 }
 
+void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
+    ubuf->tev[i].rgb.src0 = regs->source.rgb0;
+    ubuf->tev[i].rgb.src1 = regs->source.rgb1;
+    ubuf->tev[i].rgb.src2 = regs->source.rgb2;
+    ubuf->tev[i].a.src0 = regs->source.a0;
+    ubuf->tev[i].a.src1 = regs->source.a1;
+    ubuf->tev[i].a.src2 = regs->source.a2;
+    ubuf->tev[i].rgb.op0 = regs->operand.rgb0;
+    ubuf->tev[i].rgb.op1 = regs->operand.rgb1;
+    ubuf->tev[i].rgb.op2 = regs->operand.rgb2;
+    ubuf->tev[i].a.op0 = regs->operand.a0;
+    ubuf->tev[i].a.op1 = regs->operand.a1;
+    ubuf->tev[i].a.op2 = regs->operand.a2;
+    ubuf->tev[i].rgb.combiner = regs->combiner.rgb;
+    ubuf->tev[i].a.combiner = regs->combiner.a;
+    ubuf->tev[i].color[0] = (float) regs->color.r / 255;
+    ubuf->tev[i].color[1] = (float) regs->color.g / 255;
+    ubuf->tev[i].color[2] = (float) regs->color.b / 255;
+    ubuf->tev[i].color[3] = (float) regs->color.a / 255;
+    ubuf->tev[i].rgb.scale = 1 << (regs->scale.rgb & 3);
+    ubuf->tev[i].a.scale = 1 << (regs->scale.a & 3);
+}
+
 void gpu_update_gl_state(GPU* gpu) {
     gpu_update_cur_fb(gpu);
+
+    UberUniforms ubuf;
 
     switch (gpu->io.raster.facecull_config & 3) {
         case 0:
@@ -727,12 +753,22 @@ void gpu_update_gl_state(GPU* gpu) {
         glDepthRangef(0, 1);
     }
 
-    if (gpu->io.tex.texunit_cfg & 1) {
-        glUniform1i(gpu->gl.uniformlocs.tex0enable, true);
+    if (gpu->io.tex.config.tex0enable) {
         gpu_load_texture(gpu, 0, &gpu->io.tex.tex0, gpu->io.tex.tex0_fmt);
-    } else {
-        glUniform1i(gpu->gl.uniformlocs.tex0enable, false);
     }
+    if (gpu->io.tex.config.tex1enable) {
+        gpu_load_texture(gpu, 1, &gpu->io.tex.tex1, gpu->io.tex.tex1_fmt);
+    }
+    if (gpu->io.tex.config.tex2enable) {
+        gpu_load_texture(gpu, 2, &gpu->io.tex.tex2, gpu->io.tex.tex2_fmt);
+    }
+
+    load_texenv(&ubuf, 0, &gpu->io.tex.tev0);
+    load_texenv(&ubuf, 1, &gpu->io.tex.tev1);
+    load_texenv(&ubuf, 2, &gpu->io.tex.tev2);
+    load_texenv(&ubuf, 3, &gpu->io.tex.tev3);
+    load_texenv(&ubuf, 4, &gpu->io.tex.tev4);
+    load_texenv(&ubuf, 5, &gpu->io.tex.tev5);
 
     if (gpu->io.fb.color_op.frag_mode != 0) {
         lwarn("using frag op %d", gpu->io.fb.color_op.frag_mode);
@@ -755,11 +791,9 @@ void gpu_update_gl_state(GPU* gpu) {
         glLogicOp(logic_ops[gpu->io.fb.logic_op & 0xf]);
     }
 
-    glUniform1i(gpu->gl.uniformlocs.alphatest,
-                gpu->io.fb.alpha_test.enable & 1);
-    glUniform1i(gpu->gl.uniformlocs.alphafunc, gpu->io.fb.alpha_test.func & 7);
-    glUniform1f(gpu->gl.uniformlocs.alpharef,
-                (float) gpu->io.fb.alpha_test.ref / 255);
+    ubuf.alphatest = gpu->io.fb.alpha_test.enable & 1;
+    ubuf.alphafunc = gpu->io.fb.alpha_test.func & 7;
+    ubuf.alpharef = (float) gpu->io.fb.alpha_test.ref / 255;
 
     if (gpu->io.fb.stencil_test.enable) {
         glEnable(GL_STENCIL_TEST);
@@ -783,4 +817,6 @@ void gpu_update_gl_state(GPU* gpu) {
     } else {
         glDepthFunc(GL_ALWAYS);
     }
+
+    glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
 }

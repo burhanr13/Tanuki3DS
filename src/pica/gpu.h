@@ -48,6 +48,43 @@ typedef struct {
     u32 addr;
 } TexUnitRegs;
 
+typedef struct {
+    struct {
+        u32 rgb0 : 4;
+        u32 rgb1 : 4;
+        u32 rgb2 : 4;
+        u32 _12_15 : 4;
+        u32 a0 : 4;
+        u32 a1 : 4;
+        u32 a2 : 4;
+        u32 _28_31 : 4;
+    } source;
+    struct {
+        u32 rgb0 : 4;
+        u32 rgb1 : 4;
+        u32 rgb2 : 4;
+        u32 a0 : 4;
+        u32 a1 : 4;
+        u32 a2 : 4;
+        u32 _24_31 : 8;
+    } operand;
+    struct {
+        u16 rgb;
+        u16 a;
+    } combiner;
+    struct {
+        u8 r;
+        u8 g;
+        u8 b;
+        u8 a;
+    } color;
+    struct {
+        u16 rgb;
+        u16 a;
+    } scale;
+    u32 _pad[3];
+} TexEnvRegs;
+
 #pragma pack(push, 1)
 typedef union {
     u32 w[GPUREG_MAX];
@@ -86,12 +123,37 @@ typedef union {
         } raster;
         union {
             struct {
-                u32 texunit_cfg;
+                struct {
+                    u32 tex0enable : 1;
+                    u32 tex1enable : 1;
+                    u32 tex2enable : 1;
+                    u32 _3_7 : 5;
+                    u32 tex3coord : 2;
+                    u32 tex3enable : 1;
+                    u32 _11_12 : 2;
+                    u32 tex2coord : 1;
+                    u32 _14_31 : 18;
+                } config;
                 TexUnitRegs tex0;
                 u32 tex0_cubeaddr[5];
                 u32 tex0_shadow;
                 u32 _08c[2];
                 u32 tex0_fmt;
+                u32 lighting_enable;
+                u32 _090;
+                TexUnitRegs tex1;
+                u32 tex1_fmt;
+                u32 _097[2];
+                TexUnitRegs tex2;
+                u32 tex2_fmt;
+                u32 _09f[0x21];
+                TexEnvRegs tev0;
+                TexEnvRegs tev1;
+                TexEnvRegs tev2;
+                TexEnvRegs tev3;
+                u32 _0e0[0x10];
+                TexEnvRegs tev4;
+                TexEnvRegs tev5;
             };
             u32 w[0x80];
         } tex;

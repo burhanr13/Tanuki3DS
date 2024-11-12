@@ -1196,8 +1196,10 @@ DECL_ARM_COMPILE(cp_reg_trans) {
 }
 
 DECL_ARM_COMPILE(undefined) {
-    lerror("undefined instruction %08x at %08x", instr.w, addr);
-    return true;
+    EMITI_STORE_REG(15, addr + INSTRLEN);
+    EMITII(EXCEPTION, E_UND, instr.w);
+    EMIT00(END_RET);
+    return false;
 }
 
 DECL_ARM_COMPILE(sw_intr) {

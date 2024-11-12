@@ -11,22 +11,42 @@
 typedef struct _GPU GPU;
 
 typedef struct {
+    struct {
+        struct {
+            int src0;
+            int op0;
+            int src1;
+            int op1;
+            int src2;
+            int op2;
+            int combiner;
+            float scale;
+        } rgb, a;
+        float color[4];
+    } tev[6];
+
+    int alphatest;
+    int alphafunc;
+    float alpharef;
+} UberUniforms;
+
+typedef struct {
     GPU* gpu;
 
     GLuint mainvao;
+    GLuint mainvbo;
     GLuint mainprogram;
     GLuint gpuvao;
+    GLuint gpuvbo;
+    GLuint gpuebo;
     GLuint gpuprogram;
 
+    GLuint fbotop;
     GLuint textop;
+    GLuint fbobot;
     GLuint texbot;
 
-    struct {
-        GLint tex0enable;
-        GLint alphatest;
-        GLint alphafunc;
-        GLint alpharef;
-    } uniformlocs;
+    GLuint ubo;
 
 } GLState;
 
