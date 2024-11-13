@@ -479,20 +479,44 @@ DECL_PORT_ARG(fs_dir, fd) {
             struct dirent* ent;
             int i = 0;
             for (; i < count; i++) {
-                ent = readdir(dp);
-                if (!ent) break;
+                while ((ent = readdir(dp)) && (!strcmp(ent->d_name, ".") ||
+                                               !strcmp(ent->d_name, "..")));
+                if (!ent) {
+                    linfo("ran out of entries");
+                    break;
+                }
+
+                memset(&ents[i], 0, sizeof ents[i]);
 
                 int namelen = strlen(ent->d_name);
                 if (namelen > 0x105) namelen = 0x105;
+                int dotpos = -1;
                 for (int j = 0; j < namelen; j++) {
                     ents[i].name[j] = ent->d_name[j];
+
+                    if (ent->d_name[j] == '.') dotpos = j;
+                    if (dotpos < 0 && j < 8) {
+                        ents[i].shortname[j] = ent->d_name[j];
+                    }
+                    if (dotpos >= 0 && j > dotpos && j - (dotpos + 1) < 3) {
+                        ents[i].shortext[j - (dotpos + 1)] = ent->d_name[j];
+                    }
                 }
+
                 ents[i]._21a[0] = 1;
+
+                ents[i].isdir = ent->d_type == DT_DIR;
+                ents[i].isarchive = 0;
+                ents[i].ishidden = ent->d_name[0] == '.';
 
                 struct stat st;
                 fstatat(dirfd(dp), ent->d_name, &st, 0);
 
+                ents[i].isreadonly = (st.st_mode & S_IWUSR) == 0;
                 ents[i].size = st.st_size;
+
+                linfo("entry %s (%s.%s)", ent->d_name, ents[i].shortname,
+                      ents[i].shortext);
             }
 
             cmdbuf[0] = IPCHDR(2, 0);

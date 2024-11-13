@@ -26,7 +26,10 @@ typedef struct {
     u8 shortname[10];
     u8 shortext[4];
     u8 _21a[2];
-    u32 attrs;
+    u8 isdir;
+    u8 ishidden;
+    u8 isarchive;
+    u8 isreadonly;
     u64 size;
 } FSDirent;
 

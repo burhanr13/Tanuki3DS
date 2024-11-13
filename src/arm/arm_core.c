@@ -137,7 +137,6 @@ void cpu_update_mode(ArmCore* cpu, CpuMode old) {
 
 void cpu_undefined_fail(ArmCore* cpu, u32 instr) {
     lerror("executing undefined instruction %08x near %08x", instr, cpu->pc);
-    exit(1);
 }
 
 char* mode_name(CpuMode m) {
