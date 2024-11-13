@@ -82,7 +82,13 @@ typedef struct {
         u16 rgb;
         u16 a;
     } scale;
-    u32 _pad[3];
+    struct {
+        u8 r;
+        u8 g;
+        u8 b;
+        u8 a;
+    } buffer_color;
+    u32 _pad[2];
 } TexEnvRegs;
 
 #pragma pack(push, 1)
@@ -151,7 +157,15 @@ typedef union {
                 TexEnvRegs tev1;
                 TexEnvRegs tev2;
                 TexEnvRegs tev3;
-                u32 _0e0[0x10];
+                struct {
+                    u32 fogmode : 3;
+                    u32 densitysource : 1;
+                    u32 _4_7 : 4;
+                    u32 update_rgb : 4;
+                    u32 update_alpha : 4;
+                    u32 zflip : 16;
+                } tev_buffer;
+                u32 _0e0[0xf];
                 TexEnvRegs tev4;
                 TexEnvRegs tev5;
             };

@@ -77,6 +77,8 @@ typedef struct _3DS {
 void hle3ds_init(HLE3DS* s, char* romfile);
 void hle3ds_destroy(HLE3DS* s);
 
+void hle3ds_update_datetime(HLE3DS* s);
+
 void hle3ds_run_frame(HLE3DS* s);
 
 #endif

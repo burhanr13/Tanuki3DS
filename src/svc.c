@@ -332,10 +332,8 @@ DECL_SVC(ArbitrateAddress) {
             }
             thread_reschedule(s);
             break;
-        case ARBITRATE_DEC_WAIT:
-            *(s32*) PTR(addr) -= 1;
-            __attribute__((fallthrough));
         case ARBITRATE_WAIT:
+        case ARBITRATE_DEC_WAIT:
             if (*(s32*) PTR(addr) < value) {
                 klist_insert(&arbiter->waiting_thrds, &CUR_THREAD->hdr);
                 klist_insert(&CUR_THREAD->waiting_objs, &arbiter->hdr);
@@ -343,6 +341,9 @@ DECL_SVC(ArbitrateAddress) {
                 linfo("waiting on address %08x", addr);
                 thread_sleep(s, CUR_THREAD, -1);
                 thread_reschedule(s);
+            }
+            if (type == ARBITRATE_DEC_WAIT) {
+                *(s32*) PTR(addr) -= 1;
             }
             break;
         default:

@@ -24,6 +24,9 @@ typedef struct {
         } rgb, a;
         float color[4];
     } tev[6];
+    float tev_buffer_color[4];
+    int tev_update_rgb;
+    int tev_update_alpha;
 
     int alphatest;
     int alphafunc;

@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cpu.h"
 #include "loader.h"
@@ -41,6 +42,7 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
     *(u32*) PTR(CONFIG_MEM + 0x40) = FCRAMSIZE;
 
     hle3ds_vmmap(s, SHARED_PAGE, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
+    *(u32*) PTR(SHARED_PAGE + 4) = 1;
 
     hle3ds_vmmap(s, TLS_BASE, TLS_SIZE * THREAD_MAX, PERM_RW, MEMST_PRIVATE,
                  false);
@@ -64,6 +66,18 @@ void hle3ds_destroy(HLE3DS* s) {
     hle3ds_memory_destroy(s);
 }
 
+void hle3ds_update_datetime(HLE3DS* s) {
+    struct {
+        u64 time;
+        u64 systemtick;
+        u32 unk[4];
+    }* datetime = PTR(SHARED_PAGE + 0x20);
+
+    datetime->time = (time(NULL) + 2208988800) * 1000;
+    datetime->systemtick = s->sched.now;
+    datetime->unk[0] = 0xffb0ff0;
+}
+
 void hle3ds_run_frame(HLE3DS* s) {
     while (!s->frame_complete) {
         if (!s->cpu.wfe) {
@@ -74,6 +88,7 @@ void hle3ds_run_frame(HLE3DS* s) {
         while (s->cpu.wfe && !s->frame_complete) {
             run_next_event(&s->sched);
         }
+        hle3ds_update_datetime(s);
     }
     s->frame_complete = false;
 }

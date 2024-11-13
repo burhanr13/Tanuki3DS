@@ -772,6 +772,12 @@ void gpu_update_gl_state(GPU* gpu) {
     load_texenv(&ubuf, 3, &gpu->io.tex.tev3);
     load_texenv(&ubuf, 4, &gpu->io.tex.tev4);
     load_texenv(&ubuf, 5, &gpu->io.tex.tev5);
+    ubuf.tev_update_rgb = gpu->io.tex.tev_buffer.update_rgb;
+    ubuf.tev_update_alpha = gpu->io.tex.tev_buffer.update_alpha;
+    ubuf.tev_buffer_color[0] = (float) gpu->io.tex.tev5.buffer_color.r / 255;
+    ubuf.tev_buffer_color[1] = (float) gpu->io.tex.tev5.buffer_color.g / 255;
+    ubuf.tev_buffer_color[2] = (float) gpu->io.tex.tev5.buffer_color.b / 255;
+    ubuf.tev_buffer_color[3] = (float) gpu->io.tex.tev5.buffer_color.a / 255;
 
     if (gpu->io.fb.color_op.frag_mode != 0) {
         lwarn("using frag op %d", gpu->io.fb.color_op.frag_mode);
