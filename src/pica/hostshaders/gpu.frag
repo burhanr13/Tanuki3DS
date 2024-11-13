@@ -12,20 +12,25 @@ uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
+struct TevControl {
+    int src0;
+    int op0;
+    int src1;
+    int op1;
+    int src2;
+    int op2;
+    int combiner;
+    float scale;
+};
+
+struct Tev {
+    TevControl rgb;
+    TevControl a;
+    vec4 color;
+};
+
 layout (std140) uniform UberUniforms {
-    struct {
-        struct {
-            int src0;
-            int op0;
-            int src1;
-            int op1;
-            int src2;
-            int op2;
-            int combiner;
-            float scale;
-        } rgb, a;
-        vec4 color;
-    } tev[6];
+    Tev tev[6];
     vec4 tev_buffer_color;
     int tev_update_rgb;
     int tev_update_alpha;
@@ -39,7 +44,6 @@ vec4 cur_color = color;
 vec4 buf_color = tev_buffer_color;
 
 vec4 tev_source(int src, int i) {
-    vec4 v = vec4(1);
     switch (src) {
         case 0: return color;
         case 3: return texture(tex0, texcoord0);
@@ -48,6 +52,7 @@ vec4 tev_source(int src, int i) {
         case 13: return buf_color;
         case 14: return tev[i].color;
         case 15: return cur_color;
+        default: return color;
     }
 }
 
@@ -81,21 +86,19 @@ float tev_operand_alpha(vec4 v, int op) {
     }
 }
 
-#define CLAMP(v) clamp(v, 0, 1)
-
 vec3 tev_combine_rgb(int i) {
 #define SRC(_i) tev_operand_rgb(tev_source(tev[i].rgb.src##_i, i), tev[i].rgb.op##_i)
     switch (tev[i].rgb.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
-        case 2: return CLAMP(SRC(0) + SRC(1));
-        case 3: return CLAMP(SRC(0) + SRC(1) - 0.5);
+        case 2: return SRC(0) + SRC(1);
+        case 3: return SRC(0) + SRC(1) - 0.5;
         case 4: return mix(SRC(1), SRC(0), SRC(2));
-        case 5: return CLAMP(SRC(0) - SRC(1));
+        case 5: return SRC(0) - SRC(1);
         case 6:
-        case 7: return CLAMP(vec3(4 * dot(SRC(0) - 0.5, SRC(1) - 0.5)));
-        case 8: return CLAMP(SRC(0) * SRC(1) + SRC(2));
-        case 9: return CLAMP(SRC(0) + SRC(1)) * SRC(2);
+        case 7: return vec3(4 * dot(SRC(0) - 0.5, SRC(1) - 0.5));
+        case 8: return SRC(0) * SRC(1) + SRC(2);
+        case 9: return (SRC(0) + SRC(1)) * SRC(2);
         default: return SRC(0);
     }
 #undef SRC
@@ -106,29 +109,29 @@ float tev_combine_alpha(int i) {
     switch (tev[i].a.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
-        case 2: return CLAMP(SRC(0) + SRC(1));
-        case 3: return CLAMP(SRC(0) + SRC(1) - 0.5);
+        case 2: return SRC(0) + SRC(1);
+        case 3: return SRC(0) + SRC(1) - 0.5;
         case 4: return mix(SRC(1), SRC(0), SRC(2));
-        case 5: return CLAMP(SRC(0) - SRC(1));
+        case 5: return SRC(0) - SRC(1);
         case 6: 
-        case 7: return CLAMP(4 * (SRC(0) - 0.5) * (SRC(1) - 0.5));
-        case 8: return CLAMP(SRC(0) * SRC(1) + SRC(2));
-        case 9: return CLAMP(SRC(0) + SRC(1)) * SRC(2);
+        case 7: return 4 * (SRC(0) - 0.5) * (SRC(1) - 0.5);
+        case 8: return SRC(0) * SRC(1) + SRC(2);
+        case 9: return (SRC(0) + SRC(1)) * SRC(2);
         default: return SRC(0);
     }
 #undef SRC
 }
 
-bool run_alphatest() {
+bool run_alphatest(float a) {
     switch (alphafunc) {
         case 0: return false;
         case 1: return true;
-        case 2: return fragclr.a == alpharef;
-        case 3: return fragclr.a != alpharef;
-        case 4: return fragclr.a < alpharef;
-        case 5: return fragclr.a <= alpharef;
-        case 6: return fragclr.a > alpharef;
-        case 7: return fragclr.a >= alpharef;
+        case 2: return a == alpharef;
+        case 3: return a != alpharef;
+        case 4: return a < alpharef;
+        case 5: return a <= alpharef;
+        case 6: return a > alpharef;
+        case 7: return a >= alpharef;
         default: return true;
     }
 }
@@ -145,7 +148,7 @@ void main() {
         res.rgb *= tev[i].rgb.scale;
         res.a *= tev[i].a.scale;
 
-        res = CLAMP(res);
+        res = clamp(res, 0, 1);
 
         if ((tev_update_rgb & (1<<i)) != 0) {
             buf_color.rgb = res.rgb;
@@ -159,7 +162,7 @@ void main() {
 
     fragclr = cur_color;
 
-    if (alphatest && !run_alphatest()) discard;
+    if (alphatest && !run_alphatest(fragclr.a)) discard;
 
 }
 
