@@ -35,6 +35,8 @@ layout (std140) uniform UberUniforms {
     int tev_update_rgb;
     int tev_update_alpha;
 
+    bool tex2coord;
+
     bool alphatest;
     int alphafunc;
     float alpharef;
@@ -48,7 +50,7 @@ vec4 tev_source(int src, int i) {
         case 0: return color;
         case 3: return texture(tex0, texcoord0);
         case 4: return texture(tex1, texcoord1);
-        case 5: return texture(tex2, texcoord2);
+        case 5: return texture(tex2, tex2coord ? texcoord2 : texcoord1);
         case 13: return buf_color;
         case 14: return tev[i].color;
         case 15: return cur_color;

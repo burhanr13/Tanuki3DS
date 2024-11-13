@@ -53,8 +53,6 @@ void writedest(ShaderUnit* shu, fvec dest, u32 n, u8 mask) {
 #define SRC3(v, fmt) SRC(v, 3, fmt)
 #define DEST(v, _fmt) writedest(shu, v, instr.fmt##_fmt.dest, desc.destmask)
 
-void exec_block(ShaderUnit* shu, u32 start, u32 num);
-
 static inline bool condop(u32 op, bool x, bool y, bool refx, bool refy) {
     switch (op) {
         case 0:
@@ -93,316 +91,355 @@ static inline bool compare(u32 op, float a, float b) {
 #define MAX(a, b) (isinf(b) ? b : fmaxf(b, a))
 #define MIN(a, b) (fminf(b, a))
 
-u32 exec_instr(ShaderUnit* shu, u32 pc) {
-    PICAInstr instr = shu->code[pc++];
-    OpDesc desc = shu->opdescs[instr.desc];
-    switch (instr.opcode) {
-        case PICA_ADD: {
-            fvec a, b;
-            SRC1(a, 1);
-            SRC2(b, 1);
-            fvec res;
-            res[0] = a[0] + b[0];
-            res[1] = a[1] + b[1];
-            res[2] = a[2] + b[2];
-            res[3] = a[3] + b[3];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_DP3: {
-            fvec a, b;
-            SRC1(a, 1);
-            SRC2(b, 1);
-            fvec res;
-            res[0] = MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]);
-            res[1] = res[2] = res[3] = res[0];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_DP4: {
-            fvec a, b;
-            SRC1(a, 1);
-            SRC2(b, 1);
-            fvec res;
-            res[0] = MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]) +
-                     MUL(a[3], b[3]);
-            res[1] = res[2] = res[3] = res[0];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_DST:
-        case PICA_DSTI: {
-            fvec a, b;
-            if (instr.opcode == PICA_DST) {
-                SRC1(a, 1);
-                SRC2(b, 1);
-            } else {
-                SRC1(a, 1i);
-                SRC2(b, 1i);
-            }
-            fvec res;
-            res[0] = 1;
-            res[1] = MUL(a[1], b[1]);
-            res[2] = a[2];
-            res[3] = b[3];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_EX2: {
-            fvec a;
-            SRC1(a, 1);
-            fvec res;
-            res[0] = exp2f(a[0]);
-            res[1] = res[2] = res[3] = res[0];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_LG2: {
-            fvec a;
-            SRC1(a, 1);
-            fvec res;
-            res[0] = log2f(a[0]);
-            res[1] = res[2] = res[3] = res[0];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_MUL: {
-            fvec a, b;
-            SRC1(a, 1);
-            SRC2(b, 1);
-            fvec res;
-            res[0] = MUL(a[0], b[0]);
-            res[1] = MUL(a[1], b[1]);
-            res[2] = MUL(a[2], b[2]);
-            res[3] = MUL(a[3], b[3]);
-            DEST(res, 1);
-            break;
-        }
-        case PICA_SGE:
-        case PICA_SGEI: {
-            fvec a, b;
-            if (instr.opcode == PICA_SGE) {
-                SRC1(a, 1);
-                SRC2(b, 1);
-            } else {
-                SRC1(a, 1i);
-                SRC2(b, 1i);
-            }
-            fvec res;
-            res[0] = a[0] >= b[0];
-            res[1] = a[1] >= b[1];
-            res[2] = a[2] >= b[2];
-            res[3] = a[3] >= b[3];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_SLT:
-        case PICA_SLTI: {
-            fvec a, b;
-            if (instr.opcode == PICA_SLT) {
-                SRC1(a, 1);
-                SRC2(b, 1);
-            } else {
-                SRC1(a, 1i);
-                SRC2(b, 1i);
-            }
-            fvec res;
-            res[0] = a[0] < b[0];
-            res[1] = a[1] < b[1];
-            res[2] = a[2] < b[2];
-            res[3] = a[3] < b[3];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_FLR: {
-            fvec a;
-            SRC1(a, 1);
-            fvec res;
-            res[0] = floorf(a[0]);
-            res[1] = floorf(a[1]);
-            res[2] = floorf(a[2]);
-            res[3] = floorf(a[3]);
-            DEST(res, 1);
-            break;
-        }
-        case PICA_MAX: {
-            fvec a, b;
-            SRC1(a, 1);
-            SRC2(b, 1);
-            fvec res;
-            res[0] = MAX(a[0], b[0]);
-            res[1] = MAX(a[1], b[1]);
-            res[2] = MAX(a[2], b[2]);
-            res[3] = MAX(a[3], b[3]);
-            DEST(res, 1);
-            break;
-        }
-        case PICA_MIN: {
-            fvec a, b;
-            SRC1(a, 1);
-            SRC2(b, 1);
-            fvec res;
-            res[0] = MIN(a[0], b[0]);
-            res[1] = MIN(a[1], b[1]);
-            res[2] = MIN(a[2], b[2]);
-            res[3] = MIN(a[3], b[3]);
-            DEST(res, 1);
-            break;
-        }
-        case PICA_RCP: {
-            fvec a;
-            SRC1(a, 1);
-            fvec res;
-            if (a[0] == -0.f) a[0] = 0;
-            res[0] = 1 / a[0];
-            res[1] = res[2] = res[3] = res[0];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_RSQ: {
-            fvec a;
-            SRC1(a, 1);
-            fvec res;
-            if (a[0] == -0.f) a[0] = 0;
-            res[0] = 1 / sqrtf(a[0]);
-            res[1] = res[2] = res[3] = res[0];
-            DEST(res, 1);
-            break;
-        }
-        case PICA_MOVA: {
-            fvec a;
-            SRC1(a, 1);
-            if (desc.destmask & BIT(3 - 0)) {
-                shu->a[0] = a[0];
-            }
-            if (desc.destmask & BIT(3 - 1)) {
-                shu->a[1] = a[1];
-            }
-            break;
-        }
-        case PICA_MOV: {
-            fvec a;
-            SRC1(a, 1);
-            DEST(a, 1);
-            break;
-        }
-        case PICA_NOP:
-            break;
-        case PICA_BREAK:
-        case PICA_BREAKC: {
-            bool cond;
-            if (instr.opcode == PICA_BREAKC) {
-                cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
-                              instr.fmt2.refx, instr.fmt2.refy);
-            } else {
-                cond = true;
-            }
-            if (cond) pc = -1;
-            break;
-        }
-        case PICA_END:
-            pc = -1;
-            break;
-        case PICA_CALL:
-        case PICA_CALLC:
-        case PICA_CALLU: {
-            bool cond;
-            if (instr.opcode == PICA_CALLC) {
-                cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
-                              instr.fmt2.refx, instr.fmt2.refy);
-            } else if (instr.opcode == PICA_CALLU) {
-                cond = shu->b & BIT(instr.fmt3.c);
-            } else cond = true;
-            if (cond) {
-                exec_block(shu, instr.fmt3.dest, instr.fmt3.num);
-            }
-            break;
-        }
-        case PICA_IFU:
-        case PICA_IFC: {
-            bool cond;
-            if (instr.opcode == PICA_IFU) {
-                cond = shu->b & BIT(instr.fmt3.c);
-            } else {
-                cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
-                              instr.fmt2.refx, instr.fmt2.refy);
-            }
-            if (cond) {
-                exec_block(shu, pc, instr.fmt2.dest - pc);
-            } else {
-                exec_block(shu, instr.fmt2.dest, instr.fmt2.num);
-            }
-            pc = instr.fmt2.dest + instr.fmt2.num;
-            break;
-        }
-        case PICA_LOOP: {
-            shu->al = shu->i[instr.fmt3.c & 3][1];
-            for (int i = 0; i <= shu->i[instr.fmt3.c & 3][0]; i++) {
-                exec_block(shu, pc, instr.fmt3.dest + 1 - pc);
-                shu->al += shu->i[instr.fmt3.c & 3][2];
-            }
-            pc = instr.fmt3.dest + 1;
-            break;
-        }
-        case PICA_JMPC:
-        case PICA_JMPU: {
-            bool cond;
-            if (instr.opcode == PICA_JMPC) {
-                cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
-                              instr.fmt2.refx, instr.fmt2.refy);
-            } else {
-                cond = shu->b & BIT(instr.fmt3.c);
-                if (instr.fmt3.num & 1) cond = !cond;
-            }
-            if (cond) {
-                pc = instr.fmt3.dest;
-            }
-            break;
-        }
-        case PICA_CMP ... PICA_CMP + 1: {
-            fvec a, b;
-            SRC1(a, 1c);
-            SRC2(b, 1c);
-            shu->cmp[0] = compare(instr.fmt1c.cmpx, a[0], b[0]);
-            shu->cmp[1] = compare(instr.fmt1c.cmpy, a[1], b[1]);
-            break;
-        }
-        case PICA_MAD ... PICA_MAD + 0xf: {
-            desc = shu->opdescs[instr.fmt5.desc];
-            fvec a, b, c;
-            SRC1(a, 5);
-            if (instr.fmt5.opcode & 1) {
-                SRC2(b, 5);
-                SRC3(c, 5);
-            } else {
-                SRC2(b, 5i);
-                SRC3(c, 5i);
-            }
+typedef struct {
+    u32 pc;
+    u32 dest;
+    bool loop;
+    u32 idx;
+    u32 inc;
+    u32 max;
+} Control;
 
-            fvec res;
-            res[0] = MUL(a[0], b[0]) + c[0];
-            res[1] = MUL(a[1], b[1]) + c[1];
-            res[2] = MUL(a[2], b[2]) + c[2];
-            res[3] = MUL(a[3], b[3]) + c[3];
-            DEST(res, 5);
-            break;
+#define PUSH() (sp = (sp + 1) % 16)
+#define POP() (sp = (sp - 1) % 16)
+#define TOP (stack[sp])
+
+void shader_run(ShaderUnit* shu) {
+    u32 pc = shu->entrypoint;
+
+    Control stack[16];
+    u32 sp = 0;
+    TOP.pc = -1;
+    TOP.dest = 0;
+
+    while (pc < SHADER_CODE_SIZE) {
+        PICAInstr instr = shu->code[pc++ % SHADER_CODE_SIZE];
+        OpDesc desc = shu->opdescs[instr.desc];
+        switch (instr.opcode) {
+            case PICA_ADD: {
+                fvec a, b;
+                SRC1(a, 1);
+                SRC2(b, 1);
+                fvec res;
+                res[0] = a[0] + b[0];
+                res[1] = a[1] + b[1];
+                res[2] = a[2] + b[2];
+                res[3] = a[3] + b[3];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_DP3: {
+                fvec a, b;
+                SRC1(a, 1);
+                SRC2(b, 1);
+                fvec res;
+                res[0] = MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]);
+                res[1] = res[2] = res[3] = res[0];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_DP4: {
+                fvec a, b;
+                SRC1(a, 1);
+                SRC2(b, 1);
+                fvec res;
+                res[0] = MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]) +
+                         MUL(a[3], b[3]);
+                res[1] = res[2] = res[3] = res[0];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_DST:
+            case PICA_DSTI: {
+                fvec a, b;
+                if (instr.opcode == PICA_DST) {
+                    SRC1(a, 1);
+                    SRC2(b, 1);
+                } else {
+                    SRC1(a, 1i);
+                    SRC2(b, 1i);
+                }
+                fvec res;
+                res[0] = 1;
+                res[1] = MUL(a[1], b[1]);
+                res[2] = a[2];
+                res[3] = b[3];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_EX2: {
+                fvec a;
+                SRC1(a, 1);
+                fvec res;
+                res[0] = exp2f(a[0]);
+                res[1] = res[2] = res[3] = res[0];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_LG2: {
+                fvec a;
+                SRC1(a, 1);
+                fvec res;
+                res[0] = log2f(a[0]);
+                res[1] = res[2] = res[3] = res[0];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_MUL: {
+                fvec a, b;
+                SRC1(a, 1);
+                SRC2(b, 1);
+                fvec res;
+                res[0] = MUL(a[0], b[0]);
+                res[1] = MUL(a[1], b[1]);
+                res[2] = MUL(a[2], b[2]);
+                res[3] = MUL(a[3], b[3]);
+                DEST(res, 1);
+                break;
+            }
+            case PICA_SGE:
+            case PICA_SGEI: {
+                fvec a, b;
+                if (instr.opcode == PICA_SGE) {
+                    SRC1(a, 1);
+                    SRC2(b, 1);
+                } else {
+                    SRC1(a, 1i);
+                    SRC2(b, 1i);
+                }
+                fvec res;
+                res[0] = a[0] >= b[0];
+                res[1] = a[1] >= b[1];
+                res[2] = a[2] >= b[2];
+                res[3] = a[3] >= b[3];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_SLT:
+            case PICA_SLTI: {
+                fvec a, b;
+                if (instr.opcode == PICA_SLT) {
+                    SRC1(a, 1);
+                    SRC2(b, 1);
+                } else {
+                    SRC1(a, 1i);
+                    SRC2(b, 1i);
+                }
+                fvec res;
+                res[0] = a[0] < b[0];
+                res[1] = a[1] < b[1];
+                res[2] = a[2] < b[2];
+                res[3] = a[3] < b[3];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_FLR: {
+                fvec a;
+                SRC1(a, 1);
+                fvec res;
+                res[0] = floorf(a[0]);
+                res[1] = floorf(a[1]);
+                res[2] = floorf(a[2]);
+                res[3] = floorf(a[3]);
+                DEST(res, 1);
+                break;
+            }
+            case PICA_MAX: {
+                fvec a, b;
+                SRC1(a, 1);
+                SRC2(b, 1);
+                fvec res;
+                res[0] = MAX(a[0], b[0]);
+                res[1] = MAX(a[1], b[1]);
+                res[2] = MAX(a[2], b[2]);
+                res[3] = MAX(a[3], b[3]);
+                DEST(res, 1);
+                break;
+            }
+            case PICA_MIN: {
+                fvec a, b;
+                SRC1(a, 1);
+                SRC2(b, 1);
+                fvec res;
+                res[0] = MIN(a[0], b[0]);
+                res[1] = MIN(a[1], b[1]);
+                res[2] = MIN(a[2], b[2]);
+                res[3] = MIN(a[3], b[3]);
+                DEST(res, 1);
+                break;
+            }
+            case PICA_RCP: {
+                fvec a;
+                SRC1(a, 1);
+                fvec res;
+                if (a[0] == -0.f) a[0] = 0;
+                res[0] = 1 / a[0];
+                res[1] = res[2] = res[3] = res[0];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_RSQ: {
+                fvec a;
+                SRC1(a, 1);
+                fvec res;
+                if (a[0] == -0.f) a[0] = 0;
+                res[0] = 1 / sqrtf(a[0]);
+                res[1] = res[2] = res[3] = res[0];
+                DEST(res, 1);
+                break;
+            }
+            case PICA_MOVA: {
+                fvec a;
+                SRC1(a, 1);
+                if (desc.destmask & BIT(3 - 0)) {
+                    shu->a[0] = a[0];
+                }
+                if (desc.destmask & BIT(3 - 1)) {
+                    shu->a[1] = a[1];
+                }
+                break;
+            }
+            case PICA_MOV: {
+                fvec a;
+                SRC1(a, 1);
+                DEST(a, 1);
+                break;
+            }
+            case PICA_NOP:
+                break;
+            case PICA_BREAK:
+            case PICA_BREAKC: {
+                bool cond;
+                if (instr.opcode == PICA_BREAKC) {
+                    cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
+                                  instr.fmt2.refx, instr.fmt2.refy);
+                } else {
+                    cond = true;
+                }
+                if (cond) {
+                    pc = TOP.pc + 1;
+                    POP();
+                }
+                break;
+            }
+            case PICA_END:
+                return;
+            case PICA_CALL:
+            case PICA_CALLC:
+            case PICA_CALLU: {
+                bool cond;
+                if (instr.opcode == PICA_CALLC) {
+                    cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
+                                  instr.fmt2.refx, instr.fmt2.refy);
+                } else if (instr.opcode == PICA_CALLU) {
+                    cond = shu->b & BIT(instr.fmt3.c);
+                } else cond = true;
+                if (cond) {
+                    PUSH();
+                    TOP.dest = pc;
+                    TOP.loop = false;
+                    pc = instr.fmt3.dest;
+                    TOP.pc = pc + instr.fmt3.num;
+                }
+                break;
+            }
+            case PICA_IFU:
+            case PICA_IFC: {
+                bool cond;
+                if (instr.opcode == PICA_IFU) {
+                    cond = shu->b & BIT(instr.fmt3.c);
+                } else {
+                    cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
+                                  instr.fmt2.refx, instr.fmt2.refy);
+                }
+                if (cond) {
+                    PUSH();
+                    TOP.pc = instr.fmt2.dest;
+                    TOP.dest = instr.fmt2.dest + instr.fmt2.num;
+                    TOP.loop = false;
+                } else {
+                    pc = instr.fmt2.dest;
+                }
+                break;
+            }
+            case PICA_LOOP: {
+                shu->al = shu->i[instr.fmt3.c & 3][1];
+                PUSH();
+                TOP.pc = instr.fmt3.dest + 1;
+                TOP.dest = pc;
+                TOP.loop = true;
+                TOP.idx = 0;
+                TOP.inc = shu->i[instr.fmt3.c & 3][2];
+                TOP.max = shu->i[instr.fmt3.c & 3][0];
+                break;
+            }
+            case PICA_JMPC:
+            case PICA_JMPU: {
+                bool cond;
+                if (instr.opcode == PICA_JMPC) {
+                    cond = condop(instr.fmt2.op, shu->cmp[0], shu->cmp[1],
+                                  instr.fmt2.refx, instr.fmt2.refy);
+                } else {
+                    cond = shu->b & BIT(instr.fmt3.c);
+                    if (instr.fmt3.num & 1) cond = !cond;
+                }
+                if (cond) {
+                    pc = instr.fmt3.dest;
+                }
+                break;
+            }
+            case PICA_CMP ... PICA_CMP + 1: {
+                fvec a, b;
+                SRC1(a, 1c);
+                SRC2(b, 1c);
+                shu->cmp[0] = compare(instr.fmt1c.cmpx, a[0], b[0]);
+                shu->cmp[1] = compare(instr.fmt1c.cmpy, a[1], b[1]);
+                break;
+            }
+            case PICA_MAD ... PICA_MAD + 0xf: {
+                desc = shu->opdescs[instr.fmt5.desc];
+                fvec a, b, c;
+                SRC1(a, 5);
+                if (instr.fmt5.opcode & 1) {
+                    SRC2(b, 5);
+                    SRC3(c, 5);
+                } else {
+                    SRC2(b, 5i);
+                    SRC3(c, 5i);
+                }
+
+                fvec res;
+                res[0] = MUL(a[0], b[0]) + c[0];
+                res[1] = MUL(a[1], b[1]) + c[1];
+                res[2] = MUL(a[2], b[2]) + c[2];
+                res[3] = MUL(a[3], b[3]) + c[3];
+                DEST(res, 5);
+                break;
+            }
+            default:
+                lerror("unknown PICA instruction %08x (opcode %x)", instr.w,
+                       instr.opcode);
+                break;
         }
-        default:
-            lerror("unknown PICA instruction %08x (opcode %x)", instr.w,
-                   instr.opcode);
-            break;
+
+        while (TOP.pc == pc) {
+            if (TOP.loop) {
+                shu->al += TOP.inc;
+                if (TOP.idx++ == TOP.max) {
+                    POP();
+                } else {
+                    pc = TOP.dest;
+                }
+            } else {
+                pc = TOP.dest;
+                POP();
+            }
+        }
     }
-    return pc;
-}
-
-void exec_block(ShaderUnit* shu, u32 start, u32 num) {
-    u32 end = SHADER_CODE_SIZE;
-    if (start + num < end) end = start + num;
-    for (u32 pc = start; pc < end; pc = exec_instr(shu, pc));
 }
 
 void pica_shader_exec(ShaderUnit* shu) {
-    exec_block(shu, shu->entrypoint, SHADER_CODE_SIZE);
+    shader_run(shu);
 }
 
 static char coordnames[4][2] = {"x", "y", "z", "w"};

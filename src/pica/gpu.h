@@ -297,6 +297,7 @@ typedef union {
                     u32 mode : 8;
                     u32 unk : 16;
                 } prim_config;
+                u32 restart_primitive;
             };
             u32 w[0x80];
         } geom;

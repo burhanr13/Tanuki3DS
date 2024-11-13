@@ -28,6 +28,8 @@ typedef struct {
     int tev_update_rgb;
     int tev_update_alpha;
 
+    int tex2coord;
+
     int alphatest;
     int alphafunc;
     float alpharef;

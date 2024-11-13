@@ -131,6 +131,11 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         case GPUREG(vsh.floatuniform_data[0])... GPUREG(
             vsh.floatuniform_data[7]): {
+            u32 idx = gpu->io.vsh.floatuniform_idx & 7;
+            if (idx >= 96) {
+                lwarn("writing to out of bound uniform");
+                break;
+            }
             fvec* uniform = &gpu->floatuniform[gpu->io.vsh.floatuniform_idx];
             if (gpu->io.vsh.floatuniform_mode) {
                 (*uniform)[3 - gpu->curunifi] = I2F(param);
@@ -166,10 +171,15 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         }
         case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
-            gpu->progdata[gpu->io.vsh.codetrans_idx++] = param;
+            gpu->progdata[gpu->io.vsh.codetrans_idx++ % SHADER_CODE_SIZE] =
+                param;
             break;
         case GPUREG(vsh.opdescs_data[0])... GPUREG(vsh.opdescs_data[8]):
-            gpu->opdescs[gpu->io.vsh.opdescs_idx++] = param;
+            gpu->opdescs[gpu->io.vsh.opdescs_idx++ % SHADER_OPDESC_SIZE] =
+                param;
+            break;
+        case GPUREG(geom.restart_primitive):
+            Vec_free(gpu->immattrs);
             break;
     }
 }
@@ -755,6 +765,8 @@ void gpu_update_gl_state(GPU* gpu) {
     } else {
         glDepthRangef(0, 1);
     }
+
+    ubuf.tex2coord = gpu->io.tex.config.tex2coord & 1;
 
     if (gpu->io.tex.config.tex0enable) {
         gpu_load_texture(gpu, 0, &gpu->io.tex.tex0, gpu->io.tex.tex0_fmt);
