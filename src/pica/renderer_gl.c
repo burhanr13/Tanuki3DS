@@ -90,6 +90,12 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                           (void*) offsetof(Vertex, texcoord0));
     glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, texcoord1));
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, texcoord2));
+    glEnableVertexAttribArray(4);
 
     glGenFramebuffers(1, &state->fbotop);
     glBindFramebuffer(GL_FRAMEBUFFER, state->fbotop);

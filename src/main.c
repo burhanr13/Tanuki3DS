@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
             Sint64 wait = frame_ticks - elapsed;
             Sint64 waitMS =
                 wait * 1000 / (Sint64) SDL_GetPerformanceFrequency();
-            if (waitMS > 10) {
+            if (waitMS > 0) {
                 SDL_Delay(waitMS);
             }
         }

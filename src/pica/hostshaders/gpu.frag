@@ -43,18 +43,18 @@ layout (std140) uniform UberUniforms {
 };
 
 vec4 cur_color = color;
-vec4 buf_color = tev_buffer_color;
+vec4 buf_color = vec4(0);
 
 vec4 tev_source(int src, int i) {
     switch (src) {
         case 0: return color;
         case 3: return texture(tex0, texcoord0);
         case 4: return texture(tex1, texcoord1);
-        case 5: return texture(tex2, tex2coord ? texcoord2 : texcoord1);
+        case 5: return texture(tex2, tex2coord ? texcoord1 : texcoord2);
         case 13: return buf_color;
         case 14: return tev[i].color;
         case 15: return cur_color;
-        default: return color;
+        default: return vec4(0.6);
     }
 }
 
@@ -89,7 +89,7 @@ float tev_operand_alpha(vec4 v, int op) {
 }
 
 vec3 tev_combine_rgb(int i) {
-#define SRC(_i) tev_operand_rgb(tev_source(tev[i].rgb.src##_i, i), tev[i].rgb.op##_i)
+#define SRC(n) tev_operand_rgb(tev_source(tev[i].rgb.src##n, i), tev[i].rgb.op##n)
     switch (tev[i].rgb.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
@@ -107,7 +107,7 @@ vec3 tev_combine_rgb(int i) {
 }
 
 float tev_combine_alpha(int i) {
-#define SRC(_i) tev_operand_alpha(tev_source(tev[i].a.src##_i, i), tev[i].a.op##_i)
+#define SRC(n) tev_operand_alpha(tev_source(tev[i].a.src##n, i), tev[i].a.op##n)
     switch (tev[i].a.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
@@ -139,6 +139,7 @@ bool run_alphatest(float a) {
 }
 
 void main() {
+    vec4 next_buffer = tev_buffer_color;
     for (int i = 0; i < 6; i++) {
         vec4 res;
         res.rgb = tev_combine_rgb(i);
@@ -152,11 +153,13 @@ void main() {
 
         res = clamp(res, 0, 1);
 
+        buf_color = next_buffer;
+
         if ((tev_update_rgb & (1<<i)) != 0) {
-            buf_color.rgb = res.rgb;
+            next_buffer.rgb = res.rgb;
         }
         if ((tev_update_alpha & (1<<i)) != 0) {
-            buf_color.a = res.a;
+            next_buffer.a = res.a;
         }
 
         cur_color = res;

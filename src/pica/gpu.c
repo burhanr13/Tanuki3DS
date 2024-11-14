@@ -435,6 +435,7 @@ typedef struct {
 } u24;
 
 const GLint texswizzle_default[4] = {GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA};
+const GLint texswizzle_bgr[4] = {GL_BLUE, GL_GREEN, GL_RED, GL_ALPHA};
 const GLint texswizzle_lum_alpha[4] = {GL_GREEN, GL_GREEN, GL_GREEN, GL_RED};
 const GLint texswizzle_luminance[4] = {GL_RED, GL_RED, GL_RED, GL_ONE};
 const GLint texswizzle_alpha[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
@@ -472,6 +473,8 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                     LOAD_TEX(u32, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8);
                     break;
                 case 1:
+                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                                     texswizzle_bgr);
                     LOAD_TEX(u24, GL_RGB, GL_UNSIGNED_BYTE);
                     break;
                 case 2:
