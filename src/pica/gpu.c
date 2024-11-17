@@ -679,7 +679,7 @@ void gpu_drawelements(GPU* gpu) {
     ShaderUnit vsh;
     init_vsh(gpu, &vsh);
     for (int i = minind; i <= maxind; i++) {
-        load_vtx(gpu, i - minind, vsh.v);
+        load_vtx(gpu, i, vsh.v);
         pica_shader_exec(&vsh);
         store_vtx(gpu, i - minind, vbuf, vsh.o);
     }
