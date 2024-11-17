@@ -14,6 +14,6 @@ void emulator_reset();
 void read_args(int argc, char** argv);
 void hotkey_press(SDL_KeyCode key);
 
-void update_input(HLE3DS* s);
+void update_input(HLE3DS* s, SDL_GameController* controller);
 
 #endif

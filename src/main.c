@@ -18,7 +18,12 @@ int main(int argc, char** argv) {
 
     if (emulator_init(argc, argv) < 0) return -1;
 
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
+
+    SDL_GameController* controller = NULL;
+    if (SDL_NumJoysticks() > 0) {
+        controller = SDL_GameControllerOpen(0);
+    }
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
@@ -84,7 +89,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        update_input(&ctremu.system);
+        update_input(&ctremu.system, controller);
 
         if (!ctremu.uncap) {
             cur_time = SDL_GetPerformanceCounter();

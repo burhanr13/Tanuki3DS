@@ -102,7 +102,7 @@ void hotkey_press(SDL_KeyCode key) {
     }
 }
 
-void update_input(HLE3DS* s) {
+void update_input(HLE3DS* s, SDL_GameController* controller) {
     const Uint8* keys = SDL_GetKeyboardState(NULL);
 
     PadState btn;
@@ -118,13 +118,65 @@ void update_input(HLE3DS* s) {
     btn.down = keys[SDL_SCANCODE_DOWN];
     btn.left = keys[SDL_SCANCODE_LEFT];
     btn.right = keys[SDL_SCANCODE_RIGHT];
-    btn.cup = keys[SDL_SCANCODE_W];
-    btn.cdown = keys[SDL_SCANCODE_S];
-    btn.cleft = keys[SDL_SCANCODE_A];
-    btn.cright = keys[SDL_SCANCODE_D];
 
-    s16 cx = (btn.cright - btn.cleft) * INT16_MAX;
-    s16 cy = (btn.cup - btn.cdown) * INT16_MAX;
+    int cx = (keys[SDL_SCANCODE_D] - keys[SDL_SCANCODE_A]) * INT16_MAX;
+    int cy = (keys[SDL_SCANCODE_W] - keys[SDL_SCANCODE_S]) * INT16_MAX;
+
+    if (controller) {
+        btn.a |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
+        btn.b |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B);
+        btn.x |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
+        btn.y |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_Y);
+        btn.l |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+        btn.r |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+        btn.start |= SDL_GameControllerGetButton(controller,
+                                                 SDL_CONTROLLER_BUTTON_START);
+        btn.select |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
+        btn.left |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+        btn.right |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+        btn.up |= SDL_GameControllerGetButton(controller,
+                                              SDL_CONTROLLER_BUTTON_DPAD_UP);
+        btn.down |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+
+        int x =
+            SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX);
+        if (abs(x) > abs(cx)) cx = x;
+        int y =
+            -SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY);
+        if (abs(y) > abs(cy)) cy = y;
+    }
+
+    btn.cup = cy > INT16_MAX / 2;
+    btn.cdown = cy < INT16_MIN / 2;
+    btn.cleft = cx < INT16_MIN / 2;
+    btn.cright = cx > INT16_MAX / 2;
 
     hid_update_pad(s, btn.w, cx, cy);
+
+    int x, y;
+    bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
+
+    if (pressed) {
+        x -= (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * UPSCALE;
+        x /= UPSCALE;
+        y -= SCREEN_HEIGHT;
+        y /= UPSCALE;
+        if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
+            hid_update_touch(s, 0, 0, false);
+        } else {
+            hid_update_touch(s, x, y, true);
+        }
+    } else {
+        hid_update_touch(s, 0, 0, false);
+    }
 }

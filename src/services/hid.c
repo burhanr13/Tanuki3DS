@@ -53,7 +53,7 @@ DECL_PORT(hid) {
     }
 }
 
-void hid_update_pad(HLE3DS* s, u32 btns, s16 cx, s16 cy) {
+void hid_update_pad(HLE3DS* s, u32 btns, s32 cx, s32 cy) {
     if (!s->services.hid.sharedmem.mapped) return;
 
     int curidx = 0; //(HIDMEM->pad.idx + 1) % 8;
@@ -79,6 +79,25 @@ void hid_update_pad(HLE3DS* s, u32 btns, s16 cx, s16 cy) {
     HIDMEM->pad.entries[curidx].held = btns;
     HIDMEM->pad.entries[curidx].pressed = btns & ~prevbtn;
     HIDMEM->pad.entries[curidx].released = ~btns & prevbtn;
+
+    linfo("signaling hid event pad0");
+    event_signal(s, &s->services.hid.events[HIDEVENT_PAD0]);
+}
+
+void hid_update_touch(HLE3DS* s, u16 x, u16 y, bool pressed) {
+    if (!s->services.hid.sharedmem.mapped) return;
+
+    int curidx = 0; //(HIDMEM->pad.idx + 1) % 8;
+    HIDMEM->touch.idx = curidx;
+
+    if (curidx == 0) {
+        HIDMEM->touch.prevtime = HIDMEM->touch.time;
+        HIDMEM->touch.time = s->sched.now;
+    }
+
+    HIDMEM->touch.entries[curidx].x = x;
+    HIDMEM->touch.entries[curidx].y = y;
+    HIDMEM->touch.entries[curidx].pressed = pressed;
 
     linfo("signaling hid event pad0");
     event_signal(s, &s->services.hid.events[HIDEVENT_PAD0]);

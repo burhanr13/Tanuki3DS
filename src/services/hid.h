@@ -57,6 +57,17 @@ typedef struct {
             s16 cy;
         } entries[8];
     } pad;
+    struct {
+        u64 time;
+        u64 prevtime;
+        u64 idx;
+        u64 raw;
+        struct {
+            u16 x;
+            u16 y;
+            u32 pressed;
+        } entries[8];
+    } touch;
 } HIDSharedMem;
 
 typedef struct {
@@ -66,6 +77,7 @@ typedef struct {
 
 DECL_PORT(hid);
 
-void hid_update_pad(HLE3DS* s, u32 btns, s16 cx, s16 cy);
+void hid_update_pad(HLE3DS* s, u32 btns, s32 cx, s32 cy);
+void hid_update_touch(HLE3DS* s, u16 x, u16 y, bool pressed);
 
 #endif
