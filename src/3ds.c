@@ -37,7 +37,7 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
         exit(1);
     }
     if (entrypoint == -1) {
-        eprintf("failed to load rom");
+        eprintf("failed to load rom\n");
         exit(1);
     }
 
