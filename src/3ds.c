@@ -24,11 +24,13 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
         eprintf("unsupported file format\n");
         exit(1);
     }
-    if (!strcmp(ext, ".elf")) {
+    if (!strcmp(ext, ".elf") || !strcmp(ext, ".axf")) {
         entrypoint = load_elf(s, romfile);
-    } else if (!strcmp(ext, ".3ds") || !strcmp(ext, ".cci")) {
+    } else if (!strcmp(ext, ".3ds") || !strcmp(ext, ".cci") ||
+               !strcmp(ext, ".ncsd")) {
         entrypoint = load_ncsd(s, romfile);
-    } else if (!strcmp(ext, ".cxi") || !strcmp(ext, ".app")) {
+    } else if (!strcmp(ext, ".cxi") || !strcmp(ext, ".app") ||
+               !strcmp(ext, ".ncch")) {
         entrypoint = load_ncch(s, romfile, 0);
     } else {
         eprintf("unsupported file format\n");
