@@ -36,6 +36,10 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
         eprintf("unsupported file format\n");
         exit(1);
     }
+    if (entrypoint == -1) {
+        eprintf("failed to load rom");
+        exit(1);
+    }
 
     hle3ds_vmmap(s, DSPMEM, DSPMEMSIZE, PERM_RW, MEMST_STATIC, false);
     hle3ds_vmmap(s, DSPMEM | DSPBUFBIT, DSPMEMSIZE, PERM_RW, MEMST_STATIC,
