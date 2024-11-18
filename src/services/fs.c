@@ -432,7 +432,7 @@ DECL_PORT_ARG(fs_file, fd) {
         }
         case 0x0805: {
             linfo("SetSize");
-            u64 size = cmdbuf[0] + ((u64) cmdbuf[1] << 32);
+            u64 size = cmdbuf[1] + ((u64) cmdbuf[2] << 32);
             ftruncate(fileno(fp), size);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
