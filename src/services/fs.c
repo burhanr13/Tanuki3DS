@@ -284,9 +284,9 @@ DECL_PORT_ARG(fs_selfncch, base) {
 
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            fseek(s->gamecard.fp, base + offset, SEEK_SET);
+            fseek(s->romimage.fp, base + offset, SEEK_SET);
 
-            cmdbuf[2] = fread(data, 1, size, s->gamecard.fp);
+            cmdbuf[2] = fread(data, 1, size, s->romimage.fp);
             break;
         }
         case 0x0808: {
@@ -634,13 +634,13 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
                     case 0: {
                         linfo("opening romfs");
                         return session_create_arg(port_handle_fs_selfncch,
-                                                  s->gamecard.romfs_off);
+                                                  s->romimage.romfs_off);
                     }
                     case 2: {
                         char* filename = (char*) &path[1];
                         ExeFSHeader hdr;
-                        fseek(s->gamecard.fp, s->gamecard.exefs_off, SEEK_SET);
-                        fread(&hdr, sizeof hdr, 1, s->gamecard.fp);
+                        fseek(s->romimage.fp, s->romimage.exefs_off, SEEK_SET);
+                        fread(&hdr, sizeof hdr, 1, s->romimage.fp);
                         u32 offset = 0;
                         for (int i = 0; i < 10; i++) {
                             if (!strcmp(hdr.file[i].name, filename)) {
@@ -653,7 +653,7 @@ KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
                         }
                         linfo("opening exefs file %s", filename);
                         return session_create_arg(port_handle_fs_selfncch,
-                                                  s->gamecard.exefs_off +
+                                                  s->romimage.exefs_off +
                                                       offset);
                     }
                     default:

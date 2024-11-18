@@ -26,8 +26,10 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
     }
     if (!strcmp(ext, ".elf")) {
         entrypoint = load_elf(s, romfile);
-    } else if (!strcmp(ext, ".3ds")) {
+    } else if (!strcmp(ext, ".3ds") || !strcmp(ext, ".cci")) {
         entrypoint = load_ncsd(s, romfile);
+    } else if (!strcmp(ext, ".cxi")) {
+        entrypoint = load_ncch(s, romfile, 0);
     } else {
         eprintf("unsupported file format\n");
         exit(1);
@@ -61,7 +63,7 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
 void hle3ds_destroy(HLE3DS* s) {
     cpu_free(s);
 
-    if (s->gamecard.fp) fclose(s->gamecard.fp);
+    if (s->romimage.fp) fclose(s->romimage.fp);
 
     hle3ds_memory_destroy(s);
 }

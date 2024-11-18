@@ -28,12 +28,12 @@ ArmInstrFormat arm_lookup[BIT(8)][BIT(4)];
 
 // ArmExecFunc func_lookup[BIT(8)][BIT(4)];
 
-void arm_generate_lookup() {
+__attribute__((constructor)) void arm_generate_lookup() {
     for (int dechi = 0; dechi < BIT(8); dechi++) {
         for (int declo = 0; declo < BIT(4); declo++) {
             arm_lookup[dechi][declo] =
                 arm_decode_instr((ArmInstr){.dechi = dechi, .declo = declo});
-            //func_lookup[dechi][declo] = exec_funcs[arm_lookup[dechi][declo]];
+            // func_lookup[dechi][declo] = exec_funcs[arm_lookup[dechi][declo]];
         }
     }
 }
@@ -55,7 +55,8 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
         return ARM_BLOCKTRANS;
     } else if (instr.pack_sat.c1 == 0b01101 && instr.pack_sat.c2 == 1) {
         return ARM_PACKSAT;
-    } else if (instr.parallel_arith.c1 == 0b01100 && instr.parallel_arith.c2 == 1) {
+    } else if (instr.parallel_arith.c1 == 0b01100 &&
+               instr.parallel_arith.c2 == 1) {
         return ARM_PARALLELARITH;
     } else if (instr.undefined.c1 == 0b011 && instr.undefined.c2 == 1) {
         return ARM_UNDEFINED;
@@ -171,7 +172,8 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
 //                 return (s32) operand >> shift_amt;
 //             case S_ROR:
 //                 *carry = (operand >> (shift_amt - 1)) & 1;
-//                 return (operand >> shift_amt) | (operand << (32 - shift_amt));
+//                 return (operand >> shift_amt) | (operand << (32 -
+//                 shift_amt));
 //         }
 //     } else {
 //         switch (shift_type) {
@@ -249,7 +251,8 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
 //                 }
 //             } else if (shift_amt > 0) {
 //                 op2 =
-//                     arm_shifter(cpu, (shift & 0b111) | shift_amt << 3, op2, &c);
+//                     arm_shifter(cpu, (shift & 0b111) | shift_amt << 3, op2,
+//                     &c);
 //             }
 
 //             op1 = cpu->r[instr.data_proc.rn];
@@ -787,15 +790,17 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
 //     } else {
 //         if (instr.block_trans.l) {
 //             if (cpu->cpsr.t) {
-//                 if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
-//                 for (int i = 0; i < rcount; i++) {
-//                     cpu->r[rlist[i]] = cpu->read32(cpu, (addr & ~3) + (i << 2));
+//                 if (instr.block_trans.w) cpu->r[instr.block_trans.rn] =
+//                 wback; for (int i = 0; i < rcount; i++) {
+//                     cpu->r[rlist[i]] = cpu->read32(cpu, (addr & ~3) + (i <<
+//                     2));
 //                 }
 //             } else {
 //                 for (int i = 0; i < rcount; i++) {
 //                     if (i == rcount - 1 && instr.block_trans.w)
 //                         cpu->r[instr.block_trans.rn] = wback;
-//                     cpu->r[rlist[i]] = cpu->read32(cpu, (addr & ~3) + (i << 2));
+//                     cpu->r[rlist[i]] = cpu->read32(cpu, (addr & ~3) + (i <<
+//                     2));
 //                 }
 //                 if (rcount < 2 && instr.block_trans.w)
 //                     cpu->r[instr.block_trans.rn] = wback;
@@ -868,9 +873,11 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
 //         if (instr.cp_reg_trans.l) {
 //             cpu->r[instr.cp_reg_trans.rd] =
 //                 cpu->cp15_read(cpu, instr.cp_reg_trans.crn,
-//                                instr.cp_reg_trans.crm, instr.cp_reg_trans.cp);
+//                                instr.cp_reg_trans.crm,
+//                                instr.cp_reg_trans.cp);
 //         } else {
-//             cpu->cp15_write(cpu, instr.cp_reg_trans.crn, instr.cp_reg_trans.crm,
+//             cpu->cp15_write(cpu, instr.cp_reg_trans.crn,
+//             instr.cp_reg_trans.crm,
 //                             instr.cp_reg_trans.cp,
 //                             cpu->r[instr.cp_reg_trans.rd]);
 //         }

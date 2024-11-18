@@ -25,9 +25,6 @@ int emulator_init(int argc, char** argv) {
         return -1;
     }
 
-    arm_generate_lookup();
-    thumb_generate_lookup();
-
     emulator_reset();
 
     ctremu.romfilenodir = strrchr(ctremu.romfile, '/');

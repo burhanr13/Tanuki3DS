@@ -35,7 +35,7 @@ typedef struct _3DS {
 
     ServiceData services;
 
-    GameCard gamecard;
+    RomImage romimage;
 
     bool frame_complete;
 

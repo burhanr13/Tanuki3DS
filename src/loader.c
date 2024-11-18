@@ -51,7 +51,7 @@ u32 load_elf(HLE3DS* s, char* filename) {
 
     fclose(fp);
 
-    s->gamecard.fp = NULL;
+    s->romimage.fp = NULL;
 
     hle3ds_vmmap(s, STACK_BASE - STACK_SIZE, STACK_SIZE, PERM_RW, MEMST_PRIVATE,
                  false);
@@ -66,8 +66,18 @@ u32 load_ncsd(HLE3DS* s, char* filename) {
     NCSDHeader hdrncsd;
     fread(&hdrncsd, sizeof hdrncsd, 1, fp);
 
-    u32 base = hdrncsd.part[0].offset * 0x200;
-    u32 ncchbase = base;
+    u32 ncchbase = hdrncsd.part[0].offset * 0x200;
+    fclose(fp);
+
+    return load_ncch(s, filename, ncchbase);
+}
+
+u32 load_ncch(HLE3DS* s, char* filename, u64 offset) {
+    FILE* fp = fopen(filename, "rb");
+    if (!fp) return -1;
+
+    u64 base = offset;
+    u64 ncchbase = base;
 
     fseek(fp, base, SEEK_SET);
 
@@ -132,10 +142,10 @@ u32 load_ncsd(HLE3DS* s, char* filename) {
 
     free(code);
 
-    s->gamecard.fp = fp;
-    s->gamecard.exheader_off = ncchbase + 0x200;
-    s->gamecard.exefs_off = ncchbase + hdrncch.exefs.offset * 0x200;
-    s->gamecard.romfs_off = ncchbase + hdrncch.romfs.offset * 0x200 + 0x1000;
+    s->romimage.fp = fp;
+    s->romimage.exheader_off = ncchbase + 0x200;
+    s->romimage.exefs_off = ncchbase + hdrncch.exefs.offset * 0x200;
+    s->romimage.romfs_off = ncchbase + hdrncch.romfs.offset * 0x200 + 0x1000;
 
     hle3ds_vmmap(s, STACK_BASE - exhdr.sci.stacksz, exhdr.sci.stacksz, PERM_RW,
                  MEMST_PRIVATE, false);
