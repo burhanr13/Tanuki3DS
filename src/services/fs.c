@@ -430,7 +430,7 @@ DECL_PORT_ARG(fs_file, fd) {
             cmdbuf[3] = len >> 32;
             break;
         }
-        case 0x05: {
+        case 0x0805: {
             linfo("SetSize");
             u64 size = cmdbuf[0] + ((u64) cmdbuf[1] << 32);
             ftruncate(fileno(fp), size);
