@@ -559,63 +559,148 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                     texwrap[regs->param.wrap_t & 3]);
 }
 
-void load_vtx(GPU* gpu, int i, fvec* dst) {
-    memcpy(dst, gpu->fixattrs, sizeof gpu->fixattrs);
+typedef struct {
+    void* base;
+    u32 stride;
+    u32 fmt;
+} AttrConfig[12];
+
+void vtx_loader_setup(GPU* gpu, AttrConfig cfg) {
+    for (int i = 0; i < 12; i++) {
+        cfg[i].base = gpu->fixattrs[i];
+        cfg[i].stride = 0;
+        cfg[i].fmt = 0b1111;
+    }
     for (int vbo = 0; vbo < 12; vbo++) {
         void* vtx =
-            PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.attrbuf[vbo].offset +
-                i * gpu->io.geom.attrbuf[vbo].size);
+            PTR(gpu->io.geom.attr_base * 8 + gpu->io.geom.attrbuf[vbo].offset);
+        u32 stride = gpu->io.geom.attrbuf[vbo].size;
         for (int c = 0; c < gpu->io.geom.attrbuf[vbo].count; c++) {
             int attr = (gpu->io.geom.attrbuf[vbo].comp >> 4 * c) & 0xf;
             if (attr >= 0xc) {
                 vtx += 4 * (attr - 0xb);
                 continue;
             }
-            int type = (gpu->io.geom.attr_format >> 4 * attr) & 0xf;
-            attr = (gpu->io.vsh.permutation >> 4 * attr) & 0xf;
-            int size = (type >> 2) + 1;
-            type &= 3;
-            switch (type) {
-                case 0: {
-                    s8* ptr = vtx;
-                    for (int k = 0; k < size; k++) {
-                        dst[attr][k] = *ptr++;
-                    }
-                    vtx = ptr;
-                    break;
-                }
-                case 1: {
-                    u8* ptr = vtx;
-                    for (int k = 0; k < size; k++) {
-                        dst[attr][k] = *ptr++;
-                    }
-                    vtx = ptr;
-                    break;
-                }
-                case 2: {
-                    s16* ptr = vtx;
-                    for (int k = 0; k < size; k++) {
-                        dst[attr][k] = *ptr++;
-                    }
-                    vtx = ptr;
-                    break;
-                }
-                case 3: {
-                    float* ptr = vtx;
-                    for (int k = 0; k < size; k++) {
-                        dst[attr][k] = *ptr++;
-                    }
-                    vtx = ptr;
-                    break;
-                }
-            }
+            int fmt = (gpu->io.geom.attr_format >> 4 * attr) & 0xf;
+
+            cfg[attr].base = vtx;
+            cfg[attr].stride = stride;
+            cfg[attr].fmt = fmt;
+
+            int size = (fmt >> 2) + 1;
+            int type = fmt & 3;
+            static const int typesize[4] = {1, 1, 2, 4};
+            vtx += size * typesize[type];
         }
     }
 }
 
-void load_vtx_imm(GPU* gpu, int i, fvec* dst) {
+void vtx_loader_imm_setup(GPU* gpu, AttrConfig cfg) {
+    for (int i = 0; i < 12; i++) {
+        cfg[i].base = gpu->fixattrs[i];
+        cfg[i].stride = 0;
+        cfg[i].fmt = 0b1111;
+    }
     u32 nattrs = gpu->io.geom.vsh_num_attr + 1;
-    memcpy(dst, &gpu->immattrs.d[i * nattrs], nattrs * sizeof(fvec));
+    for (int i = 0; i < nattrs; i++) {
+        cfg[i].base = gpu->immattrs.d + i;
+        cfg[i].stride = nattrs * sizeof(fvec);
+        cfg[i].fmt = 0b1111;
+    }
+}
+
+#define LOADVEC1(t)                                                            \
+    ({                                                                         \
+        t* attr = vtx;                                                         \
+        dst[pa][0] = attr[0];                                                  \
+        dst[pa][1] = dst[pa][2] = 0;                                           \
+        dst[pa][3] = 1;                                                        \
+    })
+
+#define LOADVEC2(t)                                                            \
+    ({                                                                         \
+        t* attr = vtx;                                                         \
+        dst[pa][0] = attr[0];                                                  \
+        dst[pa][1] = attr[1];                                                  \
+        dst[pa][2] = 0;                                                        \
+        dst[pa][3] = 1;                                                        \
+    })
+
+#define LOADVEC3(t)                                                            \
+    ({                                                                         \
+        t* attr = vtx;                                                         \
+        dst[pa][0] = attr[0];                                                  \
+        dst[pa][1] = attr[1];                                                  \
+        dst[pa][2] = attr[2];                                                  \
+        dst[pa][3] = 1;                                                        \
+    })
+
+#define LOADVEC4(t)                                                            \
+    ({                                                                         \
+        t* attr = vtx;                                                         \
+        dst[pa][0] = attr[0];                                                  \
+        dst[pa][1] = attr[1];                                                  \
+        dst[pa][2] = attr[2];                                                  \
+        dst[pa][3] = attr[3];                                                  \
+    })
+
+void load_vtx(GPU* gpu, AttrConfig cfg, int i, fvec* dst) {
+    u32 nattrs = gpu->io.geom.vsh_num_attr + 1;
+    for (int a = 0; a < nattrs; a++) {
+        void* vtx = cfg[a].base + i * cfg[a].stride;
+        int pa = (gpu->io.vsh.permutation >> 4 * a) & 0xf;
+        if (cfg[a].fmt == 0b1111) {
+            memcpy(dst[pa], vtx, sizeof(fvec));
+        } else {
+            switch (cfg[a].fmt) {
+                case 0b0000:
+                    LOADVEC1(s8);
+                    break;
+                case 0b0001:
+                    LOADVEC1(u8);
+                    break;
+                case 0b0010:
+                    LOADVEC1(s16);
+                    break;
+                case 0b0011:
+                    LOADVEC1(float);
+                    break;
+                case 0b0100:
+                    LOADVEC2(s8);
+                    break;
+                case 0b0101:
+                    LOADVEC2(u8);
+                    break;
+                case 0b0110:
+                    LOADVEC2(s16);
+                    break;
+                case 0b0111:
+                    LOADVEC2(float);
+                    break;
+                case 0b1000:
+                    LOADVEC3(s8);
+                    break;
+                case 0b1001:
+                    LOADVEC3(u8);
+                    break;
+                case 0b1010:
+                    LOADVEC3(s16);
+                    break;
+                case 0b1011:
+                    LOADVEC3(float);
+                    break;
+                case 0b1100:
+                    LOADVEC4(s8);
+                    break;
+                case 0b1101:
+                    LOADVEC4(u8);
+                    break;
+                case 0b1110:
+                    LOADVEC4(s16);
+                    break;
+            }
+        }
+    }
 }
 
 void store_vtx(GPU* gpu, int i, Vertex* vbuf, fvec* src) {
@@ -641,10 +726,12 @@ void gpu_drawarrays(GPU* gpu) {
           gpu->io.geom.prim_config.mode);
     Vertex vbuf[gpu->io.geom.nverts];
 
+    AttrConfig cfg;
+    vtx_loader_setup(gpu, cfg);
     ShaderUnit vsh;
     init_vsh(gpu, &vsh);
     for (int i = 0; i < gpu->io.geom.nverts; i++) {
-        load_vtx(gpu, i + gpu->io.geom.vtx_off, vsh.v);
+        load_vtx(gpu, cfg, i + gpu->io.geom.vtx_off, vsh.v);
         pica_shader_exec(&vsh);
         store_vtx(gpu, i, vbuf, vsh.o);
     }
@@ -676,10 +763,12 @@ void gpu_drawelements(GPU* gpu) {
 
     Vertex vbuf[maxind + 1 - minind];
 
+    AttrConfig cfg;
+    vtx_loader_setup(gpu, cfg);
     ShaderUnit vsh;
     init_vsh(gpu, &vsh);
     for (int i = minind; i <= maxind; i++) {
-        load_vtx(gpu, i, vsh.v);
+        load_vtx(gpu, cfg, i, vsh.v);
         pica_shader_exec(&vsh);
         store_vtx(gpu, i - minind, vbuf, vsh.o);
     }
@@ -700,10 +789,12 @@ void gpu_drawimmediate(GPU* gpu) {
           gpu->io.geom.prim_config.mode);
     Vertex vbuf[nverts];
 
+    AttrConfig cfg;
+    vtx_loader_imm_setup(gpu, cfg);
     ShaderUnit vsh;
     init_vsh(gpu, &vsh);
     for (int i = 0; i < nverts; i++) {
-        load_vtx_imm(gpu, i, vsh.v);
+        load_vtx(gpu, cfg, i, vsh.v);
         pica_shader_exec(&vsh);
         store_vtx(gpu, i, vbuf, vsh.o);
     }

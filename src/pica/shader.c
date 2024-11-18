@@ -451,7 +451,7 @@ void disasmsrc(u32 n, u8 idx, u8 swizzle, bool neg) {
     else {
         n -= 0x20;
         if (idx) {
-            printf("c(%d,", n);
+            printf("c%d[", n);
             switch (idx) {
                 case 1:
                     printf("a.x");
@@ -463,7 +463,7 @@ void disasmsrc(u32 n, u8 idx, u8 swizzle, bool neg) {
                     printf("aL");
                     break;
             }
-            printf(")");
+            printf("]");
         } else printf("c%d", n);
     }
     if (swizzle != 0b00011011) {
