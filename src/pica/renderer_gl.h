@@ -31,7 +31,7 @@ typedef struct {
     int tex2coord;
     int _pad1;
 
-    float ambient_color[3];
+    float ambient_color[4];
 
     int alphatest;
     int alphafunc;
