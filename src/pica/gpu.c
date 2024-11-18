@@ -805,6 +805,21 @@ void gpu_drawimmediate(GPU* gpu) {
     Vec_free(gpu->immattrs);
 }
 
+#define COPYRGBA(dst, src)                                                     \
+    ({                                                                         \
+        dst[0] = (float) src.r / 255;                                          \
+        dst[1] = (float) src.g / 255;                                          \
+        dst[2] = (float) src.b / 255;                                          \
+        dst[3] = (float) src.a / 255;                                          \
+    })
+
+#define COPYRGB(dst, src)                                                      \
+    ({                                                                         \
+        dst[0] = (float) src.r / 255;                                          \
+        dst[1] = (float) src.g / 255;                                          \
+        dst[2] = (float) src.b / 255;                                          \
+    })
+
 void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
     ubuf->tev[i].rgb.src0 = regs->source.rgb0;
     ubuf->tev[i].rgb.src1 = regs->source.rgb1;
@@ -820,10 +835,7 @@ void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
     ubuf->tev[i].a.op2 = regs->operand.a2;
     ubuf->tev[i].rgb.combiner = regs->combiner.rgb;
     ubuf->tev[i].a.combiner = regs->combiner.a;
-    ubuf->tev[i].color[0] = (float) regs->color.r / 255;
-    ubuf->tev[i].color[1] = (float) regs->color.g / 255;
-    ubuf->tev[i].color[2] = (float) regs->color.b / 255;
-    ubuf->tev[i].color[3] = (float) regs->color.a / 255;
+    COPYRGBA(ubuf->tev[i].color, regs->color);
     ubuf->tev[i].rgb.scale = 1 << (regs->scale.rgb & 3);
     ubuf->tev[i].a.scale = 1 << (regs->scale.a & 3);
 }
@@ -880,10 +892,7 @@ void gpu_update_gl_state(GPU* gpu) {
     load_texenv(&ubuf, 5, &gpu->io.tex.tev5);
     ubuf.tev_update_rgb = gpu->io.tex.tev_buffer.update_rgb;
     ubuf.tev_update_alpha = gpu->io.tex.tev_buffer.update_alpha;
-    ubuf.tev_buffer_color[0] = (float) gpu->io.tex.tev5.buffer_color.r / 255;
-    ubuf.tev_buffer_color[1] = (float) gpu->io.tex.tev5.buffer_color.g / 255;
-    ubuf.tev_buffer_color[2] = (float) gpu->io.tex.tev5.buffer_color.b / 255;
-    ubuf.tev_buffer_color[3] = (float) gpu->io.tex.tev5.buffer_color.a / 255;
+    COPYRGBA(ubuf.tev_buffer_color, gpu->io.tex.tev5.buffer_color);
 
     if (gpu->io.fb.color_op.frag_mode != 0) {
         lwarn("using frag op %d", gpu->io.fb.color_op.frag_mode);
@@ -932,6 +941,8 @@ void gpu_update_gl_state(GPU* gpu) {
     } else {
         glDepthFunc(GL_ALWAYS);
     }
+
+    COPYRGB(ubuf.ambient_color, gpu->io.lighting.ambient);
 
     glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
 }

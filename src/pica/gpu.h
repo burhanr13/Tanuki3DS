@@ -248,8 +248,17 @@ typedef union {
             u32 w[0x40];
         } fb;
         union {
+            struct {
+                u32 light[8][0x10];
+                struct {
+                    u8 b;
+                    u8 g;
+                    u8 r;
+                    u8 _a;
+                } ambient;
+            };
             u32 w[0xc0];
-        } frag;
+        } lighting;
         union {
             struct {
                 u32 attr_base;
