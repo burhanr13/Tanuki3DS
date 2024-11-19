@@ -14,9 +14,12 @@
 
 EmulatorState ctremu;
 bool g_infologs = false;
+int g_upscale = 1;
 
 const char usage[] = "ctremu [options] <romfile>\n"
-                     "-h -- print help\n";
+                     "-h -- print help\n"
+                     "-l -- enable info logging\n"
+                     "-sN -- upscale by N\n";
 
 int emulator_init(int argc, char** argv) {
     read_args(argc, argv);
@@ -58,24 +61,29 @@ void emulator_reset() {
 }
 
 void read_args(int argc, char** argv) {
-    for (int i = 1; i < argc; i++) {
-        if (argv[i][0] == '-') {
-            for (char* f = &argv[i][1]; *f; f++) {
-                switch (*f) {
-                    case 'h':
-                        eprintf(usage);
-                        exit(0);
-                        break;
-                    case 'l':
-                        g_infologs = true;
-                        break;
-                    default:
-                        eprintf("Invalid argument\n");
-                }
+    char c;
+    while ((c = getopt(argc, argv, "hls:")) != -1) {
+        switch (c) {
+            case 'l':
+                g_infologs = true;
+                break;
+            case 's': {
+                int scale = atoi(optarg);
+                if (scale <= 0) eprintf("invalid scale factor");
+                else g_upscale = scale;
+                break;
             }
-        } else {
-            ctremu.romfile = argv[i];
+            case '?':
+            case 'h':
+            default:
+                eprintf(usage);
+                exit(0);
         }
+    }
+    argc -= optind;
+    argv += optind;
+    if (argc >= 1) {
+        ctremu.romfile = argv[0];
     }
 }
 
@@ -164,10 +172,10 @@ void update_input(HLE3DS* s, SDL_GameController* controller) {
     bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
 
     if (pressed) {
-        x -= (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * UPSCALE;
-        x /= UPSCALE;
+        x -= (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * g_upscale;
+        x /= g_upscale;
         y -= SCREEN_HEIGHT;
-        y /= UPSCALE;
+        y /= g_upscale;
         if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
             hid_update_touch(s, 0, 0, false);
         } else {

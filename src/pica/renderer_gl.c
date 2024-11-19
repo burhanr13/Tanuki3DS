@@ -101,8 +101,8 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glBindFramebuffer(GL_FRAMEBUFFER, state->fbotop);
     glGenTextures(1, &state->textop);
     glBindTexture(GL_TEXTURE_2D, state->textop);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * UPSCALE,
-                 SCREEN_WIDTH * UPSCALE, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * g_upscale,
+                 SCREEN_WIDTH * g_upscale, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -111,8 +111,8 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glBindFramebuffer(GL_FRAMEBUFFER, state->fbobot);
     glGenTextures(1, &state->texbot);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * UPSCALE,
-                 SCREEN_WIDTH_BOT * UPSCALE, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * g_upscale,
+                 SCREEN_WIDTH_BOT * g_upscale, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                  NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -167,13 +167,13 @@ void render_gl_main(GLState* state) {
 
     glActiveTexture(GL_TEXTURE0);
 
-    glViewport(0, SCREEN_HEIGHT * UPSCALE, SCREEN_WIDTH * UPSCALE,
-               SCREEN_HEIGHT * UPSCALE);
+    glViewport(0, SCREEN_HEIGHT * g_upscale, SCREEN_WIDTH * g_upscale,
+               SCREEN_HEIGHT * g_upscale);
     glBindTexture(GL_TEXTURE_2D, state->textop);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * UPSCALE, 0,
-               SCREEN_WIDTH_BOT * UPSCALE, SCREEN_HEIGHT * UPSCALE);
+    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * g_upscale, 0,
+               SCREEN_WIDTH_BOT * g_upscale, SCREEN_HEIGHT * g_upscale);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

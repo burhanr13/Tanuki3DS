@@ -50,9 +50,7 @@ vec4 buf_color = vec4(0);
 vec4 tev_source(int src, int i) {
     switch (src) {
         case 0: return color;
-        case 1: return ambient_color.rgb == vec3(0) ? 
-                        vec4(1) : 
-                        vec4(ambient_color.rgb, 1);
+        case 1: return vec4(0.75);
         case 2: return vec4(0);
         case 3: return texture(tex0, texcoord0);
         case 4: return texture(tex1, texcoord1);

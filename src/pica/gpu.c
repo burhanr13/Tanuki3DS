@@ -8,7 +8,11 @@
 #undef PTR
 #define PTR(addr) ((void*) &gpu->mem[addr])
 
-static const GLenum texfilter[2] = {GL_NEAREST, GL_LINEAR};
+static const GLenum texminfilter[4] = {
+    GL_NEAREST_MIPMAP_NEAREST, GL_LINEAR_MIPMAP_NEAREST,
+    GL_NEAREST_MIPMAP_LINEAR, GL_LINEAR_MIPMAP_LINEAR};
+static const GLenum texmagfilter[2] = {GL_NEAREST, GL_LINEAR};
+
 static const GLenum texwrap[4] = {
     GL_CLAMP_TO_EDGE,
     GL_CLAMP_TO_BORDER,
@@ -296,13 +300,13 @@ void gpu_update_cur_fb(GPU* gpu) {
         gpu->cur_fb->height = h;
 
         glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->color_tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gpu->cur_fb->width * UPSCALE,
-                     gpu->cur_fb->height * UPSCALE, 0, GL_RGBA,
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gpu->cur_fb->width * g_upscale,
+                     gpu->cur_fb->height * g_upscale, 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, NULL);
         glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->depth_tex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8,
-                     gpu->cur_fb->width * UPSCALE,
-                     gpu->cur_fb->height * UPSCALE, 0, GL_DEPTH_STENCIL,
+                     gpu->cur_fb->width * g_upscale,
+                     gpu->cur_fb->height * g_upscale, 0, GL_DEPTH_STENCIL,
                      GL_UNSIGNED_INT_24_8, NULL);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
@@ -338,10 +342,12 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     u32 scwidth = top ? SCREEN_WIDTH : SCREEN_WIDTH_BOT;
     glBlitFramebuffer(
-        0, (fb->height - scwidth + yoff + yoffsrc) * UPSCALE,
-        (SCREEN_HEIGHT << scalex) * UPSCALE,
-        (fb->height - scwidth + yoff + yoffsrc + (scwidth << scaley)) * UPSCALE,
-        0, 0, SCREEN_HEIGHT, scwidth, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        0, (fb->height - scwidth + yoff + yoffsrc) * g_upscale,
+        (SCREEN_HEIGHT << scalex) * g_upscale,
+        (fb->height - scwidth + yoff + yoffsrc + (scwidth << scaley)) *
+            g_upscale,
+        0, 0, SCREEN_HEIGHT * g_upscale, scwidth * g_upscale,
+        GL_COLOR_BUFFER_BIT, GL_LINEAR);
 }
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
@@ -385,178 +391,6 @@ TexInfo* texcache_load(GPU* gpu, u32 paddr) {
     tex->paddr = paddr;
     LRU_use(gpu->textures, tex);
     return tex;
-}
-
-u32 morton_swizzle(u32 w, u32 x, u32 y) {
-    u32 swizzle[8] = {
-        0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15,
-    };
-
-    u32 tx = x >> 3;
-    u32 fx = x & 7;
-    u32 ty = y >> 3;
-    u32 fy = y & 7;
-
-    return (ty * (w >> 3) + tx) * 64 + (swizzle[fx] | swizzle[fy] << 1);
-}
-
-#define LOAD_TEX(t, glfmt, gltype)                                             \
-    ({                                                                         \
-        t* data = rawdata;                                                     \
-                                                                               \
-        t* pixels = malloc(sizeof(t) * tex->width * tex->height);              \
-                                                                               \
-        for (int x = 0; x < tex->width; x++) {                                 \
-            for (int y = 0; y < tex->height; y++) {                            \
-                pixels[(tex->height - 1 - y) * tex->width + x] =               \
-                    data[morton_swizzle(tex->width, x, y)];                    \
-            }                                                                  \
-        }                                                                      \
-                                                                               \
-        glTexImage2D(GL_TEXTURE_2D, 0, glfmt, tex->width, tex->height, 0,      \
-                     glfmt, gltype, pixels);                                   \
-        free(pixels);                                                          \
-    })
-
-void* expand_nibbles(u8* src, u32 count) {
-    u8* dst = malloc(count);
-    for (int i = 0; i < count; i++) {
-        u8 b = src[i / 2];
-        if (i & 1) b >>= 4;
-        else b &= 0xf;
-        b *= 0x11;
-        dst[i] = b;
-    }
-    return dst;
-}
-
-typedef struct {
-    u8 d[3];
-} u24;
-
-const GLint texswizzle_default[4] = {GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA};
-const GLint texswizzle_bgr[4] = {GL_BLUE, GL_GREEN, GL_RED, GL_ALPHA};
-const GLint texswizzle_lum_alpha[4] = {GL_GREEN, GL_GREEN, GL_GREEN, GL_RED};
-const GLint texswizzle_luminance[4] = {GL_RED, GL_RED, GL_RED, GL_ONE};
-const GLint texswizzle_alpha[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
-
-const GLint texswizzle_dbg_red[4] = {GL_ONE, GL_ZERO, GL_ZERO, GL_ALPHA};
-const GLint texswizzle_dbg_green[4] = {GL_ZERO, GL_ONE, GL_ZERO, GL_ALPHA};
-const GLint texswizzle_dbg_blue[4] = {GL_ZERO, GL_ZERO, GL_ONE, GL_ALPHA};
-
-void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
-    FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
-    glActiveTexture(GL_TEXTURE0 + id);
-    if (fb) {
-        glBindTexture(GL_TEXTURE_2D, fb->color_tex);
-    } else {
-        TexInfo* tex = texcache_load(gpu, regs->addr << 3);
-
-        void* rawdata = PTR(tex->paddr);
-
-        glBindTexture(GL_TEXTURE_2D, tex->tex);
-
-        if (tex->width != regs->width || tex->height != regs->height ||
-            tex->fmt != fmt) {
-            tex->width = regs->width;
-            tex->height = regs->height;
-            tex->fmt = fmt;
-
-            linfo("creating texture from %x with dims %dx%d and fmt=%d",
-                  tex->paddr, tex->width, tex->height, tex->fmt);
-
-            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                             texswizzle_default);
-
-            switch (fmt) {
-                case 0:
-                    LOAD_TEX(u32, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8);
-                    break;
-                case 1:
-                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                     texswizzle_bgr);
-                    LOAD_TEX(u24, GL_RGB, GL_UNSIGNED_BYTE);
-                    break;
-                case 2:
-                    LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1);
-                    break;
-                case 3:
-                    LOAD_TEX(u16, GL_RGB, GL_UNSIGNED_SHORT_5_6_5);
-                    break;
-                case 4:
-                    LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
-                    break;
-                case 5:
-                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                     texswizzle_lum_alpha);
-                    LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
-                    break;
-                case 6:
-                    LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
-                    break;
-                case 7:
-                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                     texswizzle_luminance);
-                    LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
-                    break;
-                case 8:
-                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                     texswizzle_alpha);
-                    LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
-                    break;
-                case 9:
-                    rawdata =
-                        expand_nibbles(rawdata, 2 * tex->width * tex->height);
-                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                     texswizzle_lum_alpha);
-                    LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
-                    free(rawdata);
-                    break;
-                case 10:
-                    rawdata = expand_nibbles(rawdata, tex->width * tex->height);
-                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                     texswizzle_luminance);
-                    LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
-                    free(rawdata);
-                    break;
-                case 11:
-                    rawdata = expand_nibbles(rawdata, tex->width * tex->height);
-                    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                     texswizzle_alpha);
-                    LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
-                    free(rawdata);
-                    break;
-                case 12: {
-                    u8* dec = etc1_decompress_texture(tex->width, tex->height,
-                                                      rawdata);
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->width,
-                                 tex->height, 0, GL_RGB, GL_UNSIGNED_BYTE, dec);
-                    free(dec);
-                    break;
-                }
-                case 13: {
-                    u8* dec = etc1a4_decompress_texture(tex->width, tex->height,
-                                                        rawdata);
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tex->width,
-                                 tex->height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                                 dec);
-                    free(dec);
-                    break;
-                }
-                default:
-                    lwarn("unknown texture format %d", fmt);
-            }
-        }
-    }
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                    texfilter[regs->param.min_filter]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-                    texfilter[regs->param.mag_filter]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
-                    texwrap[regs->param.wrap_s & 3]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
-                    texwrap[regs->param.wrap_t & 3]);
 }
 
 typedef struct {
@@ -820,6 +654,193 @@ void gpu_drawimmediate(GPU* gpu) {
         dst[2] = (float) src.b / 255;                                          \
     })
 
+u32 morton_swizzle(u32 w, u32 x, u32 y) {
+    u32 swizzle[8] = {
+        0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15,
+    };
+
+    u32 tx = x >> 3;
+    u32 fx = x & 7;
+    u32 ty = y >> 3;
+    u32 fy = y & 7;
+
+    return (ty * (w >> 3) + tx) * 64 + (swizzle[fx] | swizzle[fy] << 1);
+}
+
+#define LOAD_TEX(t, glfmt, gltype)                                             \
+    ({                                                                         \
+        t* data = rawdata;                                                     \
+                                                                               \
+        t* pixels = malloc(sizeof(t) * w * h);                                 \
+                                                                               \
+        for (int x = 0; x < w; x++) {                                          \
+            for (int y = 0; y < h; y++) {                                      \
+                pixels[(h - 1 - y) * w + x] = data[morton_swizzle(w, x, y)];   \
+            }                                                                  \
+        }                                                                      \
+                                                                               \
+        glTexImage2D(GL_TEXTURE_2D, level, glfmt, w, h, 0, glfmt, gltype,      \
+                     pixels);                                                  \
+        free(pixels);                                                          \
+    })
+
+void* expand_nibbles(u8* src, u32 count) {
+    u8* dst = malloc(count);
+    for (int i = 0; i < count; i++) {
+        u8 b = src[i / 2];
+        if (i & 1) b >>= 4;
+        else b &= 0xf;
+        b *= 0x11;
+        dst[i] = b;
+    }
+    return dst;
+}
+
+typedef struct {
+    u8 d[3];
+} u24;
+
+const GLint texswizzle_default[4] = {GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA};
+const GLint texswizzle_bgr[4] = {GL_BLUE, GL_GREEN, GL_RED, GL_ALPHA};
+const GLint texswizzle_lum_alpha[4] = {GL_GREEN, GL_GREEN, GL_GREEN, GL_RED};
+const GLint texswizzle_luminance[4] = {GL_RED, GL_RED, GL_RED, GL_ONE};
+const GLint texswizzle_alpha[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
+
+const GLint texswizzle_dbg_red[4] = {GL_ONE, GL_ZERO, GL_ZERO, GL_ALPHA};
+const GLint texswizzle_dbg_green[4] = {GL_ZERO, GL_ONE, GL_ZERO, GL_ALPHA};
+const GLint texswizzle_dbg_blue[4] = {GL_ZERO, GL_ZERO, GL_ONE, GL_ALPHA};
+
+const int texfmtbpp[16] = {
+    32, 24, 16, 16, 16, 16, 16, 8, 8, 8, 4, 4, 4, 8, 0, 0,
+};
+const GLint* texfmtswizzle[16] = {
+    texswizzle_default,   texswizzle_bgr,       texswizzle_default,
+    texswizzle_default,   texswizzle_default,   texswizzle_lum_alpha,
+    texswizzle_default,   texswizzle_luminance, texswizzle_alpha,
+    texswizzle_lum_alpha, texswizzle_luminance, texswizzle_alpha,
+    texswizzle_default,   texswizzle_default,   texswizzle_default,
+    texswizzle_default,
+};
+
+#define TEXSIZE(w, h, fmt, level)                                              \
+    ((w >> level) * (h >> level) * texfmtbpp[fmt] / 8)
+
+void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
+    w >>= level;
+    h >>= level;
+    switch (fmt) {
+        case 0:
+            LOAD_TEX(u32, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8);
+            break;
+        case 1:
+            LOAD_TEX(u24, GL_RGB, GL_UNSIGNED_BYTE);
+            break;
+        case 2:
+            LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1);
+            break;
+        case 3:
+            LOAD_TEX(u16, GL_RGB, GL_UNSIGNED_SHORT_5_6_5);
+            break;
+        case 4:
+            LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
+            break;
+        case 5:
+            LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
+            break;
+        case 6:
+            LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
+            break;
+        case 7:
+            LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
+            break;
+        case 8:
+            LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
+            break;
+        case 9:
+            rawdata = expand_nibbles(rawdata, 2 * w * h);
+            LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
+            free(rawdata);
+            break;
+        case 10:
+            rawdata = expand_nibbles(rawdata, w * h);
+            LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
+            free(rawdata);
+            break;
+        case 11:
+            rawdata = expand_nibbles(rawdata, w * h);
+            LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
+            free(rawdata);
+            break;
+        case 12: {
+            u8* dec = etc1_decompress_texture(w, h, rawdata);
+            glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, w, h, 0, GL_RGB,
+                         GL_UNSIGNED_BYTE, dec);
+            free(dec);
+            break;
+        }
+        case 13: {
+            u8* dec = etc1a4_decompress_texture(w, h, rawdata);
+            glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, w, h, 0, GL_RGBA,
+                         GL_UNSIGNED_BYTE, dec);
+            free(dec);
+            break;
+        }
+        default:
+            lerror("unknown texture format %d", fmt);
+    }
+}
+
+void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
+    FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
+    glActiveTexture(GL_TEXTURE0 + id);
+    if (fb) {
+        glBindTexture(GL_TEXTURE_2D, fb->color_tex);
+    } else {
+        TexInfo* tex = texcache_load(gpu, regs->addr << 3);
+
+        void* rawdata = PTR(tex->paddr);
+
+        glBindTexture(GL_TEXTURE_2D, tex->tex);
+
+        if (tex->width != regs->width || tex->height != regs->height ||
+            tex->fmt != fmt) {
+            tex->width = regs->width;
+            tex->height = regs->height;
+            tex->fmt = fmt;
+
+            linfo("creating texture from %x with dims %dx%d and fmt=%d",
+                  tex->paddr, tex->width, tex->height, tex->fmt);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, regs->lod.max);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, regs->lod.min);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, regs->lod.max);
+
+            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                             texfmtswizzle[fmt]);
+
+            for (int l = regs->lod.min; l <= regs->lod.max; l++) {
+                load_tex_image(rawdata, tex->width, tex->height, l, fmt);
+                rawdata += TEXSIZE(tex->width, tex->height, fmt, l);
+            }
+        }
+    }
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    texminfilter[regs->param.min_filter |
+                                 (regs->param.mipmapfilter & 1) << 1]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                    texmagfilter[regs->param.mag_filter]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                    texwrap[regs->param.wrap_s & 3]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
+                    texwrap[regs->param.wrap_t & 3]);
+    float bordercolor[4];
+    COPYRGBA(bordercolor, regs->border);
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, bordercolor);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS,
+                    (float) ((int) (regs->lod.bias << 19) >> 19) / 256);
+}
+
 void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
     ubuf->tev[i].rgb.src0 = regs->source.rgb0;
     ubuf->tev[i].rgb.src1 = regs->source.rgb1;
@@ -860,9 +881,10 @@ void gpu_update_gl_state(GPU* gpu) {
             break;
     }
 
-    glViewport(gpu->io.raster.view_x * UPSCALE, gpu->io.raster.view_y * UPSCALE,
-               2 * I2F(f24tof32(gpu->io.raster.view_w)) * UPSCALE,
-               2 * I2F(f24tof32(gpu->io.raster.view_h)) * UPSCALE);
+    glViewport(gpu->io.raster.view_x * g_upscale,
+               gpu->io.raster.view_y * g_upscale,
+               2 * I2F(f24tof32(gpu->io.raster.view_w)) * g_upscale,
+               2 * I2F(f24tof32(gpu->io.raster.view_h)) * g_upscale);
 
     if (gpu->io.raster.depthmap_enable) {
         float offset = I2F(f24tof32(gpu->io.raster.depthmap_offset));

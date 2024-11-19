@@ -32,9 +32,10 @@ int main(int argc, char** argv) {
 #ifdef GLDEBUGCTX
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
-    SDL_Window* window = SDL_CreateWindow(
-        "ctremu", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        SCREEN_WIDTH * UPSCALE, 2 * SCREEN_HEIGHT * UPSCALE, SDL_WINDOW_OPENGL);
+    SDL_Window* window =
+        SDL_CreateWindow("ctremu", SDL_WINDOWPOS_UNDEFINED,
+                         SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * g_upscale,
+                         2 * SCREEN_HEIGHT * g_upscale, SDL_WINDOW_OPENGL);
 
     SDL_GLContext glcontext = SDL_GL_CreateContext(window);
     if (!glcontext) {

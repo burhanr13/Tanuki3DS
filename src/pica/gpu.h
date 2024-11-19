@@ -8,8 +8,6 @@
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
 
-#define UPSCALE 1
-
 typedef union {
     float semantics[24];
     struct {
@@ -41,10 +39,14 @@ typedef struct {
         u32 wrap_s : 4;
         u32 _16_20 : 4;
         u32 shadow : 4;
-        u32 mipmap : 4;
+        u32 mipmapfilter : 4;
         u32 type : 4;
     } param;
-    u32 lod;
+    struct {
+        u16 bias;
+        u8 max;
+        u8 min;
+    } lod;
     u32 addr;
 } TexUnitRegs;
 
@@ -410,6 +412,8 @@ typedef union {
         u32 incmode : 1;
     };
 } GPUCommand;
+
+extern int g_upscale;
 
 #define I2F(i)                                                                 \
     (((union {                                                                 \
