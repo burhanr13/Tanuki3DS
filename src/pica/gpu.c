@@ -73,6 +73,16 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     gpu->io.w[id] &= ~mask;
     gpu->io.w[id] |= param & mask;
     switch (id) {
+        // case GPUREG(tex.config):
+        //     if (gpu->io.tex.config.clearcache) {
+        //         while (gpu->textures.size) {
+        //             TexInfo* t = LRU_eject(gpu->textures);
+        //             t->paddr = 0;
+        //             t->width = 0;
+        //             t->height = 0;
+        //         }
+        //     }
+        //     break;
         case GPUREG(geom.drawarrays):
             gpu_update_gl_state(gpu);
             gpu_drawarrays(gpu);

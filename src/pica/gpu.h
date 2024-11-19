@@ -140,7 +140,9 @@ typedef union {
                     u32 tex3enable : 1;
                     u32 _11_12 : 2;
                     u32 tex2coord : 1;
-                    u32 _14_31 : 18;
+                    u32 _14_15 : 2;
+                    u32 clearcache : 1;
+                    u32 _17_31 : 15;
                 } config;
                 TexUnitRegs tex0;
                 u32 tex0_cubeaddr[5];
