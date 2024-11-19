@@ -63,6 +63,30 @@ static const GLenum prim_mode[4] = {
     GL_TRIANGLES,
 };
 
+#define CONVERTFLOAT(e, m, i)                                                  \
+    ({                                                                         \
+        u32 sgn = (i >> (e + m)) & 1;                                          \
+        u32 exp = (i >> m) & MASK(e);                                          \
+        u32 mantissa = i & MASK(m);                                            \
+        if (exp == 0 && mantissa == 0) {                                       \
+            exp = 0;                                                           \
+        } else if (exp == MASK(e)) {                                           \
+            exp = 0xff;                                                        \
+        } else {                                                               \
+            exp += BIT(e - 1);                                                 \
+        }                                                                      \
+        mantissa <<= 23 - m;                                                   \
+        I2F(sgn << 31 | exp << 23 | mantissa);                                 \
+    })
+
+float cvtf24(u32 i) {
+    return CONVERTFLOAT(7, 16, i);
+}
+
+float cvtf16(u16 i) {
+    return CONVERTFLOAT(5, 10, i);
+}
+
 bool is_valid_physmem(u32 addr) {
     return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAMSIZE) ||
            (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAMSIZE);
@@ -108,20 +132,20 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             }
             switch (gpu->curfixi) {
                 case 0: {
-                    (*fattr)[3] = I2F(f24tof32(param >> 8));
+                    (*fattr)[3] = cvtf24(param >> 8);
                     gpu->curfixattr = (param & 0xff) << 16;
                     gpu->curfixi = 1;
                     break;
                 }
                 case 1: {
-                    (*fattr)[2] = I2F(f24tof32(param >> 16 | gpu->curfixattr));
+                    (*fattr)[2] = cvtf24(param >> 16 | gpu->curfixattr);
                     gpu->curfixattr = (param & MASK(16)) << 8;
                     gpu->curfixi = 2;
                     break;
                 }
                 case 2: {
-                    (*fattr)[1] = I2F(f24tof32(param >> 24 | gpu->curfixattr));
-                    (*fattr)[0] = I2F(f24tof32(param & MASK(24)));
+                    (*fattr)[1] = cvtf24(param >> 24 | gpu->curfixattr);
+                    (*fattr)[0] = cvtf24(param & MASK(24));
                     gpu->curfixi = 0;
                     if (immediatemode) gpu->immattrs.size++;
                     break;
@@ -160,22 +184,20 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             } else {
                 switch (gpu->curunifi) {
                     case 0: {
-                        (*uniform)[3] = I2F(f24tof32(param >> 8));
+                        (*uniform)[3] = cvtf24(param >> 8);
                         gpu->curuniform = (param & 0xff) << 16;
                         gpu->curunifi = 1;
                         break;
                     }
                     case 1: {
-                        (*uniform)[2] =
-                            I2F(f24tof32(param >> 16 | gpu->curuniform));
+                        (*uniform)[2] = cvtf24(param >> 16 | gpu->curuniform);
                         gpu->curuniform = (param & MASK(16)) << 8;
                         gpu->curunifi = 2;
                         break;
                     }
                     case 2: {
-                        (*uniform)[1] =
-                            I2F(f24tof32(param >> 24 | gpu->curuniform));
-                        (*uniform)[0] = I2F(f24tof32(param & MASK(24)));
+                        (*uniform)[1] = cvtf24(param >> 24 | gpu->curuniform);
+                        (*uniform)[0] = cvtf24(param & MASK(24));
                         gpu->curunifi = 0;
                         gpu->io.vsh.floatuniform_idx++;
                         break;
@@ -221,38 +243,6 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
         }
         if (c.nparams & 1) cur++;
     }
-}
-
-u32 f24tof32(u32 i) {
-    u32 sgn = (i >> 23) & 1;
-    u32 exp = (i >> 16) & MASK(7);
-    u32 mantissa = i & 0xffff;
-    if (exp == 0 && mantissa == 0) {
-        exp = 0;
-    } else if (exp == MASK(7)) {
-        exp = 0xff;
-    } else {
-        exp += 0x40;
-    }
-    mantissa <<= 7;
-    i = sgn << 31 | exp << 23 | mantissa;
-    return i;
-}
-
-u32 f31tof32(u32 i) {
-    i >>= 1;
-    u32 sgn = (i >> 30) & 1;
-    u32 exp = (i >> 23) & MASK(7);
-    u32 mantissa = i & MASK(23);
-    if (exp == 0 && mantissa == 0) {
-        exp = 0;
-    } else if (exp == MASK(7)) {
-        exp = 0xff;
-    } else {
-        exp += 0x40;
-    }
-    i = sgn << 31 | exp << 23 | mantissa;
-    return i;
 }
 
 FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
@@ -893,12 +883,12 @@ void gpu_update_gl_state(GPU* gpu) {
 
     glViewport(gpu->io.raster.view_x * g_upscale,
                gpu->io.raster.view_y * g_upscale,
-               2 * I2F(f24tof32(gpu->io.raster.view_w)) * g_upscale,
-               2 * I2F(f24tof32(gpu->io.raster.view_h)) * g_upscale);
+               2 * cvtf24(gpu->io.raster.view_w) * g_upscale,
+               2 * cvtf24(gpu->io.raster.view_h) * g_upscale);
 
     if (gpu->io.raster.depthmap_enable) {
-        float offset = I2F(f24tof32(gpu->io.raster.depthmap_offset));
-        float scale = I2F(f24tof32(gpu->io.raster.depthmap_scale));
+        float offset = cvtf24(gpu->io.raster.depthmap_offset);
+        float scale = cvtf24(gpu->io.raster.depthmap_scale);
         glDepthRangef((offset - scale + 1) / 2, (offset + scale + 1) / 2);
     } else {
         glDepthRangef(0, 1);
@@ -974,6 +964,16 @@ void gpu_update_gl_state(GPU* gpu) {
         glDepthFunc(GL_ALWAYS);
     }
 
+    ubuf.numlights = gpu->io.lighting.numlights & 7;
+    for (int i = 0; i < ubuf.numlights; i++) {
+        COPYRGB(ubuf.light[i].specular0, gpu->io.lighting.light[i].specular0);
+        COPYRGB(ubuf.light[i].specular1, gpu->io.lighting.light[i].specular1);
+        COPYRGB(ubuf.light[i].diffuse, gpu->io.lighting.light[i].diffuse);
+        COPYRGB(ubuf.light[i].ambient, gpu->io.lighting.light[i].ambient);
+        ubuf.light[i].dir[0] = cvtf16(gpu->io.lighting.light[i].dir.x);
+        ubuf.light[i].dir[1] = cvtf16(gpu->io.lighting.light[i].dir.y);
+        ubuf.light[i].dir[2] = cvtf16(gpu->io.lighting.light[i].dir.z);
+    }
     COPYRGB(ubuf.ambient_color, gpu->io.lighting.ambient);
 
     glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);

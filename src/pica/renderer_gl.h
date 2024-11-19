@@ -31,7 +31,15 @@ typedef struct {
     int tex2coord;
     int _pad1;
 
+    struct {
+        float specular0[4];
+        float specular1[4];
+        float diffuse[4];
+        float ambient[4];
+        float dir[4];
+    } light[8];
     float ambient_color[4];
+    int numlights;
 
     int alphatest;
     int alphafunc;

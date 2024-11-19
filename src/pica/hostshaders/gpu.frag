@@ -5,6 +5,8 @@ in vec4 color;
 in vec2 texcoord0;
 in vec2 texcoord1;
 in vec2 texcoord2;
+in vec4 normquat;
+in vec3 view;
 
 out vec4 fragclr;
 
@@ -29,6 +31,14 @@ struct Tev {
     vec4 color;
 };
 
+struct Light {
+    vec3 specular0;
+    vec3 specular1;
+    vec3 diffuse;
+    vec3 ambient;
+    vec3 dir;
+};
+
 layout (std140) uniform UberUniforms {
     Tev tev[6];
     vec4 tev_buffer_color;
@@ -37,30 +47,16 @@ layout (std140) uniform UberUniforms {
     int tev_update_alpha;
     bool tex2coord;
 
+    Light light[8];
     vec4 ambient_color;
+    int numlights;
 
     bool alphatest;
     int alphafunc;
     float alpharef;
 };
 
-vec4 cur_color = color;
-vec4 buf_color = vec4(0);
-
-vec4 tev_source(int src, int i) {
-    switch (src) {
-        case 0: return color;
-        case 1: return vec4(0.75);
-        case 2: return vec4(0);
-        case 3: return texture(tex0, texcoord0);
-        case 4: return texture(tex1, texcoord1);
-        case 5: return texture(tex2, tex2coord ? texcoord1 : texcoord2);
-        case 13: return buf_color;
-        case 14: return tev[i].color;
-        case 15: return cur_color;
-        default: return color;
-    }
-}
+vec4 tev_srcs[16];
 
 vec3 tev_operand_rgb(vec4 v, int op) {
     switch (op) {
@@ -93,7 +89,7 @@ float tev_operand_alpha(vec4 v, int op) {
 }
 
 vec3 tev_combine_rgb(int i) {
-#define SRC(n) tev_operand_rgb(tev_source(tev[i].rgb.src##n, i), tev[i].rgb.op##n)
+#define SRC(n) tev_operand_rgb(tev_srcs[tev[i].rgb.src##n], tev[i].rgb.op##n)
     switch (tev[i].rgb.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
@@ -111,7 +107,7 @@ vec3 tev_combine_rgb(int i) {
 }
 
 float tev_combine_alpha(int i) {
-#define SRC(n) tev_operand_alpha(tev_source(tev[i].a.src##n, i), tev[i].a.op##n)
+#define SRC(n) tev_operand_alpha(tev_srcs[tev[i].a.src##n], tev[i].a.op##n)
     switch (tev[i].a.combiner) {
         case 0: return SRC(0);
         case 1: return SRC(0) * SRC(1);
@@ -126,6 +122,30 @@ float tev_combine_alpha(int i) {
         default: return SRC(0);
     }
 #undef SRC
+}
+
+vec4 quatmul(vec4 p, vec4 q) {
+    return vec4(p.x - dot(p.yzw, q.yzw),
+                cross(p.yzw, q.yzw) +
+                p.x * q.yzw + q.x * p.yzw);
+}
+
+vec3 quatrot(vec4 q, vec3 v) {
+    return quatmul(quatmul(q, vec4(0, v)), vec4(q.x, -q.yzw)).yzw;
+}
+
+void calc_lighting(out vec4 primary, out vec4 secondary) {
+    primary.rgb = ambient_color.rgb;
+    primary.a = 1;
+    secondary.rgb = vec3(0);
+    secondary.a = 1;
+
+    for (int i=0;i<numlights;i++) {
+        primary.rgb += light[i].ambient;
+
+        float diffuselevel = max(quatrot(normquat, normalize(light[i].dir)).z, 0);
+        primary.rgb += vec3(diffuselevel);
+    }
 }
 
 bool run_alphatest(float a) {
@@ -143,8 +163,16 @@ bool run_alphatest(float a) {
 }
 
 void main() {
+    tev_srcs[0] = color;
+    calc_lighting(tev_srcs[1], tev_srcs[2]);
+    tev_srcs[3] = texture(tex0, texcoord0);
+    tev_srcs[4] = texture(tex1, texcoord1);
+    tev_srcs[5] = texture(tex2, tex2coord ? texcoord1 : texcoord2);
+
     vec4 next_buffer = tev_buffer_color;
     for (int i = 0; i < 6; i++) {
+        tev_srcs[14] = tev[i].color;
+
         vec4 res;
         res.rgb = tev_combine_rgb(i);
         if (tev[i].rgb.combiner == 7) {
@@ -157,7 +185,7 @@ void main() {
 
         res = clamp(res, 0, 1);
 
-        buf_color = next_buffer;
+        tev_srcs[13] = next_buffer;
 
         if ((tev_update_rgb & (1<<i)) != 0) {
             next_buffer.rgb = res.rgb;
@@ -166,10 +194,10 @@ void main() {
             next_buffer.a = res.a;
         }
 
-        cur_color = res;
+        tev_srcs[15] = res;
     }
 
-    fragclr = cur_color;
+    fragclr = tev_srcs[15];
 
     if (alphatest && !run_alphatest(fragclr.a)) discard;
 

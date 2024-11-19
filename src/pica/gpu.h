@@ -75,20 +75,14 @@ typedef struct {
         u16 a;
     } combiner;
     struct {
-        u8 r;
-        u8 g;
-        u8 b;
-        u8 a;
+        u8 r, g, b, a;
     } color;
     struct {
         u16 rgb;
         u16 a;
     } scale;
     struct {
-        u8 r;
-        u8 g;
-        u8 b;
-        u8 a;
+        u8 r, g, b, a;
     } buffer_color;
     u32 _pad[2];
 } TexEnvRegs;
@@ -253,13 +247,27 @@ typedef union {
         } fb;
         union {
             struct {
-                u32 light[8][0x10];
                 struct {
-                    u8 b;
-                    u8 g;
-                    u8 r;
-                    u8 _a;
+                    struct {
+                        u8 b, g, r, _a;
+                    } specular0, specular1, diffuse, ambient;
+                    struct {
+                        u16 x, y, z, _w;
+                    } dir;
+                    struct {
+                        u16 x, y, z, _w;
+                    } spotdir;
+                    u32 _8;
+                    u32 config;
+                    u32 attn_bias;
+                    u32 attn_scale;
+                    u32 _c[4];
+                } light[8];
+                struct {
+                    u8 b, g, r, _a;
                 } ambient;
+                u32 _1c1;
+                u32 numlights;
             };
             u32 w[0xc0];
         } lighting;
@@ -430,9 +438,6 @@ extern int g_upscale;
          u32 _i;                                                               \
      }){f})                                                                    \
          ._i)
-
-u32 f24tof32(u32 i);
-u32 f31tof32(u32 i);
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top);
