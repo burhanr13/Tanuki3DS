@@ -143,9 +143,20 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
     for (int i=0;i<numlights;i++) {
         primary.rgb += light[i].ambient;
 
-        float diffuselevel = max(quatrot(normquat, normalize(light[i].dir)).z, 0);
-        primary.rgb += vec3(diffuselevel);
+        vec3 lightvec = quatrot(normquat, -light[i].dir);
+
+        float diffuselevel = max(lightvec.z, 0);
+        primary.rgb += diffuselevel * light[i].diffuse;
+
+        primary.rgb = min(primary.rgb, 1);
+
+        float speclevel = max(dot(reflect(lightvec, vec3(0,0,1)), 
+                                  normalize(-view)), 0);
+        secondary.rgb += speclevel * light[i].specular0;
+
+        secondary.rgb = min(secondary.rgb, 1);
     }
+
 }
 
 bool run_alphatest(float a) {

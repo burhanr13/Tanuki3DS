@@ -73,7 +73,7 @@ static const GLenum prim_mode[4] = {
         } else if (exp == MASK(e)) {                                           \
             exp = 0xff;                                                        \
         } else {                                                               \
-            exp += BIT(e - 1);                                                 \
+            exp += BIT(7) - BIT(e - 1);                                                 \
         }                                                                      \
         mantissa <<= 23 - m;                                                   \
         I2F(sgn << 31 | exp << 23 | mantissa);                                 \
@@ -83,7 +83,7 @@ float cvtf24(u32 i) {
     return CONVERTFLOAT(7, 16, i);
 }
 
-float cvtf16(u16 i) {
+float cvtf16(u32 i) {
     return CONVERTFLOAT(5, 10, i);
 }
 
@@ -964,7 +964,7 @@ void gpu_update_gl_state(GPU* gpu) {
         glDepthFunc(GL_ALWAYS);
     }
 
-    ubuf.numlights = gpu->io.lighting.numlights & 7;
+    ubuf.numlights = (gpu->io.lighting.numlights & 7) + 1;
     for (int i = 0; i < ubuf.numlights; i++) {
         COPYRGB(ubuf.light[i].specular0, gpu->io.lighting.light[i].specular0);
         COPYRGB(ubuf.light[i].specular1, gpu->io.lighting.light[i].specular1);
