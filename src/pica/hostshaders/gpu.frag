@@ -56,6 +56,44 @@ layout (std140) uniform UberUniforms {
     float alpharef;
 };
 
+vec4 quatmul(vec4 p, vec4 q) {
+    return vec4(p.x - dot(p.yzw, q.yzw),
+                cross(p.yzw, q.yzw) +
+                p.x * q.yzw + q.x * p.yzw);
+}
+
+vec3 quatrot(vec4 q, vec3 v) {
+    return quatmul(quatmul(q, vec4(0, v)), vec4(q.x, -q.yzw)).yzw;
+}
+
+void calc_lighting(out vec4 primary, out vec4 secondary) {
+    primary = vec4(0);
+    secondary = vec4(0);
+
+    primary.rgb = ambient_color.rgb;
+    primary.a = 1;
+
+    vec4 normnormquat = normalize(normquat);
+    vec3 viewvec = quatrot(normnormquat, normalize(view));
+
+    for (int i=0;i<numlights;i++) {
+        primary.rgb += light[i].ambient;
+
+        vec3 lightvec = quatrot(normnormquat, normalize(-light[i].dir));
+
+        float diffuselevel = max(lightvec.z, 0);
+        primary.rgb += diffuselevel * light[i].diffuse;
+
+        primary.rgb = min(primary.rgb, 1);
+
+        float speclevel = max(dot(vec3(-lightvec.xy, lightvec.z), 
+                                  viewvec), 0);
+        secondary.rgb += speclevel * light[i].specular0;
+
+        secondary.rgb = min(secondary.rgb, 1);
+    }
+}
+
 vec4 tev_srcs[16];
 
 vec3 tev_operand_rgb(vec4 v, int op) {
@@ -122,41 +160,6 @@ float tev_combine_alpha(int i) {
         default: return SRC(0);
     }
 #undef SRC
-}
-
-vec4 quatmul(vec4 p, vec4 q) {
-    return vec4(p.x - dot(p.yzw, q.yzw),
-                cross(p.yzw, q.yzw) +
-                p.x * q.yzw + q.x * p.yzw);
-}
-
-vec3 quatrot(vec4 q, vec3 v) {
-    return quatmul(quatmul(q, vec4(0, v)), vec4(q.x, -q.yzw)).yzw;
-}
-
-void calc_lighting(out vec4 primary, out vec4 secondary) {
-    primary = vec4(0);
-    secondary = vec4(0);
-
-    primary.rgb = ambient_color.rgb;
-    primary.a = 1;
-
-    for (int i=0;i<numlights;i++) {
-        primary.rgb += light[i].ambient;
-
-        vec3 lightvec = quatrot(normalize(normquat), -light[i].dir);
-
-        float diffuselevel = max(lightvec.z, 0);
-        primary.rgb += diffuselevel * light[i].diffuse;
-
-        primary.rgb = min(primary.rgb, 1);
-
-        float speclevel = max(dot(reflect(lightvec, vec3(0,0,1)), 
-                                  normalize(-view)), 0);
-        secondary.rgb += speclevel * light[i].specular0;
-
-        secondary.rgb = min(secondary.rgb, 1);
-    }
 }
 
 bool run_alphatest(float a) {

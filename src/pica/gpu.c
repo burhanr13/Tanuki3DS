@@ -797,8 +797,6 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         glBindTexture(GL_TEXTURE_2D, fb->color_tex);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 0);
     } else {
         TexInfo* tex = texcache_load(gpu, regs->addr << 3);
 
@@ -816,8 +814,6 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                   tex->paddr, tex->width, tex->height, tex->fmt);
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, regs->lod.max);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, regs->lod.min);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, regs->lod.max);
 
             glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
                              texfmtswizzle[fmt]);
@@ -843,6 +839,8 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, bordercolor);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS,
                     (float) ((int) (regs->lod.bias << 19) >> 19) / 256);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, regs->lod.min);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, regs->lod.max);
 }
 
 void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
