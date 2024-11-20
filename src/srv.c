@@ -6,7 +6,7 @@
 
 #include "services.h"
 
-#include "../sys_files/shared_font.app.romfs.h"
+#include "../sys_files/shared_font.h"
 
 void srvobj_init(KObject* hdr, KObjType t) {
     hdr->type = t;
@@ -36,6 +36,7 @@ void init_services(HLE3DS* s) {
     s->services.apt.shared_font.defaultdata = SHARED_FONT_DATA;
     s->services.apt.shared_font.defaultdatalen = SHARED_FONT_DATA_len;
     s->services.apt.shared_font.vaddr = 0x1b000000;
+    s->services.apt.shared_font.size = SHARED_FONT_DATA_len;
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
 
