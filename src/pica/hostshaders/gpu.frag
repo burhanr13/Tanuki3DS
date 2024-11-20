@@ -80,14 +80,14 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
         primary.rgb += light[i].ambient;
 
         vec3 lightvec = quatrot(normnormquat, normalize(-light[i].dir));
+        vec3 halfvec = normalize((lightvec + viewvec) / 2);
 
-        float diffuselevel = max(lightvec.z, 0);
+        float diffuselevel = (lightvec.z + 1) / 2;
         primary.rgb += diffuselevel * light[i].diffuse;
 
         primary.rgb = min(primary.rgb, 1);
 
-        float speclevel = max(dot(vec3(-lightvec.xy, lightvec.z), 
-                                  viewvec), 0);
+        float speclevel = (halfvec.z + 1) / 2;
         secondary.rgb += speclevel * light[i].specular0;
 
         secondary.rgb = min(secondary.rgb, 1);
