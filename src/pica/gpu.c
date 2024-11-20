@@ -795,6 +795,10 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     glActiveTexture(GL_TEXTURE0 + id);
     if (fb) {
         glBindTexture(GL_TEXTURE_2D, fb->color_tex);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 0);
     } else {
         TexInfo* tex = texcache_load(gpu, regs->addr << 3);
 
