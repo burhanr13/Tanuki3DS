@@ -249,7 +249,9 @@ typedef union {
             struct {
                 struct {
                     struct {
-                        u8 b, g, r, _a;
+                        u32 b : 10;
+                        u32 g : 10;
+                        u32 r : 12;
                     } specular0, specular1, diffuse, ambient;
                     struct {
                         u16 x, y, z, _w;
@@ -264,7 +266,9 @@ typedef union {
                     u32 _c[4];
                 } light[8];
                 struct {
-                    u8 b, g, r, _a;
+                    u32 b : 10;
+                    u32 g : 10;
+                    u32 r : 12;
                 } ambient;
                 u32 _1c1;
                 u32 numlights;

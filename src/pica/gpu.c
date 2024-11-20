@@ -73,7 +73,7 @@ static const GLenum prim_mode[4] = {
         } else if (exp == MASK(e)) {                                           \
             exp = 0xff;                                                        \
         } else {                                                               \
-            exp += BIT(7) - BIT(e - 1);                                                 \
+            exp += BIT(7) - BIT(e - 1);                                        \
         }                                                                      \
         mantissa <<= 23 - m;                                                   \
         I2F(sgn << 31 | exp << 23 | mantissa);                                 \
@@ -649,9 +649,9 @@ void gpu_drawimmediate(GPU* gpu) {
 
 #define COPYRGB(dst, src)                                                      \
     ({                                                                         \
-        dst[0] = (float) src.r / 255;                                          \
-        dst[1] = (float) src.g / 255;                                          \
-        dst[2] = (float) src.b / 255;                                          \
+        dst[0] = (float) (src.r & 0xff) / 255;                                 \
+        dst[1] = (float) (src.g & 0xff) / 255;                                 \
+        dst[2] = (float) (src.b & 0xff) / 255;                                 \
     })
 
 u32 morton_swizzle(u32 w, u32 x, u32 y) {
