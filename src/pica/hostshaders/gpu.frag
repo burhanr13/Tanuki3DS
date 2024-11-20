@@ -135,10 +135,10 @@ vec3 quatrot(vec4 q, vec3 v) {
 }
 
 void calc_lighting(out vec4 primary, out vec4 secondary) {
+    primary = vec4(0);
+    secondary = vec4(0);
+
     primary.rgb = ambient_color.rgb;
-    primary.a = 1;
-    secondary.rgb = vec3(0);
-    secondary.a = 1;
 
     for (int i=0;i<numlights;i++) {
         primary.rgb += light[i].ambient;
@@ -156,7 +156,6 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
 
         secondary.rgb = min(secondary.rgb, 1);
     }
-
 }
 
 bool run_alphatest(float a) {

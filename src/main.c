@@ -18,6 +18,8 @@ int main(int argc, char** argv) {
 
     if (emulator_init(argc, argv) < 0) return -1;
 
+    SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS, 0);
+    
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
 
     SDL_GameController* controller = NULL;

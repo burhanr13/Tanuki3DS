@@ -129,13 +129,13 @@ void update_input(HLE3DS* s, SDL_GameController* controller) {
 
     if (controller) {
         btn.a |=
-            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
-        btn.b |=
             SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B);
+        btn.b |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
         btn.x |=
-            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
-        btn.y |=
             SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_Y);
+        btn.y |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
         btn.l |= SDL_GameControllerGetButton(
             controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
         btn.r |= SDL_GameControllerGetButton(
