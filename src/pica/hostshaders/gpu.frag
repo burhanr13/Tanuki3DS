@@ -139,11 +139,12 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
     secondary = vec4(0);
 
     primary.rgb = ambient_color.rgb;
+    primary.a = 1;
 
     for (int i=0;i<numlights;i++) {
         primary.rgb += light[i].ambient;
 
-        vec3 lightvec = quatrot(normquat, -light[i].dir);
+        vec3 lightvec = quatrot(normalize(normquat), -light[i].dir);
 
         float diffuselevel = max(lightvec.z, 0);
         primary.rgb += diffuselevel * light[i].diffuse;
