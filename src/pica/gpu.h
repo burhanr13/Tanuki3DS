@@ -255,7 +255,7 @@ typedef union {
                     } specular0, specular1, diffuse, ambient;
                     struct {
                         u16 x, y, z, _w;
-                    } dir;
+                    } vec;
                     struct {
                         u16 x, y, z, _w;
                     } spotdir;

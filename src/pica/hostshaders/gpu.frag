@@ -14,6 +14,11 @@ uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
+#define BIT(k, n) ((k&(1<<n))!=0)
+
+#define L_DIRECTIONAL 0
+#define L_TWOSIDED 1
+
 struct TevControl {
     int src0;
     int op0;
@@ -36,7 +41,8 @@ struct Light {
     vec3 specular1;
     vec3 diffuse;
     vec3 ambient;
-    vec3 dir;
+    vec4 vec;
+    int config;
 };
 
 layout (std140) uniform UberUniforms {
@@ -57,13 +63,13 @@ layout (std140) uniform UberUniforms {
 };
 
 vec4 quatmul(vec4 p, vec4 q) {
-    return vec4(p.x - dot(p.yzw, q.yzw),
-                cross(p.yzw, q.yzw) +
-                p.x * q.yzw + q.x * p.yzw);
+    return vec4(cross(p.xyz, q.xyz) +
+                p.w * q.xyz + q.w * p.xyz,
+                p.w * q.w - dot(p.xyz, q.xyz));
 }
 
 vec3 quatrot(vec4 q, vec3 v) {
-    return quatmul(quatmul(q, vec4(0, v)), vec4(q.x, -q.yzw)).yzw;
+    return quatmul(quatmul(q, vec4(v, 0)), vec4(-q.xyz, q.w)).xyz;
 }
 
 void calc_lighting(out vec4 primary, out vec4 secondary) {
@@ -73,21 +79,26 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
     primary.rgb = ambient_color.rgb;
     primary.a = 1;
 
-    vec4 normnormquat = normalize(normquat);
-    vec3 viewvec = quatrot(normnormquat, normalize(view));
+    vec4 nq = normalize(normquat);
+    vec3 v = normalize(quatrot(nq, view));
 
     for (int i=0;i<numlights;i++) {
         primary.rgb += light[i].ambient;
 
-        vec3 lightvec = quatrot(normnormquat, normalize(-light[i].dir));
-        vec3 halfvec = normalize((lightvec + viewvec) / 2);
+        vec3 l;
+        if (BIT(light[i].config, L_DIRECTIONAL)) {
+            l = normalize(quatrot(nq, light[i].vec.xyz));
+        } else {
+            l = normalize(quatrot(nq, view + light[i].vec.xyz));
+        }
+        vec3 h = normalize((l + v) / 2);
 
-        float diffuselevel = (lightvec.z + 1) / 2;
+        float diffuselevel = max(l.z, 0);
         primary.rgb += diffuselevel * light[i].diffuse;
 
         primary.rgb = min(primary.rgb, 1);
 
-        float speclevel = (halfvec.z + 1) / 2;
+        float speclevel = pow(max(h.z, 0), 3);
         secondary.rgb += speclevel * light[i].specular0;
 
         secondary.rgb = min(secondary.rgb, 1);
@@ -201,10 +212,10 @@ void main() {
 
         tev_srcs[13] = next_buffer;
 
-        if ((tev_update_rgb & (1<<i)) != 0) {
+        if (BIT(tev_update_rgb, i)) {
             next_buffer.rgb = res.rgb;
         }
-        if ((tev_update_alpha & (1<<i)) != 0) {
+        if (BIT(tev_update_alpha, i)) {
             next_buffer.a = res.a;
         }
 

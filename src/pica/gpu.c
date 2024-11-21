@@ -972,9 +972,10 @@ void gpu_update_gl_state(GPU* gpu) {
         COPYRGB(ubuf.light[i].specular1, gpu->io.lighting.light[i].specular1);
         COPYRGB(ubuf.light[i].diffuse, gpu->io.lighting.light[i].diffuse);
         COPYRGB(ubuf.light[i].ambient, gpu->io.lighting.light[i].ambient);
-        ubuf.light[i].dir[0] = cvtf16(gpu->io.lighting.light[i].dir.x);
-        ubuf.light[i].dir[1] = cvtf16(gpu->io.lighting.light[i].dir.y);
-        ubuf.light[i].dir[2] = cvtf16(gpu->io.lighting.light[i].dir.z);
+        ubuf.light[i].vec[0] = cvtf16(gpu->io.lighting.light[i].vec.x);
+        ubuf.light[i].vec[1] = cvtf16(gpu->io.lighting.light[i].vec.y);
+        ubuf.light[i].vec[2] = cvtf16(gpu->io.lighting.light[i].vec.z);
+        ubuf.light[i].config = gpu->io.lighting.light[i].config;
     }
     COPYRGB(ubuf.ambient_color, gpu->io.lighting.ambient);
 

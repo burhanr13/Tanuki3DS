@@ -36,7 +36,9 @@ typedef struct {
         float specular1[4];
         float diffuse[4];
         float ambient[4];
-        float dir[4];
+        float vec[4];
+        int config;
+        int _pad[3];
     } light[8];
     float ambient_color[4];
     int numlights;
