@@ -1,6 +1,6 @@
 # ctremu
 
-ctremu is a new WIP HLE 3DS emulator. It can currently run a handful of games, and maybe even play some. However, many games will crash, much is still not implemented, and performance is not that good yet.
+ctremu (name subject to change) is a new WIP HLE 3DS emulator. It can currently run a handful of games, and maybe even play some. However, many games will crash, much is still not implemented, and performance is not that good yet.
 
 <img src=images/oot3d.png width=300><img src=images/mk7.png width=300>
 
