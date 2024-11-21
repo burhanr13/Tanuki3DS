@@ -105,6 +105,8 @@ typedef struct _ArmCore {
     u32 (*cp15_read)(ArmCore* cpu, u32 cn, u32 cm, u32 cp);
     void (*cp15_write)(ArmCore* cpu, u32 cn, u32 cm, u32 cp, u32 data);
 
+    void* fastmem;
+
     JITBlock*** jit_cache[64];
 
     u32 vector_base;

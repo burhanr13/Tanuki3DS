@@ -555,14 +555,72 @@ void init_vsh(GPU* gpu, ShaderUnit* shu) {
     shu->b = gpu->io.vsh.booluniform;
 }
 
-void deploy_vsh(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
-                Vertex* vbuf) {
+void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
+                   Vertex* vbuf) {
     ShaderUnit vsh;
     init_vsh(gpu, &vsh);
     for (int i = 0; i < count; i++) {
         load_vtx(gpu, cfg, srcoff + i, vsh.v);
         pica_shader_exec(&vsh);
         store_vtx(gpu, dstoff + i, vbuf, vsh.o);
+    }
+}
+
+void vsh_thrd_func(GPU* gpu) {
+    int id = gpu->vsh_runner.cur++;
+
+    while (true) {
+        pthread_mutex_lock(&gpu->vsh_runner.mtx);
+        pthread_cond_wait(&gpu->vsh_runner.cv1, &gpu->vsh_runner.mtx);
+        pthread_mutex_unlock(&gpu->vsh_runner.mtx);
+
+        vsh_run_range(gpu, gpu->vsh_runner.attrcfg,
+                      gpu->vsh_runner.base + gpu->vsh_runner.off[id],
+                      gpu->vsh_runner.off[id], gpu->vsh_runner.count[id],
+                      gpu->vsh_runner.vbuf);
+
+        gpu->vsh_runner.cur++;
+
+        pthread_cond_signal(&gpu->vsh_runner.cv2);
+    }
+}
+
+void gpu_thrds_init(GPU* gpu) {
+    gpu->vsh_runner.cur = 0;
+    pthread_cond_init(&gpu->vsh_runner.cv1, NULL);
+    pthread_cond_init(&gpu->vsh_runner.cv2, NULL);
+    pthread_mutex_init(&gpu->vsh_runner.mtx, NULL);
+
+    pthread_mutex_lock(&gpu->vsh_runner.mtx);
+
+    for (int i = 0; i < VSH_THREADS; i++) {
+        pthread_create(&gpu->vsh_runner.thds[i], NULL, (void*) vsh_thrd_func,
+                       gpu);
+    }
+}
+
+void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
+    if (VSH_THREADS == 0 || count < VSH_THREADS) {
+        vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
+    } else {
+        gpu->vsh_runner.attrcfg = attrcfg;
+        gpu->vsh_runner.vbuf = vbuf;
+        gpu->vsh_runner.base = base;
+
+        for (int i = 0; i < VSH_THREADS; i++) {
+            gpu->vsh_runner.off[i] = i * (count / VSH_THREADS);
+            gpu->vsh_runner.count[i] = count / VSH_THREADS;
+        }
+        gpu->vsh_runner.count[VSH_THREADS - 1] =
+            count - gpu->vsh_runner.off[VSH_THREADS - 1];
+
+        pthread_mutex_lock(&gpu->vsh_runner.mtx);
+        gpu->vsh_runner.cur = 0;
+        pthread_cond_broadcast(&gpu->vsh_runner.cv1);
+        while (gpu->vsh_runner.cur < VSH_THREADS) {
+            pthread_cond_wait(&gpu->vsh_runner.cv2, &gpu->vsh_runner.mtx);
+        }
+        pthread_mutex_unlock(&gpu->vsh_runner.mtx);
     }
 }
 
@@ -573,7 +631,7 @@ void gpu_drawarrays(GPU* gpu) {
 
     AttrConfig cfg;
     vtx_loader_setup(gpu, cfg);
-    deploy_vsh(gpu, cfg, gpu->io.geom.vtx_off, 0, gpu->io.geom.nverts, vbuf);
+    dispatch_vsh(gpu, cfg, gpu->io.geom.vtx_off, gpu->io.geom.nverts, vbuf);
 
     glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode & 3], 0,
@@ -605,7 +663,7 @@ void gpu_drawelements(GPU* gpu) {
 
     AttrConfig cfg;
     vtx_loader_setup(gpu, cfg);
-    deploy_vsh(gpu, cfg, minind, 0, nverts, vbuf);
+    dispatch_vsh(gpu, cfg, minind, nverts, vbuf);
 
     glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawElementsBaseVertex(
@@ -624,7 +682,7 @@ void gpu_drawimmediate(GPU* gpu) {
 
     AttrConfig cfg;
     vtx_loader_imm_setup(gpu, cfg);
-    deploy_vsh(gpu, cfg, 0, 0, nverts, vbuf);
+    dispatch_vsh(gpu, cfg, 0, nverts, vbuf);
 
     glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode & 3], 0, nverts);

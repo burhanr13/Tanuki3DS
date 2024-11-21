@@ -3,7 +3,6 @@
 
 #include <stdatomic.h>
 #include <pthread.h>
-#include <semaphore.h>
 
 #include "../common.h"
 #include "renderer_gl.h"
@@ -12,7 +11,7 @@
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
 
-#define VSH_THREADS 4
+#define VSH_THREADS 0
 
 typedef union {
     float semantics[24];
@@ -419,9 +418,15 @@ typedef struct _GPU {
     struct {
         pthread_t thds[VSH_THREADS];
         atomic_int cur;
-        pthread_cond_t cv;
+        pthread_cond_t cv1;
+        pthread_cond_t cv2;
         pthread_mutex_t mtx;
-        sem_t sem;
+
+        int base;
+        int off[VSH_THREADS];
+        int count[VSH_THREADS];
+        void* attrcfg;
+        void* vbuf;
     } vsh_runner;
 
     GLState gl;

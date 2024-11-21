@@ -30,6 +30,7 @@ bool iropc_hasresult(IROpcode opc) {
 
 bool iropc_iscallback(IROpcode opc) {
     switch (opc) {
+#ifndef JIT_FASTMEM
         case IR_LOAD_MEM8:
         case IR_LOAD_MEMS8:
         case IR_LOAD_MEM16:
@@ -38,6 +39,7 @@ bool iropc_iscallback(IROpcode opc) {
         case IR_STORE_MEM8:
         case IR_STORE_MEM16:
         case IR_STORE_MEM32:
+#endif
         case IR_MODESWITCH:
         case IR_EXCEPTION:
         case IR_VFP_DATA_PROC:

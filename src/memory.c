@@ -51,6 +51,7 @@ void hle3ds_memory_init(HLE3DS* s) {
         perror("mmap");
         exit(1);
     }
+    s->cpu.fastmem = s->virtmem;
     s->gpu.mem = s->physmem;
 
     struct sigaction sa = {.sa_sigaction = sigsegv_handler,

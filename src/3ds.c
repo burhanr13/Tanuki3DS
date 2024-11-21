@@ -15,6 +15,8 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
 
     cpu_init(s);
 
+    gpu_thrds_init(&s->gpu);
+
     hle3ds_memory_init(s);
 
     u32 entrypoint = 0;

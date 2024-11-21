@@ -343,6 +343,108 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 call(rax);
                 break;
             }
+#ifdef JIT_FASTMEM
+            case IR_LOAD_MEM8: {
+                mov(rax, (u64) cpu->fastmem);
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                movzx(eax, byte[rax + rdx]);
+                mov(getOp(i), eax);
+                break;
+            }
+            case IR_LOAD_MEMS8: {
+                mov(rax, (u64) cpu->fastmem);
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                movsx(eax, byte[rax + rdx]);
+                mov(getOp(i), eax);
+                break;
+            }
+            case IR_LOAD_MEM16: {
+                mov(rax, (u64) cpu->fastmem);
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                movzx(eax, word[rax + rdx]);
+                mov(getOp(i), eax);
+                break;
+            }
+            case IR_LOAD_MEMS16: {
+                mov(rax, (u64) cpu->fastmem);
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                movsx(eax, word[rax + rdx]);
+                mov(getOp(i), eax);
+                break;
+            }
+            case IR_LOAD_MEM32: {
+                mov(rax, (u64) cpu->fastmem);
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                mov(eax, dword[rax + rdx]);
+                mov(getOp(i), eax);
+                break;
+            }
+            case IR_STORE_MEM8: {
+                mov(rax, (u64) cpu->fastmem);
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                if (inst.imm2) {
+                    mov(ecx, inst.op2);
+                } else {
+                    mov(ecx, getOp(inst.op2));
+                }
+                mov(byte[rax + rdx], cl);
+                break;
+            }
+            case IR_STORE_MEM16: {
+                mov(rax, (u64) cpu->fastmem);
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                if (inst.imm2) {
+                    mov(ecx, inst.op2);
+                } else {
+                    mov(ecx, getOp(inst.op2));
+                }
+                mov(word[rax + rdx], cx);
+                break;
+            }
+            case IR_STORE_MEM32: {
+                mov(rax, (u64) cpu->fastmem);
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                if (inst.imm2) {
+                    mov(ecx, inst.op2);
+                } else {
+                    mov(ecx, getOp(inst.op2));
+                }
+                mov(dword[rax + rdx], ecx);
+                break;
+            }
+#else
             case IR_LOAD_MEM8: {
                 xor_(edx, edx);
                 if (inst.imm1) {
@@ -463,6 +565,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 call(rax);
                 break;
             }
+#endif
             case IR_MOV: {
                 auto& dst = getOp(i);
                 if (inst.imm2) {
