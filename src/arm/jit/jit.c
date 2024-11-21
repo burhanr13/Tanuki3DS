@@ -2,13 +2,13 @@
 
 #include "backend/backend.h"
 #include "optimizer.h"
-#include "translator.h"
 #include "register_allocator.h"
+#include "translator.h"
 
-//#define JIT_DISASM
-//#define JIT_CPULOG
-//#define IR_INTERPRET
-//#define NO_OPTS
+// #define JIT_DISASM
+// #define JIT_CPULOG
+// #define IR_INTERPRET
+// #define NO_OPTS
 
 #ifdef JIT_DISASM
 #define IR_DISASM
@@ -21,6 +21,8 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
     block->attrs = cpu->cpsr.w & 0x3f;
     block->start_addr = addr;
+
+    Vec_init(block->linkingblocks);
 
     IRBlock ir;
     irblock_init(&ir);
@@ -86,10 +88,13 @@ void destroy_jit_block(JITBlock* block) {
         if (!(block->cpu->jit_cache[l->attrs] &&
               block->cpu->jit_cache[l->attrs][l->addr >> 16]))
             continue;
-        JITBlock* linkingblock =
-            block->cpu
-                ->jit_cache[l->attrs][l->addr >> 16][(l->addr & 0xffff) >> 1];
-        if (linkingblock) destroy_jit_block(linkingblock);
+        if (block->cpu->jit_cache[l->attrs] &&
+            block->cpu->jit_cache[l->addr >> 16]) {
+            JITBlock* linkingblock =
+                block->cpu->jit_cache[l->attrs][l->addr >> 16]
+                                     [(l->addr & 0xffff) >> 1];
+            if (linkingblock) destroy_jit_block(linkingblock);
+        }
     }
     Vec_free(block->linkingblocks);
     free(block);
@@ -105,7 +110,6 @@ void jit_exec(JITBlock* block) {
     block->code();
 #endif
 }
-
 
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
     u32 addrhi = addr >> 16;
@@ -141,9 +145,11 @@ void jit_free_all(ArmCore* cpu) {
                     for (int k = 0; k < BIT(16) >> 1; k++) {
                         if (cpu->jit_cache[i][j][k]) {
                             destroy_jit_block(cpu->jit_cache[i][j][k]);
+                            cpu->jit_cache[i][j][k] = NULL;
                         }
                     }
                     free(cpu->jit_cache[i][j]);
+                    cpu->jit_cache[i][j] = NULL;
                 }
             }
             free(cpu->jit_cache[i]);
