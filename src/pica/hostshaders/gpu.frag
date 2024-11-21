@@ -62,14 +62,11 @@ layout (std140) uniform UberUniforms {
     float alpharef;
 };
 
-vec4 quatmul(vec4 p, vec4 q) {
-    return vec4(cross(p.xyz, q.xyz) +
-                p.w * q.xyz + q.w * p.xyz,
-                p.w * q.w - dot(p.xyz, q.xyz));
-}
-
 vec3 quatrot(vec4 q, vec3 v) {
-    return quatmul(quatmul(q, vec4(v, 0)), vec4(-q.xyz, q.w)).xyz;
+    return cross(q.xyz, cross(q.xyz, v)) +
+           2 * q.w * cross(q.xyz, v) +
+           dot(q.xyz, v) * q.xyz +
+           q.w * q.w * v;
 }
 
 void calc_lighting(out vec4 primary, out vec4 secondary) {
