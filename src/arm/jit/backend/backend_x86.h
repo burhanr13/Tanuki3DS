@@ -12,10 +12,12 @@ extern "C" {
 #include "../../media.h"
 #include "../../vfp.h"
 
-void* generate_code_x86(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
-JITFunc get_code_x86(void* backend);
-void free_code_x86(void* backend);
-void backend_disassemble_x86(void* backend);
+void* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
+                                ArmCore* cpu);
+JITFunc backend_x86_get_code(void* backend);
+void backend_x86_patch_links(JITBlock* block);
+void backend_x86_free(void* backend);
+void backend_x86_disassemble(void* backend);
 
 #ifdef __cplusplus
 }

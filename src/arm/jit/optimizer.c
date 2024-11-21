@@ -715,9 +715,14 @@ void optimize_blocklinking(IRBlock* block, ArmCore* cpu) {
                 break;
             case IR_END_RET:
                 if (can_link) {
-                    inst->opcode = IR_END_LINK;
-                    inst->op1 = cpu->cpsr.m | (link_thumb << 5);
-                    inst->op2 = link_pc;
+                    if (link_pc == block->start_addr &&
+                        link_thumb == cpu->cpsr.t) {
+                        inst->opcode = IR_END_LOOP;
+                    } else {
+                        inst->opcode = IR_END_LINK;
+                        inst->op1 = cpu->cpsr.m | (link_thumb << 5);
+                        inst->op2 = link_pc;
+                    }
                 }
                 can_link = true;
                 break;

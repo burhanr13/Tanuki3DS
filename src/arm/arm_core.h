@@ -44,6 +44,10 @@ typedef struct _ArmCore {
     union {
         u32 w;
         struct {
+            u32 jitattrs : 6;
+            u32 _6_31 : 26;
+        };
+        struct {
             u32 m : 5;
             u32 t : 1;
             u32 f : 1;
@@ -102,11 +106,10 @@ typedef struct _ArmCore {
     void (*cp15_write)(ArmCore* cpu, u32 cn, u32 cm, u32 cp, u32 data);
 
     JITBlock*** jit_cache[64];
-    u8** jit_dirty;
 
     u32 vector_base;
 
-    int cycles;
+    long cycles;
 
     bool wfe;
 

@@ -57,6 +57,7 @@ typedef enum {
     IR_BEGIN,
     IR_END_RET,
     IR_END_LINK,
+    IR_END_LOOP,
 
     IR_NOP,
     IR_MOV,

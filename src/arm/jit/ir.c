@@ -451,6 +451,12 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                     }
                 }
                 return;
+            case IR_END_LOOP:
+                cpu->cycles -= block->numinstr;
+                if (cpu->cycles > 0) {
+                    ir_interpret(block, cpu);
+                }
+                return;
             case IR_END_RET:
                 cpu->cycles -= block->numinstr;
                 return;
@@ -668,6 +674,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
             DISASM(end_ret, 0, 0, 0);
         case IR_END_LINK:
             DISASM(end_link, 0, 1, 1);
+        case IR_END_LOOP:
+            DISASM(end_loop, 0, 0, 0);
     }
 }
 

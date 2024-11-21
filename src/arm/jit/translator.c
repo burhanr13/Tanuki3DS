@@ -83,7 +83,7 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
 #ifdef DEBUG_PC
         EMITI_STORE_REG(15, addr);
 #endif
-        if (!can_continue) break;
+        if (((addr & 0xffff) == 0) || !can_continue) break;
     }
     EMITI_STORE_REG(15, addr);
     EMIT00(END_RET);
