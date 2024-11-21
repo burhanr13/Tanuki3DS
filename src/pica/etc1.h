@@ -35,7 +35,10 @@ typedef union {
     };
 } etc1block;
 
-u8* etc1_decompress_texture(u32 width, u32 height, u64 (*src)[width / 8][2][2]);
-u8* etc1a4_decompress_texture(u32 width, u32 height, u64 (*src)[width / 8][2][2][2]);
+void etc1_decompress_texture(u32 width, u32 height, u64 (*src)[width / 8][2][2],
+                             u8 (*dst)[width][3]);
+void etc1a4_decompress_texture(u32 width, u32 height,
+                               u64 (*src)[width / 8][2][2][2],
+                               u8 (*dst)[width][4]);
 
 #endif

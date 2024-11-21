@@ -555,6 +555,17 @@ void init_vsh(GPU* gpu, ShaderUnit* shu) {
     shu->b = gpu->io.vsh.booluniform;
 }
 
+void deploy_vsh(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
+                Vertex* vbuf) {
+    ShaderUnit vsh;
+    init_vsh(gpu, &vsh);
+    for (int i = 0; i < count; i++) {
+        load_vtx(gpu, cfg, srcoff + i, vsh.v);
+        pica_shader_exec(&vsh);
+        store_vtx(gpu, dstoff + i, vbuf, vsh.o);
+    }
+}
+
 void gpu_drawarrays(GPU* gpu) {
     linfo("drawing arrays nverts=%d primmode=%d", gpu->io.geom.nverts,
           gpu->io.geom.prim_config.mode);
@@ -562,15 +573,9 @@ void gpu_drawarrays(GPU* gpu) {
 
     AttrConfig cfg;
     vtx_loader_setup(gpu, cfg);
-    ShaderUnit vsh;
-    init_vsh(gpu, &vsh);
-    for (int i = 0; i < gpu->io.geom.nverts; i++) {
-        load_vtx(gpu, cfg, i + gpu->io.geom.vtx_off, vsh.v);
-        pica_shader_exec(&vsh);
-        store_vtx(gpu, i, vbuf, vsh.o);
-    }
-    glBufferData(GL_ARRAY_BUFFER, gpu->io.geom.nverts * sizeof(Vertex), vbuf,
-                 GL_STREAM_DRAW);
+    deploy_vsh(gpu, cfg, gpu->io.geom.vtx_off, 0, gpu->io.geom.nverts, vbuf);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode & 3], 0,
                  gpu->io.geom.nverts);
 }
@@ -595,20 +600,14 @@ void gpu_drawelements(GPU* gpu) {
                  gpu->io.geom.nverts * (gpu->io.geom.indexfmt ? 2 : 1),
                  indexbuf, GL_STREAM_DRAW);
 
-    Vertex vbuf[maxind + 1 - minind];
+    int nverts = maxind + 1 - minind;
+    Vertex vbuf[nverts];
 
     AttrConfig cfg;
     vtx_loader_setup(gpu, cfg);
-    ShaderUnit vsh;
-    init_vsh(gpu, &vsh);
-    for (int i = minind; i <= maxind; i++) {
-        load_vtx(gpu, cfg, i, vsh.v);
-        pica_shader_exec(&vsh);
-        store_vtx(gpu, i - minind, vbuf, vsh.o);
-    }
+    deploy_vsh(gpu, cfg, minind, 0, nverts, vbuf);
 
-    glBufferData(GL_ARRAY_BUFFER, (maxind + 1 - minind) * sizeof(Vertex), vbuf,
-                 GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawElementsBaseVertex(
         prim_mode[gpu->io.geom.prim_config.mode & 3], gpu->io.geom.nverts,
         gpu->io.geom.indexfmt ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE, 0,
@@ -625,15 +624,9 @@ void gpu_drawimmediate(GPU* gpu) {
 
     AttrConfig cfg;
     vtx_loader_imm_setup(gpu, cfg);
-    ShaderUnit vsh;
-    init_vsh(gpu, &vsh);
-    for (int i = 0; i < nverts; i++) {
-        load_vtx(gpu, cfg, i, vsh.v);
-        pica_shader_exec(&vsh);
-        store_vtx(gpu, i, vbuf, vsh.o);
-    }
-    glBufferData(GL_ARRAY_BUFFER, nverts * sizeof(Vertex), vbuf,
-                 GL_STREAM_DRAW);
+    deploy_vsh(gpu, cfg, 0, 0, nverts, vbuf);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode & 3], 0, nverts);
 
     Vec_free(gpu->immattrs);
@@ -671,7 +664,7 @@ u32 morton_swizzle(u32 w, u32 x, u32 y) {
     ({                                                                         \
         t* data = rawdata;                                                     \
                                                                                \
-        t* pixels = malloc(sizeof(t) * w * h);                                 \
+        t pixels[w * h];                                                       \
                                                                                \
         for (int x = 0; x < w; x++) {                                          \
             for (int y = 0; y < h; y++) {                                      \
@@ -681,11 +674,9 @@ u32 morton_swizzle(u32 w, u32 x, u32 y) {
                                                                                \
         glTexImage2D(GL_TEXTURE_2D, level, glfmt, w, h, 0, glfmt, gltype,      \
                      pixels);                                                  \
-        free(pixels);                                                          \
     })
 
-void* expand_nibbles(u8* src, u32 count) {
-    u8* dst = malloc(count);
+void* expand_nibbles(u8* src, u32 count, u8* dst) {
     for (int i = 0; i < count; i++) {
         u8 b = src[i / 2];
         if (i & 1) b >>= 4;
@@ -756,33 +747,36 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
         case 8:
             LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
             break;
-        case 9:
-            rawdata = expand_nibbles(rawdata, 2 * w * h);
+        case 9: {
+            u8 dec[2 * w * h];
+            rawdata = expand_nibbles(rawdata, 2 * w * h, dec);
             LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
-            free(rawdata);
             break;
-        case 10:
-            rawdata = expand_nibbles(rawdata, w * h);
+        }
+        case 10: {
+            u8 dec[w * h];
+            rawdata = expand_nibbles(rawdata, w * h, dec);
             LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
-            free(rawdata);
             break;
-        case 11:
-            rawdata = expand_nibbles(rawdata, w * h);
+        }
+        case 11: {
+            u8 dec[w * h];
+            rawdata = expand_nibbles(rawdata, w * h, dec);
             LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
-            free(rawdata);
             break;
+        }
         case 12: {
-            u8* dec = etc1_decompress_texture(w, h, rawdata);
+            u8 dec[h * w * 3];
+            etc1_decompress_texture(w, h, rawdata, (void*) dec);
             glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, w, h, 0, GL_RGB,
                          GL_UNSIGNED_BYTE, dec);
-            free(dec);
             break;
         }
         case 13: {
-            u8* dec = etc1a4_decompress_texture(w, h, rawdata);
+            u8 dec[h * w * 4];
+            etc1a4_decompress_texture(w, h, rawdata, (void*) dec);
             glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, w, h, 0, GL_RGBA,
                          GL_UNSIGNED_BYTE, dec);
-            free(dec);
             break;
         }
         default:

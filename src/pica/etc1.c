@@ -7,14 +7,13 @@ const u8 etc1table[8][2] = {
 
 #define CLAMP(x) ((x) < 0 ? 0 : (x) > 255 ? 255 : (x))
 
-u8* flip_vertical(u32 height, u32 pitch, u8 (*tex)[pitch]) {
+void flip_vertical(u32 height, u32 pitch, u8 (*tex)[pitch]) {
     u8 tmp[pitch];
     for (int y = 0; y < height / 2; y++) {
         memcpy(tmp, tex[y], pitch);
         memcpy(tex[y], tex[height - 1 - y], pitch);
         memcpy(tex[height - 1 - y], tmp, pitch);
     }
-    return (u8*) tex;
 }
 
 void etc1_decompress_block(u64 block, u32 width, int Bpp,
@@ -82,9 +81,8 @@ void etc1_decompress_block(u64 block, u32 width, int Bpp,
     }
 }
 
-u8* etc1_decompress_texture(u32 width, u32 height,
-                            u64 (*src)[width / 8][2][2]) {
-    u8(*dst)[width][3] = malloc(height * sizeof *dst);
+void etc1_decompress_texture(u32 width, u32 height, u64 (*src)[width / 8][2][2],
+                             u8 (*dst)[width][3]) {
 
     for (int tx = 0; tx < width / 8; tx++) {
         for (int ty = 0; ty < height / 8; ty++) {
@@ -98,12 +96,12 @@ u8* etc1_decompress_texture(u32 width, u32 height,
         }
     }
 
-    return flip_vertical(height, width * 3, (void*) dst);
+    flip_vertical(height, width * 3, (void*) dst);
 }
 
-u8* etc1a4_decompress_texture(u32 width, u32 height,
-                              u64 (*src)[width / 8][2][2][2]) {
-    u8(*dst)[width][4] = malloc(height * sizeof *dst);
+void etc1a4_decompress_texture(u32 width, u32 height,
+                               u64 (*src)[width / 8][2][2][2],
+                               u8 (*dst)[width][4]) {
 
     for (int tx = 0; tx < width / 8; tx++) {
         for (int ty = 0; ty < height / 8; ty++) {
@@ -127,5 +125,5 @@ u8* etc1a4_decompress_texture(u32 width, u32 height,
         }
     }
 
-    return flip_vertical(height, width * 4, (void*) dst);
+    flip_vertical(height, width * 4, (void*) dst);
 }

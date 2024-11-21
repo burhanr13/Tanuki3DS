@@ -1,12 +1,18 @@
 #ifndef GPU_H
 #define GPU_H
 
+#include <stdatomic.h>
+#include <pthread.h>
+#include <semaphore.h>
+
 #include "../common.h"
 #include "renderer_gl.h"
 #include "shader.h"
 
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
+
+#define VSH_THREADS 4
 
 typedef union {
     float semantics[24];
@@ -410,6 +416,14 @@ typedef struct _GPU {
 
     LRUCache(TexInfo, TEX_MAX) textures;
 
+    struct {
+        pthread_t thds[VSH_THREADS];
+        atomic_int cur;
+        pthread_cond_t cv;
+        pthread_mutex_t mtx;
+        sem_t sem;
+    } vsh_runner;
+
     GLState gl;
 
     GPURegs io;
@@ -442,6 +456,8 @@ extern int g_upscale;
          u32 _i;                                                               \
      }){f})                                                                    \
          ._i)
+
+void gpu_thrds_init(GPU* gpu);
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top);
