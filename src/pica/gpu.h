@@ -416,15 +416,21 @@ typedef struct _GPU {
     LRUCache(TexInfo, TEX_MAX) textures;
 
     struct {
-        pthread_t thds[VSH_THREADS];
-        atomic_int cur;
+        struct {
+            pthread_t thd;
+            pthread_cond_t cv;
+            pthread_mutex_t mtx;
+
+            int off;
+            int count;
+        } thread[VSH_THREADS];
+
         pthread_cond_t cv;
         pthread_mutex_t mtx;
-        pthread_rwlock_t lock;
+
+        atomic_int cur;
 
         int base;
-        int off[VSH_THREADS];
-        int count[VSH_THREADS];
         void* attrcfg;
         void* vbuf;
     } vsh_runner;

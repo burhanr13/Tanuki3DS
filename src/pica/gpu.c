@@ -557,7 +557,6 @@ void init_vsh(GPU* gpu, ShaderUnit* shu) {
 
 void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
                    Vertex* vbuf) {
-    // printfln("run %d %d", dstoff, count);
     ShaderUnit vsh;
     init_vsh(gpu, &vsh);
     for (int i = 0; i < count; i++) {
@@ -570,32 +569,34 @@ void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
 void vsh_thrd_func(GPU* gpu) {
     int id = gpu->vsh_runner.cur++;
 
+    pthread_mutex_lock(&gpu->vsh_runner.thread[id].mtx);
     while (true) {
-        pthread_rwlock_rdlock(&gpu->vsh_runner.lock);
+        pthread_cond_wait(&gpu->vsh_runner.thread[id].cv,
+                          &gpu->vsh_runner.thread[id].mtx);
 
         vsh_run_range(gpu, gpu->vsh_runner.attrcfg,
-                      gpu->vsh_runner.base + gpu->vsh_runner.off[id],
-                      gpu->vsh_runner.off[id], gpu->vsh_runner.count[id],
-                      gpu->vsh_runner.vbuf);
+                      gpu->vsh_runner.base + gpu->vsh_runner.thread[id].off,
+                      gpu->vsh_runner.thread[id].off,
+                      gpu->vsh_runner.thread[id].count, gpu->vsh_runner.vbuf);
 
         gpu->vsh_runner.cur++;
-
+        pthread_mutex_lock(&gpu->vsh_runner.mtx);
         pthread_cond_signal(&gpu->vsh_runner.cv);
-        pthread_rwlock_unlock(&gpu->vsh_runner.lock);
+        pthread_mutex_unlock(&gpu->vsh_runner.mtx);
     }
 }
 
 void gpu_thrds_init(GPU* gpu) {
     gpu->vsh_runner.cur = 0;
-    pthread_cond_init(&gpu->vsh_runner.cv, NULL);
+
     pthread_mutex_init(&gpu->vsh_runner.mtx, NULL);
-    pthread_rwlock_init(&gpu->vsh_runner.lock, NULL);
-    pthread_rwlock_wrlock(&gpu->vsh_runner.lock);
-    pthread_mutex_lock(&gpu->vsh_runner.mtx);
+    pthread_cond_init(&gpu->vsh_runner.cv, NULL);
 
     for (int i = 0; i < VSH_THREADS; i++) {
-        pthread_create(&gpu->vsh_runner.thds[i], NULL, (void*) vsh_thrd_func,
-                       gpu);
+        pthread_mutex_init(&gpu->vsh_runner.thread[i].mtx, NULL);
+        pthread_cond_init(&gpu->vsh_runner.thread[i].cv, NULL);
+        pthread_create(&gpu->vsh_runner.thread[i].thd, NULL,
+                       (void*) vsh_thrd_func, gpu);
     }
 }
 
@@ -603,23 +604,32 @@ void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
     if (VSH_THREADS == 0 || count < 4 * VSH_THREADS) {
         vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
     } else {
+#if VSH_THREADS != 0
         gpu->vsh_runner.attrcfg = attrcfg;
         gpu->vsh_runner.vbuf = vbuf;
         gpu->vsh_runner.base = base;
 
         for (int i = 0; i < VSH_THREADS; i++) {
-            gpu->vsh_runner.off[i] = i * (count / VSH_THREADS);
-            gpu->vsh_runner.count[i] = count / VSH_THREADS;
+            gpu->vsh_runner.thread[i].off = i * (count / VSH_THREADS);
+            gpu->vsh_runner.thread[i].count = count / VSH_THREADS;
         }
-        gpu->vsh_runner.count[VSH_THREADS - 1] =
-            count - gpu->vsh_runner.off[VSH_THREADS - 1];
+        gpu->vsh_runner.thread[VSH_THREADS - 1].count =
+            count - gpu->vsh_runner.thread[VSH_THREADS - 1].off;
 
         gpu->vsh_runner.cur = 0;
-        pthread_rwlock_unlock(&gpu->vsh_runner.lock);
+        for (int i = 0; i < VSH_THREADS; i++) {
+            pthread_cond_signal(&gpu->vsh_runner.thread[i].cv);
+            pthread_mutex_unlock(&gpu->vsh_runner.thread[i].mtx);
+        }
+        pthread_mutex_lock(&gpu->vsh_runner.mtx);
         while (gpu->vsh_runner.cur < VSH_THREADS) {
             pthread_cond_wait(&gpu->vsh_runner.cv, &gpu->vsh_runner.mtx);
         }
-        pthread_rwlock_wrlock(&gpu->vsh_runner.lock);
+        pthread_mutex_unlock(&gpu->vsh_runner.mtx);
+        for (int i = 0; i < VSH_THREADS; i++) {
+            pthread_mutex_lock(&gpu->vsh_runner.thread[i].mtx);
+        }
+#endif
     }
 }
 
