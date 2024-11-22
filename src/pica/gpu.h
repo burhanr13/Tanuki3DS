@@ -418,15 +418,17 @@ typedef struct _GPU {
     struct {
         struct {
             pthread_t thd;
-            pthread_cond_t cv;
-            pthread_mutex_t mtx;
+            
 
             int off;
             int count;
         } thread[VSH_THREADS];
 
-        pthread_cond_t cv;
-        pthread_mutex_t mtx;
+        pthread_cond_t cv1;
+        pthread_mutex_t mtx1;
+
+        pthread_cond_t cv2;
+        pthread_mutex_t mtx2;
 
         atomic_int cur;
 
