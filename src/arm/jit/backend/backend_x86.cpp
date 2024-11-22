@@ -1147,7 +1147,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 switch (inst.op1) {
                     case E_SWI:
-                        mov(esi, (ArmInstr){inst.op2}.sw_intr.arg);
+                        mov(esi, (ArmInstr) {inst.op2}.sw_intr.arg);
                         mov(rax, (u64) cpu->handle_svc);
                         call(rax);
                         break;
@@ -1197,9 +1197,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     cmp(qword[CPU(cycles)], 0);
                     jle(".nolink");
                     pop(rbx);
-                    links.push_back((LinkPatch){(u32) (getCurr() - getCode()),
-                                                inst.op1, inst.op2});
-                    nop(5);
+                    links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
+                                                 inst.op1, inst.op2});
+                    nop(10);
+                    jmp(rax);
                     L(".nolink");
                     outLocalLabel();
                 }
@@ -1232,14 +1233,11 @@ void backend_x86_patch_links(JITBlock* block) {
     for (auto [offset, attrs, addr] : code->links) {
         char* jmpsrc = (char*) code->getCode() + offset;
         JITBlock* linkblock = get_jitblock(code->cpu, attrs, addr);
-        int rel32 = (char*) linkblock->code - (jmpsrc + 5);
-        jmpsrc[0] = 0xe9;
-        jmpsrc[1] = rel32 & 0xff;
-        jmpsrc[2] = (rel32 >> 8) & 0xff;
-        jmpsrc[3] = (rel32 >> 16) & 0xff;
-        jmpsrc[4] = (rel32 >> 24) & 0xff;
+        jmpsrc[0] = 0x48;
+        jmpsrc[1] = 0xb8;
+        *(u64*) &jmpsrc[2] = (u64) linkblock->code;
         Vec_push(linkblock->linkingblocks,
-                 ((BlockLocation){block->attrs, block->start_addr}));
+                 ((BlockLocation) {block->attrs, block->start_addr}));
     }
 
     code->readyRE();
