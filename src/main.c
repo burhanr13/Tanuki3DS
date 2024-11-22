@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
     if (emulator_init(argc, argv) < 0) return -1;
 
     SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS, 0);
-    
+
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
 
     SDL_GameController* controller = NULL;
@@ -106,16 +106,12 @@ int main(int argc, char** argv) {
         }
         cur_time = SDL_GetPerformanceCounter();
         elapsed = cur_time - prev_fps_update;
-        if (elapsed >= SDL_GetPerformanceFrequency() / 2) {
+        if (!ctremu.pause && elapsed >= SDL_GetPerformanceFrequency() / 2) {
             double fps = (double) SDL_GetPerformanceFrequency() *
                          (frame - prev_fps_frame) / elapsed;
-            if (ctremu.pause) {
-                snprintf(wintitle, 199, "ctremu | %s | paused",
-                         ctremu.romfilenodir, fps);
-            } else {
-                snprintf(wintitle, 199, "ctremu | %s | %.2lf FPS",
-                         ctremu.romfilenodir, fps);
-            }
+
+            snprintf(wintitle, 199, "ctremu | %s | %.2lf FPS",
+                     ctremu.romfilenodir, fps);
             SDL_SetWindowTitle(window, wintitle);
             prev_fps_update = cur_time;
             prev_fps_frame = frame;
