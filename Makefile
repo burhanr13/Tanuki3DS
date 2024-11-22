@@ -7,7 +7,7 @@ CSTD := -std=gnu17
 CXXSTD := -std=gnu++20
 CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unused-result -Werror
 CFLAGS_RELEASE := -O3 -flto -DJIT_FASTMEM
-CFLAGS_DEBUG := -g -fsanitize=address
+CFLAGS_DEBUG := -g -O2 #-fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE
 

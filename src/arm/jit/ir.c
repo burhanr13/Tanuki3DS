@@ -103,7 +103,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
 #endif
 
     bool cf = 0, vf = 0;
-    bool jmptaken;
+    bool jmptaken = false;
     while (true) {
         while (block->code.d[i].opcode == IR_NOP) i++;
         switch (block->code.d[i].opcode) {

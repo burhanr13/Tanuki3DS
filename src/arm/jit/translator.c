@@ -32,11 +32,11 @@ ArmCompileFunc compile_funcs[ARM_MAX] = {
 #define INSTRLEN (cpu->cpsr.t ? 2 : 4)
 
 #define EMITXX(opc, _op1, _op2, _imm1, _imm2)                                  \
-    (irblock_write(block, (IRInstr){.opcode = IR_##opc,                        \
-                                    .imm1 = _imm1,                             \
-                                    .imm2 = _imm2,                             \
-                                    .op1 = _op1,                               \
-                                    .op2 = _op2}))
+    (irblock_write(block, (IRInstr) {.opcode = IR_##opc,                       \
+                                     .imm1 = _imm1,                            \
+                                     .imm2 = _imm2,                            \
+                                     .op1 = _op1,                              \
+                                     .op2 = _op2}))
 
 #define EMITVX(opc, op1, op2, imm) EMITXX(opc, op1, op2, 0, imm)
 #define EMITVV(opc, op1, op2) EMITVX(opc, op1, op2, 0)
@@ -76,7 +76,7 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
 
     for (int i = 0; i < MAX_BLOCK_INSTRS; i++) {
         ArmInstr instr = cpu->cpsr.t ? thumb_lookup[cpu->fetch16(cpu, addr)]
-                                     : (ArmInstr){cpu->fetch32(cpu, addr)};
+                                     : (ArmInstr) {cpu->fetch32(cpu, addr)};
         bool can_continue = arm_compile_instr(block, cpu, addr, instr);
         addr += INSTRLEN;
         block->numinstr++;
@@ -218,7 +218,7 @@ u32 compile_shifter(IRBlock* block, ArmCore* cpu, u8 op, u32 operand, u32 shamt,
 }
 
 DECL_ARM_COMPILE(data_proc) {
-    u32 op1, op2;
+    u32 op1 = 0, op2 = 0;
     bool imm = instr.data_proc.i;
 
     bool usingop1 =
@@ -272,7 +272,8 @@ DECL_ARM_COMPILE(data_proc) {
                                   instr.data_proc.s ? &shiftc : NULL);
         }
     }
-    if (usingop1 && instr.data_proc.rn == 15 && instr.data_proc.rd != 15 && cpu->cpsr.t) {
+    if (usingop1 && instr.data_proc.rn == 15 && instr.data_proc.rd != 15 &&
+        cpu->cpsr.t) {
         op1 = EMITVI(AND, op1, ~3);
     }
 
