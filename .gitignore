@@ -16,5 +16,6 @@ ctremu*
 system
 
 perf*
+*.rdc
 
 .DS_Store
