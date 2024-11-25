@@ -7,8 +7,6 @@
 #include <unistd.h>
 
 #include "3ds.h"
-#include "arm/arm.h"
-#include "arm/thumb.h"
 #include "emulator_state.h"
 #include "services/hid.h"
 
@@ -174,7 +172,7 @@ void update_input(HLE3DS* s, SDL_GameController* controller) {
     if (pressed) {
         x -= (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * g_upscale;
         x /= g_upscale;
-        y -= SCREEN_HEIGHT;
+        y -= SCREEN_HEIGHT * g_upscale;
         y /= g_upscale;
         if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
             hid_update_touch(s, 0, 0, false);
