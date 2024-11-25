@@ -13,6 +13,7 @@
 #include "services/fs.h"
 #include "services/gsp.h"
 #include "services/hid.h"
+#include "services/ir.h"
 #include "services/mic.h"
 #include "services/ndm.h"
 #include "services/nim.h"
