@@ -24,6 +24,7 @@ void readsrc(ShaderUnit* shu, fvec src, u32 n, u8 idx, u8 swizzle, bool neg) {
             if (n < 0x60) {
                 rn = &shu->c[n];
             } else {
+                // out of bounds uniforms read as vec4(1)
                 static fvec dummy = {1, 1, 1, 1};
                 rn = &dummy;
             }
@@ -87,6 +88,7 @@ static inline bool compare(u32 op, float a, float b) {
     }
 }
 
+// pica semantics for these operations differ from IEEE standards
 #define MUL(a, b) ((a != 0) ? a * b : 0)
 #define MAX(a, b) (isinf(b) ? b : fmaxf(b, a))
 #define MIN(a, b) (fminf(b, a))
@@ -94,6 +96,7 @@ static inline bool compare(u32 op, float a, float b) {
 typedef struct {
     u32 pc;
     u32 dest;
+    
     bool loop;
     u32 idx;
     u32 inc;

@@ -207,16 +207,12 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 break;
             case IR_CP15_READ: {
                 ArmInstr cpinst = {OP(1)};
-                v[i] = cpu->cp15_read(cpu, cpinst.cp_reg_trans.crn,
-                                      cpinst.cp_reg_trans.crm,
-                                      cpinst.cp_reg_trans.cp);
+                v[i] = cpu->cp15_read(cpu, cpinst);
                 break;
             }
             case IR_CP15_WRITE: {
                 ArmInstr cpinst = {OP(1)};
-                cpu->cp15_write(cpu, cpinst.cp_reg_trans.crn,
-                                cpinst.cp_reg_trans.crm, cpinst.cp_reg_trans.cp,
-                                OP(2));
+                cpu->cp15_write(cpu, cpinst, OP(2));
                 break;
             }
             case IR_LOAD_MEM8:
@@ -431,7 +427,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
             case IR_EXCEPTION:
                 switch (OP(1)) {
                     case E_SWI:
-                        cpu->handle_svc(cpu, (ArmInstr){OP(2)}.sw_intr.arg);
+                        cpu->handle_svc(cpu, (ArmInstr) {OP(2)}.sw_intr.arg);
                         break;
                     case E_UND:
                         cpu_undefined_fail(cpu, OP(2));

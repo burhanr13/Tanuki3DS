@@ -82,6 +82,7 @@ void hid_update_pad(HLE3DS* s, u32 btns, s32 cx, s32 cy) {
 
     linfo("signaling hid event pad0");
     event_signal(s, &s->services.hid.events[HIDEVENT_PAD0]);
+    event_signal(s, &s->services.hid.events[HIDEVENT_PAD1]);
 }
 
 void hid_update_touch(HLE3DS* s, u16 x, u16 y, bool pressed) {
@@ -101,4 +102,5 @@ void hid_update_touch(HLE3DS* s, u16 x, u16 y, bool pressed) {
 
     linfo("signaling hid event pad0");
     event_signal(s, &s->services.hid.events[HIDEVENT_PAD0]);
+    event_signal(s, &s->services.hid.events[HIDEVENT_PAD1]);
 }

@@ -1,5 +1,7 @@
 #include "media.h"
 
+// interpreter implementations of the integer SIMD "media" instructions
+
 u32 media_uadd8(ArmCore* cpu, u32 a, u32 b) {
     u32 res = 0;
     for (int i = 0; i < 4; i++) {

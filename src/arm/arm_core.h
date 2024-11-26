@@ -102,8 +102,8 @@ typedef struct _ArmCore {
 
     void (*handle_svc)(ArmCore* cpu, u32 num);
 
-    u32 (*cp15_read)(ArmCore* cpu, u32 cn, u32 cm, u32 cp);
-    void (*cp15_write)(ArmCore* cpu, u32 cn, u32 cm, u32 cp, u32 data);
+    u32 (*cp15_read)(ArmCore* cpu, ArmInstr instr);
+    void (*cp15_write)(ArmCore* cpu, ArmInstr instr, u32 data);
 
     void* fastmem;
 

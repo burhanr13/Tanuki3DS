@@ -28,7 +28,7 @@ void cpu_writef64(HLE3DS* s, u32 addr, double d);
 
 void cpu_handle_svc(HLE3DS* s, u32 num);
 
-u32 cp15_read(HLE3DS* s, u32 cn, u32 cm, u32 cp);
-void cp15_write(HLE3DS* s, u32 cn, u32 cm, u32 cp, u32 data);
+u32 cp15_read(HLE3DS* s, ArmInstr instr);
+void cp15_write(HLE3DS* s, ArmInstr instr, u32 data);
 
 #endif

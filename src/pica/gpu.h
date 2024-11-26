@@ -92,6 +92,7 @@ typedef struct {
     u32 _pad[2];
 } TexEnvRegs;
 
+// we need this since there are some 64 bit io regs not aligned to 8 bytes
 #pragma pack(push, 1)
 typedef union {
     u32 w[GPUREG_MAX];

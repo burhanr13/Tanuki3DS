@@ -22,6 +22,11 @@ DECL_PORT(dsp) {
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = size;
+
+            // the dsp code first reads 2 bytes containing the number of entries
+            // (15) then it reads 15 shorts (30 bytes) containing dsp addresses
+            // of each dsp firmware memory region
+
             if (size == 2) {
                 *(u16*) buf = 15;
             }

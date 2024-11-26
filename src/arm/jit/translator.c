@@ -3,7 +3,6 @@
 #include "../arm.h"
 #include "../thumb.h"
 #include "jit.h"
-#include <stdlib.h>
 
 ArmCompileFunc compile_funcs[ARM_MAX] = {
     [ARM_DATAPROC] = compile_arm_data_proc,

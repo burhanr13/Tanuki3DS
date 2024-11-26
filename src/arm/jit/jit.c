@@ -111,6 +111,10 @@ void jit_exec(JITBlock* block) {
 #endif
 }
 
+// the jit cache is formatted as follows
+// 64 root entries corresponding to low 6 bits of cpsr of the block
+// then BIT(16) entries corresponding to bit[31:16] of start addr
+// then BIT(15) entries corresponding to bit[15:1] of start addr
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
     u32 addrhi = addr >> 16;
     u32 addrlo = (addr & 0xffff) >> 1;
