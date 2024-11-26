@@ -1,6 +1,6 @@
 # Tanuki3DS
 
-Tanuki3DS is a new HLE 3DS emulator written in C which aims to be simple, fast, and compatible. Currently it can play a handful of games at full speed and supports some nice features like controller support and video upscaling.
+Tanuki3DS is a new HLE 3DS emulator written in C which aims to be simple, fast, and compatible. Currently it can play a handful of games at full speed and supports some nice features like controller support and video upscaling. If you have any questions, you can join our [discord server](https://discord.gg/6ya65fvD3g).
 
 <img src=images/oot3d.png width=300><img src=images/mk7.png width=300>
 
