@@ -5,10 +5,10 @@
 #include "svc.h"
 #include "thread.h"
 
-//#define CPULOG
-//#define BREAK
-// #define WATCH
-//#define PATCHFN
+// #define CPULOG
+// #define BREAK
+//  #define WATCH
+// #define PATCHFN
 
 void cpu_init(HLE3DS* s) {
     s->cpu.read8 = (void*) cpu_read8;
@@ -123,12 +123,12 @@ void cpu_handle_svc(HLE3DS* s, u32 num) {
     hle3ds_handle_svc(s, num);
 }
 
-u32 cp15_read(HLE3DS* s, u32 cn, u32 cm, u32 cp) {
-    switch (cn) {
+u32 cp15_read(HLE3DS* s, ArmInstr instr) {
+    switch (instr.cp_reg_trans.crn) {
         case 13:
-            switch (cm) {
+            switch (instr.cp_reg_trans.crm) {
                 case 0:
-                    switch (cp) {
+                    switch (instr.cp_reg_trans.cp) {
                         case 3:
                             return CUR_TLS;
                     }
@@ -136,16 +136,18 @@ u32 cp15_read(HLE3DS* s, u32 cn, u32 cm, u32 cp) {
             }
             break;
     }
-    lwarn("unknown cp15 read: %d,%d,%d", cn, cm, cp);
+    lwarn("unknown cp15 read: %d,%d,%d", instr.cp_reg_trans.crn,
+          instr.cp_reg_trans.crm, instr.cp_reg_trans.cp);
     return 0;
 }
 
-void cp15_write(HLE3DS* s, u32 cn, u32 cm, u32 cp, u32 data) {
-    switch (cn) {
+void cp15_write(HLE3DS* s, ArmInstr instr, u32 data) {
+    switch (instr.cp_reg_trans.crn) {
         case 7:
-            switch (cm) {
+            switch (instr.cp_reg_trans.crm) {
                 case 10:
-                    switch (cp) {
+                    switch (instr.cp_reg_trans.cp) {
+                        // these are the data and memory barrier instructions
                         case 4:
                             return;
                         case 5:
@@ -154,16 +156,7 @@ void cp15_write(HLE3DS* s, u32 cn, u32 cm, u32 cp, u32 data) {
                     break;
             }
             break;
-        case 13:
-            switch (cm) {
-                case 0:
-                    switch (cp) {
-                        case 3:
-                            return;
-                    }
-                    break;
-            }
-            break;
     }
-    lwarn("unknown cp15 write: %d,%d,%d", cn, cm, cp);
+    lwarn("unknown cp15 write: %d,%d,%d", instr.cp_reg_trans.crn,
+          instr.cp_reg_trans.crm, instr.cp_reg_trans.cp);
 }

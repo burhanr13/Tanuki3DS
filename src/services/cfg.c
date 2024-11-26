@@ -13,6 +13,9 @@ DECL_PORT(cfg) {
             linfo("GetConfigInfoBlk2 with blkid %x", blkid);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
+
+            // these are currently set to reasonable defaults
+            // in the future it should be possible to change these
             switch (blkid) {
                 case 0x50005: {
                     float* block = ptr;

@@ -16,6 +16,17 @@ uniform sampler2D tex2;
 
 #define BIT(k, n) ((k&(1<<n))!=0)
 
+#define TEVSRC_COLOR 0
+#define TEVSRC_LIGHT_PRIMARY 1
+#define TEVSRC_LIGHT_SECONDARY 2
+#define TEVSRC_TEX0 3
+#define TEVSRC_TEX1 4
+#define TEVSRC_TEX2 5
+#define TEVSRC_TEX3 6
+#define TEVSRC_BUFFER 13
+#define TEVSRC_CONSTANT 14
+#define TEVSRC_PREVIOUS 15
+
 #define L_DIRECTIONAL 0
 #define L_TWOSIDED 1
 
@@ -62,6 +73,7 @@ layout (std140) uniform UberUniforms {
     float alpharef;
 };
 
+// q * v * q^-1
 vec3 quatrot(vec4 q, vec3 v) {
     return 2 * (q.w * cross(q.xyz, v) + q.xyz * dot(q.xyz, v)) +
            (q.w * q.w - dot(q.xyz, q.xyz)) * v;
@@ -87,6 +99,9 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
             l = normalize(quatrot(nq, view + light[i].vec.xyz));
         }
         vec3 h = normalize((l + v) / 2);
+
+        // right now we just use phong shading
+        // TODO: implement this properly
 
         float diffuselevel = max(l.z, 0);
         primary.rgb += diffuselevel * light[i].diffuse;
@@ -183,15 +198,15 @@ bool run_alphatest(float a) {
 }
 
 void main() {
-    tev_srcs[0] = color;
-    calc_lighting(tev_srcs[1], tev_srcs[2]);
-    tev_srcs[3] = texture(tex0, texcoord0);
-    tev_srcs[4] = texture(tex1, texcoord1);
-    tev_srcs[5] = texture(tex2, tex2coord ? texcoord1 : texcoord2);
+    tev_srcs[TEVSRC_COLOR] = color;
+    calc_lighting(tev_srcs[TEVSRC_LIGHT_PRIMARY], tev_srcs[TEVSRC_LIGHT_SECONDARY]);
+    tev_srcs[TEVSRC_TEX0] = texture(tex0, texcoord0);
+    tev_srcs[TEVSRC_TEX1] = texture(tex1, texcoord1);
+    tev_srcs[TEVSRC_TEX2] = texture(tex2, tex2coord ? texcoord1 : texcoord2);
 
     vec4 next_buffer = tev_buffer_color;
     for (int i = 0; i < 6; i++) {
-        tev_srcs[14] = tev[i].color;
+        tev_srcs[TEVSRC_CONSTANT] = tev[i].color;
 
         vec4 res;
         res.rgb = tev_combine_rgb(i);
@@ -205,7 +220,7 @@ void main() {
 
         res = clamp(res, 0, 1);
 
-        tev_srcs[13] = next_buffer;
+        tev_srcs[TEVSRC_BUFFER] = next_buffer;
 
         if (BIT(tev_update_rgb, i)) {
             next_buffer.rgb = res.rgb;
@@ -214,10 +229,10 @@ void main() {
             next_buffer.a = res.a;
         }
 
-        tev_srcs[15] = res;
+        tev_srcs[TEVSRC_PREVIOUS] = res;
     }
 
-    fragclr = tev_srcs[15];
+    fragclr = tev_srcs[TEVSRC_PREVIOUS];
 
     if (alphatest && !run_alphatest(fragclr.a)) discard;
 

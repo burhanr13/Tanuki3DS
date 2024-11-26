@@ -318,11 +318,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_VFP_WRITE64H:
                 break;
             case IR_CP15_READ: {
-                ArmInstr cpinst = {inst.op1};
                 mov(rdi, rbx);
-                mov(esi, cpinst.cp_reg_trans.crn);
-                mov(edx, cpinst.cp_reg_trans.crm);
-                mov(ecx, cpinst.cp_reg_trans.cp);
+                mov(esi, inst.op1);
                 mov(rax, (u64) cpu->cp15_read);
                 call(rax);
                 mov(getOp(i), eax);
@@ -330,15 +327,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_CP15_WRITE: {
                 if (inst.imm2) {
-                    mov(r8d, inst.op2);
+                    mov(edx, inst.op2);
                 } else {
-                    mov(r8d, getOp(inst.op2));
+                    mov(edx, getOp(inst.op2));
                 }
-                ArmInstr cpinst = {inst.op1};
                 mov(rdi, rbx);
-                mov(esi, cpinst.cp_reg_trans.crn);
-                mov(edx, cpinst.cp_reg_trans.crm);
-                mov(ecx, cpinst.cp_reg_trans.cp);
+                mov(esi, inst.op1);
                 mov(rax, (u64) cpu->cp15_write);
                 call(rax);
                 break;

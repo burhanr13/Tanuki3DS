@@ -97,6 +97,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     gpu->io.w[id] &= ~mask;
     gpu->io.w[id] |= param & mask;
     switch (id) {
+        // this is a slow way to maybe ensure texture cache coherency
         // case GPUREG(tex.config):
         //     if (gpu->io.tex.config.clearcache) {
         //         while (gpu->textures.size) {
@@ -154,6 +155,9 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         }
         case GPUREG(geom.start_draw_func0):
+            // this register must be written to after any draw call so we can
+            // use it to end an immediate draw call, since there is no explicit
+            // way to end an immediate mode draw call like glEnd
             if (gpu->immattrs.size) {
                 gpu_update_gl_state(gpu);
                 gpu_drawimmediate(gpu);
@@ -241,10 +245,12 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
             gpu_write_internalreg(gpu, c.id, *cur++, mask);
             if (c.incmode) c.id++;
         }
+        // each command must be 8 byte aligned
         if (c.nparams & 1) cur++;
     }
 }
 
+// searches the framebuffer cache and return NULL if not found
 FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
     FBInfo* newfb = NULL;
     for (int i = 0; i < FB_MAX; i++) {
@@ -257,6 +263,7 @@ FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
     return newfb;
 }
 
+// searches the framebuffer cache and creates a new framebuffer if not found
 FBInfo* fbcache_load(GPU* gpu, u32 color_paddr) {
     FBInfo* newfb = NULL;
     for (int i = 0; i < FB_MAX; i++) {
@@ -323,6 +330,8 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top) {
     FBInfo* fb = NULL;
     int yoffsrc;
+    // the source is often offset into an existing framebuffer, so we need to
+    // account for this
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].width == 0) continue;
         yoffsrc = gpu->fbs.d[i].color_paddr - paddr;
@@ -374,6 +383,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
     }
 }
 
+// ensures there is a texture with the given paddr in the cache
 TexInfo* texcache_load(GPU* gpu, u32 paddr) {
     TexInfo* tex = NULL;
     for (int i = 0; i < TEX_MAX; i++) {
@@ -715,6 +725,9 @@ u32 morton_swizzle(u32 w, u32 x, u32 y) {
         0x00, 0x01, 0x04, 0x05, 0x10, 0x11, 0x14, 0x15,
     };
 
+    // textures are stored as 8x8 tiles, and within each each tile the x and y
+    // coordinates are interleaved
+
     u32 tx = x >> 3;
     u32 fx = x & 7;
     u32 ty = y >> 3;
@@ -783,59 +796,59 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
     w >>= level;
     h >>= level;
     switch (fmt) {
-        case 0:
+        case 0: // rgba8888
             LOAD_TEX(u32, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8);
             break;
-        case 1:
+        case 1: // rgb888
             LOAD_TEX(u24, GL_RGB, GL_UNSIGNED_BYTE);
             break;
-        case 2:
+        case 2: // rgba5551
             LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1);
             break;
-        case 3:
+        case 3: // rgb565
             LOAD_TEX(u16, GL_RGB, GL_UNSIGNED_SHORT_5_6_5);
             break;
-        case 4:
+        case 4: // rgba4444
             LOAD_TEX(u16, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
             break;
-        case 5:
+        case 5: // ia88
             LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
             break;
-        case 6:
+        case 6: // hilo8 (rg88)
             LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
             break;
-        case 7:
+        case 7: // i8
             LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
             break;
-        case 8:
+        case 8: // a8
             LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
             break;
-        case 9: {
+        case 9: { // ia44
             u8 dec[2 * w * h];
             rawdata = expand_nibbles(rawdata, 2 * w * h, dec);
             LOAD_TEX(u16, GL_RG, GL_UNSIGNED_BYTE);
             break;
         }
-        case 10: {
+        case 10: { // i4
             u8 dec[w * h];
             rawdata = expand_nibbles(rawdata, w * h, dec);
             LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
             break;
         }
-        case 11: {
+        case 11: { // a4
             u8 dec[w * h];
             rawdata = expand_nibbles(rawdata, w * h, dec);
             LOAD_TEX(u8, GL_RED, GL_UNSIGNED_BYTE);
             break;
         }
-        case 12: {
+        case 12: { // etc1
             u8 dec[h * w * 3];
             etc1_decompress_texture(w, h, rawdata, (void*) dec);
             glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, w, h, 0, GL_RGB,
                          GL_UNSIGNED_BYTE, dec);
             break;
         }
-        case 13: {
+        case 13: { // etc1a4
             u8 dec[h * w * 4];
             etc1a4_decompress_texture(w, h, rawdata, (void*) dec);
             glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, w, h, 0, GL_RGBA,
@@ -861,6 +874,9 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
 
         glBindTexture(GL_TEXTURE_2D, tex->tex);
 
+        // this is not completely correct, since games often use different
+        // textures with the same attributes
+        // TODO: proper cache invalidation
         if (tex->width != regs->width || tex->height != regs->height ||
             tex->fmt != fmt) {
             tex->width = regs->width;
@@ -875,6 +891,8 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
             glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
                              texfmtswizzle[fmt]);
 
+            // mipmap images are stored adjacent in memory and each image is
+            // half the width and height of the previous one
             for (int l = regs->lod.min; l <= regs->lod.max; l++) {
                 load_tex_image(rawdata, tex->width, tex->height, l, fmt);
                 rawdata += TEXSIZE(tex->width, tex->height, fmt, l);
@@ -976,7 +994,7 @@ void gpu_update_gl_state(GPU* gpu) {
     COPYRGBA(ubuf.tev_buffer_color, gpu->io.tex.tev5.buffer_color);
 
     if (gpu->io.fb.color_op.frag_mode != 0) {
-        lwarn("using frag op %d", gpu->io.fb.color_op.frag_mode);
+        lwarn("unknown frag mode %d", gpu->io.fb.color_op.frag_mode);
     }
     if (gpu->io.fb.color_op.blend_mode == 1) {
         glDisable(GL_COLOR_LOGIC_OP);
@@ -1016,6 +1034,9 @@ void gpu_update_gl_state(GPU* gpu) {
     glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
                 gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
     glDepthMask(gpu->io.fb.color_mask.depth);
+
+    // we need to always enable the depth test, since the pica can still write
+    // the depth buffer even if depth testing is disabled
     glEnable(GL_DEPTH_TEST);
     if (gpu->io.fb.color_mask.depthtest) {
         glDepthFunc(compare_func[gpu->io.fb.color_mask.depthfunc & 7]);
@@ -1025,6 +1046,7 @@ void gpu_update_gl_state(GPU* gpu) {
 
     ubuf.numlights = (gpu->io.lighting.numlights & 7) + 1;
     for (int i = 0; i < ubuf.numlights; i++) {
+        // TODO: handle light permutation
         COPYRGB(ubuf.light[i].specular0, gpu->io.lighting.light[i].specular0);
         COPYRGB(ubuf.light[i].specular1, gpu->io.lighting.light[i].specular1);
         COPYRGB(ubuf.light[i].diffuse, gpu->io.lighting.light[i].diffuse);

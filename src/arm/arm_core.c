@@ -2,6 +2,9 @@
 
 #include <stdlib.h>
 
+// most of the code in this file is leftover from my GBA emulator,
+// mostly irrelevant now for 3ds
+
 // #include "thumb.h"
 
 // void cpu_fetch_instr(ArmCore* cpu) {

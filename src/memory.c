@@ -13,7 +13,7 @@
 #include "emulator_state.h"
 #include "svc_types.h"
 
-#ifdef __APPLE__
+#ifndef __linux__
 #define memfd_create(name, x)                                                  \
     ({                                                                         \
         int fd = open(name, O_RDWR | O_CREAT);                                 \

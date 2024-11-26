@@ -7,6 +7,9 @@
 
 ArmInstrFormat arm_lookup[BIT(8)][BIT(4)];
 
+// this file contains an arm interpreter that has not been updated for 3DS
+// the only relevant part is the decoder
+
 // ArmExecFunc exec_funcs[] = {
 //     [ARM_DATAPROC] = exec_arm_data_proc,
 //     [ARM_PSRTRANS] = exec_arm_psr_trans,
