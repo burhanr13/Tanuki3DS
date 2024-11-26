@@ -8,6 +8,8 @@ Tanuki3DS is a new HLE 3DS emulator written in C which aims to be simple, fast, 
 
 This project depends on SDL2, GLEW, and Xbyak to build and run. To build use `make` or `make release` to build the release version or `make debug` for debugging symbols. I have tested on both Linux with gcc and MacOS with Apple clang. Currently Windows is not natively supported, but you should be able to use the emulator on Windows through WSL (Windows Subsystem for Linux).
 
+Note for M1 Mac users: we currently only have x86 backend, so you will need to install dependencies using the x86 version of brew, eg `arch -x86_64 brew install ...`.
+
 ## Usage
 
 You can run the executable in the command line with the rom file as the argument like `./ctremu path/to/game.3ds` (currently supports .elf, .3ds, .cci, .cxi files, roms must be decrypted). You can also pass `-h` to see other options.
