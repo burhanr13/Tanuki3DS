@@ -11,7 +11,7 @@ CFLAGS_DEBUG := -g -O2 -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE
 
-LDFLAGS := -lm -lSDL2 -lcapstone
+LDFLAGS := -lm -lSDL2 #-lcapstone
 
 ifeq ($(shell uname),Darwin)
 	CFLAGS += -arch x86_64
