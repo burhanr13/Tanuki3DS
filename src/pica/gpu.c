@@ -93,6 +93,10 @@ bool is_valid_physmem(u32 addr) {
 }
 
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
+    if (id >= GPUREG_MAX) {
+        lerror("out of bounds gpu reg");
+        return;
+    }
     linfo("command %03x (0x%08x) & %08x (%f)", id, param, mask, I2F(param));
     gpu->io.w[id] &= ~mask;
     gpu->io.w[id] |= param & mask;
@@ -163,14 +167,6 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
                 gpu_drawimmediate(gpu);
             }
             break;
-        case GPUREG(geom.cmdbuf.jmp[0]):
-            gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[0] << 3,
-                                 gpu->io.geom.cmdbuf.size[0] << 3);
-            break;
-        case GPUREG(geom.cmdbuf.jmp[1]):
-            gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[1] << 3,
-                                 gpu->io.geom.cmdbuf.size[1] << 3);
-            break;
         case GPUREG(vsh.floatuniform_data[0])... GPUREG(
             vsh.floatuniform_data[7]): {
             u32 idx = gpu->io.vsh.floatuniform_idx & 7;
@@ -224,6 +220,20 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     }
 }
 
+#define NESTED_CMDLIST()                                                       \
+    ({                                                                         \
+        switch (c.id) {                                                      \
+            case GPUREG(geom.cmdbuf.jmp[0]):                                   \
+                gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[0] << 3,    \
+                                     gpu->io.geom.cmdbuf.size[0] << 3);        \
+                return;                                                        \
+            case GPUREG(geom.cmdbuf.jmp[1]):                                   \
+                gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[1] << 3,    \
+                                     gpu->io.geom.cmdbuf.size[1] << 3);        \
+                return;                                                        \
+        }                                                                      \
+    })
+
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
     gpu->cur_fb = NULL;
 
@@ -238,10 +248,15 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
         if (c.mask & BIT(1)) mask |= 0xff << 8;
         if (c.mask & BIT(2)) mask |= 0xff << 16;
         if (c.mask & BIT(3)) mask |= 0xff << 24;
+
+        // nested command lists are jumps, so we need to handle them over here
+        // to avoid possible stack overflow
+        NESTED_CMDLIST();
         gpu_write_internalreg(gpu, c.id, cur[0], mask);
         cur += 2;
         if (c.incmode) c.id++;
         for (int i = 0; i < c.nparams; i++) {
+            NESTED_CMDLIST();
             gpu_write_internalreg(gpu, c.id, *cur++, mask);
             if (c.incmode) c.id++;
         }
