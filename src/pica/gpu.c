@@ -238,6 +238,7 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
     gpu->cur_fb = NULL;
 
     paddr &= ~15;
+    size &= ~15;
 
     u32* cmds = PTR(paddr);
 
