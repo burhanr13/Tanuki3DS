@@ -1,6 +1,7 @@
 #ifndef GPU_H
 #define GPU_H
 
+#include <stdalign.h>
 #include <stdatomic.h>
 #include <pthread.h>
 
@@ -409,7 +410,7 @@ typedef struct _GPU {
 
     u32 curuniform;
     int curunifi;
-    fvec floatuniform[96];
+    alignas(16) fvec floatuniform[96];
 
     LRUCache(FBInfo, FB_MAX) fbs;
     FBInfo* cur_fb;

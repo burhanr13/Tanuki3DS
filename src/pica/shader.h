@@ -1,6 +1,8 @@
 #ifndef SHADER_H
 #define SHADER_H
 
+#include <stdalign.h>
+
 #include "../common.h"
 
 #define SHADER_CODE_SIZE 512
@@ -128,10 +130,10 @@ typedef struct {
     OpDesc* opdescs;
     u32 entrypoint;
 
-    fvec v[16];
-    fvec o[16];
+    alignas(16) fvec v[16];
+    alignas(16) fvec o[16];
 
-    fvec r[16];
+    alignas(16) fvec r[16];
 
     fvec* c;
     u8 (*i)[4];
