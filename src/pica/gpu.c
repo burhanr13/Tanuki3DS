@@ -237,6 +237,8 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
     gpu->cur_fb = NULL;
 
+    paddr &= ~15;
+
     u32* cmds = PTR(paddr);
 
     u32* cur = cmds;
