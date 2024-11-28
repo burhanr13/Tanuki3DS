@@ -177,10 +177,10 @@ ShaderCode::ShaderCode(ShaderUnit* shu)
     movzx(rsi, word[rdi + offsetof(ShaderUnit, b)]);
     mov(eax, BIT(31));
     movd(xmm3, eax);
-    pshufd(xmm3, xmm3, 0);
+    shufps(xmm3, xmm3, 0);
     mov(eax, 0x3f800000); // 1.0f
     movd(xmm4, eax);
-    pshufd(xmm4, xmm4, 0);
+    shufps(xmm4, xmm4, 0);
 
     compileBlock(shu, shu->entrypoint, SHADER_CODE_SIZE);
 
@@ -270,14 +270,14 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
             case PICA_RCP: {
                 SRC1(xmm0, 1);
                 rcpss(xmm0, xmm0);
-                pshufd(xmm0, xmm0, 0);
+                shufps(xmm0, xmm0, 0);
                 DEST(xmm0, 1);
                 break;
             }
             case PICA_RSQ: {
                 SRC1(xmm0, 1);
                 rsqrtss(xmm0, xmm0);
-                pshufd(xmm0, xmm0, 0);
+                shufps(xmm0, xmm0, 0);
                 DEST(xmm0, 1);
                 break;
             }
