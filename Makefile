@@ -6,12 +6,18 @@ CXX := g++
 CSTD := -std=gnu17
 CXXSTD := -std=gnu++20
 CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unused-result -Werror
-CFLAGS_RELEASE := -O3 -DJIT_FASTMEM #-flto
-CFLAGS_DEBUG := -g -O2 -fsanitize=address
+CFLAGS_RELEASE := -O3 -DJIT_FASTMEM
+CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE
 
-LDFLAGS := -lm -lSDL2 -lcapstone
+LDFLAGS := -lm -lSDL2
+
+ifeq ($(USER), 1)
+	CFLAGS_RELEASE += -flto
+else
+	LDFLAGS += -lcapstone
+endif
 
 ifeq ($(shell uname),Darwin)
 	CFLAGS += -arch x86_64

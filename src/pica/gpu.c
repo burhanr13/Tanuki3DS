@@ -5,6 +5,8 @@
 #include "renderer_gl.h"
 #include "shader.h"
 
+#define SHADERJIT
+
 #undef PTR
 #define PTR(addr) ((void*) &gpu->mem[addr])
 
@@ -207,10 +209,12 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         }
         case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
+            gpu->sh_dirty = true;
             gpu->progdata[gpu->io.vsh.codetrans_idx++ % SHADER_CODE_SIZE] =
                 param;
             break;
         case GPUREG(vsh.opdescs_data[0])... GPUREG(vsh.opdescs_data[8]):
+            gpu->sh_dirty = true;
             gpu->opdescs[gpu->io.vsh.opdescs_idx++ % SHADER_OPDESC_SIZE] =
                 param;
             break;
@@ -222,7 +226,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
 
 #define NESTED_CMDLIST()                                                       \
     ({                                                                         \
-        switch (c.id) {                                                      \
+        switch (c.id) {                                                        \
             case GPUREG(geom.cmdbuf.jmp[0]):                                   \
                 gpu_run_command_list(gpu, gpu->io.geom.cmdbuf.addr[0] << 3,    \
                                      gpu->io.geom.cmdbuf.size[0] << 3);        \
@@ -589,7 +593,11 @@ void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
     init_vsh(gpu, &vsh);
     for (int i = 0; i < count; i++) {
         load_vtx(gpu, cfg, srcoff + i, vsh.v);
+#ifdef SHADERJIT
+        gpu->jitblock.code(&vsh);
+#else
         pica_shader_exec(&vsh);
+#endif
         store_vtx(gpu, dstoff + i, vbuf, vsh.o);
     }
 }
@@ -630,6 +638,14 @@ void gpu_thrds_init(GPU* gpu) {
 }
 
 void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
+    if (gpu->sh_dirty) {
+        ShaderUnit shu;
+        init_vsh(gpu, &shu);
+        shaderjit_free(&gpu->jitblock);
+        shaderjit_compile(&gpu->jitblock, &shu);
+        gpu->sh_dirty = false;
+    }
+
     if (VSH_THREADS == 0 || count < VSH_THREADS) {
         vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
     } else {

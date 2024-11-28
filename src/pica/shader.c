@@ -744,7 +744,7 @@ u32 disasm_instr(ShaderUnit* shu, u32 pc) {
             printf("mad ");
             DDEST(5);
             printf(", ");
-            DSRC3(5);
+            DSRC1(5);
             printf(", ");
             if (instr.fmt5.opcode & 1) {
                 DSRC2(5);

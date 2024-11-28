@@ -8,6 +8,7 @@
 #include "../common.h"
 #include "renderer_gl.h"
 #include "shader.h"
+#include "shaderjit/shaderjit.h"
 
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
@@ -402,6 +403,7 @@ typedef struct _GPU {
     u32 progdata[SHADER_CODE_SIZE];
     u32 opdescs[SHADER_OPDESC_SIZE];
     u32 sh_idx;
+    bool sh_dirty;
 
     fvec fixattrs[16];
     u32 curfixattr;
@@ -416,6 +418,8 @@ typedef struct _GPU {
     FBInfo* cur_fb;
 
     LRUCache(TexInfo, TEX_MAX) textures;
+
+    ShaderJitBlock jitblock;
 
     struct {
         struct {
