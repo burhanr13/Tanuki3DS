@@ -1,14 +1,23 @@
 # Tanuki3DS
 
-Tanuki3DS is a new HLE 3DS emulator written in C which aims to be simple, fast, and compatible. Currently it can play a handful of games at full speed and supports some nice features like controller support and video upscaling. If you have any questions, you can join our [discord server](https://discord.gg/6ya65fvD3g).
+Tanuki3DS is a new HLE 3DS emulator for MacOS and Linux written in C which aims to be simple, fast, and compatible. Currently it can play a handful of games at full speed and supports some nice features like controller support and video upscaling. If you have any questions, you can join our [discord server](https://discord.gg/6ya65fvD3g).
 
 <img src=images/oot3d.png width=300><img src=images/mk7.png width=300>
 
 ## Building
 
-This project depends on SDL2, GLEW, and Xbyak to build and run. To build use `make` or `make release` to build the release version or `make debug` for debugging symbols. I have tested on both Linux with gcc and MacOS with Apple clang. Currently Windows is not natively supported, but you should be able to use the emulator on Windows through WSL (Windows Subsystem for Linux).
+You need the following dependencies installed to build and run:
+- sdl2
+- glew
+- xbyak (build only)
+- xxhash (build only)
+- capstone (build only)
 
-Note for M1 Mac users: we currently only have x86 backend, so you will need to install dependencies using the x86 version of brew, eg `arch -x86_64 brew install ...`.
+They can all be installed with your local package manager (brew on macos, apt on ubuntu, and if you are using some other linux distro you should already know).
+
+To build use `make` or `make release` to build the release version or `make debug` for debugging symbols. I have tested on both Linux with gcc and MacOS with Apple clang. Currently Windows is not natively supported, but you should be able to use the emulator on Windows through WSL (Windows Subsystem for Linux).
+
+Note for M1 Mac users: we currently only have x86 JIT backends, so you will need to install the x86 version of brew, then install dependencies using `arch -x86_64 brew install ...`.
 
 ## Usage
 
