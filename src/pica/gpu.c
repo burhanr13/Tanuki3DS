@@ -594,7 +594,7 @@ void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
     for (int i = 0; i < count; i++) {
         load_vtx(gpu, cfg, srcoff + i, vsh.v);
 #ifdef SHADERJIT
-        gpu->jitblock.code(&vsh);
+        gpu->vsh_runner.jitfunc(&vsh);
 #else
         pica_shader_exec(&vsh);
 #endif
@@ -623,7 +623,7 @@ void vsh_thrd_func(GPU* gpu) {
     }
 }
 
-void gpu_thrds_init(GPU* gpu) {
+void gpu_vshrunner_init(GPU* gpu) {
     gpu->vsh_runner.cur = 0;
 
     pthread_mutex_init(&gpu->vsh_runner.mtx, NULL);
@@ -635,21 +635,26 @@ void gpu_thrds_init(GPU* gpu) {
         pthread_create(&gpu->vsh_runner.thread[i].thd, NULL,
                        (void*) vsh_thrd_func, gpu);
     }
+
+    LRU_init(gpu->vshaders);
 }
 
 void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
+#ifdef SHADERJIT
     if (gpu->sh_dirty) {
         ShaderUnit shu;
         init_vsh(gpu, &shu);
-        shaderjit_free(&gpu->jitblock);
-        shaderjit_compile(&gpu->jitblock, &shu);
+        gpu->vsh_runner.jitfunc = shaderjit_get(gpu, &shu);
         gpu->sh_dirty = false;
     }
+#endif
 
-    if (VSH_THREADS == 0 || count < VSH_THREADS) {
+#if VSH_THREADS == 0
+    vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
+#else
+    if (count < VSH_THREADS) {
         vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
     } else {
-#if VSH_THREADS != 0
         gpu->vsh_runner.attrcfg = attrcfg;
         gpu->vsh_runner.vbuf = vbuf;
         gpu->vsh_runner.base = base;
@@ -669,8 +674,8 @@ void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
         while (gpu->vsh_runner.cur < VSH_THREADS) {
             pthread_cond_wait(&gpu->vsh_runner.cv2, &gpu->vsh_runner.mtx);
         }
-#endif
     }
+#endif
 }
 
 void gpu_drawarrays(GPU* gpu) {

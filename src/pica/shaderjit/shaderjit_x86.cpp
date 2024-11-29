@@ -4,23 +4,6 @@
 #include <vector>
 #include <xbyak/xbyak.h>
 
-// v in r10
-// o in r11
-// r : rbp
-// scratch : xmm0, xmm1, xmm2
-// xmm3 : negation mask
-// xmm4 : ones
-// c in rcx
-// i in rdx
-// b in si
-// a.x in r8b
-// a.y in r9b
-// al in dil
-// cmp.x in al
-// cmp.y in ah
-// rbx scratch
-// loopcounter in r12b
-
 struct ShaderCode : Xbyak::CodeGenerator {
 
     Xbyak::Reg64 reg_v = r10;
@@ -90,23 +73,22 @@ struct ShaderCode : Xbyak::CodeGenerator {
     }
 
     void writedest(Xbyak::Xmm src, int n, u8 mask) {
+        Xbyak::Address addr = xword[(int) 0];
+        if (n < 0x10) {
+            addr = xword[reg_o + 16 * n];
+        } else {
+            n -= 0x10;
+            addr = xword[reg_r + 16 * n];
+        }
         if (mask != 0b1111) {
             // pica destination masks are also backwards
             mask = (mask & 0b1010) >> 1 | (mask & 0b0101) << 1;
             mask = (mask & 0b1100) >> 2 | (mask & 0b0011) << 2;
-            mask = ~mask & 0xf;
-            if (n < 0x10) {
-                blendps(src, xword[reg_o + 16 * n], mask);
-            } else {
-                blendps(src, xword[reg_r + 16 * (n - 0x10)], mask);
-            }
+            // invert the mask since we blend the opposite direction
+            mask ^= 0xf;
+            blendps(src, addr, mask);
         }
-        if (n < 0x10) {
-            movaps(xword[reg_o + 16 * n], src);
-        } else {
-            n -= 0x10;
-            movaps(xword[reg_r + 16 * n], src);
-        }
+        movaps(addr, src);
     }
 
     void compare(Xbyak::Reg8 dst, u8 op) {

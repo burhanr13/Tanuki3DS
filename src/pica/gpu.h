@@ -1,9 +1,9 @@
 #ifndef GPU_H
 #define GPU_H
 
+#include <pthread.h>
 #include <stdalign.h>
 #include <stdatomic.h>
-#include <pthread.h>
 
 #include "../common.h"
 #include "renderer_gl.h"
@@ -419,7 +419,7 @@ typedef struct _GPU {
 
     LRUCache(TexInfo, TEX_MAX) textures;
 
-    ShaderJitBlock jitblock;
+    ShaderCache vshaders;
 
     struct {
         struct {
@@ -439,6 +439,8 @@ typedef struct _GPU {
         int base;
         void* attrcfg;
         void* vbuf;
+
+        ShaderJitFunc jitfunc;
     } vsh_runner;
 
     GLState gl;
@@ -464,17 +466,17 @@ extern int g_upscale;
     (((union {                                                                 \
          u32 _i;                                                               \
          float _f;                                                             \
-     }){i})                                                                    \
+     }) {i})                                                                   \
          ._f)
 
 #define F2I(f)                                                                 \
     (((union {                                                                 \
          float _f;                                                             \
          u32 _i;                                                               \
-     }){f})                                                                    \
+     }) {f})                                                                   \
          ._i)
 
-void gpu_thrds_init(GPU* gpu);
+void gpu_vshrunner_init(GPU* gpu);
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top);
