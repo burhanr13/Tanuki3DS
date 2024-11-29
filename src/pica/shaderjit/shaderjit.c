@@ -2,7 +2,7 @@
 
 #include "shaderjit_backend.h"
 
-#define JIT_DISASM
+//#define JIT_DISASM
 
 void shaderjit_compile(ShaderJitBlock* block, ShaderUnit* shu) {
     block->backend = shaderjit_backend_compile(shu);

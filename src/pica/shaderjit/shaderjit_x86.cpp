@@ -450,11 +450,11 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
                 SRC1(xmm0, 1c);
                 SRC2(xmm1, 1c);
                 comiss(xmm0, xmm1);
-                compare(reg_ax, instr.fmt1c.cmpx);
+                compare(reg_cmpx, instr.fmt1c.cmpx);
                 psrldq(xmm0, 4);
                 psrldq(xmm1, 4);
                 comiss(xmm0, xmm1);
-                compare(reg_ay, instr.fmt1c.cmpy);
+                compare(reg_cmpy, instr.fmt1c.cmpy);
                 break;
             }
             case PICA_MAD ... PICA_MAD + 0xf: {
