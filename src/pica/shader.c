@@ -96,7 +96,7 @@ static inline bool compare(u32 op, float a, float b) {
 typedef struct {
     u32 pc;
     u32 dest;
-    
+
     bool loop;
     u32 idx;
     u32 inc;
@@ -445,7 +445,7 @@ void pica_shader_exec(ShaderUnit* shu) {
     shader_run(shu);
 }
 
-static char coordnames[4][2] = {"x", "y", "z", "w"};
+static char coordnames[4] = "xyzw";
 
 void disasmsrc(u32 n, u8 idx, u8 swizzle, bool neg) {
     if (neg) printf("-");
@@ -486,7 +486,7 @@ void disasmsrc(u32 n, u8 idx, u8 swizzle, bool neg) {
             }
         }
         for (int i = 0; i < ct; i++) {
-            printf("%s", coordnames[sw[i]]);
+            printf("%c", coordnames[sw[i]]);
         }
     }
 }
@@ -497,7 +497,7 @@ void disasmdest(u32 n, u8 mask) {
     if (mask != 0b1111) {
         printf(".");
         for (int i = 0; i < 4; i++) {
-            if (mask & BIT(3 - i)) printf("%s", coordnames[i]);
+            if (mask & BIT(3 - i)) printf("%c", coordnames[i]);
         }
     }
 }
@@ -515,10 +515,10 @@ void disasm_block(ShaderUnit* shu, u32 start, u32 num);
 static inline void disasmcondop(u32 op, bool refx, bool refy) {
     switch (op) {
         case 0:
-            printf("%s and %s", refx ? "x" : "not x", refy ? "y" : "not y");
+            printf("%s or %s", refx ? "x" : "not x", refy ? "y" : "not y");
             break;
         case 1:
-            printf("%s or %s", refx ? "x" : "not x", refy ? "y" : "not y");
+            printf("%s and %s", refx ? "x" : "not x", refy ? "y" : "not y");
             break;
         case 2:
             printf("%s", refx ? "x" : "not x");
@@ -583,6 +583,7 @@ static inline void disasmcompare(u32 op) {
 static struct {
     Vector(PICAInstr) calls;
     u32 depth;
+    u32 farthestjmp;
 } disasm;
 
 u32 disasm_instr(ShaderUnit* shu, u32 pc) {
@@ -648,7 +649,7 @@ u32 disasm_instr(ShaderUnit* shu, u32 pc) {
             break;
         case PICA_END:
             printf("end");
-            pc = -1;
+            if (disasm.farthestjmp < pc) pc = -1;
             break;
         case PICA_CALL:
         case PICA_CALLC:
@@ -724,6 +725,8 @@ u32 disasm_instr(ShaderUnit* shu, u32 pc) {
                 printf(", ");
             }
             printf("%03x", instr.fmt2.dest);
+            if (instr.fmt2.dest > disasm.farthestjmp)
+                disasm.farthestjmp = instr.fmt2.dest;
             break;
         }
         case PICA_CMP ... PICA_CMP + 1: {
@@ -788,6 +791,7 @@ void pica_shader_disasm(ShaderUnit* shu) {
 
     disasm.depth = 0;
     Vec_init(disasm.calls);
+    disasm.farthestjmp = 0;
     printf("proc main\n");
     disasm_block(shu, shu->entrypoint, SHADER_CODE_SIZE);
     printf("end proc\n");

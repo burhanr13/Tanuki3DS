@@ -1160,7 +1160,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_BEGIN: {
                 push(rbx);
                 for (u32 i = 0; i < hralloc.count[REG_SAVED]; i++) {
-                    push(savedregs[i].changeBit(64));
+                    push(savedregs[i].cvt64());
                 }
                 int spdisp = getSPDisp();
                 if (spdisp) sub(rsp, spdisp);
@@ -1183,7 +1183,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 int spdisp = getSPDisp();
                 if (spdisp) add(rsp, spdisp);
                 for (int i = hralloc.count[REG_SAVED] - 1; i >= 0; i--) {
-                    pop(savedregs[i].changeBit(64));
+                    pop(savedregs[i].cvt64());
                 }
 
                 if (inst.opcode == IR_END_LINK) {
@@ -1249,7 +1249,7 @@ void backend_x86_disassemble(void* backend) {
     cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
     size_t count =
         cs_disasm(handle, code->getCode(), code->getSize(), 0, 0, &insn);
-    printf("--------- JIT Disassembly at 0x%p ------------\n", code->getCode());
+    printf("--------- JIT Disassembly at %p ------------\n", code->getCode());
     for (size_t i = 0; i < count; i++) {
         printf("%04lx: %s %s\n", insn[i].address, insn[i].mnemonic,
                insn[i].op_str);
