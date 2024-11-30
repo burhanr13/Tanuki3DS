@@ -15,7 +15,7 @@ You need the following dependencies installed to build and run:
 
 They can all be installed with your local package manager (brew on macos, apt on ubuntu, etc).
 
-To build use `make` or `make release` to build the release version or `make debug` for debugging symbols. I have tested on both Linux with gcc and MacOS with Apple clang. Currently Windows is not natively supported, but you should be able to use the emulator on Windows through WSL (Windows Subsystem for Linux).
+To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. I have tested on both Linux with gcc and MacOS with Apple clang. Currently Windows is not natively supported, but you should be able to use the emulator on Windows through WSL (Windows Subsystem for Linux).
 
 Note for M1 Mac users: we currently only have x86 JIT backends, so you will need to install the x86 version of brew, then install dependencies using `arch -x86_64 brew install ...`.
 
