@@ -5,7 +5,7 @@
 #include <vector>
 #include <xbyak/xbyak.h>
 
-#define JIT_DISASM
+// #define JIT_DISASM
 
 struct ShaderCode : Xbyak::CodeGenerator {
 
