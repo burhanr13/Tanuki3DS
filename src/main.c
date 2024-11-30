@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
                 ctremu.running = false;
                 break;
             }
-            if (e.type == SDL_KEYDOWN && (e.key.keysym.mod & KMOD_CTRL)) {
+            if (e.type == SDL_KEYDOWN) {
                 hotkey_press(e.key.keysym.sym);
             }
         }

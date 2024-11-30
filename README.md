@@ -37,8 +37,8 @@ The keyboard controls are as follows:
 | `Dpad` | `Arrow keys` |
 | `Start` | `Return` |
 | `Select` | `RShift` |
-| Pause/Unpause | `ctrl-P` |
-| Toggle speedup | `ctrl-Tab` |
+| Pause/Unpause | `F5` |
+| Toggle speedup | `Tab` |
 
 The touch screen can be used with the mouse.
 

@@ -87,15 +87,8 @@ void read_args(int argc, char** argv) {
 
 void hotkey_press(SDL_KeyCode key) {
     switch (key) {
-        case SDLK_p:
+        case SDLK_F5:
             ctremu.pause = !ctremu.pause;
-            break;
-        case SDLK_m:
-            ctremu.mute = !ctremu.mute;
-            break;
-        case SDLK_r:
-            emulator_reset();
-            ctremu.pause = false;
             break;
         case SDLK_TAB:
             ctremu.uncap = !ctremu.uncap;
