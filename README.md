@@ -13,7 +13,7 @@ You need the following dependencies installed to build and run:
 - xxhash (build only)
 - capstone (build only)
 
-They can all be installed with your local package manager (brew on macos, apt on ubuntu, and if you are using some other linux distro you should already know).
+They can all be installed with your local package manager (brew on macos, apt on ubuntu, etc).
 
 To build use `make` or `make release` to build the release version or `make debug` for debugging symbols. I have tested on both Linux with gcc and MacOS with Apple clang. Currently Windows is not natively supported, but you should be able to use the emulator on Windows through WSL (Windows Subsystem for Linux).
 

@@ -8,8 +8,8 @@ extern "C" {
 #include "../shader.h"
 #include "shaderjit.h"
 
-void* shaderjit_x86_compile(ShaderUnit* shu);
-ShaderJitFunc shaderjit_x86_get_code(void* backend);
+void* shaderjit_x86_init();
+ShaderJitFunc shaderjit_x86_get_code(void* backend, ShaderUnit* shu);
 void shaderjit_x86_free(void* backend);
 void shaderjit_x86_disassemble(void* backend);
 

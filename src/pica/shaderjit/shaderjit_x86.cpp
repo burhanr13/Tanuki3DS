@@ -1,8 +1,11 @@
 #include "shaderjit_x86.h"
 
 #include <capstone/capstone.h>
+#include <map>
 #include <vector>
 #include <xbyak/xbyak.h>
+
+#define JIT_DISASM
 
 struct ShaderCode : Xbyak::CodeGenerator {
 
@@ -24,10 +27,41 @@ struct ShaderCode : Xbyak::CodeGenerator {
     Xbyak::Reg8 loopcounter = r12b;
 
     std::vector<PICAInstr> calls;
+    std::map<u32, u32> entrypoints;
 
-    ShaderCode(ShaderUnit* shu);
+    ShaderCode() : Xbyak::CodeGenerator(4096, Xbyak::AutoGrow) {}
 
+    u32 compileWithEntry(ShaderUnit* shu, u32 entry);
     void compileBlock(ShaderUnit* shu, u32 start, u32 len);
+
+    void compileAllEntries(ShaderUnit* shu) {
+        reset();
+        calls.clear();
+        for (auto& e : entrypoints) {
+            e.second = compileWithEntry(shu, e.first);
+        }
+        ready();
+    }
+
+    // it is possible to have multiple entrypoints in the same shader
+    // we keep track of them and whenever there is a new one we recompile
+    // the entire shader
+    const u8* getCodeForEntry(ShaderUnit* shu) {
+        auto e = entrypoints.find(shu->entrypoint);
+        u32 offset;
+        if (e == entrypoints.end()) {
+            entrypoints[shu->entrypoint] = 0;
+            compileAllEntries(shu);
+            offset = entrypoints[shu->entrypoint];
+#ifdef JIT_DISASM
+            pica_shader_disasm(shu);
+            shaderjit_x86_disassemble((void*) this);
+#endif
+        } else {
+            offset = e->second;
+        }
+        return getCode() + offset;
+    }
 
     void readsrc(Xbyak::Xmm dst, u32 n, u8 idx, u8 swizzle, bool neg) {
         Xbyak::Address addr = xword[(int) 0];
@@ -158,8 +192,17 @@ struct ShaderCode : Xbyak::CodeGenerator {
     }
 };
 
-ShaderCode::ShaderCode(ShaderUnit* shu)
-    : Xbyak::CodeGenerator(4096, Xbyak::AutoGrow) {
+std::string endLabel(u32 entry) {
+    return std::string("end") + std::to_string(entry);
+}
+
+// returns the offset of the function for the given entrypoint
+u32 ShaderCode::compileWithEntry(ShaderUnit* shu, u32 entry) {
+    u32 offset = getCurr() - getCode();
+
+    // this is so we only compile any functions that were not already compiled
+    // while compiling previous entry points
+    u32 callsStart = calls.size();
 
     push(rbp);
     push(rbx);
@@ -178,21 +221,21 @@ ShaderCode::ShaderCode(ShaderUnit* shu)
     movd(ones, eax);
     shufps(ones, ones, 0);
 
-    compileBlock(shu, shu->entrypoint, SHADER_CODE_SIZE);
+    compileBlock(shu, entry, SHADER_CODE_SIZE);
 
-    L("end");
+    L(endLabel(entry));
     add(rsp, 16 * 16);
     pop(r12);
     pop(rbx);
     pop(rbp);
     ret();
 
-    for (size_t i = 0; i < calls.size(); i++) {
+    for (size_t i = callsStart; i < calls.size(); i++) {
         compileBlock(shu, calls[i].fmt2.dest, calls[i].fmt2.num);
         ret();
     }
 
-    ready();
+    return offset;
 }
 
 #define SRC(v, i, _fmt)                                                        \
@@ -331,9 +374,13 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
             case PICA_NOP:
                 break;
             case PICA_END:
+                // there can be multiple end instructions
+                // in the same main procedure, if the first one
+                // is skipped with a jump
+                // if this is not the final end, we just jump to the end label
                 if (farthestjmp < pc) return;
                 else {
-                    jmp("end", T_NEAR);
+                    jmp(endLabel(shu->entrypoint), T_NEAR);
                     break;
                 }
             case PICA_CALL:
@@ -467,12 +514,12 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
 
 extern "C" {
 
-void* shaderjit_x86_compile(ShaderUnit* shu) {
-    return (void*) new ShaderCode(shu);
+void* shaderjit_x86_init() {
+    return (void*) new ShaderCode();
 }
 
-ShaderJitFunc shaderjit_x86_get_code(void* backend) {
-    return (ShaderJitFunc) ((ShaderCode*) backend)->getCode();
+ShaderJitFunc shaderjit_x86_get_code(void* backend, ShaderUnit* shu) {
+    return (ShaderJitFunc) ((ShaderCode*) backend)->getCodeForEntry(shu);
 }
 
 void shaderjit_x86_free(void* backend) {

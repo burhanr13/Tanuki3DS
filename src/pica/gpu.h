@@ -341,8 +341,8 @@ typedef union {
                 u32 _285[4];
                 u32 inconfig;
                 struct {
-                    u32 entrypoint : 16;
-                    u32 entrypointhi : 16;
+                    u16 entrypoint;
+                    u16 entrypointhi;
                 };
                 u64 permutation;
                 u32 outmap_mask;

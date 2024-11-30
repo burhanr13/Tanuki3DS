@@ -208,6 +208,9 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             }
             break;
         }
+        case GPUREG(vsh.entrypoint):
+            gpu->sh_dirty = true;
+            break;
         case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
             gpu->sh_dirty = true;
             gpu->progdata[gpu->io.vsh.codetrans_idx++ % SHADER_CODE_SIZE] =
