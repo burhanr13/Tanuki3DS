@@ -1062,7 +1062,11 @@ void gpu_update_gl_state(GPU* gpu) {
 
     if (gpu->io.fb.stencil_test.enable) {
         glEnable(GL_STENCIL_TEST);
-        glStencilMask(gpu->io.fb.stencil_test.bufmask);
+        if (gpu->io.fb.perms.depthbuf.write & BIT(0)) {
+            glStencilMask(gpu->io.fb.stencil_test.bufmask);
+        } else {
+            glStencilMask(0);
+        }
         glStencilFunc(compare_func[gpu->io.fb.stencil_test.func & 7],
                       gpu->io.fb.stencil_test.ref,
                       gpu->io.fb.stencil_test.mask);
@@ -1073,9 +1077,19 @@ void gpu_update_gl_state(GPU* gpu) {
         glDisable(GL_STENCIL_TEST);
     }
 
-    glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
-                gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
-    glDepthMask(gpu->io.fb.color_mask.depth);
+    if (gpu->io.fb.perms.colorbuf.write) {
+        glColorMask(gpu->io.fb.color_mask.red, gpu->io.fb.color_mask.green,
+                    gpu->io.fb.color_mask.blue, gpu->io.fb.color_mask.alpha);
+    } else {
+        glColorMask(false, false, false, false);
+    }
+    // you can disable writing to the depth buffer with this bit
+    // instead of using the depth mask
+    if (gpu->io.fb.perms.depthbuf.write & BIT(1)) {
+        glDepthMask(gpu->io.fb.color_mask.depth);
+    } else {
+        glDepthMask(false);
+    }
 
     // we need to always enable the depth test, since the pica can still write
     // the depth buffer even if depth testing is disabled
