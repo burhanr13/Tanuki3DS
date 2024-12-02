@@ -1,12 +1,10 @@
 #include "loader.h"
 
-#include <elf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 
 #include "3ds.h"
-#include "filesystems.h"
 #include "svc_types.h"
 
 u32 load_elf(HLE3DS* s, char* filename) {

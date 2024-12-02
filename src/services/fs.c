@@ -7,7 +7,7 @@
 
 #include "../3ds.h"
 #include "../emulator_state.h"
-#include "../filesystems.h"
+#include "../loader.h"
 #include "../srv.h"
 
 #include "../../sys_files/mii_data.h"
