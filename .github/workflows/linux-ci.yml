@@ -1,0 +1,23 @@
+name: Linux CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: install dependencies
+      run: sudo apt install libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev
+    - name: build
+      run: make USER=1
+    - name: compress
+      run: zip ctremu-linux.zip ./ctremu
+    - uses: actions/upload-artifact@v4
+      with: 
+        path: ./ctremu-linux.zip
