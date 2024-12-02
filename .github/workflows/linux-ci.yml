@@ -16,8 +16,7 @@ jobs:
       run: sudo apt install libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
     - name: build
       run: make USER=1
-    - name: compress
-      run: zip ctremu-linux.zip ./ctremu
     - uses: actions/upload-artifact@v4
-      with: 
+      with:
+        name: ctremu-linux
         path: ./ctremu-linux.zip
