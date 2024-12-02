@@ -19,4 +19,4 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: ctremu-linux
-        path: ./ctremu-linux.zip
+        path: ./ctremu
