@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
-      run: sudo apt install libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev
+      run: sudo apt install libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
     - name: build
       run: make USER=1
     - name: compress
