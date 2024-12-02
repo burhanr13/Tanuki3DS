@@ -4,6 +4,10 @@ Tanuki3DS is a new HLE 3DS emulator for MacOS and Linux written in C which aims 
 
 <img src=images/oot3d.png width=300><img src=images/mk7.png width=300>
 
+## Download
+
+You can download a stable release from the releases tab, or the latest builds for [Linux](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux.zip) or [MacOS](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos.zip).
+
 ## Building
 
 You need the following dependencies installed to build and run:
