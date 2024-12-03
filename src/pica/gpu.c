@@ -903,6 +903,11 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
 }
 
 void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
+    if ((regs->addr << 3) < VRAM_PBASE) {
+        // games setup textures with NULL sometimes
+        return;
+    }
+
     FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
     glActiveTexture(GL_TEXTURE0 + id);
     if (fb) {
@@ -1091,8 +1096,8 @@ void gpu_update_gl_state(GPU* gpu) {
         glDepthMask(false);
     }
 
-    // we need to always enable the depth test, since the pica can still write
-    // the depth buffer even if depth testing is disabled
+    // we need to always enable the depth test, since the pica can still
+    // write the depth buffer even if depth testing is disabled
     glEnable(GL_DEPTH_TEST);
     if (gpu->io.fb.color_mask.depthtest) {
         glDepthFunc(compare_func[gpu->io.fb.color_mask.depthfunc & 7]);

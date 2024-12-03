@@ -2,6 +2,7 @@
 #define SERVICE_DATA_H
 
 #include "services/ac.h"
+#include "services/act.h"
 #include "services/am.h"
 #include "services/apt.h"
 #include "services/boss.h"

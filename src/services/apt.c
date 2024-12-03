@@ -158,6 +158,13 @@ DECL_PORT(apt) {
             cmdbuf[2] = s->services.apt.application_cpu_time_limit;
             break;
         }
+        case 0x0101: {
+            linfo("GetTargetPlatform");
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 0; // 0 for old 3ds
+            break;
+        }
         default:
             lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
                   cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);

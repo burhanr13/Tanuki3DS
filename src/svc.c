@@ -106,7 +106,7 @@ DECL_SVC(ExitThread) {
 }
 
 DECL_SVC(SleepThread) {
-    s64 timeout = RR(0);
+    s64 timeout = R(0) | (u64) R(1) << 32;
 
     R(0) = 0;
     thread_sleep(s, CUR_THREAD, timeout);
@@ -284,7 +284,7 @@ DECL_SVC(ArbitrateAddress) {
     u32 addr = R(1);
     u32 type = R(2);
     s32 value = R(3);
-    s64 time = RR(4);
+    s64 time = R(4) | (u64) R(5) << 32;
 
     KArbiter* arbiter = HANDLE_GET_TYPED(h, KOT_ARBITER);
     if (!arbiter) {
@@ -371,7 +371,7 @@ DECL_SVC(CloseHandle) {
 DECL_SVC(WaitSynchronization1) {
     u32 handle = R(0);
 
-    s64 timeout = RR(2);
+    s64 timeout = R(2) | (u64) R(3) << 32;
 
     KObject* obj = HANDLE_GET(handle);
     if (!obj) {
@@ -395,7 +395,7 @@ DECL_SVC(WaitSynchronizationN) {
     u32* handles = PTR(R(1));
     int count = R(2);
     bool waitAll = R(3);
-    s64 timeout = (u64) R(0) | (u64) R(4) << 32;
+    s64 timeout = R(0) | (u64) R(4) << 32;
 
     bool wokeup = false;
     int wokeupi = 0;
@@ -451,8 +451,25 @@ DECL_SVC(DuplicateHandle) {
 }
 
 DECL_SVC(GetSystemTick) {
-    RR(0) = s->sched.now;
-    s->sched.now += 200;
+    R(0) = s->sched.now;
+    R(1) = s->sched.now >> 32;
+    s->sched.now += 200; // make time advance so the next read happens later
+}
+
+DECL_SVC(GetProcessInfo) {
+    u32 type = R(2);
+
+    R(0) = 0;
+    switch (type) {
+        case 0x14: // linear memory address conversion
+            R(1) = FCRAM_PBASE - LINEAR_HEAP_BASE;
+            R(2) = 0;
+            break;
+        default:
+            R(0) = -1;
+            lerror("unknown process info");
+            break;
+    }
 }
 
 DECL_SVC(ConnectToPort) {

@@ -12,6 +12,7 @@ enum {
     PICA_ADD = 0x00,
     PICA_DP3 = 0x01,
     PICA_DP4 = 0x02,
+    PICA_DPH = 0x03,
     PICA_DST = 0x04,
     PICA_EX2 = 0x05,
     PICA_LG2 = 0x06,

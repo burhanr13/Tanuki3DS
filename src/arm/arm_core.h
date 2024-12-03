@@ -38,7 +38,6 @@ typedef struct _ArmCore {
             u32 lr;
             u32 pc;
         };
-        u64 rr[8];
     };
 
     union {

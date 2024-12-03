@@ -132,6 +132,8 @@ DECL_PORT(srv) {
                 handler = port_handle_cam;
             } else if (IS("ir:USER")) {
                 handler = port_handle_ir;
+            } else if (IS("act:u")) {
+                handler = port_handle_act;
             } else {
                 lerror("unknown service '%s'", name);
                 cmdbuf[1] = -1;

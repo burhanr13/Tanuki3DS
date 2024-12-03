@@ -152,6 +152,17 @@ void shader_run(ShaderUnit* shu) {
                 DEST(res, 1);
                 break;
             }
+            case PICA_DPH: {
+                fvec a, b;
+                SRC1(a, 1);
+                SRC2(b, 1);
+                fvec res;
+                res[0] =
+                    MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]) + b[3];
+                res[1] = res[2] = res[3] = res[0];
+                DEST(res, 1);
+                break;
+            }
             case PICA_DST:
             case PICA_DSTI: {
                 fvec a, b;

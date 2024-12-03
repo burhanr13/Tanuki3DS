@@ -43,7 +43,6 @@ typedef struct _3DS {
 } HLE3DS;
 
 #define R(n) s->cpu.r[n]
-#define RR(n) (s->cpu.rr[n >> 1])
 #define PTR(addr) ((void*) &s->virtmem[addr])
 
 #define PAGE_SIZE BIT(12)
