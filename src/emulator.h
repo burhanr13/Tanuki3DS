@@ -6,6 +6,8 @@
 #include "common.h"
 #include "emulator_state.h"
 
+#define EMUNAME "Tanuki3DS"
+
 int emulator_init(int argc, char** argv);
 void emulator_quit();
 

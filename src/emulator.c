@@ -6,13 +6,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#ifdef USE_TFD
+#include "tinyfiledialogs/tinyfiledialogs.h"
+#endif
+
 #include "3ds.h"
 #include "emulator_state.h"
 #include "services/hid.h"
 
-EmulatorState ctremu;
 bool g_infologs = false;
-int g_upscale = 1;
+EmulatorState ctremu;
 
 const char usage[] = "ctremu [options] <romfile>\n"
                      "-h -- print help\n"
@@ -20,10 +23,19 @@ const char usage[] = "ctremu [options] <romfile>\n"
                      "-sN -- upscale by N\n";
 
 int emulator_init(int argc, char** argv) {
+    ctremu.videoscale = 1;
+
     read_args(argc, argv);
     if (!ctremu.romfile) {
+#ifdef USE_TFD
+        const char* filetypes[] = {"*.3ds", "*.cci", "*.cxi", "*.app", "*.elf"};
+        ctremu.romfile = tinyfd_openFileDialog(
+            EMUNAME ": Open Game", NULL, sizeof filetypes / sizeof filetypes[0],
+            filetypes, "3DS Executables", false);
+#else
         eprintf(usage);
         return -1;
+#endif
     }
 
     emulator_reset();
@@ -68,7 +80,7 @@ void read_args(int argc, char** argv) {
             case 's': {
                 int scale = atoi(optarg);
                 if (scale <= 0) eprintf("invalid scale factor");
-                else g_upscale = scale;
+                else ctremu.videoscale = scale;
                 break;
             }
             case '?':
@@ -163,10 +175,10 @@ void update_input(HLE3DS* s, SDL_GameController* controller) {
     bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
 
     if (pressed) {
-        x -= (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * g_upscale;
-        x /= g_upscale;
-        y -= SCREEN_HEIGHT * g_upscale;
-        y /= g_upscale;
+        x -= (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * ctremu.videoscale;
+        x /= ctremu.videoscale;
+        y -= SCREEN_HEIGHT * ctremu.videoscale;
+        y /= ctremu.videoscale;
         if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
             hid_update_touch(s, 0, 0, false);
         } else {

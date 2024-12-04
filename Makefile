@@ -15,6 +15,7 @@ LDFLAGS := -lm -lSDL2
 
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto
+	CPPFLAGS += -DUSE_TFD
 else
 	LDFLAGS += -lcapstone
 endif

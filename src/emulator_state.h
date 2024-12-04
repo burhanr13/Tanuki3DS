@@ -16,6 +16,8 @@ typedef struct {
 
     HLE3DS system;
 
+    int videoscale;
+
 } EmulatorState;
 
 extern EmulatorState ctremu;

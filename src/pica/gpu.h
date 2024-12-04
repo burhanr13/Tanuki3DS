@@ -460,8 +460,6 @@ typedef union {
     };
 } GPUCommand;
 
-extern int g_upscale;
-
 #define I2F(i)                                                                 \
     (((union {                                                                 \
          u32 _i;                                                               \

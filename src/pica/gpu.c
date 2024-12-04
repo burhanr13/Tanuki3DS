@@ -1,5 +1,6 @@
 #include "gpu.h"
 
+#include "../emulator_state.h"
 #include "../3ds.h"
 #include "etc1.h"
 #include "renderer_gl.h"
@@ -332,14 +333,15 @@ void gpu_update_cur_fb(GPU* gpu) {
         gpu->cur_fb->height = h;
 
         glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->color_tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gpu->cur_fb->width * g_upscale,
-                     gpu->cur_fb->height * g_upscale, 0, GL_RGBA,
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     gpu->cur_fb->width * ctremu.videoscale,
+                     gpu->cur_fb->height * ctremu.videoscale, 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, NULL);
         glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->depth_tex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8,
-                     gpu->cur_fb->width * g_upscale,
-                     gpu->cur_fb->height * g_upscale, 0, GL_DEPTH_STENCIL,
-                     GL_UNSIGNED_INT_24_8, NULL);
+                     gpu->cur_fb->width * ctremu.videoscale,
+                     gpu->cur_fb->height * ctremu.videoscale, 0,
+                     GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_2D, gpu->cur_fb->color_tex, 0);
@@ -376,11 +378,11 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     u32 scwidth = top ? SCREEN_WIDTH : SCREEN_WIDTH_BOT;
     glBlitFramebuffer(
-        0, (fb->height - scwidth + yoff + yoffsrc) * g_upscale,
-        (SCREEN_HEIGHT << scalex) * g_upscale,
+        0, (fb->height - scwidth + yoff + yoffsrc) * ctremu.videoscale,
+        (SCREEN_HEIGHT << scalex) * ctremu.videoscale,
         (fb->height - scwidth + yoff + yoffsrc + (scwidth << scaley)) *
-            g_upscale,
-        0, 0, SCREEN_HEIGHT * g_upscale, scwidth * g_upscale,
+            ctremu.videoscale,
+        0, 0, SCREEN_HEIGHT * ctremu.videoscale, scwidth * ctremu.videoscale,
         GL_COLOR_BUFFER_BIT, GL_LINEAR);
 }
 
@@ -1005,10 +1007,10 @@ void gpu_update_gl_state(GPU* gpu) {
             break;
     }
 
-    glViewport(gpu->io.raster.view_x * g_upscale,
-               gpu->io.raster.view_y * g_upscale,
-               2 * cvtf24(gpu->io.raster.view_w) * g_upscale,
-               2 * cvtf24(gpu->io.raster.view_h) * g_upscale);
+    glViewport(gpu->io.raster.view_x * ctremu.videoscale,
+               gpu->io.raster.view_y * ctremu.videoscale,
+               2 * cvtf24(gpu->io.raster.view_w) * ctremu.videoscale,
+               2 * cvtf24(gpu->io.raster.view_h) * ctremu.videoscale);
 
     if (gpu->io.raster.depthmap_enable) {
         float offset = cvtf24(gpu->io.raster.depthmap_offset);
@@ -1041,7 +1043,7 @@ void gpu_update_gl_state(GPU* gpu) {
     COPYRGBA(ubuf.tev_buffer_color, gpu->io.tex.tev5.buffer_color);
 
     if (gpu->io.fb.color_op.frag_mode != 0) {
-        lwarn("unknown frag mode %d", gpu->io.fb.color_op.frag_mode);
+        return; // shadows or gas, ignore these for now
     }
     if (gpu->io.fb.color_op.blend_mode == 1) {
         glDisable(GL_COLOR_LOGIC_OP);

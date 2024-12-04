@@ -1,6 +1,7 @@
 #include "renderer_gl.h"
 
 #include "../3ds.h"
+#include "../emulator_state.h"
 #include "gpu.h"
 #include "hostshaders/hostshaders.h"
 
@@ -107,8 +108,9 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glBindFramebuffer(GL_FRAMEBUFFER, state->fbotop);
     glGenTextures(1, &state->textop);
     glBindTexture(GL_TEXTURE_2D, state->textop);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * g_upscale,
-                 SCREEN_WIDTH * g_upscale, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * ctremu.videoscale,
+                 SCREEN_WIDTH * ctremu.videoscale, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -117,9 +119,9 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glBindFramebuffer(GL_FRAMEBUFFER, state->fbobot);
     glGenTextures(1, &state->texbot);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * g_upscale,
-                 SCREEN_WIDTH_BOT * g_upscale, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                 NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * ctremu.videoscale,
+                 SCREEN_WIDTH_BOT * ctremu.videoscale, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -173,13 +175,15 @@ void render_gl_main(GLState* state) {
 
     glActiveTexture(GL_TEXTURE0);
 
-    glViewport(0, SCREEN_HEIGHT * g_upscale, SCREEN_WIDTH * g_upscale,
-               SCREEN_HEIGHT * g_upscale);
+    glViewport(0, SCREEN_HEIGHT * ctremu.videoscale,
+               SCREEN_WIDTH * ctremu.videoscale,
+               SCREEN_HEIGHT * ctremu.videoscale);
     glBindTexture(GL_TEXTURE_2D, state->textop);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * g_upscale, 0,
-               SCREEN_WIDTH_BOT * g_upscale, SCREEN_HEIGHT * g_upscale);
+    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * ctremu.videoscale, 0,
+               SCREEN_WIDTH_BOT * ctremu.videoscale,
+               SCREEN_HEIGHT * ctremu.videoscale);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

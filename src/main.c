@@ -5,8 +5,6 @@
 #include "emulator.h"
 #include "pica/renderer_gl.h"
 
-char wintitle[200];
-
 #ifdef GLDEBUGCTX
 void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
                    GLsizei length, const char* message, const void* userParam) {
@@ -34,10 +32,10 @@ int main(int argc, char** argv) {
 #ifdef GLDEBUGCTX
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
-    SDL_Window* window =
-        SDL_CreateWindow("ctremu", SDL_WINDOWPOS_UNDEFINED,
-                         SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * g_upscale,
-                         2 * SCREEN_HEIGHT * g_upscale, SDL_WINDOW_OPENGL);
+    SDL_Window* window = SDL_CreateWindow(
+        EMUNAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+        SCREEN_WIDTH * ctremu.videoscale, 2 * SCREEN_HEIGHT * ctremu.videoscale,
+        SDL_WINDOW_OPENGL);
 
     SDL_GLContext glcontext = SDL_GL_CreateContext(window);
     if (!glcontext) {
@@ -110,9 +108,11 @@ int main(int argc, char** argv) {
             double fps = (double) SDL_GetPerformanceFrequency() *
                          (frame - prev_fps_frame) / elapsed;
 
-            snprintf(wintitle, 199, "ctremu | %s | %.2lf FPS",
+            char* wintitle;
+            asprintf(&wintitle, EMUNAME " | %s | %.2lf FPS",
                      ctremu.romfilenodir, fps);
             SDL_SetWindowTitle(window, wintitle);
+            free(wintitle);
             prev_fps_update = cur_time;
             prev_fps_frame = frame;
         }
