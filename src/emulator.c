@@ -32,6 +32,10 @@ int emulator_init(int argc, char** argv) {
         ctremu.romfile = tinyfd_openFileDialog(
             EMUNAME ": Open Game", NULL, sizeof filetypes / sizeof filetypes[0],
             filetypes, "3DS Executables", false);
+        if (!ctremu.romfile) {
+            eprintf(usage);
+            return -1;
+        }
 #else
         eprintf(usage);
         return -1;
