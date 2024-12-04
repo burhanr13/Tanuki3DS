@@ -2,14 +2,12 @@
 
 Tanuki3DS is a new HLE 3DS emulator for MacOS and Linux written in C which aims to be simple, fast, and compatible. Currently it can play a handful of games at full speed and supports some nice features like controller support and video upscaling. If you have any questions, you can join our [discord server](https://discord.gg/6ya65fvD3g).
 
-<img src=images/oot3d.png width=300><img src=images/mk7.png width=300>
-
 ## Download
-
 You can download a stable release from the releases tab, or the latest builds for [Linux](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux.zip) or [MacOS](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos.zip).
 
-## Building
+<img src=images/oot3d.png width=300><img src=images/mk7.png width=300>
 
+## Building
 You need the following dependencies installed to build and run:
 - sdl2
 - glew
@@ -24,8 +22,9 @@ To build use `make`. You can pass some options to make, `USER=1` to compile a us
 Note for M1 Mac users: we currently only have x86 JIT backends, so you will need to install the x86 version of brew. A guide can be found [here](https://gist.github.com/progrium/b286cd8c82ce0825b2eb3b0b3a0720a0).
 
 ## Usage
+Launching the executable will give you a prompt to select the game file (currently supports .elf, .3ds/.cci, .cxi/.app files, roms must be decrypted).
 
-You can run the executable in the command line with the rom file as the argument like `./ctremu path/to/game.3ds` (currently supports .elf, .3ds, .cci, .cxi files, roms must be decrypted). You can also pass `-h` to see other options.
+You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 
 The keyboard controls are as follows:
 
