@@ -3,7 +3,11 @@
 #include "../3ds.h"
 #include "../emulator_state.h"
 #include "gpu.h"
-#include "hostshaders/hostshaders.h"
+
+#include "hostshaders/main.frag"
+#include "hostshaders/main.vert"
+#include "hostshaders/gpu.frag"
+#include "hostshaders/gpu.vert"
 
 GLuint make_shader(const char* vert, const char* frag) {
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);

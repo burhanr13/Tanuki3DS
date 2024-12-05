@@ -21,9 +21,10 @@ else
 endif
 
 ifeq ($(shell uname),Darwin)
-	CFLAGS += -arch x86_64
-	CPPFLAGS += -I/opt/homebrew/include
-	LDFLAGS := -L/usr/local/lib -L/opt/homebrew/lib $(LDFLAGS)
+	CC := gcc-14
+	CXX := g++-14
+	CPPFLAGS += -I/usr/local/include
+	LDFLAGS := -L/usr/local/lib $(LDFLAGS)
 	LDFLAGS += -framework OpenGL -lGLEW
 else
 	LDFLAGS += -lGL -lGLEW
