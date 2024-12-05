@@ -24,7 +24,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
-      run: brew install gcc sdl2 glew xxhash xbyak capstone
+      run: brew install sdl2 glew xxhash xbyak capstone
     - name: build
       run: make USER=1
     - uses: actions/upload-artifact@v4
