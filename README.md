@@ -1,5 +1,23 @@
 # Tanuki3DS
 
+```
+        __                           __
+      //  \\                       //  \\
+     ||  __\\_____________________//_   ||
+     \\|  |------------------------|  |//
+      \|::|                        |::|/
+       |::|                        |::||
+       |  |                        |  ||
+       |__|________________________|__||      _____
+      / __    _________________       //     /_____\
+     / (__)  /                /  O   //     /_____ /
+    / __/__ /                / O  O //_____/ ____ /
+   /   /   /________________/   O  // /  | | \   /
+  /_______/_____/____/_____/______//_/__/__|__\/
+ |_______________________________|/
+
+```
+
 Tanuki3DS is a new HLE 3DS emulator for MacOS and Linux written in C which aims to be simple, fast, and compatible. Currently it can play a handful of games at full speed and supports some nice features like controller support and video upscaling. If you have any questions, you can join our [discord server](https://discord.gg/6ya65fvD3g).
 
 ## Download
