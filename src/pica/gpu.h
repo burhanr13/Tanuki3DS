@@ -119,9 +119,10 @@ typedef union {
                 u32 earlydepth_test1;
                 u32 earlydepth_clear;
                 u32 sh_outattr_mode;
-                u32 scissortest_mode;
-                u32 scissortest_pos;
-                u32 scissortest_dim;
+                struct {
+                    u32 enable;
+                    u16 x1, y1, x2, y2;
+                } scisssortest;
                 s16 view_x;
                 s16 view_y;
                 u32 _069;

@@ -1,7 +1,7 @@
 #include "gpu.h"
 
-#include "../emulator_state.h"
 #include "../3ds.h"
+#include "../emulator_state.h"
 #include "etc1.h"
 #include "renderer_gl.h"
 #include "shader.h"
@@ -1011,6 +1011,18 @@ void gpu_update_gl_state(GPU* gpu) {
                gpu->io.raster.view_y * ctremu.videoscale,
                2 * cvtf24(gpu->io.raster.view_w) * ctremu.videoscale,
                2 * cvtf24(gpu->io.raster.view_h) * ctremu.videoscale);
+    if (gpu->io.raster.scisssortest.enable) {
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(
+            gpu->io.raster.scisssortest.x1 * ctremu.videoscale,
+            gpu->io.raster.scisssortest.y1 * ctremu.videoscale,
+            (gpu->io.raster.scisssortest.x2 - gpu->io.raster.scisssortest.x1) *
+                ctremu.videoscale,
+            (gpu->io.raster.scisssortest.y2 - gpu->io.raster.scisssortest.y1) *
+                ctremu.videoscale);
+    } else {
+        glDisable(GL_SCISSOR_TEST);
+    }
 
     if (gpu->io.raster.depthmap_enable) {
         float offset = cvtf24(gpu->io.raster.depthmap_offset);

@@ -165,6 +165,7 @@ void render_gl_main(GLState* state) {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_CULL_FACE);
+    glDisable(GL_SCISSOR_TEST);
 
 #ifdef WIREFRAME
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
