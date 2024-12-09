@@ -387,6 +387,7 @@ typedef struct _TexInfo {
     u32 paddr;
     u32 width, height;
     u32 fmt;
+    u32 size;
 
     struct _TexInfo* next;
     struct _TexInfo* prev;

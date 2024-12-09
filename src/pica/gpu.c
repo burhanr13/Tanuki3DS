@@ -931,6 +931,7 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
             tex->width = regs->width;
             tex->height = regs->height;
             tex->fmt = fmt;
+            tex->size = 0;
 
             linfo("creating texture from %x with dims %dx%d and fmt=%d",
                   tex->paddr, tex->width, tex->height, tex->fmt);
@@ -945,6 +946,7 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
             for (int l = regs->lod.min; l <= regs->lod.max; l++) {
                 load_tex_image(rawdata, tex->width, tex->height, l, fmt);
                 rawdata += TEXSIZE(tex->width, tex->height, fmt, l);
+                tex->size += TEXSIZE(tex->width, tex->height, fmt, l);
             }
         }
     }

@@ -15,9 +15,9 @@
 extern bool g_infologs;
 
 #define linfo(format, ...)                                                     \
-    (g_infologs ? printf("\e[32m[INFO](%s) " format "\e[0m\n",                   \
-                       __func__ __VA_OPT__(, ) __VA_ARGS__)                    \
-              : (void) 0)
+    (g_infologs ? printf("\e[32m[INFO](%s) " format "\e[0m\n",                 \
+                         __func__ __VA_OPT__(, ) __VA_ARGS__)                  \
+                : (void) 0)
 
 #define lwarn(format, ...)                                                     \
     printf("\e[43;30m[WARNING](%s) " format "\e[0m\n",                         \
@@ -118,6 +118,13 @@ typedef float fvec2[2];
     }
 
 #define LRU_init(c) ((c).root.next = (c).root.prev = &(c).root, (c).size = 0)
+
+#define LL_remove(n)                                                           \
+    ({                                                                         \
+        (n)->next->prev = (n)->prev;                                           \
+        (n)->prev->next = (n)->next;                                           \
+        (n)->prev = (n)->next = NULL;                                          \
+    })
 
 #define LRU_use(c, e)                                                          \
     ({                                                                         \
