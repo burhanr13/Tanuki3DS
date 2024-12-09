@@ -2,7 +2,7 @@
 
 #include "3ds.h"
 
-void load_context(HLE3DS* s) {
+void load_context(E3DS* s) {
     for (int i = 0; i < 16; i++) {
         s->cpu.r[i] = CUR_THREAD->context.r[i];
         s->cpu.d[i] = CUR_THREAD->context.d[i];
@@ -11,7 +11,7 @@ void load_context(HLE3DS* s) {
     s->cpu.fpscr.w = CUR_THREAD->context.fpscr;
 }
 
-void save_context(HLE3DS* s) {
+void save_context(E3DS* s) {
     for (int i = 0; i < 16; i++) {
         CUR_THREAD->context.r[i] = s->cpu.r[i];
         CUR_THREAD->context.d[i] = s->cpu.d[i];
@@ -20,7 +20,7 @@ void save_context(HLE3DS* s) {
     CUR_THREAD->context.fpscr = s->cpu.fpscr.w;
 }
 
-void thread_init(HLE3DS* s, u32 entrypoint) {
+void thread_init(E3DS* s, u32 entrypoint) {
     u32 tid = thread_create(s, entrypoint, STACK_BASE, 0x30, 0);
 
     s->process.handles[0] = &s->process.threads[tid]->hdr;
@@ -30,7 +30,7 @@ void thread_init(HLE3DS* s, u32 entrypoint) {
     CUR_THREAD->state = THRD_RUNNING;
 }
 
-u32 thread_create(HLE3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
+u32 thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
                   u32 arg) {
     u32 tid = -1;
     for (int i = 0; i < THREAD_MAX; i++) {
@@ -59,7 +59,7 @@ u32 thread_create(HLE3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
     return tid;
 }
 
-bool thread_reschedule(HLE3DS* s) {
+bool thread_reschedule(E3DS* s) {
     if (CUR_THREAD->state == THRD_RUNNING) CUR_THREAD->state = THRD_READY;
     u32 nexttid = -1;
     u32 maxprio = THRD_MAX_PRIO;
@@ -92,7 +92,7 @@ bool thread_reschedule(HLE3DS* s) {
     return true;
 }
 
-void thread_sleep(HLE3DS* s, KThread* t, s64 timeout) {
+void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
     linfo("sleeping thread %d with timeout %ld", t->id, timeout);
     if (timeout < 0) {
         t->state = THRD_SLEEP;
@@ -103,7 +103,7 @@ void thread_sleep(HLE3DS* s, KThread* t, s64 timeout) {
     }
 }
 
-void thread_wakeup_timeout(HLE3DS* s, u32 tid) {
+void thread_wakeup_timeout(E3DS* s, u32 tid) {
     KThread* t = s->process.threads[tid];
     if (!t || t->state != THRD_SLEEP) return;
 
@@ -117,7 +117,7 @@ void thread_wakeup_timeout(HLE3DS* s, u32 tid) {
     thread_reschedule(s);
 }
 
-bool thread_wakeup(HLE3DS* s, KThread* t, KObject* reason) {
+bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
     if (t->state != THRD_SLEEP) return false;
     t->context.r[1] = klist_remove_key(&t->waiting_objs, reason);
     if (!t->waiting_objs || !t->wait_all) {
@@ -141,7 +141,7 @@ KEvent* event_create(bool sticky) {
     return ev;
 }
 
-void event_signal(HLE3DS* s, KEvent* ev) {
+void event_signal(E3DS* s, KEvent* ev) {
     KListNode** cur = &ev->waiting_thrds;
     while (*cur) {
         thread_wakeup(s, (KThread*) (*cur)->key, &ev->hdr);
@@ -158,7 +158,7 @@ KMutex* mutex_create() {
     return mtx;
 }
 
-void mutex_release(HLE3DS* s, KMutex* mtx) {
+void mutex_release(E3DS* s, KMutex* mtx) {
     if (!mtx->waiting_thrds) {
         mtx->locker_thrd = NULL;
         return;
@@ -185,7 +185,7 @@ void mutex_release(HLE3DS* s, KMutex* mtx) {
     thread_reschedule(s);
 }
 
-bool sync_wait(HLE3DS* s, KObject* o) {
+bool sync_wait(E3DS* s, KObject* o) {
     switch (o->type) {
         case KOT_THREAD: {
             KThread* thr = (KThread*) o;

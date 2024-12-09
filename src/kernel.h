@@ -6,7 +6,7 @@
 #define HANDLE_MAX BIT(10)
 #define HANDLE_BASE 0xffff8000
 
-typedef struct _3DS HLE3DS;
+typedef struct _3DS E3DS;
 
 typedef enum {
     KOT_PROCESS,
@@ -34,7 +34,7 @@ typedef struct _KListNode {
     struct _KListNode* next;
 } KListNode;
 
-u32 handle_new(HLE3DS* s);
+u32 handle_new(E3DS* s);
 #define HANDLE_SET(h, o) (s->process.handles[h - HANDLE_BASE] = (KObject*) (o))
 #define HANDLE_GET(h)                                                          \
     (((h - HANDLE_BASE) < HANDLE_MAX) ? s->process.handles[h - HANDLE_BASE]    \
@@ -49,6 +49,6 @@ void klist_insert(KListNode** l, KObject* o);
 void klist_remove(KListNode** l);
 u32 klist_remove_key(KListNode** l, KObject* o);
 
-void kobject_destroy(HLE3DS* s, KObject* o);
+void kobject_destroy(E3DS* s, KObject* o);
 
 #endif

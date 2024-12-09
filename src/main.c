@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <stdio.h>
+#include "tinyfiledialogs/tinyfiledialogs.h"
 
 #include "3ds.h"
 #include "emulator.h"
@@ -12,7 +13,109 @@ void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
 }
 #endif
 
+void hotkey_press(SDL_KeyCode key) {
+    switch (key) {
+        case SDLK_F5:
+            ctremu.pause = !ctremu.pause;
+            break;
+        case SDLK_TAB:
+            ctremu.uncap = !ctremu.uncap;
+            break;
+        default:
+            break;
+    }
+}
+
+void update_input(E3DS* s, SDL_GameController* controller) {
+    const Uint8* keys = SDL_GetKeyboardState(NULL);
+
+    PadState btn;
+    btn.a = keys[SDL_SCANCODE_L];
+    btn.b = keys[SDL_SCANCODE_K];
+    btn.x = keys[SDL_SCANCODE_O];
+    btn.y = keys[SDL_SCANCODE_I];
+    btn.l = keys[SDL_SCANCODE_Q];
+    btn.r = keys[SDL_SCANCODE_P];
+    btn.start = keys[SDL_SCANCODE_RETURN];
+    btn.select = keys[SDL_SCANCODE_RSHIFT];
+    btn.up = keys[SDL_SCANCODE_UP];
+    btn.down = keys[SDL_SCANCODE_DOWN];
+    btn.left = keys[SDL_SCANCODE_LEFT];
+    btn.right = keys[SDL_SCANCODE_RIGHT];
+
+    int cx = (keys[SDL_SCANCODE_D] - keys[SDL_SCANCODE_A]) * INT16_MAX;
+    int cy = (keys[SDL_SCANCODE_W] - keys[SDL_SCANCODE_S]) * INT16_MAX;
+
+    if (controller) {
+        btn.a |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B);
+        btn.b |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
+        btn.x |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_Y);
+        btn.y |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
+        btn.l |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+        btn.r |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+        btn.start |= SDL_GameControllerGetButton(controller,
+                                                 SDL_CONTROLLER_BUTTON_START);
+        btn.select |=
+            SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
+        btn.left |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+        btn.right |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+        btn.up |= SDL_GameControllerGetButton(controller,
+                                              SDL_CONTROLLER_BUTTON_DPAD_UP);
+        btn.down |= SDL_GameControllerGetButton(
+            controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+
+        int x =
+            SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX);
+        if (abs(x) > abs(cx)) cx = x;
+        int y =
+            -SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY);
+        if (abs(y) > abs(cy)) cy = y;
+    }
+
+    btn.cup = cy > INT16_MAX / 2;
+    btn.cdown = cy < INT16_MIN / 2;
+    btn.cleft = cx < INT16_MIN / 2;
+    btn.cright = cx > INT16_MAX / 2;
+
+    hid_update_pad(s, btn.w, cx, cy);
+
+    int x, y;
+    bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
+
+    if (pressed) {
+        x -= (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * ctremu.videoscale;
+        x /= ctremu.videoscale;
+        y -= SCREEN_HEIGHT * ctremu.videoscale;
+        y /= ctremu.videoscale;
+        if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
+            hid_update_touch(s, 0, 0, false);
+        } else {
+            hid_update_touch(s, x, y, true);
+        }
+    } else {
+        hid_update_touch(s, 0, 0, false);
+    }
+}
+
 int main(int argc, char** argv) {
+
+    emulator_read_args(argc, argv);
+#ifdef USE_TFD
+    if (!ctremu.romfile) {
+        const char* filetypes[] = {"*.3ds", "*.cci", "*.cxi", "*.app", "*.elf"};
+        ctremu.romfile = tinyfd_openFileDialog(
+            EMUNAME ": Open Game", NULL, sizeof filetypes / sizeof filetypes[0],
+            filetypes, "3DS Executables", false);
+    }
+#endif
 
     if (emulator_init(argc, argv) < 0) return -1;
 
@@ -67,7 +170,7 @@ int main(int argc, char** argv) {
 
         if (!(ctremu.pause)) {
             do {
-                hle3ds_run_frame(&ctremu.system);
+                e3ds_run_frame(&ctremu.system);
                 frame++;
 
                 cur_time = SDL_GetPerformanceCounter();

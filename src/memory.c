@@ -10,7 +10,7 @@
 
 #include "3ds.h"
 #include "common.h"
-#include "emulator_state.h"
+#include "emulator.h"
 #include "svc_types.h"
 
 #ifndef __linux__
@@ -42,7 +42,7 @@ void sigsegv_handler(int sig, siginfo_t* info, void* ucontext) {
     sigaction(sig, &(struct sigaction){.sa_handler = SIG_DFL}, NULL);
 }
 
-void hle3ds_memory_init(HLE3DS* s) {
+void e3ds_memory_init(E3DS* s) {
     s->physmem = mmap(NULL, BITL(32), PROT_NONE,
                       MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
     s->virtmem = mmap(NULL, BITL(32), PROT_NONE,
@@ -101,7 +101,7 @@ void hle3ds_memory_init(HLE3DS* s) {
     initblk->next = &s->process.vmblocks;
 }
 
-void hle3ds_memory_destroy(HLE3DS* s) {
+void e3ds_memory_destroy(E3DS* s) {
     while (s->process.vmblocks.next != &s->process.vmblocks) {
         VMBlock* tmp = s->process.vmblocks.next;
         s->process.vmblocks.next = s->process.vmblocks.next->next;
@@ -117,7 +117,7 @@ void hle3ds_memory_destroy(HLE3DS* s) {
     close(s->vram_fd);
 }
 
-void insert_vmblock(HLE3DS* s, VMBlock* n) {
+void insert_vmblock(E3DS* s, VMBlock* n) {
     VMBlock* l = s->process.vmblocks.next;
     while (l != &s->process.vmblocks) {
         if (l->startpg <= n->startpg && n->startpg < l->endpg) break;
@@ -185,8 +185,7 @@ void print_vmblocks(VMBlock* vmblocks) {
     printf("\n");
 }
 
-void hle3ds_vmmap(HLE3DS* s, u32 base, u32 size, u32 perm, u32 state,
-                  bool linear) {
+void e3ds_vmmap(E3DS* s, u32 base, u32 size, u32 perm, u32 state, bool linear) {
     base = base & ~(PAGE_SIZE - 1);
     size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
     if (!size) return;
@@ -216,7 +215,7 @@ void hle3ds_vmmap(HLE3DS* s, u32 base, u32 size, u32 perm, u32 state,
           base, size, perm, state);
 }
 
-VMBlock* hle3ds_vmquery(HLE3DS* s, u32 addr) {
+VMBlock* e3ds_vmquery(E3DS* s, u32 addr) {
     addr >>= 12;
     VMBlock* b = s->process.vmblocks.next;
     while (b != &s->process.vmblocks) {

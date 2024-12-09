@@ -5,9 +5,9 @@
 
 #define EVENT_MAX BIT(8)
 
-typedef struct _3DS HLE3DS;
+typedef struct _3DS E3DS;
 
-typedef void (*SchedEventHandler)(HLE3DS*, u32);
+typedef void (*SchedEventHandler)(E3DS*, u32);
 
 typedef struct {
     u64 time;
@@ -15,12 +15,12 @@ typedef struct {
     u32 arg;
 } SchedulerEvent;
 
-typedef struct _3DS HLE3DS;
+typedef struct _3DS E3DS;
 
 typedef struct {
     u64 now;
 
-    HLE3DS* master;
+    E3DS* master;
 
     FIFO(SchedulerEvent, EVENT_MAX) event_queue;
 } Scheduler;

@@ -8,7 +8,7 @@
 #include "loader.h"
 #include "svc_types.h"
 
-void hle3ds_init(HLE3DS* s, char* romfile) {
+void e3ds_init(E3DS* s, char* romfile) {
     memset(s, 0, sizeof *s);
 
     s->sched.master = s;
@@ -17,7 +17,7 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
 
     gpu_vshrunner_init(&s->gpu);
 
-    hle3ds_memory_init(s);
+    e3ds_memory_init(s);
 
     u32 entrypoint = 0;
 
@@ -43,19 +43,18 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
         exit(1);
     }
 
-    hle3ds_vmmap(s, DSPMEM, DSPMEMSIZE, PERM_RW, MEMST_STATIC, false);
-    hle3ds_vmmap(s, DSPMEM | DSPBUFBIT, DSPMEMSIZE, PERM_RW, MEMST_STATIC,
-                 false);
+    e3ds_vmmap(s, DSPMEM, DSPMEMSIZE, PERM_RW, MEMST_STATIC, false);
+    e3ds_vmmap(s, DSPMEM | DSPBUFBIT, DSPMEMSIZE, PERM_RW, MEMST_STATIC, false);
 
-    hle3ds_vmmap(s, CONFIG_MEM, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
+    e3ds_vmmap(s, CONFIG_MEM, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
     *(u8*) PTR(CONFIG_MEM + 0x14) = 1;
     *(u32*) PTR(CONFIG_MEM + 0x40) = FCRAMSIZE;
 
-    hle3ds_vmmap(s, SHARED_PAGE, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
+    e3ds_vmmap(s, SHARED_PAGE, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
     *(u32*) PTR(SHARED_PAGE + 4) = 1;
 
-    hle3ds_vmmap(s, TLS_BASE, TLS_SIZE * THREAD_MAX, PERM_RW, MEMST_PRIVATE,
-                 false);
+    e3ds_vmmap(s, TLS_BASE, TLS_SIZE * THREAD_MAX, PERM_RW, MEMST_PRIVATE,
+               false);
 
     init_services(s);
 
@@ -68,15 +67,15 @@ void hle3ds_init(HLE3DS* s, char* romfile) {
     add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
 }
 
-void hle3ds_destroy(HLE3DS* s) {
+void e3ds_destroy(E3DS* s) {
     cpu_free(s);
 
     if (s->romimage.fp) fclose(s->romimage.fp);
 
-    hle3ds_memory_destroy(s);
+    e3ds_memory_destroy(s);
 }
 
-void hle3ds_update_datetime(HLE3DS* s) {
+void e3ds_update_datetime(E3DS* s) {
     struct {
         u64 time;
         u64 systemtick;
@@ -88,7 +87,7 @@ void hle3ds_update_datetime(HLE3DS* s) {
     datetime->unk[0] = 0xffb0ff0;
 }
 
-void hle3ds_run_frame(HLE3DS* s) {
+void e3ds_run_frame(E3DS* s) {
     while (!s->frame_complete) {
         if (!s->cpu.wfe) {
             cpu_run(s, FIFO_peek(s->sched.event_queue).time - s->sched.now);
@@ -98,7 +97,7 @@ void hle3ds_run_frame(HLE3DS* s) {
         while (s->cpu.wfe && !s->frame_complete) {
             run_next_event(&s->sched);
         }
-        hle3ds_update_datetime(s);
+        e3ds_update_datetime(s);
     }
     s->frame_complete = false;
 }

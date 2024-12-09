@@ -2,7 +2,7 @@
 
 #include "3ds.h"
 
-u32 handle_new(HLE3DS* s) {
+u32 handle_new(E3DS* s) {
     for (int i = 0; i < HANDLE_MAX; i++) {
         if (!s->process.handles[i]) {
             return HANDLE_BASE + i;
@@ -37,7 +37,7 @@ u32 klist_remove_key(KListNode** l, KObject* o) {
     return 0;
 }
 
-void kobject_destroy(HLE3DS* s, KObject* o) {
+void kobject_destroy(E3DS* s, KObject* o) {
     switch (o->type) {
         case KOT_THREAD: {
             KThread* t = (KThread*) o;

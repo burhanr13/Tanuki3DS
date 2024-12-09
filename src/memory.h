@@ -4,7 +4,7 @@
 #include "common.h"
 #include "kernel.h"
 
-typedef struct _3DS HLE3DS;
+typedef struct _3DS E3DS;
 
 typedef struct _VMBlock {
     u32 startpg;
@@ -26,11 +26,10 @@ typedef struct {
     u32 defaultdatalen;
 } KSharedMem;
 
-void hle3ds_memory_init(HLE3DS* s);
-void hle3ds_memory_destroy(HLE3DS* s);
+void e3ds_memory_init(E3DS* s);
+void e3ds_memory_destroy(E3DS* s);
 
-void hle3ds_vmmap(HLE3DS* s, u32 base, u32 size, u32 perm, u32 state,
-                  bool linear);
-VMBlock* hle3ds_vmquery(HLE3DS* s, u32 addr);
+void e3ds_vmmap(E3DS* s, u32 base, u32 size, u32 perm, u32 state, bool linear);
+VMBlock* e3ds_vmquery(E3DS* s, u32 addr);
 
 #endif

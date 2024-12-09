@@ -93,7 +93,7 @@ DECL_PORT(gsp_gpu) {
     }
 }
 
-void gsp_handle_event(HLE3DS* s, u32 arg) {
+void gsp_handle_event(E3DS* s, u32 arg) {
     if (arg == GSPEVENT_VBLANK0) {
         add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
 
@@ -137,7 +137,7 @@ u32 vaddr_to_paddr(u32 vaddr) {
     return vaddr - LINEAR_HEAP_BASE + FCRAM_PBASE;
 }
 
-void gsp_handle_command(HLE3DS* s) {
+void gsp_handle_command(E3DS* s) {
     struct {
         u8 cur;
         u8 count;
@@ -260,7 +260,7 @@ void gsp_handle_command(HLE3DS* s) {
                 int yoff = addrout - s->services.gsp.toplcdfbs.d[i];
                 yoff /= wout * fmtBpp[fmtout];
                 if (abs(yoff) < hout / 2) {
-                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff, 
+                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
                                          scalex, scaley, true);
                     break;
                 }

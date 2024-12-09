@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 #include "../3ds.h"
-#include "../emulator_state.h"
+#include "../emulator.h"
 #include "../loader.h"
 #include "../srv.h"
 
@@ -624,7 +624,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
     }
 }
 
-KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
+KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                        u32 pathsize, u32 flags) {
     switch (archive << 32 >> 32) {
         case 3: {
@@ -787,7 +787,7 @@ bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
     }
 }
 
-KSession* fs_open_dir(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
+KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                       u32 pathsize) {
     switch (archive << 32 >> 32) {
         case 4:

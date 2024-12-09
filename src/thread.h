@@ -7,7 +7,7 @@
 
 #define THREAD_MAX 32
 
-typedef struct _3DS HLE3DS;
+typedef struct _3DS E3DS;
 
 enum {
     THRD_RUNNING,
@@ -47,7 +47,7 @@ typedef struct _KThread {
     u32 state;
 } KThread;
 
-typedef void (*KEventCallback)(HLE3DS*, u32);
+typedef void (*KEventCallback)(E3DS*, u32);
 
 typedef struct {
     KObject hdr;
@@ -83,22 +83,21 @@ typedef struct {
 #define CUR_THREAD ((KThread*) s->process.handles[0])
 #define CUR_TLS (TLS_BASE + TLS_SIZE * (CUR_THREAD->id))
 
-void thread_init(HLE3DS* s, u32 entrypoint);
-u32 thread_create(HLE3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
-                  u32 arg);
-bool thread_reschedule(HLE3DS* s);
+void thread_init(E3DS* s, u32 entrypoint);
+u32 thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority, u32 arg);
+bool thread_reschedule(E3DS* s);
 
-void thread_sleep(HLE3DS* s, KThread* t, s64 timeout);
-void thread_wakeup_timeout(HLE3DS* s, u32 tid);
-bool thread_wakeup(HLE3DS* s, KThread* t, KObject* reason);
+void thread_sleep(E3DS* s, KThread* t, s64 timeout);
+void thread_wakeup_timeout(E3DS* s, u32 tid);
+bool thread_wakeup(E3DS* s, KThread* t, KObject* reason);
 
 KEvent* event_create(bool sticky);
-void event_signal(HLE3DS* s, KEvent* ev);
+void event_signal(E3DS* s, KEvent* ev);
 
 KMutex* mutex_create();
-void mutex_release(HLE3DS* s, KMutex* mtx);
+void mutex_release(E3DS* s, KMutex* mtx);
 
-bool sync_wait(HLE3DS* s, KObject* o);
+bool sync_wait(E3DS* s, KObject* o);
 void sync_cancel(KThread* t, KObject* o);
 
 #endif

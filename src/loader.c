@@ -7,7 +7,7 @@
 #include "3ds.h"
 #include "svc_types.h"
 
-u32 load_elf(HLE3DS* s, char* filename) {
+u32 load_elf(E3DS* s, char* filename) {
     FILE* fp = fopen(filename, "r");
     if (!fp) {
         eprintf("no such file\n");
@@ -33,8 +33,8 @@ u32 load_elf(HLE3DS* s, char* filename) {
         if (phdrs[i].p_flags & PF_R) perm |= PERM_R;
         if (phdrs[i].p_flags & PF_W) perm |= PERM_W;
         if (phdrs[i].p_flags & PF_X) perm |= PERM_X;
-        hle3ds_vmmap(s, phdrs[i].p_vaddr, phdrs[i].p_memsz, perm, MEMST_CODE,
-                     false);
+        e3ds_vmmap(s, phdrs[i].p_vaddr, phdrs[i].p_memsz, perm, MEMST_CODE,
+                   false);
         void* segment = PTR(phdrs[i].p_vaddr);
         fseek(fp, phdrs[i].p_offset, SEEK_SET);
         if (fread(segment, 1, phdrs[i].p_filesz, fp) < phdrs[i].p_filesz) {
@@ -51,13 +51,13 @@ u32 load_elf(HLE3DS* s, char* filename) {
 
     s->romimage.fp = NULL;
 
-    hle3ds_vmmap(s, STACK_BASE - STACK_SIZE, STACK_SIZE, PERM_RW, MEMST_PRIVATE,
-                 false);
+    e3ds_vmmap(s, STACK_BASE - STACK_SIZE, STACK_SIZE, PERM_RW, MEMST_PRIVATE,
+               false);
 
     return ehdr.e_entry;
 }
 
-u32 load_ncsd(HLE3DS* s, char* filename) {
+u32 load_ncsd(E3DS* s, char* filename) {
     FILE* fp = fopen(filename, "rb");
     if (!fp) return -1;
 
@@ -70,7 +70,7 @@ u32 load_ncsd(HLE3DS* s, char* filename) {
     return load_ncch(s, filename, ncchbase);
 }
 
-u32 load_ncch(HLE3DS* s, char* filename, u64 offset) {
+u32 load_ncch(E3DS* s, char* filename, u64 offset) {
     FILE* fp = fopen(filename, "rb");
     if (!fp) return -1;
 
@@ -116,22 +116,22 @@ u32 load_ncch(HLE3DS* s, char* filename, u64 offset) {
         code = buf;
     }
 
-    hle3ds_vmmap(s, exhdr.sci.text.vaddr, exhdr.sci.text.pages * PAGE_SIZE,
-                 PERM_RX, MEMST_CODE, false);
+    e3ds_vmmap(s, exhdr.sci.text.vaddr, exhdr.sci.text.pages * PAGE_SIZE,
+               PERM_RX, MEMST_CODE, false);
     void* text = PTR(exhdr.sci.text.vaddr);
     memcpy(text, code, exhdr.sci.text.size);
     mprotect(text, exhdr.sci.text.pages * PAGE_SIZE, PROT_READ);
 
-    hle3ds_vmmap(s, exhdr.sci.rodata.vaddr, exhdr.sci.rodata.pages * PAGE_SIZE,
-                 PERM_R, MEMST_CODE, false);
+    e3ds_vmmap(s, exhdr.sci.rodata.vaddr, exhdr.sci.rodata.pages * PAGE_SIZE,
+               PERM_R, MEMST_CODE, false);
     void* rodata = PTR(exhdr.sci.rodata.vaddr);
     memcpy(rodata, code + exhdr.sci.text.pages * PAGE_SIZE,
            exhdr.sci.rodata.size);
     mprotect(rodata, exhdr.sci.rodata.pages * PAGE_SIZE, PROT_READ);
 
-    hle3ds_vmmap(s, exhdr.sci.data.vaddr,
-                 exhdr.sci.data.pages * PAGE_SIZE + exhdr.sci.bss, PERM_RW,
-                 MEMST_CODE, false);
+    e3ds_vmmap(s, exhdr.sci.data.vaddr,
+               exhdr.sci.data.pages * PAGE_SIZE + exhdr.sci.bss, PERM_RW,
+               MEMST_CODE, false);
     void* data = PTR(exhdr.sci.data.vaddr);
     memcpy(data,
            code + exhdr.sci.text.pages * PAGE_SIZE +
@@ -145,8 +145,8 @@ u32 load_ncch(HLE3DS* s, char* filename, u64 offset) {
     s->romimage.exefs_off = ncchbase + hdrncch.exefs.offset * 0x200;
     s->romimage.romfs_off = ncchbase + hdrncch.romfs.offset * 0x200 + 0x1000;
 
-    hle3ds_vmmap(s, STACK_BASE - exhdr.sci.stacksz, exhdr.sci.stacksz, PERM_RW,
-                 MEMST_PRIVATE, false);
+    e3ds_vmmap(s, STACK_BASE - exhdr.sci.stacksz, exhdr.sci.stacksz, PERM_RW,
+               MEMST_PRIVATE, false);
 
     return exhdr.sci.text.vaddr;
 }

@@ -40,7 +40,7 @@ typedef struct _3DS {
     bool frame_complete;
 
     Scheduler sched;
-} HLE3DS;
+} E3DS;
 
 #define R(n) s->cpu.r[n]
 #define PTR(addr) ((void*) &s->virtmem[addr])
@@ -73,11 +73,11 @@ typedef struct _3DS {
 #define TLS_SIZE 0x200
 #define IPC_CMD_OFF 0x80
 
-void hle3ds_init(HLE3DS* s, char* romfile);
-void hle3ds_destroy(HLE3DS* s);
+void e3ds_init(E3DS* s, char* romfile);
+void e3ds_destroy(E3DS* s);
 
-void hle3ds_update_datetime(HLE3DS* s);
+void e3ds_update_datetime(E3DS* s);
 
-void hle3ds_run_frame(HLE3DS* s);
+void e3ds_run_frame(E3DS* s);
 
 #endif

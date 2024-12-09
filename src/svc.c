@@ -14,7 +14,7 @@
         return;                                                                \
     }
 
-void hle3ds_handle_svc(HLE3DS* s, u32 num) {
+void e3ds_handle_svc(E3DS* s, u32 num) {
     num &= 0xff;
     if (!svc_table[num]) {
         lerror("unknown svc 0x%x (0x%x,0x%x,0x%x,0x%x) at %08x (lr=%08x)", num,
@@ -40,7 +40,7 @@ DECL_SVC(ControlMemory) {
     R(0) = 0;
     switch (memop) {
         case MEMOP_ALLOC:
-            hle3ds_vmmap(s, addr0, size, perm, MEMST_PRIVATE, linear);
+            e3ds_vmmap(s, addr0, size, perm, MEMST_PRIVATE, linear);
             R(1) = addr0;
             break;
         default:
@@ -51,7 +51,7 @@ DECL_SVC(ControlMemory) {
 
 DECL_SVC(QueryMemory) {
     u32 addr = R(2);
-    VMBlock* b = hle3ds_vmquery(s, addr);
+    VMBlock* b = e3ds_vmquery(s, addr);
     R(0) = 0;
     R(1) = b->startpg << 12;
     R(2) = (b->endpg - b->startpg) << 12;
@@ -221,7 +221,7 @@ DECL_SVC(CreateMemoryBlock) {
 
     linfo("created memory block with handle %x at addr %x", handle, addr);
 
-    hle3ds_vmmap(s, addr, size, perm, MEMST_SHARED, false);
+    e3ds_vmmap(s, addr, size, perm, MEMST_SHARED, false);
 
     R(0) = 0;
     R(1) = handle;
@@ -255,8 +255,8 @@ DECL_SVC(MapMemoryBlock) {
 
     linfo("mapping shared mem block %x at %08x", memblock, addr);
 
-    hle3ds_vmmap(s, addr, shmem->size ? shmem->size : PAGE_SIZE, perm,
-                 MEMST_SHARED, false);
+    e3ds_vmmap(s, addr, shmem->size ? shmem->size : PAGE_SIZE, perm,
+               MEMST_SHARED, false);
 
     if (shmem->defaultdata) {
         memcpy(PTR(addr), shmem->defaultdata, shmem->defaultdatalen);

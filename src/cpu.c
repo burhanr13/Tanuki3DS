@@ -10,7 +10,7 @@
 //  #define WATCH
 // #define PATCHFN
 
-void cpu_init(HLE3DS* s) {
+void cpu_init(E3DS* s) {
     s->cpu.read8 = (void*) cpu_read8;
     s->cpu.read16 = (void*) cpu_read16;
     s->cpu.read32 = (void*) cpu_read32;
@@ -28,11 +28,11 @@ void cpu_init(HLE3DS* s) {
     s->cpu.cp15_write = (void*) cp15_write;
 }
 
-void cpu_free(HLE3DS* s) {
+void cpu_free(E3DS* s) {
     jit_free_all(&s->cpu);
 }
 
-bool cpu_run(HLE3DS* s, int cycles) {
+bool cpu_run(E3DS* s, int cycles) {
     s->cpu.cycles = cycles;
     while (s->cpu.cycles > 0) {
 #ifdef BREAK
@@ -56,19 +56,19 @@ bool cpu_run(HLE3DS* s, int cycles) {
     return true;
 }
 
-u32 cpu_read8(HLE3DS* s, u32 addr, bool sx) {
+u32 cpu_read8(E3DS* s, u32 addr, bool sx) {
     if (sx) return *(s8*) PTR(addr);
     else return *(u8*) PTR(addr);
 }
-u32 cpu_read16(HLE3DS* s, u32 addr, bool sx) {
+u32 cpu_read16(E3DS* s, u32 addr, bool sx) {
     if (sx) return *(s16*) PTR(addr);
     else return *(u16*) PTR(addr);
 }
-u32 cpu_read32(HLE3DS* s, u32 addr) {
+u32 cpu_read32(E3DS* s, u32 addr) {
     return *(u32*) PTR(addr);
 }
 
-void cpu_write8(HLE3DS* s, u32 addr, u8 b) {
+void cpu_write8(E3DS* s, u32 addr, u8 b) {
 #ifdef WATCH
     if (addr == WATCH) {
         printfln("write8 [%08x] = %x", addr, b);
@@ -77,7 +77,7 @@ void cpu_write8(HLE3DS* s, u32 addr, u8 b) {
 #endif
     *(u8*) PTR(addr) = b;
 }
-void cpu_write16(HLE3DS* s, u32 addr, u16 h) {
+void cpu_write16(E3DS* s, u32 addr, u16 h) {
 #ifdef WATCH
     if (addr == WATCH) {
         printfln("write16 [%08x] = %x", addr, h);
@@ -86,7 +86,7 @@ void cpu_write16(HLE3DS* s, u32 addr, u16 h) {
 #endif
     *(u16*) PTR(addr) = h;
 }
-void cpu_write32(HLE3DS* s, u32 addr, u32 w) {
+void cpu_write32(E3DS* s, u32 addr, u32 w) {
 #ifdef WATCH
     if (addr == WATCH) {
         printfln("write32 [%08x] = %x", addr, w);
@@ -96,34 +96,34 @@ void cpu_write32(HLE3DS* s, u32 addr, u32 w) {
     *(u32*) PTR(addr) = w;
 }
 
-u16 cpu_fetch16(HLE3DS* s, u32 addr) {
+u16 cpu_fetch16(E3DS* s, u32 addr) {
     return *(u16*) PTR(addr);
 }
-u32 cpu_fetch32(HLE3DS* s, u32 addr) {
+u32 cpu_fetch32(E3DS* s, u32 addr) {
     return *(u32*) PTR(addr);
 }
 
-float cpu_readf32(HLE3DS* s, u32 addr) {
+float cpu_readf32(E3DS* s, u32 addr) {
     return *(float*) PTR(addr);
 }
 
-double cpu_readf64(HLE3DS* s, u32 addr) {
+double cpu_readf64(E3DS* s, u32 addr) {
     return *(double*) PTR(addr);
 }
 
-void cpu_writef32(HLE3DS* s, u32 addr, float f) {
+void cpu_writef32(E3DS* s, u32 addr, float f) {
     *(float*) PTR(addr) = f;
 }
 
-void cpu_writef64(HLE3DS* s, u32 addr, double d) {
+void cpu_writef64(E3DS* s, u32 addr, double d) {
     *(double*) PTR(addr) = d;
 }
 
-void cpu_handle_svc(HLE3DS* s, u32 num) {
-    hle3ds_handle_svc(s, num);
+void cpu_handle_svc(E3DS* s, u32 num) {
+    e3ds_handle_svc(s, num);
 }
 
-u32 cp15_read(HLE3DS* s, ArmInstr instr) {
+u32 cp15_read(E3DS* s, ArmInstr instr) {
     switch (instr.cp_reg_trans.crn) {
         case 13:
             switch (instr.cp_reg_trans.crm) {
@@ -141,7 +141,7 @@ u32 cp15_read(HLE3DS* s, ArmInstr instr) {
     return 0;
 }
 
-void cp15_write(HLE3DS* s, ArmInstr instr, u32 data) {
+void cp15_write(E3DS* s, ArmInstr instr, u32 data) {
     switch (instr.cp_reg_trans.crn) {
         case 7:
             switch (instr.cp_reg_trans.crm) {

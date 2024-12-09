@@ -112,7 +112,7 @@ typedef struct {
     } file[10];
 } ExeFSHeader;
 
-typedef struct _3DS HLE3DS;
+typedef struct _3DS E3DS;
 
 typedef struct {
     FILE* fp;
@@ -121,9 +121,9 @@ typedef struct {
     u32 romfs_off;
 } RomImage;
 
-u32 load_elf(HLE3DS* s, char* filename);
-u32 load_ncsd(HLE3DS* s, char* filename);
-u32 load_ncch(HLE3DS* s, char* filename, u64 offset);
+u32 load_elf(E3DS* s, char* filename);
+u32 load_ncsd(E3DS* s, char* filename);
+u32 load_ncch(E3DS* s, char* filename, u64 offset);
 
 u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size);
 

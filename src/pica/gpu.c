@@ -1,7 +1,7 @@
 #include "gpu.h"
 
 #include "../3ds.h"
-#include "../emulator_state.h"
+#include "../emulator.h"
 #include "etc1.h"
 #include "renderer_gl.h"
 #include "shader.h"

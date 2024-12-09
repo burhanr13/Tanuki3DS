@@ -13,7 +13,7 @@ void srvobj_init(KObject* hdr, KObjType t) {
     hdr->refcount = 1;
 }
 
-u32 srvobj_make_handle(HLE3DS* s, KObject* o) {
+u32 srvobj_make_handle(E3DS* s, KObject* o) {
     u32 handle = handle_new(s);
     if (!handle) return handle;
     HANDLE_SET(handle, o);
@@ -21,7 +21,7 @@ u32 srvobj_make_handle(HLE3DS* s, KObject* o) {
     return handle;
 }
 
-void init_services(HLE3DS* s) {
+void init_services(E3DS* s) {
     srvobj_init(&s->services.notif_sem.hdr, KOT_SEMAPHORE);
 
     srvobj_init(&s->services.apt.lock.hdr, KOT_MUTEX);

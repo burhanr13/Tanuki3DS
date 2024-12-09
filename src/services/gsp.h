@@ -26,7 +26,7 @@ typedef struct {
 
 DECL_PORT(gsp_gpu);
 
-void gsp_handle_event(HLE3DS* s, u32 arg);
-void gsp_handle_command(HLE3DS* s);
+void gsp_handle_event(E3DS* s, u32 arg);
+void gsp_handle_command(E3DS* s);
 
 #endif

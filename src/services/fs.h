@@ -48,11 +48,11 @@ DECL_PORT_ARG(fs_file, fd);
 DECL_PORT_ARG(fs_dir, fd);
 
 u64 fs_open_archive(u32 id, u32 path_type, void* path);
-KSession* fs_open_file(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
+KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                        u32 pathsize, u32 flags);
 bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
                     u32 flags, u64 filesize);
-KSession* fs_open_dir(HLE3DS* s, u64 archive, u32 pathtype, void* rawpath,
+KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                       u32 pathsize);
 bool fs_create_dir(u64 archive, u32 pathtype, void* rawpath, u32 pathsize);
 

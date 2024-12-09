@@ -1,7 +1,7 @@
 #include "renderer_gl.h"
 
 #include "../3ds.h"
-#include "../emulator_state.h"
+#include "../emulator.h"
 #include "gpu.h"
 #include "hostshaders/hostshaders.h"
 
