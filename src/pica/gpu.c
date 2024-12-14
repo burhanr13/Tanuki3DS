@@ -320,8 +320,9 @@ void gpu_update_cur_fb(GPU* gpu) {
     gpu->cur_fb->color_fmt = gpu->io.fb.colorbuf_fmt.fmt & 7;
     gpu->cur_fb->color_Bpp = gpu->io.fb.colorbuf_fmt.size + 2;
 
-    linfo("drawing on fb %d at %x", gpu->cur_fb - gpu->fbs.d,
-          gpu->cur_fb->color_paddr);
+    linfo("drawing on fb %d at %x with depth buffer at %x",
+          gpu->cur_fb - gpu->fbs.d, gpu->cur_fb->color_paddr,
+          gpu->cur_fb->depth_paddr);
 
     glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
 
@@ -387,12 +388,19 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
 }
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
+    // some of the current gl state can affect gl clear
+    // so we need to reset it
+    glDisable(GL_SCISSOR_TEST);
+    glColorMask(true, true, true, true);
+    glDepthMask(true);
+    // right now we assume clear color is rgba8888 and d24s8 format, this should
+    // be changed
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearColor((color >> 24) / 256.f, ((color >> 16) & 0xff) / 256.f,
-                         ((color >> 8) & 0xff) / 256.f, (color & 0xff) / 256.f);
+            glClearColor((color >> 24) / 255.f, ((color >> 16) & 0xff) / 255.f,
+                         ((color >> 8) & 0xff) / 255.f, (color & 0xff) / 255.f);
             glClear(GL_COLOR_BUFFER_BIT);
             linfo("cleared color buffer at %x of fb %d with value %x", paddr, i,
                   color);
@@ -401,11 +409,11 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
         if (gpu->fbs.d[i].depth_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearDepthf((color & MASK(24)) / (float) (1 << 24));
+            glClearDepthf((color & MASK(24)) / (float) BIT(24));
+            glClearStencil(color >> 24);
             glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
             linfo("cleared depth buffer at %x of fb %d with value %x", paddr, i,
                   color);
-            return;
         }
     }
 }
@@ -1015,13 +1023,14 @@ void gpu_update_gl_state(GPU* gpu) {
                2 * cvtf24(gpu->io.raster.view_h) * ctremu.videoscale);
     if (gpu->io.raster.scisssortest.enable) {
         glEnable(GL_SCISSOR_TEST);
-        glScissor(
-            gpu->io.raster.scisssortest.x1 * ctremu.videoscale,
-            gpu->io.raster.scisssortest.y1 * ctremu.videoscale,
-            (gpu->io.raster.scisssortest.x2 - gpu->io.raster.scisssortest.x1) *
-                ctremu.videoscale,
-            (gpu->io.raster.scisssortest.y2 - gpu->io.raster.scisssortest.y1) *
-                ctremu.videoscale);
+        glScissor(gpu->io.raster.scisssortest.x1 * ctremu.videoscale,
+                  gpu->io.raster.scisssortest.y1 * ctremu.videoscale,
+                  (gpu->io.raster.scisssortest.x2 + 1 -
+                   gpu->io.raster.scisssortest.x1) *
+                      ctremu.videoscale,
+                  (gpu->io.raster.scisssortest.y2 + 1 -
+                   gpu->io.raster.scisssortest.y1) *
+                      ctremu.videoscale);
     } else {
         glDisable(GL_SCISSOR_TEST);
     }

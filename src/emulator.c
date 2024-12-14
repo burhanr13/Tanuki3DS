@@ -5,10 +5,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#ifdef USE_TFD
-#include "tinyfiledialogs/tinyfiledialogs.h"
-#endif
-
 #include "3ds.h"
 #include "emulator.h"
 #include "services/hid.h"
