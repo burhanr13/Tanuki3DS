@@ -393,6 +393,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
     glDisable(GL_SCISSOR_TEST);
     glColorMask(true, true, true, true);
     glDepthMask(true);
+    glStencilMask(0xff);
     // right now we assume clear color is rgba8888 and d24s8 format, this should
     // be changed
     for (int i = 0; i < FB_MAX; i++) {
