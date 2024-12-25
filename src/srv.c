@@ -60,7 +60,7 @@ KSession* session_create(PortRequestHandler f) {
     return session;
 }
 
-KSession* session_create_arg(PortRequestHandlerArg f, u32 arg) {
+KSession* session_create_arg(PortRequestHandlerArg f, u64 arg) {
     KSession* session = calloc(1, sizeof *session);
     session->hdr.type = KOT_SESSION;
     session->handler = f;
@@ -68,8 +68,17 @@ KSession* session_create_arg(PortRequestHandlerArg f, u32 arg) {
     return session;
 }
 
+DECL_PORT_ARG(stub, name) {
+    u32* cmdbuf = PTR(cmd_addr);
+    lwarn("stubbed service '%.8s' command 0x%04x (%x,%x,%x,%x,%x)",
+          (char*) &name, cmd.command, cmdbuf[1], cmdbuf[2], cmdbuf[3],
+          cmdbuf[4], cmdbuf[5]);
+    cmdbuf[0] = IPCHDR(1, 0);
+    cmdbuf[1] = 0;
+}
+
 DECL_PORT(srv) {
-#define IS(_name) (!strcmp(name, _name))
+#define IS(_name) (!strncmp(name, _name, 8))
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0001: {
@@ -89,11 +98,8 @@ DECL_PORT(srv) {
             break;
         }
         case 0x0005: {
-            char name[9];
-            memcpy(name, &cmdbuf[1], cmdbuf[3]);
+            char* name = (char*) &cmdbuf[1];
             name[cmdbuf[3]] = '\0';
-            cmdbuf[0] = IPCHDR(3, 0);
-            cmdbuf[1] = 0;
 
             PortRequestHandler handler;
             if (IS("APT:U") || IS("APT:A") || IS("APT:S")) {
@@ -108,44 +114,30 @@ DECL_PORT(srv) {
                 handler = port_handle_dsp;
             } else if (IS("cfg:u")) {
                 handler = port_handle_cfg;
-            } else if (IS("ndm:u")) {
-                handler = port_handle_ndm;
-            } else if (IS("cecd:u")) {
-                handler = port_handle_cecd;
-            } else if (IS("mic:u")) {
-                handler = port_handle_mic;
-            } else if (IS("frd:u")) {
-                handler = port_handle_frd;
-            } else if (IS("ptm:u") || IS("ptm:sysm")) {
-                handler = port_handle_ptm;
-            } else if (IS("boss:U")) {
-                handler = port_handle_boss;
-            } else if (IS("am:app")) {
-                handler = port_handle_am;
-            } else if (IS("nim:aoc")) {
-                handler = port_handle_nim_aoc;
             } else if (IS("y2r:u")) {
                 handler = port_handle_y2r;
-            } else if (IS("ac:u")) {
-                handler = port_handle_ac;
-            } else if (IS("cam:u")) {
-                handler = port_handle_cam;
-            } else if (IS("ir:USER")) {
-                handler = port_handle_ir;
-            } else if (IS("act:u")) {
-                handler = port_handle_act;
             } else {
-                lerror("unknown service '%s'", name);
-                cmdbuf[1] = -1;
-            }
-            if (cmdbuf[1] == 0) {
+                lerror("unknown service '%.8s'", name);
                 u32 handle = handle_new(s);
-                KSession* session = session_create(handler);
+                KSession* session =
+                    session_create_arg(port_handle_stub, *(u64*) name);
                 HANDLE_SET(handle, session);
                 session->hdr.refcount = 1;
                 cmdbuf[3] = handle;
-                linfo("connected to service '%s' with handle %x", name, handle);
+                linfo("connected to unknown service '%.8s' with handle %x",
+                      name, handle);
+                cmdbuf[0] = IPCHDR(3, 0);
+                cmdbuf[1] = 0;
+                break;
             }
+            u32 handle = handle_new(s);
+            KSession* session = session_create(handler);
+            HANDLE_SET(handle, session);
+            session->hdr.refcount = 1;
+            cmdbuf[3] = handle;
+            linfo("connected to service '%s' with handle %x", name, handle);
+            cmdbuf[0] = IPCHDR(3, 0);
+            cmdbuf[1] = 0;
             break;
         }
         case 0x0009:
