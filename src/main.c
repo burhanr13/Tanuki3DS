@@ -55,10 +55,6 @@ void update_input(E3DS* s, SDL_GameController* controller) {
             SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_Y);
         btn.y |=
             SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
-        btn.l |= SDL_GameControllerGetButton(
-            controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-        btn.r |= SDL_GameControllerGetButton(
-            controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
         btn.start |= SDL_GameControllerGetButton(controller,
                                                  SDL_CONTROLLER_BUTTON_START);
         btn.select |=
@@ -78,6 +74,13 @@ void update_input(E3DS* s, SDL_GameController* controller) {
         int y =
             -SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY);
         if (abs(y) > abs(cy)) cy = y;
+
+        int tl = SDL_GameControllerGetAxis(controller,
+                                          SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+        if (tl > INT16_MAX / 10) btn.l = 1;
+        int tr = SDL_GameControllerGetAxis(controller,
+                                          SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+        if (tr > INT16_MAX / 10) btn.r = 1;
     }
 
     btn.cup = cy > INT16_MAX / 2;
@@ -89,6 +92,12 @@ void update_input(E3DS* s, SDL_GameController* controller) {
 
     int x, y;
     bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
+    if (controller) {
+        if (SDL_GameControllerGetButton(controller,
+                                        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) {
+            pressed = true;
+        }
+    }
 
     if (pressed) {
         x -= (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * ctremu.videoscale;
