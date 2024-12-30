@@ -18,13 +18,11 @@ const char usage[] = "ctremu [options] <romfile>\n"
                      "-sN -- upscale by N\n";
 
 // the romfile should already have been set from read_args
-int emulator_init(int argc, char** argv) {
+int emulator_init() {
     if (!ctremu.romfile) {
         eprintf(usage);
         return -1;
     }
-
-    emulator_reset();
 
     ctremu.romfilenodir = strrchr(ctremu.romfile, '/');
     if (ctremu.romfilenodir) ctremu.romfilenodir++;
@@ -38,6 +36,8 @@ int emulator_init(int argc, char** argv) {
     mkdir("system/savedata", S_IRWXU);
     mkdir("system/extdata", S_IRWXU);
     mkdir("system/sdmc", S_IRWXU);
+
+    emulator_reset();
 
     return 0;
 }

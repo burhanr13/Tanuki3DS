@@ -1,6 +1,6 @@
+#include "tinyfiledialogs/tinyfiledialogs.h"
 #include <SDL2/SDL.h>
 #include <stdio.h>
-#include "tinyfiledialogs/tinyfiledialogs.h"
 
 #include "3ds.h"
 #include "emulator.h"
@@ -76,10 +76,10 @@ void update_input(E3DS* s, SDL_GameController* controller) {
         if (abs(y) > abs(cy)) cy = y;
 
         int tl = SDL_GameControllerGetAxis(controller,
-                                          SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+                                           SDL_CONTROLLER_AXIS_TRIGGERLEFT);
         if (tl > INT16_MAX / 10) btn.l = 1;
         int tr = SDL_GameControllerGetAxis(controller,
-                                          SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+                                           SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
         if (tr > INT16_MAX / 10) btn.r = 1;
     }
 
@@ -115,19 +115,7 @@ void update_input(E3DS* s, SDL_GameController* controller) {
 }
 
 int main(int argc, char** argv) {
-
-    emulator_read_args(argc, argv);
-#ifdef USE_TFD
-    if (!ctremu.romfile) {
-        const char* filetypes[] = {"*.3ds", "*.cci", "*.cxi", "*.app", "*.elf"};
-        ctremu.romfile = tinyfd_openFileDialog(
-            EMUNAME ": Open Game", NULL, sizeof filetypes / sizeof filetypes[0],
-            filetypes, "3DS Executables", false);
-    }
-#endif
-
-    if (emulator_init(argc, argv) < 0) return -1;
-
+    
     SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS, "0");
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
@@ -164,7 +152,20 @@ int main(int argc, char** argv) {
                           GL_TRUE);
 #endif
 
-    renderer_gl_setup(&ctremu.system.gpu.gl, &ctremu.system.gpu);
+    emulator_read_args(argc, argv);
+#ifdef USE_TFD
+    if (!ctremu.romfile) {
+        const char* filetypes[] = {"*.3ds", "*.cci", "*.cxi", "*.app", "*.elf"};
+        ctremu.romfile = tinyfd_openFileDialog(
+            EMUNAME ": Open Game", NULL, sizeof filetypes / sizeof filetypes[0],
+            filetypes, "3DS Executables", false);
+    }
+#endif
+
+    if (emulator_init() < 0) {
+        SDL_Quit();
+        return -1;
+    }
 
     Uint64 prev_time = SDL_GetPerformanceCounter();
     Uint64 prev_fps_update = prev_time;

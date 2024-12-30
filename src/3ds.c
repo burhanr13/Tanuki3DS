@@ -65,6 +65,8 @@ void e3ds_init(E3DS* s, char* romfile) {
     s->process.handles[1] = &s->process.hdr;
 
     add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
+
+    renderer_gl_setup(&s->gpu.gl, &s->gpu);
 }
 
 void e3ds_destroy(E3DS* s) {

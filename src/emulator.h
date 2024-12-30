@@ -28,7 +28,7 @@ extern EmulatorState ctremu;
 
 void emulator_read_args(int argc, char** argv);
 
-int emulator_init(int argc, char** argv);
+int emulator_init();
 void emulator_quit();
 
 void emulator_reset();

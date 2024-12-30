@@ -27,7 +27,15 @@ jobs:
       run: brew install sdl2 glew xxhash xbyak capstone
     - name: build
       run: make USER=1
+
+    # taken from panda3ds
+    - name: create app bundle
+      run: |
+        brew install dylibbundler imagemagick
+        ./.github/mac-bundle.sh
+        codesign --force -s - -vvvv Tanuki3DS.app
+
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-macos
-        path: ./ctremu
+        path: ./Tanuki3DS.app
