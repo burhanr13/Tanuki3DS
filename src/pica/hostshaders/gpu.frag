@@ -86,7 +86,7 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
     primary.rgb = ambient_color.rgb;
     primary.a = 1;
 
-    secondary.a = 1;
+    secondary.a = 0.5;
 
     vec4 nq = normalize(normquat);
     vec3 v = normalize(quatrot(nq, view));
