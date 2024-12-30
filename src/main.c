@@ -115,7 +115,8 @@ void update_input(E3DS* s, SDL_GameController* controller) {
 }
 
 int main(int argc, char** argv) {
-    
+    emulator_read_args(argc, argv);
+
     SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS, "0");
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
@@ -152,7 +153,6 @@ int main(int argc, char** argv) {
                           GL_TRUE);
 #endif
 
-    emulator_read_args(argc, argv);
 #ifdef USE_TFD
     if (!ctremu.romfile) {
         const char* filetypes[] = {"*.3ds", "*.cci", "*.cxi", "*.app", "*.elf"};
