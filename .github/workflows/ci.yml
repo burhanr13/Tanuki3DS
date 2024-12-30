@@ -34,8 +34,9 @@ jobs:
         brew install dylibbundler imagemagick
         ./.github/mac-bundle.sh
         codesign --force -s - -vvvv Tanuki3DS.app
+        zip -r Tanuki3DS-macos Tanuki3DS.app
 
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-macos
-        path: ./Tanuki3DS.app
+        path: ./Tanuki3DS-macos.zip
