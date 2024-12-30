@@ -1,6 +1,8 @@
-#include "tinyfiledialogs/tinyfiledialogs.h"
 #include <SDL2/SDL.h>
 #include <stdio.h>
+#include <unistd.h>
+
+#include "tinyfiledialogs/tinyfiledialogs.h"
 
 #include "3ds.h"
 #include "emulator.h"
@@ -160,6 +162,12 @@ int main(int argc, char** argv) {
             EMUNAME ": Open Game", NULL, sizeof filetypes / sizeof filetypes[0],
             filetypes, "3DS Executables", false);
     }
+#endif
+
+#ifdef NOPORTABLE
+    char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
+    chdir(prefpath);
+    SDL_free(prefpath);
 #endif
 
     if (emulator_init() < 0) {

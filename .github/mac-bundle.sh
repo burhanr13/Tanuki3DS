@@ -44,7 +44,6 @@ PlistBuddy Tanuki3DS.app/Contents/Info.plist -c "add CFBundleDevelopmentRegion s
 PlistBuddy Tanuki3DS.app/Contents/Info.plist -c "add CFBundleInfoDictionaryVersion string 6.0"
 PlistBuddy Tanuki3DS.app/Contents/Info.plist -c "add CFBundleName string Tanuki3DS"
 PlistBuddy Tanuki3DS.app/Contents/Info.plist -c "add CFBundlePackageType string APPL"
-PlistBuddy Tanuki3DS.app/Contents/Info.plist -c "add NSHumanReadableCopyright string Copyright 2024 Tanuki3DS Team"
 
 # Bundle dylibs
 dylibbundler -od -b -x Tanuki3DS.app/Contents/MacOS/ctremu -d Tanuki3DS.app/Contents/Frameworks -p @rpath
