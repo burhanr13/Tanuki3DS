@@ -288,6 +288,11 @@ void gsp_handle_command(E3DS* s) {
             u32 gapout = cmds->d[cmds->cur].args[4] >> 16;
             u32 flags = cmds->d[cmds->cur].args[5];
 
+            pitchin <<= 4;
+            gapin <<= 4;
+            pitchout <<= 4;
+            gapout <<= 4;
+
             linfo("texture copy from %x(pitch=%d,gap=%d) to "
                   "%x(pitch=%d,gap=%d), size=%d, flags=%x",
                   addrin, pitchin, gapin, addrout, pitchout, gapout, copysize,
