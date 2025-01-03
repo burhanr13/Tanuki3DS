@@ -100,7 +100,7 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
         } else {
             l = normalize(quatrot(nq, view + light[i].vec.xyz));
         }
-        vec3 h = normalize((l + v) / 2);
+        vec3 h = normalize(l + v);
 
         // right now we just use phong shading
         // TODO: implement this properly

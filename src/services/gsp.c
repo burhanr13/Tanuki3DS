@@ -298,17 +298,20 @@ void gsp_handle_command(E3DS* s) {
                   addrin, pitchin, gapin, addrout, pitchout, gapout, copysize,
                   flags);
 
-            // texture copy can be used to copy between framebuffers and this wont work right now
-
             u8* src = PTR(addrin);
             u8* dst = PTR(addrout);
 
             int cnt = 0;
+            int curline = 0;
             while (cnt < copysize) {
                 memcpy(dst, src, pitchin);
                 cnt += pitchin;
+                curline += pitchin;
                 src += pitchin + gapin;
-                dst += pitchout + gapout;
+                if (curline >= pitchout) {
+                    dst += pitchout + gapout;
+                    curline = 0;
+                }
             }
 
             gsp_handle_event(s, GSPEVENT_PPF);
