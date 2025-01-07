@@ -104,8 +104,6 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
                           (void*) offsetof(Vertex, view));
     glEnableVertexAttribArray(6);
 
-    glGenFramebuffers(1, &state->fbotop);
-    glBindFramebuffer(GL_FRAMEBUFFER, state->fbotop);
     glGenTextures(1, &state->textop);
     glBindTexture(GL_TEXTURE_2D, state->textop);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * ctremu.videoscale,
@@ -113,10 +111,7 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
                  NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                           state->textop, 0);
-    glGenFramebuffers(1, &state->fbobot);
-    glBindFramebuffer(GL_FRAMEBUFFER, state->fbobot);
+    
     glGenTextures(1, &state->texbot);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * ctremu.videoscale,
@@ -124,9 +119,6 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
                  GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                           state->texbot, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     LRU_init(gpu->fbs);
 

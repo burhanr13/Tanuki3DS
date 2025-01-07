@@ -298,21 +298,9 @@ void gsp_handle_command(E3DS* s) {
                   addrin, pitchin, gapin, addrout, pitchout, gapout, copysize,
                   flags);
 
-            u8* src = PTR(addrin);
-            u8* dst = PTR(addrout);
-
-            int cnt = 0;
-            int curline = 0;
-            while (cnt < copysize) {
-                memcpy(dst, src, pitchin);
-                cnt += pitchin;
-                curline += pitchin;
-                src += pitchin + gapin;
-                if (curline >= pitchout) {
-                    dst += pitchout + gapout;
-                    curline = 0;
-                }
-            }
+            gpu_texture_copy(&s->gpu, vaddr_to_paddr(addrin),
+                             vaddr_to_paddr(addrout), copysize, pitchin, gapin,
+                             pitchout, gapout);
 
             gsp_handle_event(s, GSPEVENT_PPF);
             break;

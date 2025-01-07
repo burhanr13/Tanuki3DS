@@ -276,19 +276,6 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
     }
 }
 
-// searches the framebuffer cache and return NULL if not found
-FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
-    FBInfo* newfb = NULL;
-    for (int i = 0; i < FB_MAX; i++) {
-        if (gpu->fbs.d[i].color_paddr == color_paddr) {
-            newfb = &gpu->fbs.d[i];
-            break;
-        }
-    }
-    if (newfb) LRU_use(gpu->fbs, newfb);
-    return newfb;
-}
-
 // searches the framebuffer cache and creates a new framebuffer if not found
 FBInfo* fbcache_load(GPU* gpu, u32 color_paddr) {
     FBInfo* newfb = NULL;
@@ -308,6 +295,55 @@ FBInfo* fbcache_load(GPU* gpu, u32 color_paddr) {
     newfb->color_paddr = color_paddr;
     LRU_use(gpu->fbs, newfb);
     return newfb;
+}
+
+// searches the framebuffer cache and return NULL if not found
+FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
+    FBInfo* newfb = NULL;
+    for (int i = 0; i < FB_MAX; i++) {
+        if (gpu->fbs.d[i].color_paddr == color_paddr) {
+            newfb = &gpu->fbs.d[i];
+            break;
+        }
+    }
+    if (newfb) LRU_use(gpu->fbs, newfb);
+    return newfb;
+}
+
+// searches the framebuffer cache and return NULL if not found
+FBInfo* fbcache_find_within(GPU* gpu, u32 color_paddr) {
+    FBInfo* newfb = NULL;
+    for (int i = 0; i < FB_MAX; i++) {
+        if (gpu->fbs.d[i].color_paddr <= color_paddr &&
+            color_paddr < gpu->fbs.d[i].color_paddr +
+                             gpu->fbs.d[i].width * gpu->fbs.d[i].height *
+                                 gpu->fbs.d[i].color_Bpp) {
+            newfb = &gpu->fbs.d[i];
+            break;
+        }
+    }
+    if (newfb) LRU_use(gpu->fbs, newfb);
+    return newfb;
+}
+
+// ensures there is a texture with the given paddr in the cache
+TexInfo* texcache_load(GPU* gpu, u32 paddr) {
+    TexInfo* tex = NULL;
+    for (int i = 0; i < TEX_MAX; i++) {
+        if (gpu->textures.d[i].paddr == paddr ||
+            gpu->textures.d[i].paddr == 0) {
+            tex = &gpu->textures.d[i];
+            break;
+        }
+    }
+    if (!tex) {
+        tex = LRU_eject(gpu->textures);
+        tex->width = 0;
+        tex->height = 0;
+    }
+    tex->paddr = paddr;
+    LRU_use(gpu->textures, tex);
+    return tex;
 }
 
 void gpu_update_cur_fb(GPU* gpu) {
@@ -356,35 +392,58 @@ void gpu_update_cur_fb(GPU* gpu) {
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top) {
-    FBInfo* fb = NULL;
-    int yoffsrc;
+    
     // the source is often offset into an existing framebuffer, so we need to
     // account for this
-    for (int i = 0; i < FB_MAX; i++) {
-        if (gpu->fbs.d[i].width == 0) continue;
-        yoffsrc = gpu->fbs.d[i].color_paddr - paddr;
-        yoffsrc /= (int) (gpu->fbs.d[i].color_Bpp * gpu->fbs.d[i].width);
-        if (abs(yoffsrc) < gpu->fbs.d[i].height / 2) {
-            fb = &gpu->fbs.d[i];
-            break;
-        }
-    }
-    if (!fb) return;
-    LRU_use(gpu->fbs, fb);
+    FBInfo* fb = fbcache_find_within(gpu, paddr);
+    if(!fb) return;
+    int yoffsrc = (fb->color_paddr - paddr) / (fb->color_Bpp * fb->width);
 
     linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
 
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,
-                      top ? gpu->gl.fbotop : gpu->gl.fbobot);
+    glBindTexture(GL_TEXTURE_2D, top ? gpu->gl.textop : gpu->gl.texbot);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     u32 scwidth = top ? SCREEN_WIDTH : SCREEN_WIDTH_BOT;
-    glBlitFramebuffer(
-        0, (fb->height - scwidth + yoff + yoffsrc) * ctremu.videoscale,
-        (SCREEN_HEIGHT << scalex) * ctremu.videoscale,
-        (fb->height - scwidth + yoff + yoffsrc + (scwidth << scaley)) *
-            ctremu.videoscale,
-        0, 0, SCREEN_HEIGHT * ctremu.videoscale, scwidth * ctremu.videoscale,
-        GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
+                     (fb->height - scwidth + yoff + yoffsrc) *
+                         ctremu.videoscale,
+                     (SCREEN_HEIGHT << scalex) * ctremu.videoscale,
+                     (scwidth << scaley) * ctremu.videoscale, 0);
+}
+
+void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
+                      u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap) {
+    u8* src = PTR(srcpaddr);
+    u8* dst = PTR(dstpaddr);
+
+    int cnt = 0;
+    int curline = 0;
+    if (srcpitch <= dstpitch) {
+        while (cnt < size) {
+            memcpy(dst, src, srcpitch);
+            cnt += srcpitch;
+            curline += srcpitch;
+            src += srcpitch + srcgap;
+            dst += srcpitch;
+            if (curline >= dstpitch) {
+                dst += dstgap;
+                curline = 0;
+            }
+        }
+    } else {
+        while (cnt < size) {
+            memcpy(dst, src, dstpitch);
+            cnt += dstpitch;
+            curline += dstpitch;
+            dst += dstpitch + dstgap;
+            src += dstpitch;
+            if (curline >= srcpitch) {
+                src += srcgap;
+                curline = 0;
+            }
+        }
+    }
 }
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
@@ -417,26 +476,6 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
                   color);
         }
     }
-}
-
-// ensures there is a texture with the given paddr in the cache
-TexInfo* texcache_load(GPU* gpu, u32 paddr) {
-    TexInfo* tex = NULL;
-    for (int i = 0; i < TEX_MAX; i++) {
-        if (gpu->textures.d[i].paddr == paddr ||
-            gpu->textures.d[i].paddr == 0) {
-            tex = &gpu->textures.d[i];
-            break;
-        }
-    }
-    if (!tex) {
-        tex = LRU_eject(gpu->textures);
-        tex->width = 0;
-        tex->height = 0;
-    }
-    tex->paddr = paddr;
-    LRU_use(gpu->textures, tex);
-    return tex;
 }
 
 typedef struct {

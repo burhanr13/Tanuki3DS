@@ -480,6 +480,7 @@ void gpu_vshrunner_init(GPU* gpu);
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top);
+void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size, u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 
