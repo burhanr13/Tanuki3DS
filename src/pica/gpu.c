@@ -393,11 +393,21 @@ void gpu_update_cur_fb(GPU* gpu) {
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top) {
     
-    // the source is often offset into an existing framebuffer, so we need to
+    // the source can be offset into or before an existing framebuffer, so we need to
     // account for this
-    FBInfo* fb = fbcache_find_within(gpu, paddr);
-    if(!fb) return;
-    int yoffsrc = (fb->color_paddr - paddr) / (fb->color_Bpp * fb->width);
+    FBInfo* fb = NULL;
+    int yoffsrc;
+    for (int i = 0; i < FB_MAX; i++) {
+        if (gpu->fbs.d[i].width == 0) continue;
+        yoffsrc = gpu->fbs.d[i].color_paddr - paddr;
+        yoffsrc /= (int) (gpu->fbs.d[i].color_Bpp * gpu->fbs.d[i].width);
+        if (abs(yoffsrc) < gpu->fbs.d[i].height / 2) {
+            fb = &gpu->fbs.d[i];
+            break;
+        }
+    }
+    if (!fb) return;
+    LRU_use(gpu->fbs, fb);
 
     linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
 
