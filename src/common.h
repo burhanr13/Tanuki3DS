@@ -20,10 +20,10 @@ extern bool g_infologs;
                 : (void) 0)
 
 #define lwarn(format, ...)                                                     \
-    printf("\e[43;30m[WARNING](%s) " format "\e[0m\n",                         \
+    printf("\e[33;30m[WARNING](%s) " format "\e[0m\n",                         \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
 #define lerror(format, ...)                                                    \
-    printf("\e[41m[ERROR](%s) " format "\e[0m\n",                              \
+    printf("\e[31m[ERROR](%s) " format "\e[0m\n",                              \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
 
 #define print_fvec(v) printf("[%f,%f,%f,%f] ", (v)[0], (v)[1], (v)[2], (v)[3])

@@ -316,8 +316,8 @@ FBInfo* fbcache_find_within(GPU* gpu, u32 color_paddr) {
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr <= color_paddr &&
             color_paddr < gpu->fbs.d[i].color_paddr +
-                             gpu->fbs.d[i].width * gpu->fbs.d[i].height *
-                                 gpu->fbs.d[i].color_Bpp) {
+                              gpu->fbs.d[i].width * gpu->fbs.d[i].height *
+                                  gpu->fbs.d[i].color_Bpp) {
             newfb = &gpu->fbs.d[i];
             break;
         }
@@ -343,6 +343,18 @@ TexInfo* texcache_load(GPU* gpu, u32 paddr) {
     }
     tex->paddr = paddr;
     LRU_use(gpu->textures, tex);
+    return tex;
+}
+
+TexInfo* texcache_find_within(GPU* gpu, u32 paddr) {
+    TexInfo* tex = NULL;
+    for (int i = 0; i < TEX_MAX; i++) {
+        if (gpu->textures.d[i].paddr <= paddr &&
+            paddr < gpu->textures.d[i].paddr + gpu->textures.d[i].size) {
+            tex = &gpu->textures.d[i];
+            break;
+        }
+    }
     return tex;
 }
 
@@ -392,9 +404,9 @@ void gpu_update_cur_fb(GPU* gpu) {
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top) {
-    
-    // the source can be offset into or before an existing framebuffer, so we need to
-    // account for this
+
+    // the source can be offset into or before an existing framebuffer, so we
+    // need to account for this
     FBInfo* fb = NULL;
     int yoffsrc;
     for (int i = 0; i < FB_MAX; i++) {
@@ -424,6 +436,35 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
 
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap) {
+
+    FBInfo* srcfb = fbcache_find_within(gpu, srcpaddr);
+    TexInfo* dsttex = texcache_find_within(gpu, dstpaddr);
+
+    linfo("texture copy from %x to %x size=%d", srcpaddr, dstpaddr, size);
+
+    if (srcfb && dsttex) {
+        // do a hardware copy
+
+        linfo("copying from fb at %x to texture at %x", srcfb->color_paddr,
+              dsttex->paddr);
+
+        // need to handle more general cases at some point
+
+        if (srcgap == 0 && dstgap == 0) {
+            int yoff = (srcpaddr - srcfb->color_paddr) /
+                       (srcfb->width * srcfb->color_Bpp);
+            int height = size / srcfb->width;
+            // this feels wrong but it works ... :/
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, srcfb->fbo);
+            glBindTexture(GL_TEXTURE_2D, dsttex->tex);
+            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0,
+                             srcfb->width * ctremu.videoscale,
+                             srcfb->height * ctremu.videoscale, 0);
+        }
+
+        return;
+    }
+
     u8* src = PTR(srcpaddr);
     u8* dst = PTR(dstpaddr);
 
