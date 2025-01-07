@@ -35,7 +35,7 @@ void init_services(E3DS* s) {
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
     s->services.apt.shared_font.defaultdata = SHARED_FONT_DATA;
     s->services.apt.shared_font.defaultdatalen = SHARED_FONT_DATA_len;
-    s->services.apt.shared_font.vaddr = 0x1b000000;
+    s->services.apt.shared_font.vaddr = 0x20000000;
     s->services.apt.shared_font.size = SHARED_FONT_DATA_len;
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
