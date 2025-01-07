@@ -37,14 +37,14 @@ typedef struct {
     u16 height;
     u16 width;
     struct {
-        u32 _0 : 1;
+        u32 : 1;
         u32 mag_filter : 1;
         u32 min_filter : 1;
-        u32 _3 : 1;
+        u32 : 1;
         u32 etc1 : 4;
         u32 wrap_t : 4;
         u32 wrap_s : 4;
-        u32 _16_20 : 4;
+        u32 : 4;
         u32 shadow : 4;
         u32 mipmapfilter : 4;
         u32 type : 4;
@@ -62,11 +62,11 @@ typedef struct {
         u32 rgb0 : 4;
         u32 rgb1 : 4;
         u32 rgb2 : 4;
-        u32 _12_15 : 4;
+        u32 : 4;
         u32 a0 : 4;
         u32 a1 : 4;
         u32 a2 : 4;
-        u32 _28_31 : 4;
+        u32 : 4;
     } source;
     struct {
         u32 rgb0 : 4;
@@ -75,7 +75,7 @@ typedef struct {
         u32 a0 : 4;
         u32 a1 : 4;
         u32 a2 : 4;
-        u32 _24_31 : 8;
+        u32 : 8;
     } operand;
     struct {
         u16 rgb;
@@ -138,14 +138,14 @@ typedef union {
                     u32 tex0enable : 1;
                     u32 tex1enable : 1;
                     u32 tex2enable : 1;
-                    u32 _3_7 : 5;
+                    u32 : 5;
                     u32 tex3coord : 2;
                     u32 tex3enable : 1;
-                    u32 _11_12 : 2;
+                    u32 : 2;
                     u32 tex2coord : 1;
-                    u32 _14_15 : 2;
+                    u32 : 2;
                     u32 clearcache : 1;
-                    u32 _17_31 : 15;
+                    u32 : 15;
                 } config;
                 TexUnitRegs tex0;
                 u32 tex0_cubeaddr[5];
@@ -167,7 +167,7 @@ typedef union {
                 struct {
                     u32 fogmode : 3;
                     u32 densitysource : 1;
-                    u32 _4_7 : 4;
+                    u32 : 4;
                     u32 update_rgb : 4;
                     u32 update_alpha : 4;
                     u32 zflip : 16;
@@ -204,7 +204,7 @@ typedef union {
                     u32 enable : 4;
                     u32 func : 4;
                     u32 ref : 8;
-                    u32 _16_31 : 16;
+                    u32 : 16;
                 } alpha_test;
                 struct {
                     u32 enable : 4;
@@ -217,7 +217,7 @@ typedef union {
                     u32 fail : 4;
                     u32 zfail : 4;
                     u32 zpass : 4;
-                    u32 unused : 20;
+                    u32 : 20;
                 } stencil_op;
                 struct {
                     u32 depthtest : 4;
@@ -227,7 +227,7 @@ typedef union {
                     u32 blue : 1;
                     u32 alpha : 1;
                     u32 depth : 1;
-                    u32 unused : 19;
+                    u32 : 19;
                 } color_mask;
                 u32 _108[8];
                 u32 fb_invalidate;
@@ -249,7 +249,7 @@ typedef union {
                 struct {
                     u32 width : 12;
                     u32 height : 12;
-                    u32 _24_31 : 8;
+                    u32 : 8;
                 } dim;
             };
             u32 w[0x40];
@@ -297,7 +297,7 @@ typedef union {
                     struct {
                         u64 comp : 48;
                         u64 size : 8;
-                        u64 _unused : 4;
+                        u64 : 4;
                         u64 count : 4;
                     };
                 } attrbuf[12];
@@ -329,7 +329,7 @@ typedef union {
                 struct {
                     u32 outmapcount : 8;
                     u32 mode : 8;
-                    u32 unk : 16;
+                    u32 : 16;
                 } prim_config;
                 u32 restart_primitive;
             };
@@ -457,7 +457,7 @@ typedef union {
         u32 id : 16;
         u32 mask : 4;
         u32 nparams : 8;
-        u32 unused : 3;
+        u32 : 3;
         u32 incmode : 1;
     };
 } GPUCommand;

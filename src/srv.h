@@ -11,7 +11,7 @@ typedef union {
     struct {
         u32 paramsize_translate : 6;
         u32 paramsize_normal : 6;
-        u32 unused : 4;
+        u32 : 4;
         u32 command : 16;
     };
 } IPCHeader;

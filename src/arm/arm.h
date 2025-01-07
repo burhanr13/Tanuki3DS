@@ -66,9 +66,9 @@ enum {
 typedef union {
     u32 w;
     struct {
-        u32 _b0_3 : 4;
+        u32 : 4;
         u32 declo : 4;
-        u32 _b8_19 : 12;
+        u32 : 12;
         u32 dechi : 8;
         u32 cond : 4;
     };

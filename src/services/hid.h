@@ -31,7 +31,7 @@ typedef union {
         u32 x : 1;
         u32 y : 1;
         u32 gpio : 2;
-        u32 unused : 14;
+        u32 : 14;
         u32 cright : 1;
         u32 cleft : 1;
         u32 cup : 1;

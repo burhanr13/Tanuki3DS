@@ -44,16 +44,16 @@ typedef struct _ArmCore {
         u32 w;
         struct {
             u32 jitattrs : 6;
-            u32 _6_31 : 26;
+            u32 : 26;
         };
         struct {
             u32 m : 5;
             u32 t : 1;
             u32 f : 1;
             u32 i : 1;
-            u32 reserved1 : 8;
+            u32 : 8;
             u32 ge : 4;
-            u32 reserved2 : 7;
+            u32 : 7;
             u32 q : 1;
             u32 v : 1;
             u32 c : 1;
@@ -73,7 +73,7 @@ typedef struct _ArmCore {
     union {
         u32 w;
         struct {
-            u32 reserved : 28;
+            u32 : 28;
             u32 nzcv : 4;
         };
     } fpscr;
