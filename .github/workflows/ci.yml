@@ -16,10 +16,6 @@ jobs:
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         sudo ./llvm.sh 19
-        which clang
-        which clang-19
-        clang --version
-        clang-19 --version
     - name: build
       run: make USER=1
     - uses: actions/upload-artifact@v4

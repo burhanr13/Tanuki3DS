@@ -1,7 +1,7 @@
 TARGET_EXEC := ctremu
 
-CC := clang
-CXX := clang++
+CC := clang-19
+CXX := clang++-19
 
 CSTD := -std=gnu23
 CXXSTD := -std=gnu++23
