@@ -3,28 +3,41 @@
 #include "../3ds.h"
 #include "../emulator.h"
 #include "gpu.h"
-#include "hostshaders/hostshaders.h"
+
+const char mainvertsource[] = {
+#embed "hostshaders/main.vert"
+    , '\0'};
+const char mainfragsource[] = {
+#embed "hostshaders/main.frag"
+    , '\0'};
+
+const char gpuvertsource[] = {
+#embed "hostshaders/gpu.vert"
+    , '\0'};
+const char gpufragsource[] = {
+#embed "hostshaders/gpu.frag"
+    , '\0'};
 
 GLuint make_shader(const char* vert, const char* frag) {
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vert, NULL);
+    glShaderSource(vertexShader, 1, &vert, nullptr);
     glCompileShader(vertexShader);
     int success;
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if (!success) {
         char infolog[512];
-        glGetShaderInfoLog(vertexShader, 512, NULL, infolog);
+        glGetShaderInfoLog(vertexShader, 512, nullptr, infolog);
         printf("Error compiling vertex shader: %s\n", infolog);
         exit(1);
     }
 
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &frag, NULL);
+    glShaderSource(fragmentShader, 1, &frag, nullptr);
     glCompileShader(fragmentShader);
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if (!success) {
         char infolog[512];
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infolog);
+        glGetShaderInfoLog(fragmentShader, 512, nullptr, infolog);
         printf("Error compiling fragment shader: %s\n", infolog);
         exit(1);
     }
@@ -36,7 +49,7 @@ GLuint make_shader(const char* vert, const char* frag) {
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
         char infolog[512];
-        glGetProgramInfoLog(program, 512, NULL, infolog);
+        glGetProgramInfoLog(program, 512, nullptr, infolog);
         printf("Error linking program: %s\n", infolog);
     }
 
@@ -58,7 +71,7 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
 
     glGenBuffers(1, &state->mainvbo);
     glBindBuffer(GL_ARRAY_BUFFER, state->mainvbo);
-    glBufferData(GL_ARRAY_BUFFER, 0, NULL, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
 
     state->gpuprogram = make_shader(gpuvertsource, gpufragsource);
     glUseProgram(state->gpuprogram);
@@ -108,15 +121,15 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glBindTexture(GL_TEXTURE_2D, state->textop);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * ctremu.videoscale,
                  SCREEN_WIDTH * ctremu.videoscale, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                 NULL);
+                 nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
+
     glGenTextures(1, &state->texbot);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT * ctremu.videoscale,
                  SCREEN_WIDTH_BOT * ctremu.videoscale, 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, NULL);
+                 GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 

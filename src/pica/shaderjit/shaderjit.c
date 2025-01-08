@@ -8,7 +8,7 @@
 
 ShaderJitFunc shaderjit_get(GPU* gpu, ShaderUnit* shu) {
     u64 hash = XXH3_64bits(shu->code, SHADER_CODE_SIZE * sizeof(PICAInstr));
-    ShaderJitBlock* block = NULL;
+    ShaderJitBlock* block = nullptr;
     for (int i = 0; i < VSH_MAX; i++) {
         if (gpu->vshaders.d[i].hash == hash || gpu->vshaders.d[i].hash == 0) {
             block = &gpu->vshaders.d[i];

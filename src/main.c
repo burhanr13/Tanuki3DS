@@ -29,7 +29,7 @@ void hotkey_press(SDL_KeyCode key) {
 }
 
 void update_input(E3DS* s, SDL_GameController* controller) {
-    const Uint8* keys = SDL_GetKeyboardState(NULL);
+    const Uint8* keys = SDL_GetKeyboardState(nullptr);
 
     PadState btn;
     btn.a = keys[SDL_SCANCODE_L];
@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER);
 
-    SDL_GameController* controller = NULL;
+    SDL_GameController* controller = nullptr;
     if (SDL_NumJoysticks() > 0) {
         controller = SDL_GameControllerOpen(0);
     }
@@ -150,17 +150,18 @@ int main(int argc, char** argv) {
 #ifdef GLDEBUGCTX
     glEnable(GL_DEBUG_OUTPUT);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-    glDebugMessageCallback(glDebugOutput, NULL);
-    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL,
+    glDebugMessageCallback(glDebugOutput, nullptr);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
                           GL_TRUE);
 #endif
 
 #ifdef USE_TFD
     if (!ctremu.romfile) {
         const char* filetypes[] = {"*.3ds", "*.cci", "*.cxi", "*.app", "*.elf"};
-        ctremu.romfile = tinyfd_openFileDialog(
-            EMUNAME ": Open Game", NULL, sizeof filetypes / sizeof filetypes[0],
-            filetypes, "3DS Executables", false);
+        ctremu.romfile =
+            tinyfd_openFileDialog(EMUNAME ": Open Game", nullptr,
+                                  sizeof filetypes / sizeof filetypes[0],
+                                  filetypes, "3DS Executables", false);
     }
 #endif
 

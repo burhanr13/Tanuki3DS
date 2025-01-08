@@ -1,4 +1,3 @@
-const char* mainfragsource = R"(
 #version 410 core
 
 in vec2 texcoord;
@@ -10,4 +9,3 @@ void main() {
     fragclr = texture(screen, texcoord);
 }
 
-)";

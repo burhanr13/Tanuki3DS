@@ -39,13 +39,13 @@ void sigsegv_handler(int sig, siginfo_t* info, void* ucontext) {
                addr - ctremu.system.physmem);
         exit(1);
     }
-    sigaction(sig, &(struct sigaction){.sa_handler = SIG_DFL}, NULL);
+    sigaction(sig, &(struct sigaction) {.sa_handler = SIG_DFL}, nullptr);
 }
 
 void e3ds_memory_init(E3DS* s) {
-    s->physmem = mmap(NULL, BITL(32), PROT_NONE,
+    s->physmem = mmap(nullptr, BITL(32), PROT_NONE,
                       MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
-    s->virtmem = mmap(NULL, BITL(32), PROT_NONE,
+    s->virtmem = mmap(nullptr, BITL(32), PROT_NONE,
                       MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
     if (s->physmem == MAP_FAILED || s->virtmem == MAP_FAILED) {
         perror("mmap");
@@ -56,8 +56,8 @@ void e3ds_memory_init(E3DS* s) {
 
     struct sigaction sa = {.sa_sigaction = sigsegv_handler,
                            .sa_flags = SA_SIGINFO};
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGBUS, &sa, NULL);
+    sigaction(SIGSEGV, &sa, nullptr);
+    sigaction(SIGBUS, &sa, nullptr);
 
     s->fcram_fd = memfd_create(".fcram", 0);
     if (s->fcram_fd < 0 || ftruncate(s->fcram_fd, FCRAMSIZE) < 0) {
@@ -91,7 +91,7 @@ void e3ds_memory_init(E3DS* s) {
     }
 
     VMBlock* initblk = malloc(sizeof(VMBlock));
-    *initblk = (VMBlock){
+    *initblk = (VMBlock) {
         .startpg = 0, .endpg = BIT(20), .perm = 0, .state = MEMST_FREE};
     s->process.vmblocks.startpg = BIT(20);
     s->process.vmblocks.endpg = BIT(20);
@@ -108,8 +108,8 @@ void e3ds_memory_destroy(E3DS* s) {
         free(tmp);
     }
 
-    sigaction(SIGSEGV, &(struct sigaction){.sa_handler = SIG_DFL}, NULL);
-    sigaction(SIGBUS, &(struct sigaction){.sa_handler = SIG_DFL}, NULL);
+    sigaction(SIGSEGV, &(struct sigaction) {.sa_handler = SIG_DFL}, nullptr);
+    sigaction(SIGBUS, &(struct sigaction) {.sa_handler = SIG_DFL}, nullptr);
 
     munmap(s->virtmem, BITL(32));
 
@@ -191,10 +191,10 @@ void e3ds_vmmap(E3DS* s, u32 base, u32 size, u32 perm, u32 state, bool linear) {
     if (!size) return;
 
     VMBlock* n = malloc(sizeof(VMBlock));
-    *n = (VMBlock){.startpg = base >> 12,
-                   .endpg = (base + size) >> 12,
-                   .perm = perm,
-                   .state = state};
+    *n = (VMBlock) {.startpg = base >> 12,
+                    .endpg = (base + size) >> 12,
+                    .perm = perm,
+                    .state = state};
     insert_vmblock(s, n);
 
     void* ptr;
@@ -222,5 +222,5 @@ VMBlock* e3ds_vmquery(E3DS* s, u32 addr) {
         if (b->startpg <= addr && addr < b->endpg) return b;
         b = b->next;
     }
-    return NULL;
+    return nullptr;
 }

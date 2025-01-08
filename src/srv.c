@@ -40,10 +40,10 @@ void init_services(E3DS* s) {
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
 
-    s->services.gsp.event = NULL;
+    s->services.gsp.event = nullptr;
     srvobj_init(&s->services.gsp.sharedmem.hdr, KOT_SHAREDMEM);
 
-    s->services.dsp.event = NULL;
+    s->services.dsp.event = nullptr;
     srvobj_init(&s->services.dsp.semEvent.hdr, KOT_EVENT);
 
     srvobj_init(&s->services.hid.sharedmem.hdr, KOT_SHAREDMEM);

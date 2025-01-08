@@ -1,7 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -85,7 +84,7 @@ typedef float fvec2[2];
         size_t cap;                                                            \
     }
 
-#define Vec_init(v) ((v).d = NULL, (v).size = 0, (v).cap = 0)
+#define Vec_init(v) ((v).d = nullptr, (v).size = 0, (v).cap = 0)
 #define Vec_assn(v1, v2)                                                       \
     ((v1).d = (v2).d, (v1).size = (v2).size, (v1).cap = (v2).cap)
 #define Vec_free(v) (free((v).d), Vec_init(v))
@@ -123,7 +122,7 @@ typedef float fvec2[2];
     ({                                                                         \
         (n)->next->prev = (n)->prev;                                           \
         (n)->prev->next = (n)->next;                                           \
-        (n)->prev = (n)->next = NULL;                                          \
+        (n)->prev = (n)->next = nullptr;                                       \
     })
 
 #define LRU_use(c, e)                                                          \
@@ -142,7 +141,7 @@ typedef float fvec2[2];
         typeof(&(c).root) e = (c).root.prev;                                   \
         (c).root.prev = (c).root.prev->prev;                                   \
         (c).root.prev->next = &(c).root;                                       \
-        e->next = e->prev = NULL;                                              \
+        e->next = e->prev = nullptr;                                           \
         (c).size--;                                                            \
         e;                                                                     \
     })

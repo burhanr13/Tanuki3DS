@@ -1,4 +1,3 @@
-const char* mainvertsource = R"(
 #version 410 core
 
 out vec2 texcoord;
@@ -21,5 +20,3 @@ void main() {
     gl_Position = vec4(xys[gl_VertexID],0,1);
     texcoord = uvs[gl_VertexID];
 }
-
-)";

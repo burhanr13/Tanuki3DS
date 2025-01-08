@@ -1,4 +1,3 @@
-const char* gpuvertsource = R"(
 #version 410 core
 
 layout (location=0) in vec4 a_pos;
@@ -27,4 +26,3 @@ void main() {
     view = a_view;
 }
 
-)";

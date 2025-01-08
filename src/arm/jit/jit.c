@@ -82,7 +82,7 @@ void destroy_jit_block(JITBlock* block) {
 #endif
 
     block->cpu->jit_cache[block->attrs][block->start_addr >> 16]
-                         [(block->start_addr & 0xffff) >> 1] = NULL;
+                         [(block->start_addr & 0xffff) >> 1] = nullptr;
     backend_free(block->backend);
     Vec_foreach(l, block->linkingblocks) {
         if (!(block->cpu->jit_cache[l->attrs] &&
@@ -127,7 +127,7 @@ JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
         cpu->jit_cache[attrs][addrhi] = calloc(BIT(16) >> 1, sizeof(JITBlock*));
     }
 
-    JITBlock* block = NULL;
+    JITBlock* block = nullptr;
     if (!cpu->jit_cache[attrs][addrhi][addrlo]) {
         u32 old = cpu->cpsr.jitattrs;
         cpu->cpsr.jitattrs = attrs;
@@ -149,15 +149,15 @@ void jit_free_all(ArmCore* cpu) {
                     for (int k = 0; k < BIT(16) >> 1; k++) {
                         if (cpu->jit_cache[i][j][k]) {
                             destroy_jit_block(cpu->jit_cache[i][j][k]);
-                            cpu->jit_cache[i][j][k] = NULL;
+                            cpu->jit_cache[i][j][k] = nullptr;
                         }
                     }
                     free(cpu->jit_cache[i][j]);
-                    cpu->jit_cache[i][j] = NULL;
+                    cpu->jit_cache[i][j] = nullptr;
                 }
             }
             free(cpu->jit_cache[i]);
-            cpu->jit_cache[i] = NULL;
+            cpu->jit_cache[i] = nullptr;
         }
     }
 }
