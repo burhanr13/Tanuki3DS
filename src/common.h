@@ -8,7 +8,6 @@
 #include <string.h>
 
 #define eprintf(format, ...) fprintf(stderr, format __VA_OPT__(, ) __VA_ARGS__)
-#define println() printf("\n")
 #define printfln(format, ...) printf(format "\n"__VA_OPT__(, ) __VA_ARGS__)
 
 extern bool g_infologs;
