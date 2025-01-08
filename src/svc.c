@@ -247,7 +247,7 @@ DECL_SVC(MapMemoryBlock) {
     } else if (shmem->vaddr) {
         addr = shmem->vaddr;
     } else {
-        lwarn("trying to map at nullptr");
+        lwarn("trying to map at null");
         R(0) = -1;
         return;
     }

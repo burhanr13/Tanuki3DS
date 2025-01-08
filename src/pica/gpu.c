@@ -1005,7 +1005,7 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
 
 void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     if ((regs->addr << 3) < VRAM_PBASE) {
-        // games setup textures with nullptr sometimes
+        // games setup textures with null sometimes
         return;
     }
 

@@ -7,16 +7,16 @@ PATH="$PATH:/usr/libexec"
 
 # Construct the app iconset.
 mkdir icon.iconset
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 16x16 -composite icon.iconset/icon_16x16.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 32x32 -composite icon.iconset/icon_16x16@2x.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 32x32 -composite icon.iconset/icon_32x32.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 64x64 -composite icon.iconset/icon_32x32@2x.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 128x128 -composite icon.iconset/icon_128x128.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 256x256 -composite icon.iconset/icon_128x128@2x.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 256x256 -composite icon.iconset/icon_256x256.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 512x512 -composite icon.iconset/icon_256x256@2x.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 512x512 -composite icon.iconset/icon_512x512.png
-convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 1024x1024 -composite icon.iconset/icon_512x512@2x.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 16x16 icon.iconset/icon_16x16.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 32x32 icon.iconset/icon_16x16@2x.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 32x32 icon.iconset/icon_32x32.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 64x64 icon.iconset/icon_32x32@2x.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 128x128 icon.iconset/icon_128x128.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 256x256 icon.iconset/icon_128x128@2x.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 256x256 icon.iconset/icon_256x256.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 512x512 icon.iconset/icon_256x256@2x.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 72 -resize 512x512 icon.iconset/icon_512x512.png
+convert images/logo.ico -alpha on -background none -units PixelsPerInch -density 144 -resize 1024x1024 icon.iconset/icon_512x512@2x.png
 iconutil --convert icns icon.iconset
 rm -r icon.iconset
 

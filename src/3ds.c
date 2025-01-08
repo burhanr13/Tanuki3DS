@@ -84,7 +84,7 @@ void e3ds_update_datetime(E3DS* s) {
         u32 unk[4];
     }* datetime = PTR(SHARED_PAGE + 0x20);
 
-    datetime->time = (time(nullptr) + 2208988800) * 1000;
+    datetime->time = (time(nullptr) + 2'208'988'800) * 1000;
     datetime->systemtick = s->sched.now;
     datetime->unk[0] = 0xffb0ff0;
 }
