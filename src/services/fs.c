@@ -10,10 +10,12 @@
 #include "../loader.h"
 #include "../srv.h"
 
-#include "../../sys_files/mii_data.h"
-
 enum {
     SYSFILE_MIIDATA = 1,
+};
+
+u8 mii_data[] = {
+#embed "../../sys_files/mii.app.romfs"
 };
 
 char* archive_basepath(u64 archive) {
@@ -327,8 +329,8 @@ DECL_PORT_ARG(fs_sysfile, file) {
     u64 srcsize = 0;
     switch (file) {
         case SYSFILE_MIIDATA:
-            srcdata = MII_DATA;
-            srcsize = MII_DATA_len;
+            srcdata = mii_data;
+            srcsize = sizeof mii_data;
             linfo("accessing mii data");
             break;
         default:
