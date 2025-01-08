@@ -437,8 +437,8 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap) {
 
-    FBInfo* srcfb = fbcache_find_within(gpu, srcpaddr);
-    TexInfo* dsttex = texcache_find_within(gpu, dstpaddr);
+    auto srcfb = fbcache_find_within(gpu, srcpaddr);
+    auto dsttex = texcache_find_within(gpu, dstpaddr);
 
     linfo("texture copy from %x to %x size=%d", srcpaddr, dstpaddr, size);
 
@@ -449,7 +449,7 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
               dsttex->paddr);
 
         // need to handle more general cases at some point
-
+    
         if (srcgap == 0 && dstgap == 0) {
             int yoff = (srcpaddr - srcfb->color_paddr) /
                        (srcfb->width * srcfb->color_Bpp);
