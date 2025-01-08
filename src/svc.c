@@ -100,7 +100,7 @@ DECL_SVC(ExitThread) {
         klist_remove(cur);
     }
 
-    s->process.threads[CUR_THREAD->id] = NULL;
+    s->process.threads[CUR_THREAD->id] = nullptr;
 
     thread_reschedule(s);
 }
@@ -247,7 +247,7 @@ DECL_SVC(MapMemoryBlock) {
     } else if (shmem->vaddr) {
         addr = shmem->vaddr;
     } else {
-        lwarn("trying to map at NULL");
+        lwarn("trying to map at null");
         R(0) = -1;
         return;
     }
@@ -261,7 +261,7 @@ DECL_SVC(MapMemoryBlock) {
     if (shmem->defaultdata) {
         memcpy(PTR(addr), shmem->defaultdata, shmem->defaultdatalen);
     }
-    
+
     R(0) = 0;
 }
 
@@ -312,7 +312,7 @@ DECL_SVC(ArbitrateAddress) {
             } else {
                 for (int i = 0; i < value; i++) {
                     u32 maxprio = THRD_MAX_PRIO;
-                    KListNode** toRemove = NULL;
+                    KListNode** toRemove = nullptr;
                     KListNode** cur = &arbiter->waiting_thrds;
                     while (*cur) {
                         KThread* t = (KThread*) (*cur)->key;
@@ -363,7 +363,7 @@ DECL_SVC(CloseHandle) {
     R(0) = 0;
     if (!--obj->refcount) {
         linfo("destroying object of handle %x", handle);
-        HANDLE_SET(handle, NULL);
+        HANDLE_SET(handle, nullptr);
         kobject_destroy(s, obj);
     }
 }

@@ -10,10 +10,12 @@
 #include "../loader.h"
 #include "../srv.h"
 
-#include "../../sys_files/mii_data.h"
-
 enum {
     SYSFILE_MIIDATA = 1,
+};
+
+u8 mii_data[] = {
+#embed "../../sys_files/mii.app.romfs"
 };
 
 char* archive_basepath(u64 archive) {
@@ -35,15 +37,15 @@ char* archive_basepath(u64 archive) {
         }
         default:
             lerror("invalid archive");
-            return NULL;
+            return nullptr;
     }
 }
 
 char* create_text_path(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
     char* basepath = archive_basepath(archive);
-    if (!basepath) return NULL;
+    if (!basepath) return nullptr;
 
-    char* filepath = NULL;
+    char* filepath = nullptr;
     if (pathtype == FSPATH_ASCII) {
         asprintf(&filepath, "%s%s", basepath, rawpath);
     } else if (pathtype == FSPATH_UTF16) {
@@ -55,7 +57,7 @@ char* create_text_path(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
         asprintf(&filepath, "%s%s", basepath, path);
     } else {
         lerror("unknown text file path type");
-        return NULL;
+        return nullptr;
     }
     free(basepath);
     return filepath;
@@ -323,12 +325,12 @@ DECL_PORT_ARG(fs_selfncch, base) {
 DECL_PORT_ARG(fs_sysfile, file) {
     u32* cmdbuf = PTR(cmd_addr);
 
-    void* srcdata = NULL;
+    void* srcdata = nullptr;
     u64 srcsize = 0;
     switch (file) {
         case SYSFILE_MIIDATA:
-            srcdata = MII_DATA;
-            srcsize = MII_DATA_len;
+            srcdata = mii_data;
+            srcsize = sizeof mii_data;
             linfo("accessing mii data");
             break;
         default:
@@ -441,7 +443,7 @@ DECL_PORT_ARG(fs_file, fd) {
         case 0x0808: {
             linfo("closing file");
             fclose(fp);
-            s->services.fs.files[fd] = NULL;
+            s->services.fs.files[fd] = nullptr;
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -527,7 +529,7 @@ DECL_PORT_ARG(fs_dir, fd) {
         case 0x0802: {
             linfo("closing dir");
             closedir(dp);
-            s->services.fs.dirs[fd] = NULL;
+            s->services.fs.dirs[fd] = nullptr;
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -649,7 +651,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                         }
                         if (offset == 0) {
                             lerror("no such exefs file %s", filename);
-                            return NULL;
+                            return nullptr;
                         }
                         linfo("opening exefs file %s", filename);
                         return session_create_arg(port_handle_fs_selfncch,
@@ -658,11 +660,11 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                     }
                     default:
                         lerror("unknown selfNCCH file");
-                        return NULL;
+                        return nullptr;
                 }
             } else {
                 lerror("unknown selfNCCH file path type");
-                return NULL;
+                return nullptr;
             }
             break;
         }
@@ -672,14 +674,14 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
 
             int fd = -1;
             for (int i = 0; i < FS_FILE_MAX; i++) {
-                if (s->services.fs.files[i] == NULL) {
+                if (s->services.fs.files[i] == nullptr) {
                     fd = i;
                     break;
                 }
             }
             if (fd == -1) {
                 lerror("ran out of files");
-                return NULL;
+                return nullptr;
             }
 
             char* filepath =
@@ -703,7 +705,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             if (hostfd < 0) {
                 lwarn("file %s not found", filepath);
                 free(filepath);
-                return NULL;
+                return nullptr;
             }
 
             char* fopenmode = "r";
@@ -723,7 +725,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             if (!fp) {
                 perror("fdopen");
                 free(filepath);
-                return NULL;
+                return nullptr;
             }
             s->services.fs.files[fd] = fp;
 
@@ -748,13 +750,13 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                 }
             } else {
                 lerror("unknown selfNCCH(0x234578a) file path type");
-                return NULL;
+                return nullptr;
             }
             break;
         }
         default:
             lerror("unknown archive %llx", archive);
-            return NULL;
+            return nullptr;
     }
 }
 
@@ -796,14 +798,14 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
 
             int fd = -1;
             for (int i = 0; i < FS_FILE_MAX; i++) {
-                if (s->services.fs.dirs[i] == NULL) {
+                if (s->services.fs.dirs[i] == nullptr) {
                     fd = i;
                     break;
                 }
             }
             if (fd == -1) {
                 lerror("ran out of dirs");
-                return NULL;
+                return nullptr;
             }
 
             char* filepath =
@@ -813,7 +815,7 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             if (!dp) {
                 linfo("failed to open directory %s", filepath);
                 free(filepath);
-                return NULL;
+                return nullptr;
             }
             s->services.fs.dirs[fd] = dp;
 
@@ -827,7 +829,7 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
         }
         default:
             lerror("unknown archive %llx", archive);
-            return NULL;
+            return nullptr;
     }
 }
 

@@ -260,7 +260,7 @@ DECL_ARM_COMPILE(data_proc) {
                 shiftc = EMITVV(GETCIFZ, shamt, shiftc);
             } else {
                 op2 = compile_shifter(block, cpu, shift_type, op2, shamt,
-                                      immshift, NULL);
+                                      immshift, nullptr);
             }
         } else {
             if (usingop1) op1 = EMIT_LOAD_REG(instr.data_proc.rn);
@@ -268,7 +268,7 @@ DECL_ARM_COMPILE(data_proc) {
 
             shamt = shift >> 3;
             op2 = compile_shifter(block, cpu, shift_type, op2, shamt, immshift,
-                                  instr.data_proc.s ? &shiftc : NULL);
+                                  instr.data_proc.s ? &shiftc : nullptr);
         }
     }
     if (usingop1 && instr.data_proc.rn == 15 && instr.data_proc.rd != 15 &&
@@ -885,7 +885,8 @@ DECL_ARM_COMPILE(single_trans) {
         u8 shift = instr.single_trans.offset >> 4;
         u8 shamt = shift >> 3;
         u8 op = (shift >> 1) & 3;
-        voffset = compile_shifter(block, cpu, op, voffset, shamt, true, NULL);
+        voffset =
+            compile_shifter(block, cpu, op, voffset, shamt, true, nullptr);
     } else {
         voffset = instr.single_trans.offset;
     }

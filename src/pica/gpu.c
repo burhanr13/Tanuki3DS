@@ -243,7 +243,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     })
 
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
-    gpu->cur_fb = NULL;
+    gpu->cur_fb = nullptr;
 
     paddr &= ~15;
     size &= ~15;
@@ -278,7 +278,7 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
 
 // searches the framebuffer cache and creates a new framebuffer if not found
 FBInfo* fbcache_load(GPU* gpu, u32 color_paddr) {
-    FBInfo* newfb = NULL;
+    FBInfo* newfb = nullptr;
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr == color_paddr ||
             gpu->fbs.d[i].color_paddr == 0) {
@@ -297,9 +297,9 @@ FBInfo* fbcache_load(GPU* gpu, u32 color_paddr) {
     return newfb;
 }
 
-// searches the framebuffer cache and return NULL if not found
+// searches the framebuffer cache and return nullptr if not found
 FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
-    FBInfo* newfb = NULL;
+    FBInfo* newfb = nullptr;
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr == color_paddr) {
             newfb = &gpu->fbs.d[i];
@@ -310,9 +310,9 @@ FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
     return newfb;
 }
 
-// searches the framebuffer cache and return NULL if not found
+// searches the framebuffer cache and return nullptr if not found
 FBInfo* fbcache_find_within(GPU* gpu, u32 color_paddr) {
-    FBInfo* newfb = NULL;
+    FBInfo* newfb = nullptr;
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr <= color_paddr &&
             color_paddr < gpu->fbs.d[i].color_paddr +
@@ -328,7 +328,7 @@ FBInfo* fbcache_find_within(GPU* gpu, u32 color_paddr) {
 
 // ensures there is a texture with the given paddr in the cache
 TexInfo* texcache_load(GPU* gpu, u32 paddr) {
-    TexInfo* tex = NULL;
+    TexInfo* tex = nullptr;
     for (int i = 0; i < TEX_MAX; i++) {
         if (gpu->textures.d[i].paddr == paddr ||
             gpu->textures.d[i].paddr == 0) {
@@ -347,7 +347,7 @@ TexInfo* texcache_load(GPU* gpu, u32 paddr) {
 }
 
 TexInfo* texcache_find_within(GPU* gpu, u32 paddr) {
-    TexInfo* tex = NULL;
+    TexInfo* tex = nullptr;
     for (int i = 0; i < TEX_MAX; i++) {
         if (gpu->textures.d[i].paddr <= paddr &&
             paddr < gpu->textures.d[i].paddr + gpu->textures.d[i].size) {
@@ -385,12 +385,12 @@ void gpu_update_cur_fb(GPU* gpu) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                      gpu->cur_fb->width * ctremu.videoscale,
                      gpu->cur_fb->height * ctremu.videoscale, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, NULL);
+                     GL_UNSIGNED_BYTE, nullptr);
         glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->depth_tex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8,
                      gpu->cur_fb->width * ctremu.videoscale,
                      gpu->cur_fb->height * ctremu.videoscale, 0,
-                     GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+                     GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_2D, gpu->cur_fb->color_tex, 0);
@@ -407,7 +407,7 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
 
     // the source can be offset into or before an existing framebuffer, so we
     // need to account for this
-    FBInfo* fb = NULL;
+    FBInfo* fb = nullptr;
     int yoffsrc;
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].width == 0) continue;
@@ -437,8 +437,8 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap) {
 
-    FBInfo* srcfb = fbcache_find_within(gpu, srcpaddr);
-    TexInfo* dsttex = texcache_find_within(gpu, dstpaddr);
+    auto srcfb = fbcache_find_within(gpu, srcpaddr);
+    auto dsttex = texcache_find_within(gpu, dstpaddr);
 
     linfo("texture copy from %x to %x size=%d", srcpaddr, dstpaddr, size);
 
@@ -449,7 +449,7 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
               dsttex->paddr);
 
         // need to handle more general cases at some point
-
+    
         if (srcgap == 0 && dstgap == 0) {
             int yoff = (srcpaddr - srcfb->color_paddr) /
                        (srcfb->width * srcfb->color_Bpp);
@@ -730,13 +730,13 @@ void vsh_thrd_func(GPU* gpu) {
 void gpu_vshrunner_init(GPU* gpu) {
     gpu->vsh_runner.cur = 0;
 
-    pthread_mutex_init(&gpu->vsh_runner.mtx, NULL);
-    pthread_cond_init(&gpu->vsh_runner.cv1, NULL);
-    pthread_cond_init(&gpu->vsh_runner.cv2, NULL);
+    pthread_mutex_init(&gpu->vsh_runner.mtx, nullptr);
+    pthread_cond_init(&gpu->vsh_runner.cv1, nullptr);
+    pthread_cond_init(&gpu->vsh_runner.cv2, nullptr);
 
     for (int i = 0; i < VSH_THREADS; i++) {
         gpu->vsh_runner.thread[i].ready = false;
-        pthread_create(&gpu->vsh_runner.thread[i].thd, NULL,
+        pthread_create(&gpu->vsh_runner.thread[i].thd, nullptr,
                        (void*) vsh_thrd_func, gpu);
     }
 
@@ -1005,7 +1005,7 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
 
 void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     if ((regs->addr << 3) < VRAM_PBASE) {
-        // games setup textures with NULL sometimes
+        // games setup textures with null sometimes
         return;
     }
 

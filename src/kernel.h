@@ -38,12 +38,12 @@ u32 handle_new(E3DS* s);
 #define HANDLE_SET(h, o) (s->process.handles[h - HANDLE_BASE] = (KObject*) (o))
 #define HANDLE_GET(h)                                                          \
     (((h - HANDLE_BASE) < HANDLE_MAX) ? s->process.handles[h - HANDLE_BASE]    \
-                                      : NULL)
+                                      : nullptr)
 #define HANDLE_GET_TYPED(h, t)                                                 \
     (((h - HANDLE_BASE) < HANDLE_MAX && s->process.handles[h - HANDLE_BASE] && \
       s->process.handles[h - HANDLE_BASE]->type == t)                          \
          ? (void*) s->process.handles[h - HANDLE_BASE]                         \
-         : NULL)
+         : nullptr)
 
 void klist_insert(KListNode** l, KObject* o);
 void klist_remove(KListNode** l);

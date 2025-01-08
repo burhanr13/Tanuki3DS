@@ -1,10 +1,10 @@
 TARGET_EXEC := ctremu
 
-CC := gcc
-CXX := g++
+CC := clang-19
+CXX := clang++-19
 
-CSTD := -std=gnu17
-CXXSTD := -std=gnu++17
+CSTD := -std=gnu23
+CXXSTD := -std=gnu++23
 CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unused-result -Werror
 CFLAGS_RELEASE := -O3 -DJIT_FASTMEM
 CFLAGS_DEBUG := -g -fsanitize=address
@@ -21,8 +21,10 @@ else
 endif
 
 ifeq ($(shell uname),Darwin)
-	CFLAGS += -arch x86_64
-	CPPFLAGS += -I/opt/homebrew/include
+	CC := /usr/local/opt/llvm/bin/clang
+	CXX := /usr/local/opt/llvm/bin/clang++
+	CFLAGS += -target x86_64-apple-darwin
+	CPPFLAGS += -I/usr/local/include -I/opt/homebrew/include
 	LDFLAGS := -L/usr/local/lib -L/opt/homebrew/lib $(LDFLAGS)
 	LDFLAGS += -framework OpenGL -lGLEW
 else

@@ -48,7 +48,7 @@ void kobject_destroy(E3DS* s, KObject* o) {
                 klist_remove(cur);
             }
 
-            s->process.threads[t->id] = NULL;
+            s->process.threads[t->id] = nullptr;
 
             thread_reschedule(s);
             break;

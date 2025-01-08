@@ -11,7 +11,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
-      run: sudo apt install libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
+      run: |
+        sudo apt install libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 19
     - name: build
       run: make USER=1
     - uses: actions/upload-artifact@v4
@@ -24,7 +28,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
-      run: brew install sdl2 glew xxhash xbyak capstone
+      run: brew install llvm sdl2 glew xxhash xbyak capstone
     - name: build
       run: make USER=1
 

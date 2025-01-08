@@ -110,7 +110,7 @@ DECL_PORT(apt) {
 
             s->services.apt.nextparam.appid = appid;
             s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
-            s->services.apt.nextparam.kobj = NULL;
+            s->services.apt.nextparam.kobj = nullptr;
             event_signal(s, &s->services.apt.resume_event);
 
             cmdbuf[0] = IPCHDR(1, 0);

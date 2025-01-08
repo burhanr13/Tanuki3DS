@@ -31,11 +31,11 @@ ArmInstrFormat arm_lookup[BIT(8)][BIT(4)];
 
 // ArmExecFunc func_lookup[BIT(8)][BIT(4)];
 
-__attribute__((constructor)) void arm_generate_lookup() {
+[[gnu::constructor]] void arm_generate_lookup() {
     for (int dechi = 0; dechi < BIT(8); dechi++) {
         for (int declo = 0; declo < BIT(4); declo++) {
             arm_lookup[dechi][declo] =
-                arm_decode_instr((ArmInstr){.dechi = dechi, .declo = declo});
+                arm_decode_instr((ArmInstr) {.dechi = dechi, .declo = declo});
             // func_lookup[dechi][declo] = exec_funcs[arm_lookup[dechi][declo]];
         }
     }
@@ -741,7 +741,7 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
 //     }
 //     if (reg == 13) return &cpu->banked_sp[0];
 //     if (reg == 14) return &cpu->banked_lr[0];
-//     return NULL;
+//     return nullptr;
 // }
 
 // DECL_ARM_EXEC(block_trans) {

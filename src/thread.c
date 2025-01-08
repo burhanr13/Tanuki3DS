@@ -160,15 +160,15 @@ KMutex* mutex_create() {
 
 void mutex_release(E3DS* s, KMutex* mtx) {
     if (!mtx->waiting_thrds) {
-        mtx->locker_thrd = NULL;
+        mtx->locker_thrd = nullptr;
         return;
     }
     if (!mtx->locker_thrd) return;
 
     int maxprio = THRD_MAX_PRIO;
     KListNode** cur = &mtx->waiting_thrds;
-    KListNode** toremove = NULL;
-    KThread* wakeupthread = NULL;
+    KListNode** toremove = nullptr;
+    KThread* wakeupthread = nullptr;
     while (*cur) {
         KThread* t = (KThread*) (*cur)->key;
         if (t->priority < maxprio) {

@@ -549,8 +549,8 @@ static int sizeUtf8(wchar_t const* aUtf16string) {
 }
 
 static int sizeMbcs(wchar_t const* aMbcsString) {
-    int lRes =
-        WideCharToMultiByte(CP_ACP, 0, aMbcsString, -1, NULL, 0, NULL, NULL);
+    int lRes = WideCharToMultiByte(CP_ACP, 0, aMbcsString, -1, NULL, 0,
+                                   NULL, NULL);
     /* DWORD licic = GetLastError(); */
     return lRes;
 }
@@ -1070,7 +1070,7 @@ param( \
 [ValidateSet('info', 'warning', 'error')] \
 [string]$IconType = 'info');\
 [system.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') |
-Out-Null ; \
+Out-NULL ; \
 $balloon = New-Object System.Windows.Forms.NotifyIcon ; \
 $path = Get-Process -id $pid | Select-Object -ExpandProperty Path ; \
 $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path) ;");
@@ -1227,8 +1227,8 @@ End Sub\n\
 }
 
 wchar_t* tinyfd_inputBoxW(
-    wchar_t const* aTitle,        /* NULL or L"" */
-    wchar_t const* aMessage,      /* NULL or L"" (\n and \t have no effect) */
+    wchar_t const* aTitle,   /* NULL or L"" */
+    wchar_t const* aMessage, /* NULL or L"" (\n and \t have no effect) */
     wchar_t const* aDefaultInput) /* L"" , if NULL it's a passwordBox */
 {
     static wchar_t lBuff[MAX_PATH_OR_CMD];
@@ -1840,8 +1840,8 @@ tinyfd_selectFolderDialogW(wchar_t const* aTitle,       /* NULL or "" */
 }
 
 wchar_t*
-tinyfd_colorChooserW(wchar_t const* aTitle,              /* NULL or "" */
-                     wchar_t const* aDefaultHexRGB,      /* NULL or "#FF0000"*/
+tinyfd_colorChooserW(wchar_t const* aTitle,         /* NULL or "" */
+                     wchar_t const* aDefaultHexRGB, /* NULL or "#FF0000"*/
                      unsigned char const aDefaultRGB[3], /* { 0 , 255 , 255 } */
                      unsigned char aoResultRGB[3])       /* { 0 , 0 , 0 } */
 {
@@ -1982,10 +1982,10 @@ notifyWinGui(char const* aTitle,   /* NULL or "" */
     return 1;
 }
 
-static int
-inputBoxWinGui(char* aoBuff, char const* aTitle, /* NULL or "" */
-               char const* aMessage, /* NULL or "" may NOT contain \n nor \t */
-               char const* aDefaultInput) /* "" , if NULL it's a passwordBox */
+static int inputBoxWinGui(
+    char* aoBuff, char const* aTitle, /* NULL or "" */
+    char const* aMessage,      /* NULL or "" may NOT contain \n nor \t */
+    char const* aDefaultInput) /* "" , if NULL it's a passwordBox */
 {
     wchar_t lTitle[128] = L"";
     wchar_t* lMessage = NULL;
@@ -2153,9 +2153,9 @@ static char* openFileDialogWinGui(
     return lTmpChar;
 }
 
-static char* selectFolderDialogWinGui(char* aoBuff,
-                                      char const* aTitle, /*  NULL or "" */
-                                      char const* aDefaultPath) /* NULL or "" */
+static char*
+selectFolderDialogWinGui(char* aoBuff, char const* aTitle, /*  NULL or "" */
+                         char const* aDefaultPath)         /* NULL or "" */
 {
     wchar_t lTitle[128] = L"";
     wchar_t lDefaultPath[MAX_PATH_OR_CMD] = L"";
@@ -2348,8 +2348,8 @@ static int messageBoxWinConsole(
 
 static int inputBoxWinConsole(
     char* aoBuff, char const* aTitle, /* NULL or "" */
-    char const* aMessage,             /* NULL or "" may NOT contain \n nor \t */
-    char const* aDefaultInput)        /* "" , if NULL it's a passwordBox */
+    char const* aMessage,      /* NULL or "" may NOT contain \n nor \t */
+    char const* aDefaultInput) /* "" , if NULL it's a passwordBox */
 {
     char lDialogString[MAX_PATH_OR_CMD];
     char lDialogFile[MAX_PATH_OR_CMD];
@@ -2543,8 +2543,9 @@ openFileDialogWinConsole(char const* aTitle,                /*  NULL or "" */
 }
 
 static char*
-selectFolderDialogWinConsole(char* aoBuff, char const* aTitle, /*  NULL or "" */
-                             char const* aDefaultPath)         /* NULL or "" */
+selectFolderDialogWinConsole(char* aoBuff,
+                             char const* aTitle,       /*  NULL or "" */
+                             char const* aDefaultPath) /* NULL or "" */
 {
     char lDialogString[MAX_PATH_OR_CMD];
     char lString[MAX_PATH_OR_CMD];
@@ -2730,9 +2731,10 @@ int tinyfd_messageBox(
 }
 
 /* return has only meaning for tinyfd_query */
-int tinyfd_notifyPopup(char const* aTitle,    /* NULL or "" */
-                       char const* aMessage,  /* NULL or "" may contain \n \t */
-                       char const* aIconType) /* "info" "warning" "error" */
+int tinyfd_notifyPopup(
+    char const* aTitle,    /* NULL or "" */
+    char const* aMessage,  /* NULL or "" may contain \n \t */
+    char const* aIconType) /* "info" "warning" "error" */
 {
     if (tfd_quoteDetected(aTitle))
         return tinyfd_notifyPopup("INVALID TITLE WITH QUOTES", aMessage,
@@ -2921,7 +2923,8 @@ char* tinyfd_saveFileDialog(
         if (tfd_quoteDetected(aFilterPatterns[i]))
             return tinyfd_saveFileDialog("INVALID FILTER_PATTERN WITH QUOTES: "
                                          "use the GRAVE ACCENT \\x60 instead.",
-                                         aDefaultPathAndOrFile, 0, NULL, NULL);
+                                         aDefaultPathAndOrFile, 0, NULL,
+                                         NULL);
     }
 
     if ((!tinyfd_forceConsole || !(GetConsoleWindow() || dialogPresent())) &&
@@ -2948,8 +2951,8 @@ char* tinyfd_saveFileDialog(
         strcat(lBuff, getCurDir());
 
         lPointerInputBox = tinyfd_inputBox(
-            NULL, NULL, NULL); /* obtain a pointer on the current content of
-                                  tinyfd_inputBox */
+            NULL, NULL, NULL); /* obtain a pointer on the current
+                                  content of tinyfd_inputBox */
         if (lPointerInputBox)
             strcpy(lString, lPointerInputBox); /* preserve the current content
                                                   of tinyfd_inputBox */
@@ -3011,8 +3014,8 @@ char* tinyfd_openFileDialog(
         if (tfd_quoteDetected(aFilterPatterns[i]))
             return tinyfd_openFileDialog("INVALID FILTER_PATTERN WITH QUOTES: "
                                          "use the GRAVE ACCENT \\x60 instead.",
-                                         aDefaultPathAndOrFile, 0, NULL, NULL,
-                                         aAllowMultipleSelects);
+                                         aDefaultPathAndOrFile, 0, NULL,
+                                         NULL, aAllowMultipleSelects);
     }
 
     if ((!tinyfd_forceConsole || !(GetConsoleWindow() || dialogPresent())) &&
@@ -3039,8 +3042,8 @@ char* tinyfd_openFileDialog(
         strcpy(lBuff, "Open file from ");
         strcat(lBuff, getCurDir());
         lPointerInputBox = tinyfd_inputBox(
-            NULL, NULL, NULL); /* obtain a pointer on the current content of
-                                  tinyfd_inputBox */
+            NULL, NULL, NULL); /* obtain a pointer on the current
+                                  content of tinyfd_inputBox */
         if (lPointerInputBox)
             strcpy(lString, lPointerInputBox); /* preserve the current content
                                                   of tinyfd_inputBox */
@@ -3102,8 +3105,8 @@ char* tinyfd_selectFolderDialog(char const* aTitle,       /* NULL or "" */
         strcpy(lBuff, "Select folder from ");
         strcat(lBuff, getCurDir());
         lPointerInputBox = tinyfd_inputBox(
-            NULL, NULL, NULL); /* obtain a pointer on the current content of
-                                  tinyfd_inputBox */
+            NULL, NULL, NULL); /* obtain a pointer on the current
+                                  content of tinyfd_inputBox */
         if (lPointerInputBox)
             strcpy(lString, lPointerInputBox); /* preserve the current content
                                                   of tinyfd_inputBox */
@@ -3184,8 +3187,8 @@ char* tinyfd_colorChooser(
     }
 
     lPointerInputBox = tinyfd_inputBox(
-        NULL, NULL,
-        NULL); /* obtain a pointer on the current content of tinyfd_inputBox */
+        NULL, NULL, NULL); /* obtain a pointer on the current content
+                                       of tinyfd_inputBox */
     if (lPointerInputBox)
         strcpy(lString, lPointerInputBox); /* preserve the current content of
                                               tinyfd_inputBox */
@@ -3249,8 +3252,8 @@ static int detectPresence(char const* aExecutable) {
     strcat(lTestedString, aExecutable);
     strcat(lTestedString, " 2>/dev/null ");
     lIn = popen(lTestedString, "r");
-    if ((fgets(lBuff, sizeof(lBuff), lIn) != NULL) && (!strchr(lBuff, ':')) &&
-        (strncmp(lBuff, "no ", 3))) { /* present */
+    if ((fgets(lBuff, sizeof(lBuff), lIn) != NULL) &&
+        (!strchr(lBuff, ':')) && (strncmp(lBuff, "no ", 3))) { /* present */
         pclose(lIn);
 
 #ifdef _GNU_SOURCE /*to bypass this, just comment out "#define _GNU_SOURCE" at \
@@ -5739,10 +5742,10 @@ frontmost of process \\\"Python\\\" to true' ''');");
 }
 
 char* tinyfd_saveFileDialog(
-    char const* aTitle,                /* NULL or "" */
-    char const* aDefaultPathAndOrFile, /* NULL or "" , ends with / to set only a
-                                          directory */
-    int aNumOfFilterPatterns,          /* 0 */
+    char const* aTitle,                   /* NULL or "" */
+    char const* aDefaultPathAndOrFile,    /* NULL or "" , ends with / to set
+                                             only a    directory */
+    int aNumOfFilterPatterns,             /* 0 */
     char const* const* aFilterPatterns,   /* NULL or {"*.txt","*.doc"} */
     char const* aSingleFilterDescription) /* NULL or "text files" */
 {
@@ -5776,7 +5779,8 @@ char* tinyfd_saveFileDialog(
         if (tfd_quoteDetected(aFilterPatterns[i]))
             return tinyfd_saveFileDialog("INVALID FILTER_PATTERN WITH QUOTES: "
                                          "use the GRAVE ACCENT \\x60 instead.",
-                                         aDefaultPathAndOrFile, 0, NULL, NULL);
+                                         aDefaultPathAndOrFile, 0, NULL,
+                                         NULL);
     }
 
     if (osascriptPresent()) {
@@ -6125,8 +6129,8 @@ char* tinyfd_saveFileDialog(
         strcpy(lBuff, "Save file in ");
         strcat(lBuff, getCurDir());
         lPointerInputBox = tinyfd_inputBox(
-            NULL, NULL, NULL); /* obtain a pointer on the current content of
-                                  tinyfd_inputBox */
+            NULL, NULL, NULL); /* obtain a pointer on the current
+                                  content of tinyfd_inputBox */
         if (lPointerInputBox)
             strcpy(lString, lPointerInputBox); /* preserve the current content
                                                   of tinyfd_inputBox */
@@ -6179,10 +6183,10 @@ char* tinyfd_saveFileDialog(
 
 /* in case of multiple files, the separator is | */
 char* tinyfd_openFileDialog(
-    char const* aTitle,                /* NULL or "" */
-    char const* aDefaultPathAndOrFile, /* NULL or "" , ends with / to set only a
-                                          directory */
-    int aNumOfFilterPatterns,          /* 0 */
+    char const* aTitle,                   /* NULL or "" */
+    char const* aDefaultPathAndOrFile,    /* NULL or "" , ends with / to set
+                                             only a    directory */
+    int aNumOfFilterPatterns,             /* 0 */
     char const* const* aFilterPatterns,   /* NULL or {"*.jpg","*.png"} */
     char const* aSingleFilterDescription, /* NULL or "image files" */
     int aAllowMultipleSelects)            /* 0 or 1 */
@@ -6220,8 +6224,8 @@ char* tinyfd_openFileDialog(
         if (tfd_quoteDetected(aFilterPatterns[i]))
             return tinyfd_openFileDialog("INVALID FILTER_PATTERN WITH QUOTES: "
                                          "use the GRAVE ACCENT \\x60 instead.",
-                                         aDefaultPathAndOrFile, 0, NULL, NULL,
-                                         aAllowMultipleSelects);
+                                         aDefaultPathAndOrFile, 0, NULL,
+                                         NULL, aAllowMultipleSelects);
     }
 
     free(lBuff);
@@ -6633,8 +6637,8 @@ frontmost of process \\\"Python\\\" to true' ''');");
         strcpy(lBuff, "Open file from ");
         strcat(lBuff, getCurDir());
         lPointerInputBox = tinyfd_inputBox(
-            NULL, NULL, NULL); /* obtain a pointer on the current content of
-                                  tinyfd_inputBox */
+            NULL, NULL, NULL); /* obtain a pointer on the current
+                                  content of tinyfd_inputBox */
         if (lPointerInputBox)
             strcpy(lDialogString,
                    lPointerInputBox); /* preserve the current content of
@@ -6977,8 +6981,8 @@ frontmost of process \\\"Python\\\" to true' ''');");
         strcpy(lBuff, "Select folder from ");
         strcat(lBuff, getCurDir());
         lPointerInputBox = tinyfd_inputBox(
-            NULL, NULL, NULL); /* obtain a pointer on the current content of
-                                  tinyfd_inputBox */
+            NULL, NULL, NULL); /* obtain a pointer on the current
+                                  content of tinyfd_inputBox */
         if (lPointerInputBox)
             strcpy(lDialogString,
                    lPointerInputBox); /* preserve the current content of
@@ -7268,8 +7272,8 @@ frontmost of process \\\"Python\\\" to true' ''');");
             return tinyfd_inputBox(aTitle, NULL, NULL);
         }
         lPointerInputBox = tinyfd_inputBox(
-            NULL, NULL, NULL); /* obtain a pointer on the current content of
-                                  tinyfd_inputBox */
+            NULL, NULL, NULL); /* obtain a pointer on the current
+                                  content of tinyfd_inputBox */
         if (lPointerInputBox)
             strcpy(lDialogString,
                    lPointerInputBox); /* preserve the current content of

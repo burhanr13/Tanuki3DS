@@ -1,8 +1,6 @@
 #ifndef SHADER_H
 #define SHADER_H
 
-#include <stdalign.h>
-
 #include "../common.h"
 
 #define SHADER_CODE_SIZE 512

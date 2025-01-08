@@ -6,7 +6,9 @@
 
 #include "services.h"
 
-#include "../sys_files/shared_font.h"
+u8 shared_font[] = {2, [0x80] =
+#embed "../sys_files/font.bcfnt"
+};
 
 void srvobj_init(KObject* hdr, KObjType t) {
     hdr->type = t;
@@ -33,17 +35,17 @@ void init_services(E3DS* s) {
     s->services.apt.nextparam.appid = APPID_HOMEMENU;
     s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
-    s->services.apt.shared_font.defaultdata = SHARED_FONT_DATA;
-    s->services.apt.shared_font.defaultdatalen = SHARED_FONT_DATA_len;
+    s->services.apt.shared_font.defaultdata = shared_font;
+    s->services.apt.shared_font.defaultdatalen = sizeof shared_font;
     s->services.apt.shared_font.vaddr = 0x20000000;
-    s->services.apt.shared_font.size = SHARED_FONT_DATA_len;
+    s->services.apt.shared_font.size = sizeof shared_font;
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
 
-    s->services.gsp.event = NULL;
+    s->services.gsp.event = nullptr;
     srvobj_init(&s->services.gsp.sharedmem.hdr, KOT_SHAREDMEM);
 
-    s->services.dsp.event = NULL;
+    s->services.dsp.event = nullptr;
     srvobj_init(&s->services.dsp.semEvent.hdr, KOT_EVENT);
 
     srvobj_init(&s->services.hid.sharedmem.hdr, KOT_SHAREDMEM);
