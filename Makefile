@@ -24,7 +24,7 @@ ifeq ($(shell uname),Darwin)
 	CC := /usr/local/opt/llvm/bin/clang
 	CXX := /usr/local/opt/llvm/bin/clang++
 	CFLAGS += -target x86_64-apple-darwin
-	CPPFLAGS += -I/opt/homebrew/include
+	CPPFLAGS += -I/usr/local/include -I/opt/homebrew/include
 	LDFLAGS := -L/usr/local/lib -L/opt/homebrew/lib $(LDFLAGS)
 	LDFLAGS += -framework OpenGL -lGLEW
 else
