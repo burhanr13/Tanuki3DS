@@ -11,7 +11,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
-      run: sudo apt install clang libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
+      run: |
+        sudo apt install libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
+        bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
     - name: build
       run: make USER=1
     - uses: actions/upload-artifact@v4
