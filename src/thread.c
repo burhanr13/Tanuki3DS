@@ -98,7 +98,7 @@ void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
         t->state = THRD_SLEEP;
     } else if (timeout > 0) {
         t->state = THRD_SLEEP;
-        s64 timeCycles = timeout * CPU_CLK / 1000000000;
+        s64 timeCycles = timeout * CPU_CLK / 1'000'000'000;
         add_event(&s->sched, thread_wakeup_timeout, t->id, timeCycles);
     }
 }
