@@ -85,11 +85,13 @@ typedef struct {
 
 void thread_init(E3DS* s, u32 entrypoint);
 u32 thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority, u32 arg);
-bool thread_reschedule(E3DS* s);
+void thread_reschedule(E3DS* s);
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout);
 void thread_wakeup_timeout(E3DS* s, u32 tid);
 bool thread_wakeup(E3DS* s, KThread* t, KObject* reason);
+
+void thread_kill(E3DS* s, KThread* t);
 
 KEvent* event_create(bool sticky);
 void event_signal(E3DS* s, KEvent* ev);

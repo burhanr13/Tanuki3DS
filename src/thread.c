@@ -59,7 +59,7 @@ u32 thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
     return tid;
 }
 
-bool thread_reschedule(E3DS* s) {
+void thread_reschedule(E3DS* s) {
     if (CUR_THREAD->state == THRD_RUNNING) CUR_THREAD->state = THRD_READY;
     u32 nexttid = -1;
     u32 maxprio = THRD_MAX_PRIO;
@@ -72,9 +72,9 @@ bool thread_reschedule(E3DS* s) {
         }
     }
     if (nexttid == -1) {
-        s->cpu.wfe = true;
-        linfo("all threads sleeping");
-        return false;
+            s->cpu.wfe = true;
+            linfo("all threads sleeping");
+        return;
     } else {
         s->cpu.wfe = false;
     }
@@ -82,14 +82,14 @@ bool thread_reschedule(E3DS* s) {
     if (CUR_THREAD->id == nexttid) {
         linfo("not switching threads");
     } else {
-        linfo("switching from thread %d to thread %d", CUR_THREAD->id, nexttid);
-        save_context(s);
-        s->process.handles[0]->refcount--;
-        s->process.handles[0] = &s->process.threads[nexttid]->hdr;
-        s->process.handles[0]->refcount++;
-        load_context(s);
+    linfo("switching from thread %d to thread %d", CUR_THREAD->id, nexttid);
+    save_context(s);
+    s->process.handles[0]->refcount--;
+    s->process.handles[0] = &s->process.threads[nexttid]->hdr;
+    s->process.handles[0]->refcount++;
+    load_context(s);
     }
-    return true;
+    return;
 }
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
@@ -132,6 +132,27 @@ bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
         return true;
     }
     return false;
+}
+
+void thread_kill(E3DS* s, KThread* t) {
+    linfo("killing thread %d", t->id);
+
+    t->state = THRD_DEAD;
+    auto cur = &t->waiting_thrds;
+    while (*cur) {
+        thread_wakeup(s, (KThread*) (*cur)->key, &CUR_THREAD->hdr);
+        klist_remove(cur);
+    }
+
+    cur = &t->waiting_objs;
+    while (*cur) {
+        sync_cancel(t, (*cur)->key);
+        klist_remove(cur);
+    }
+
+    s->process.threads[t->id] = nullptr;
+
+    thread_reschedule(s);
 }
 
 KEvent* event_create(bool sticky) {

@@ -93,14 +93,7 @@ DECL_SVC(CreateThread) {
 DECL_SVC(ExitThread) {
     linfo("thread %d exiting", CUR_THREAD->id);
 
-    CUR_THREAD->state = THRD_DEAD;
-    KListNode** cur = &CUR_THREAD->waiting_thrds;
-    while (*cur) {
-        thread_wakeup(s, (KThread*) (*cur)->key, &CUR_THREAD->hdr);
-        klist_remove(cur);
-    }
-
-    s->process.threads[CUR_THREAD->id] = nullptr;
+    thread_kill(s, CUR_THREAD);
 
     thread_reschedule(s);
 }

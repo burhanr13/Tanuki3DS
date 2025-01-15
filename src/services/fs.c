@@ -15,7 +15,7 @@ enum {
 };
 
 u8 mii_data[] = {
-#embed "../../sys_files/mii.app.romfs"
+#embed "../sys_files/mii.app.romfs"
 };
 
 char* archive_basepath(u64 archive) {

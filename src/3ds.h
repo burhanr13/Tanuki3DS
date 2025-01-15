@@ -37,6 +37,9 @@ typedef struct _3DS {
 
     RomImage romimage;
 
+    bool in_svc;
+    bool pending_reschedule;
+
     bool frame_complete;
 
     Scheduler sched;

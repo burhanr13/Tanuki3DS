@@ -7,7 +7,7 @@
 #include "services.h"
 
 u8 shared_font[] = {2, [0x80] =
-#embed "../sys_files/font.bcfnt"
+#embed "sys_files/font.bcfnt"
 };
 
 void srvobj_init(KObject* hdr, KObjType t) {
