@@ -109,8 +109,20 @@ DECL_SVC(SleepThread) {
     s64 timeout = R(0) | (u64) R(1) << 32;
 
     R(0) = 0;
-    thread_sleep(s, CUR_THREAD, timeout);
-    thread_reschedule(s);
+
+    if (timeout == 0) {
+        // timeout 0 will switch to a different thread without sleeping this
+        // thread
+        // since the scheduler always picks the thread with highest priority
+        // we need to temporarily sleep this one so it does not get picked
+        auto curt = CUR_THREAD;
+        curt->state = THRD_SLEEP;
+        thread_reschedule(s);
+        curt->state = THRD_READY;
+    } else {
+        thread_sleep(s, CUR_THREAD, timeout);
+        thread_reschedule(s);
+    }
 }
 
 DECL_SVC(GetThreadPriority) {

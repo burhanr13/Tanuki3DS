@@ -114,7 +114,8 @@ typedef enum {
     // media instructions
     IR_MEDIA_UADD8,  // rvv
     IR_MEDIA_UQSUB8, // rvv
-    IR_MEDIA_SEL,    // rvv
+    IR_MEDIA_QSUB8, // rvv
+    IR_MEDIA_SEL, // rvv
 
     // flag instructions, these always appear in groups of alternating get flag
     // + store flag

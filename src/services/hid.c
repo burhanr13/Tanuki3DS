@@ -83,6 +83,11 @@ void hid_update_pad(E3DS* s, u32 btns, s32 cx, s32 cy) {
     linfo("signaling hid event pad0");
     event_signal(s, &s->services.hid.events[HIDEVENT_PAD0]);
     event_signal(s, &s->services.hid.events[HIDEVENT_PAD1]);
+
+    // need to signal these at some point so things don't get stuck
+    // but there isn't any actual data for these yet
+    event_signal(s, &s->services.hid.events[HIDEVENT_ACCEL]);
+    event_signal(s, &s->services.hid.events[HIDEVENT_GYRO]);
 }
 
 void hid_update_touch(E3DS* s, u16 x, u16 y, bool pressed) {

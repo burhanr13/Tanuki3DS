@@ -5,6 +5,7 @@
 
 u32 media_uadd8(ArmCore* cpu, u32 a, u32 b);
 u32 media_uqsub8(ArmCore* cpu, u32 a, u32 b);
+u32 media_qsub8(ArmCore* cpu, u32 a, u32 b);
 
 u32 media_sel(ArmCore* cpu, u32 a, u32 b);
 

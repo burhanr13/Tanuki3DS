@@ -728,7 +728,30 @@ DECL_ARM_COMPILE(parallel_arith) {
                 break;
         }
     } else {
-        lwarn("unknown parallel arith sxxxxx %08x", instr.w);
+        switch (instr.parallel_arith.op1) {
+            case 2:
+                if (instr.parallel_arith.b) {
+                    switch (instr.parallel_arith.op2) {
+                        case 3:
+                            EMITVV(MEDIA_QSUB8, vrn, vrm);
+                            EMITV_STORE_REG(instr.parallel_arith.rd, LASTV);
+                            break;
+                        default:
+                            lwarn("unknown parallel arith qxxx8 %08x",
+                                  instr.w);
+                            break;
+                    }
+                } else {
+                    lwarn("unknown parallel arith qxxx16 %08x", instr.w);
+                }
+                break;
+            case 3:
+                lwarn("unknown parallel arith shxxxx %08x", instr.w);
+                break;
+            default:
+                lwarn("unknown parallel arith sxxxx %08x", instr.w);
+                break;
+        }
     }
     return true;
 }

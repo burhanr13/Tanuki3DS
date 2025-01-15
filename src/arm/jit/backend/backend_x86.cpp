@@ -920,6 +920,23 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(getOp(i), eax);
                 break;
             }
+            case IR_MEDIA_QSUB8: {
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                if (inst.imm1) {
+                    mov(esi, inst.op1);
+                } else {
+                    mov(esi, getOp(inst.op1));
+                }
+                mov(rdi, rbx);
+                mov(rax, (u64) media_qsub8);
+                call(rax);
+                mov(getOp(i), eax);
+                break;
+            }
             case IR_MEDIA_SEL: {
                 if (inst.imm2) {
                     mov(edx, inst.op2);

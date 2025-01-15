@@ -20,7 +20,20 @@ u32 media_uqsub8(ArmCore* cpu, u32 a, u32 b) {
     u32 res = 0;
     for (int i = 0; i < 4; i++) {
         u32 diff = (a & 0xff) - (b & 0xff);
-        if (diff >= 0x100) diff = 0;
+        if (diff > UINT8_MAX) diff = 0;
+        res |= diff << 8 * i;
+        a >>= 8;
+        b >>= 8;
+    }
+    return res;
+}
+
+u32 media_qsub8(ArmCore* cpu, u32 a, u32 b) {
+    u32 res = 0;
+    for (int i = 0; i < 4; i++) {
+        s32 diff = (s8) (a & 0xff) - (s8) (b & 0xff);
+        if (diff > INT8_MAX) diff = INT8_MAX;
+        if (diff < INT8_MIN) diff = INT8_MIN & 0xff;
         res |= diff << 8 * i;
         a >>= 8;
         b >>= 8;
