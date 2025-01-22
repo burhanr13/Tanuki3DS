@@ -21,11 +21,11 @@ else
 endif
 
 ifeq ($(shell uname),Darwin)
-	CC := /usr/local/opt/llvm/bin/clang
-	CXX := /usr/local/opt/llvm/bin/clang++
+	CC := $(shell brew --prefix)/opt/llvm/bin/clang
+	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
 	CFLAGS += -target x86_64-apple-darwin
-	CPPFLAGS += -I/usr/local/include -I/opt/homebrew/include
-	LDFLAGS := -L/usr/local/lib -L/opt/homebrew/lib $(LDFLAGS)
+	CPPFLAGS += -I/usr/local/include
+	LDFLAGS := -L/usr/local/lib $(LDFLAGS)
 	LDFLAGS += -framework OpenGL -lGLEW
 else
 	LDFLAGS += -lGL -lGLEW
