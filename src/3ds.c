@@ -84,7 +84,13 @@ void e3ds_update_datetime(E3DS* s) {
         u32 unk[4];
     }* datetime = PTR(SHARED_PAGE + 0x20);
 
-    datetime->time = (time(nullptr) + 2'208'988'800) * 1000;
+    // need time since 1900 in milliseconds
+
+    auto timeval = time(nullptr);
+    auto tm = localtime(&timeval);
+    timeval += tm->tm_gmtoff;
+
+    datetime->time = (timeval + 2'208'988'800) * 1000;
     datetime->systemtick = s->sched.now;
     datetime->unk[0] = 0xffb0ff0;
 }
