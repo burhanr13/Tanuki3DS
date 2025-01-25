@@ -5,10 +5,11 @@
 #include "jit.h"
 
 #define MOVX(_op2, imm)                                                        \
-    ((IRInstr){.opcode = IR_MOV, .imm1 = 1, .imm2 = imm, .op1 = 0, .op2 = _op2})
+    ((IRInstr) {                                                               \
+        .opcode = IR_MOV, .imm1 = 1, .imm2 = imm, .op1 = 0, .op2 = _op2})
 #define MOVI(op2) MOVX(op2, 1)
 #define NOP                                                                    \
-    ((IRInstr){.opcode = IR_NOP, .imm1 = 1, .imm2 = 1, .op1 = 0, .op2 = 0})
+    ((IRInstr) {.opcode = IR_NOP, .imm1 = 1, .imm2 = 1, .op1 = 0, .op2 = 0})
 
 void optimize_loadstore(IRBlock* block) {
     u32 vreg[16] = {};
@@ -238,12 +239,12 @@ void optimize_constprop(IRBlock* block) {
                     } else {
                         OPTI(inst->op1 + inst->op2);
                         if (inst[1].opcode == IR_ADC) {
-                            *inst = (IRInstr){.opcode = IR_SETC,
-                                              .imm1 = 1,
-                                              .imm2 = 1,
-                                              .op1 = 0,
-                                              .op2 = inst->op1 + inst->op2 <
-                                                     inst->op1};
+                            *inst = (IRInstr) {.opcode = IR_SETC,
+                                               .imm1 = 1,
+                                               .imm2 = 1,
+                                               .op1 = 0,
+                                               .op2 = inst->op1 + inst->op2 <
+                                                      inst->op1};
                         }
                     }
                     break;
@@ -358,11 +359,11 @@ void optimize_constprop(IRBlock* block) {
                         if (inst[1].opcode == IR_GETC) inst[1] = MOVI(0);
                         if (inst[3].opcode == IR_GETV) inst[3] = MOVI(0);
                         if (inst[1].opcode == IR_ADC) {
-                            *inst = (IRInstr){.opcode = IR_SETC,
-                                              .imm1 = 1,
-                                              .imm2 = 1,
-                                              .op1 = 0,
-                                              .op2 = 0};
+                            *inst = (IRInstr) {.opcode = IR_SETC,
+                                               .imm1 = 1,
+                                               .imm2 = 1,
+                                               .op1 = 0,
+                                               .op2 = 0};
                         }
                     } else {
                         NOOPT();
@@ -431,11 +432,11 @@ void optimize_constprop(IRBlock* block) {
                         if (inst[1].opcode == IR_GETC) inst[1] = MOVI(0);
                         if (inst[3].opcode == IR_GETV) inst[3] = MOVI(0);
                         if (inst[1].opcode == IR_ADC) {
-                            *inst = (IRInstr){.opcode = IR_SETC,
-                                              .imm1 = 1,
-                                              .imm2 = 1,
-                                              .op1 = 0,
-                                              .op2 = 0};
+                            *inst = (IRInstr) {.opcode = IR_SETC,
+                                               .imm1 = 1,
+                                               .imm2 = 1,
+                                               .op1 = 0,
+                                               .op2 = 0};
                         }
                     } else {
                         NOOPT();
@@ -546,11 +547,11 @@ u32 chainjmp_helper(IRBlock* block, IRInstr* jmp) {
             jmp->op2 = next->op2;
             *next = NOP;
         } else {
-            *next = (IRInstr){.opcode = IR_JELSE,
-                              .imm1 = 1,
-                              .imm2 = 1,
-                              .op1 = 0,
-                              .op2 = next->op2};
+            *next = (IRInstr) {.opcode = IR_JELSE,
+                               .imm1 = 1,
+                               .imm2 = 1,
+                               .op1 = 0,
+                               .op2 = next->op2};
         }
     }
     return jmp->op2;
@@ -718,7 +719,8 @@ void optimize_blocklinking(IRBlock* block, ArmCore* cpu) {
                     if (link_pc == block->start_addr &&
                         link_thumb == cpu->cpsr.t) {
                         inst->opcode = IR_END_LOOP;
-                    } else {
+                    } else if (link_pc) { // don't link to a null block because
+                                          // apparently this can happen
                         inst->opcode = IR_END_LINK;
                         inst->op1 = cpu->cpsr.m | (link_thumb << 5);
                         inst->op2 = link_pc;

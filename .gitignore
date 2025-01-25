@@ -21,3 +21,5 @@ perf*
 *.rdc
 
 .DS_Store
+
+.clangd
