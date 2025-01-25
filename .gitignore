@@ -4,6 +4,8 @@
 *.bin.*
 *.elf
 
+!src/sys_files/*
+
 roms
 build
 tools/bin
