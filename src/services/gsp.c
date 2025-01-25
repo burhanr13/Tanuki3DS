@@ -5,7 +5,7 @@
 #include "../pica/gpu.h"
 #include "../scheduler.h"
 
-#define GSPMEM(off) PTR(s->services.gsp.sharedmem.vaddr + off)
+#define GSPMEM ((GSPSharedMem*) PTR(s->services.gsp.sharedmem.vaddr))
 
 DECL_PORT(gsp_gpu) {
     u32* cmdbuf = PTR(cmd_addr);
@@ -93,29 +93,57 @@ DECL_PORT(gsp_gpu) {
     }
 }
 
+void update_fbinfos(E3DS* s) {
+    // updates internal state from the fbinfo in shared mem
+    // this should happen every vblank and every display transfer
+    // applications use multiple framebuffers and swap between them
+    // we don't really care and just use whatever one we can and this
+    // is kept track of by storing the most recent fbs for a screen in a fifo
+
+    auto fbtop = &GSPMEM->fbinfo[0].top;
+    auto fbbot = &GSPMEM->fbinfo[0].bot;
+
+    if (fbtop->newdataflag) {
+        linfo("top fb idx %d [0] l %08x r %08x [1] l %08x r %08x", fbtop->idx,
+              fbtop->fbs[0].left_vaddr, fbtop->fbs[0].right_vaddr,
+              fbtop->fbs[1].left_vaddr, fbtop->fbs[1].right_vaddr);
+
+        FIFO_push(s->services.gsp.toplcdfbs,
+                  fbtop->fbs[1 - fbtop->idx].left_vaddr);
+        fbtop->newdataflag = 0;
+    }
+    if (fbbot->newdataflag) {
+        linfo("bot fb idx %d [0] l %08x r %08x [1] l %08x r %08x", fbbot->idx,
+              fbbot->fbs[0].left_vaddr, fbbot->fbs[0].right_vaddr,
+              fbbot->fbs[1].left_vaddr, fbbot->fbs[1].right_vaddr);
+
+        FIFO_push(s->services.gsp.botlcdfbs,
+                  fbbot->fbs[1 - fbbot->idx].left_vaddr);
+        fbbot->newdataflag = 0;
+    }
+}
+
 void gsp_handle_event(E3DS* s, u32 arg) {
     if (arg == GSPEVENT_VBLANK0) {
         add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
 
         gsp_handle_event(s, GSPEVENT_VBLANK1);
+
+        // dsp stub for now
         if (s->services.dsp.event) event_signal(s, s->services.dsp.event);
 
         linfo("vblank");
+
+        if (s->services.gsp.sharedmem.mapped) {
+            update_fbinfos(s);
+        }
 
         s->frame_complete = true;
     }
 
     if (!s->services.gsp.sharedmem.mapped) return;
 
-    struct {
-        u8 cur;
-        u8 count;
-        u8 err;
-        u8 flags;
-        u8 errvblank0[4];
-        u8 errvblank1[4];
-        u8 queue[0x34];
-    }* interrupts = GSPMEM(0);
+    auto interrupts = &GSPMEM->interrupts[0];
 
     if (interrupts->count < 0x34) {
         u32 idx = interrupts->cur + interrupts->count;
@@ -138,21 +166,7 @@ u32 vaddr_to_paddr(u32 vaddr) {
 }
 
 void gsp_handle_command(E3DS* s) {
-    struct {
-        u8 cur;
-        u8 count;
-        u8 flags;
-        u8 flags2;
-        u8 err;
-        u8 pad[27];
-        struct {
-            u8 id;
-            u8 unk;
-            u8 unk2;
-            u8 mode;
-            u32 args[7];
-        } d[15];
-    }* cmds = GSPMEM(0x800);
+    auto cmds = &GSPMEM->commands[0];
 
     if (cmds->count == 0) return;
 
@@ -220,41 +234,7 @@ void gsp_handle_command(E3DS* s) {
                   "flags %x",
                   addrin, win, hin, addrout, wout, hout, flags);
 
-            struct {
-                u8 idx;
-                u8 flags;
-                u16 _pad;
-                struct {
-                    u32 active;
-                    u32 left_vaddr;
-                    u32 right_vaddr;
-                    u32 stride;
-                    u32 format;
-                    u32 status;
-                    u32 unk;
-                } fbs[2];
-            } *fbtop = GSPMEM(0x200), *fbbot = GSPMEM(0x240);
-
-            if (fbtop->flags & 1) {
-                linfo("top fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
-                      fbtop->idx, fbtop->fbs[0].left_vaddr,
-                      fbtop->fbs[0].right_vaddr, fbtop->fbs[1].left_vaddr,
-                      fbtop->fbs[1].right_vaddr);
-
-                FIFO_push(s->services.gsp.toplcdfbs,
-                          fbtop->fbs[1 - fbtop->idx].left_vaddr);
-                fbtop->flags &= ~1;
-            }
-            if (fbbot->flags & 1) {
-                linfo("bot fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
-                      fbbot->idx, fbbot->fbs[0].left_vaddr,
-                      fbbot->fbs[0].right_vaddr, fbbot->fbs[1].left_vaddr,
-                      fbbot->fbs[1].right_vaddr);
-
-                FIFO_push(s->services.gsp.botlcdfbs,
-                          fbbot->fbs[1 - fbbot->idx].left_vaddr);
-                fbbot->flags &= ~1;
-            }
+            update_fbinfos(s);
 
             for (int i = 0; i < 4; i++) {
                 int yoff = addrout - s->services.gsp.toplcdfbs.d[i];

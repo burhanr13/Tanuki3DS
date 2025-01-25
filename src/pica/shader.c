@@ -152,10 +152,16 @@ void shader_run(ShaderUnit* shu) {
                 DEST(res, 1);
                 break;
             }
-            case PICA_DPH: {
+            case PICA_DPH:
+            case PICA_DPHI: {
                 fvec a, b;
-                SRC1(a, 1);
-                SRC2(b, 1);
+                if (instr.opcode == PICA_DPH) {
+                    SRC1(a, 1);
+                    SRC2(b, 1);
+                } else {
+                    SRC1(a, 1i);
+                    SRC2(b, 1i);
+                }
                 fvec res;
                 res[0] =
                     MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]) + b[3];
@@ -607,6 +613,10 @@ u32 disasm_instr(ShaderUnit* shu, u32 pc) {
             DISASMFMT1(dp3);
         case PICA_DP4:
             DISASMFMT1(dp4);
+        case PICA_DPH:
+            DISASMFMT1(dph);
+        case PICA_DPHI:
+            DISASMFMT1I(dph);
         case PICA_DST:
             DISASMFMT1(dst);
         case PICA_DSTI:

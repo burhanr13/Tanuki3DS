@@ -6,6 +6,14 @@
 
 typedef struct _3DS E3DS;
 
+typedef struct {
+    u32 paddr;
+    u16 perm;
+    u16 state;
+} PageEntry;
+
+typedef PageEntry (*PageTable)[BIT(10)];
+
 typedef struct _VMBlock {
     u32 startpg;
     u32 endpg;

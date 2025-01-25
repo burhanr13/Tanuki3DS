@@ -284,9 +284,15 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
                 DEST(xmm0, 1);
                 break;
             }
-            case PICA_DPH: {
-                SRC1(xmm0, 1);
-                SRC2(xmm1, 1);
+            case PICA_DPH:
+            case PICA_DPHI: {
+                if (instr.opcode == PICA_DPH) {
+                    SRC1(xmm0, 1);
+                    SRC2(xmm1, 1);
+                } else {
+                    SRC1(xmm0, 1i);
+                    SRC2(xmm1, 1i);
+                }
                 insertps(xmm0, ones, 0 << 6 | 3 << 4); // src1[3] = 1
                 setupMul();
                 dpps(xmm0, xmm1, 0xff);

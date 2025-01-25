@@ -9,6 +9,7 @@
 // #define JIT_CPULOG
 // #define IR_INTERPRET
 // #define NO_OPTS
+// #define NO_LINKING
 
 #ifdef JIT_DISASM
 #define IR_DISASM
@@ -40,7 +41,9 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     optimize_constprop(&ir);
     optimize_chainjumps(&ir);
     optimize_deadcode(&ir);
+#ifndef NO_LINKING
     optimize_blocklinking(&ir, cpu);
+#endif
 #endif
 
     block->end_addr = ir.end_addr;

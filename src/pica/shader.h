@@ -24,6 +24,7 @@ enum {
     PICA_RSQ = 0x0f,
     PICA_MOVA = 0x12,
     PICA_MOV = 0x13,
+    PICA_DPHI = 0x18,
     PICA_DSTI = 0x19,
     PICA_SGEI = 0x1a,
     PICA_SLTI = 0x1b,

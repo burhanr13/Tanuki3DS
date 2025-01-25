@@ -36,10 +36,7 @@ typedef struct _3DS {
     ServiceData services;
 
     RomImage romimage;
-
-    bool in_svc;
-    bool pending_reschedule;
-
+    
     bool frame_complete;
 
     Scheduler sched;

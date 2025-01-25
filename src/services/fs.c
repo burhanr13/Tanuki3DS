@@ -130,6 +130,22 @@ DECL_PORT(fs) {
             cmdbuf[3] = h;
             break;
         }
+        case 0x0804: {
+            linfo("DeleteFile");
+            u64 archivehandle = cmdbuf[2] | (u64) cmdbuf[3] << 32;
+            u32 pathtype = cmdbuf[4];
+            u32 pathsize = cmdbuf[5];
+            void* path = PTR(cmdbuf[7]);
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            if (fs_delete_file(archivehandle, pathtype, path, pathsize)) {
+                cmdbuf[1] = 0;
+            } else {
+                cmdbuf[1] = FSERR_OPEN;
+            }
+            
+            break;
+        }
         case 0x0808: {
             linfo("CreateFile");
             u64 archivehandle = cmdbuf[2] | (u64) cmdbuf[3] << 32;
@@ -229,7 +245,7 @@ DECL_PORT(fs) {
             char* basepath =
                 archive_basepath(fs_open_archive(archive, pathtype, path));
 
-            linfo("GetFormatInfo for %s", basepath);
+            lwarn("GetFormatInfo for %s", basepath);
 
             cmdbuf[0] = IPCHDR(5, 0);
             if (!basepath) {
@@ -238,10 +254,24 @@ DECL_PORT(fs) {
                 return;
             }
             free(basepath);
-            cmdbuf[2] = 0;
-            cmdbuf[3] = 0;
-            cmdbuf[4] = 0;
+
+            cmdbuf[1] = 0;
+            // these are set when formatting the save data
+            cmdbuf[2] = 0; // size
+            cmdbuf[3] = 1; // max dirs
+            cmdbuf[4] = 2; // max files
             cmdbuf[5] = 0;
+            break;
+        }
+        case 0x084c: {
+            u32 numdirs = cmdbuf[5];
+            u32 numfiles = cmdbuf[6];
+
+            lwarn("FormatSaveData with numfiles=%d and numdirs=%d", numfiles,
+                  numdirs);
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         }
         case 0x0861: {
@@ -780,6 +810,27 @@ bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
             }
             ftruncate(hostfd, filesize);
             close(hostfd);
+
+            return true;
+        }
+        default:
+            lerror("unknown archive %llx", archive);
+            return false;
+    }
+}
+
+bool fs_delete_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
+    switch (archive << 32 >> 32) {
+        case 4:
+        case 7:
+        case 9: {
+            char* filepath =
+                create_text_path(archive, pathtype, rawpath, pathsize);
+
+            linfo("deleting file %s", filepath);
+
+            remove(filepath);
+            free(filepath);
 
             return true;
         }

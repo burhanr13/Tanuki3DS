@@ -4,7 +4,13 @@
 #include "common.h"
 
 enum {
-    MEMOP_ALLOC = 3,
+    MEMOP_FREE = 1,
+    MEMOP_RESERVE,
+    MEMOP_ALLOC,
+    MEMOP_MIRRORMAP,
+    MEMOP_UNMAP,
+    MEMOP_PROTECT,
+
     MEMOP_MASK = 0xff,
 
     MEMOP_REGMASK = 0xf00,

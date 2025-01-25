@@ -135,6 +135,8 @@ bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
 }
 
 void thread_kill(E3DS* s, KThread* t) {
+    if (t->state == THRD_DEAD) return; // don't beat a dead thread
+
     linfo("killing thread %d", t->id);
 
     t->state = THRD_DEAD;

@@ -2,15 +2,54 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../src/filesystems.h"
 #include "../src/loader.h"
+
+// i hate linkers
+u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size) {
+    *dst_size = src_size + *(u32*) &in[src_size - 4];
+    u8* out = malloc(*dst_size);
+    memcpy(out, in, src_size);
+
+    u8* src = out + src_size;
+    u8* dst = src + *(u32*) (src - 4) - 1;
+    u8* fin = src - (*(u32*) (src - 8) & MASK(24));
+    src = src - src[-5] - 1;
+
+    u8 flags;
+    int count = 0;
+    while (src > fin) {
+        if (count == 0) {
+            flags = *src--;
+            count = 8;
+        }
+        if (flags & 0x80) {
+            src--;
+            int disp = *(u16*) src;
+            src--;
+            int len = disp >> 12;
+            disp &= 0xfff;
+            len += 3;
+            disp += 3;
+            for (int i = 0; i < len; i++) {
+                *dst = dst[disp];
+                dst--;
+            }
+        } else {
+            *dst-- = *src--;
+        }
+        flags <<= 1;
+        count--;
+    }
+
+    return out;
+}
 
 int main(int argc, char** argv) {
     if (argc < 2) return -1;
     char* filename = argv[1];
 
     char* ext = strrchr(filename, '.');
-    if (!ext || strcmp(ext, ".3ds")) return -1;
+    if (!ext) return -1;
 
     char* outfile = malloc(strlen(filename) + 2);
     strcpy(outfile, filename);
@@ -19,12 +58,19 @@ int main(int argc, char** argv) {
     FILE* fp = fopen(filename, "rb");
     if (!fp) return -1;
 
-    NCSDHeader hdr;
-    fread(&hdr, sizeof hdr, 1, fp);
+    if (strcmp(ext, ".3ds") && strcmp(ext, ".cxi")) {
+        return -1;
+    }
 
-    u32 base = hdr.part[0].offset * 0x200;
+    u32 base = 0;
+    if (!strcmp(ext, ".3ds")) {
+        NCSDHeader hdr;
+        fread(&hdr, sizeof hdr, 1, fp);
 
-    fseek(fp, base, SEEK_SET);
+        base = hdr.part[0].offset * 0x200;
+
+        fseek(fp, base, SEEK_SET);
+    }
 
     NCCHHeader hdr2;
     fread(&hdr2, sizeof hdr2, 1, fp);

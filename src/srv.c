@@ -6,7 +6,9 @@
 
 #include "services.h"
 
-u8 shared_font[] = {2, [0x80] =
+u8 shared_font[] = {
+#embed "sys_files/fonthdr.bin"
+    ,
 #embed "sys_files/font.bcfnt"
 };
 
@@ -37,7 +39,7 @@ void init_services(E3DS* s) {
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
     s->services.apt.shared_font.defaultdata = shared_font;
     s->services.apt.shared_font.defaultdatalen = sizeof shared_font;
-    s->services.apt.shared_font.vaddr = 0x20000000;
+    s->services.apt.shared_font.vaddr = 0x1800'0000;
     s->services.apt.shared_font.size = sizeof shared_font;
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
@@ -137,7 +139,7 @@ DECL_PORT(srv) {
             HANDLE_SET(handle, session);
             session->hdr.refcount = 1;
             cmdbuf[3] = handle;
-            linfo("connected to service '%s' with handle %x", name, handle);
+            linfo("connected to service '%.8s' with handle %x", name, handle);
             cmdbuf[0] = IPCHDR(3, 0);
             cmdbuf[1] = 0;
             break;
