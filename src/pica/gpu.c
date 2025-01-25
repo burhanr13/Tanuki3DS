@@ -437,6 +437,8 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap) {
 
+    if (!srcpitch || !dstpitch) return; // why
+
     auto srcfb = fbcache_find_within(gpu, srcpaddr);
     auto dsttex = texcache_find_within(gpu, dstpaddr);
 
@@ -1031,6 +1033,13 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
             tex->height = regs->height;
             tex->fmt = fmt;
             tex->size = 0;
+
+            if (!is_valid_physmem(tex->paddr) ||
+                !is_valid_physmem(tex->paddr + TEXSIZE(tex->width, tex->height,
+                                                       tex->fmt, 0))) {
+                lwarn("invalid texture address");
+                return; // pain
+            }
 
             linfo("creating texture from %x with dims %dx%d and fmt=%d",
                   tex->paddr, tex->width, tex->height, tex->fmt);
