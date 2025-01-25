@@ -2,7 +2,7 @@
 
 #include "3ds.h"
 
-void load_context(E3DS* s) {
+void e3ds_restore_context(E3DS* s) {
     for (int i = 0; i < 16; i++) {
         s->cpu.r[i] = CUR_THREAD->context.r[i];
         s->cpu.d[i] = CUR_THREAD->context.d[i];
@@ -11,7 +11,7 @@ void load_context(E3DS* s) {
     s->cpu.fpscr.w = CUR_THREAD->context.fpscr;
 }
 
-void save_context(E3DS* s) {
+void e3ds_save_context(E3DS* s) {
     for (int i = 0; i < 16; i++) {
         CUR_THREAD->context.r[i] = s->cpu.r[i];
         CUR_THREAD->context.d[i] = s->cpu.d[i];
