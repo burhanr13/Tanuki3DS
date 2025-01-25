@@ -42,11 +42,13 @@ typedef struct {
         u32 min_filter : 1;
         u32 : 1;
         u32 etc1 : 4;
-        u32 wrap_t : 4;
-        u32 wrap_s : 4;
-        u32 : 4;
+        u32 wrap_t : 2;
+        u32 : 2;
+        u32 wrap_s : 2;
+        u32 : 6;
         u32 shadow : 4;
-        u32 mipmapfilter : 4;
+        u32 mipmapfilter : 1;
+        u32 : 3;
         u32 type : 4;
     } param;
     struct {
@@ -78,15 +80,19 @@ typedef struct {
         u32 : 8;
     } operand;
     struct {
-        u16 rgb;
-        u16 a;
+        u32 rgb : 4;
+        u32 : 12;
+        u32 a : 4;
+        u32 : 12;
     } combiner;
     struct {
         u8 r, g, b, a;
     } color;
     struct {
-        u16 rgb;
-        u16 a;
+        u32 rgb : 2;
+        u32 : 14;
+        u32 a : 2;
+        u32 : 14;
     } scale;
     struct {
         u8 r, g, b, a;
@@ -104,7 +110,10 @@ typedef union {
         } misc;
         union {
             struct {
-                u32 facecull_config;
+                struct {
+                    u32 cullmode : 2;
+                    u32 : 30;
+                };
                 u32 view_w;
                 u32 view_invw;
                 u32 view_h;
@@ -181,19 +190,24 @@ typedef union {
         union {
             struct {
                 struct {
-                    u8 frag_mode;
-                    u8 blend_mode;
-                    u16 unused;
+                    u32 frag_mode : 8;
+                    u32 blend_mode : 1;
+                    u32 : 23;
                 } color_op;
                 struct {
-                    u32 rgb_eq : 8;
-                    u32 a_eq : 8;
+                    u32 rgb_eq : 3;
+                    u32 : 5;
+                    u32 a_eq : 3;
+                    u32 : 5;
                     u32 rgb_src : 4;
                     u32 rgb_dst : 4;
                     u32 a_src : 4;
                     u32 a_dst : 4;
                 } blend_func;
-                u32 logic_op;
+                struct {
+                    u32 logic_op : 4;
+                    u32 : 28;
+                };
                 struct {
                     u8 r;
                     u8 g;
@@ -201,27 +215,36 @@ typedef union {
                     u8 a;
                 } blend_color;
                 struct {
-                    u32 enable : 4;
-                    u32 func : 4;
+                    u32 enable : 1;
+                    u32 : 3;
+                    u32 func : 3;
+                    u32 : 1;
                     u32 ref : 8;
                     u32 : 16;
                 } alpha_test;
                 struct {
-                    u32 enable : 4;
-                    u32 func : 4;
+                    u32 enable : 1;
+                    u32 : 3;
+                    u32 func : 3;
+                    u32 : 1;
                     u32 bufmask : 8;
                     u32 ref : 8;
                     u32 mask : 8;
                 } stencil_test;
                 struct {
-                    u32 fail : 4;
-                    u32 zfail : 4;
-                    u32 zpass : 4;
+                    u32 fail : 3;
+                    u32 : 1;
+                    u32 zfail : 3;
+                    u32 : 1;
+                    u32 zpass : 3;
+                    u32 : 1;
                     u32 : 20;
                 } stencil_op;
                 struct {
-                    u32 depthtest : 4;
-                    u32 depthfunc : 4;
+                    u32 depthtest : 1;
+                    u32 : 3;
+                    u32 depthfunc : 3;
+                    u32 : 1;
                     u32 red : 1;
                     u32 green : 1;
                     u32 blue : 1;
@@ -241,7 +264,10 @@ typedef union {
                 u32 depthbuf_fmt;
                 struct {
                     u16 size;
-                    u16 fmt;
+                    struct {
+                        u16 fmt : 3;
+                        u16 : 13;
+                    };
                 } colorbuf_fmt;
                 u32 _118[4];
                 u32 depthbuf_loc;
@@ -258,9 +284,12 @@ typedef union {
             struct {
                 struct {
                     struct {
-                        u32 b : 10;
-                        u32 g : 10;
-                        u32 r : 12;
+                        u32 b : 8;
+                        u32 : 2;
+                        u32 g : 8;
+                        u32 : 2;
+                        u32 r : 8;
+                        u32 : 4;
                     } specular0, specular1, diffuse, ambient;
                     struct {
                         u16 x, y, z, _w;
@@ -275,12 +304,18 @@ typedef union {
                     u32 _c[4];
                 } light[8];
                 struct {
-                    u32 b : 10;
-                    u32 g : 10;
-                    u32 r : 12;
+                    u32 b : 8;
+                    u32 : 2;
+                    u32 g : 8;
+                    u32 : 2;
+                    u32 r : 8;
+                    u32 : 4;
                 } ambient;
                 u32 _1c1;
-                u32 numlights;
+                struct {
+                    u32 numlights : 3;
+                    u32 : 29;
+                };
             };
             u32 w[0xc0];
         } lighting;
@@ -328,7 +363,8 @@ typedef union {
                 u32 _246[0x18];
                 struct {
                     u32 outmapcount : 8;
-                    u32 mode : 8;
+                    u32 mode : 2;
+                    u32 : 6;
                     u32 : 16;
                 } prim_config;
                 u32 restart_primitive;
@@ -350,7 +386,8 @@ typedef union {
                 u32 _28e;
                 u32 codetrans_end;
                 struct {
-                    u32 floatuniform_idx : 31;
+                    u32 floatuniform_idx : 7;
+                    u32 : 24;
                     u32 floatuniform_mode : 1;
                 };
                 u32 floatuniform_data[8];
@@ -480,7 +517,8 @@ void gpu_vshrunner_init(GPU* gpu);
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top);
-void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size, u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
+void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
+                      u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 

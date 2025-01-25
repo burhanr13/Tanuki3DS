@@ -172,12 +172,12 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         case GPUREG(vsh.floatuniform_data[0])... GPUREG(
             vsh.floatuniform_data[7]): {
-            u32 idx = gpu->io.vsh.floatuniform_idx & 7;
+            u32 idx = gpu->io.vsh.floatuniform_idx;
             if (idx >= 96) {
                 lwarn("writing to out of bound uniform");
                 break;
             }
-            fvec* uniform = &gpu->floatuniform[gpu->io.vsh.floatuniform_idx];
+            fvec* uniform = &gpu->floatuniform[idx];
             if (gpu->io.vsh.floatuniform_mode) {
                 (*uniform)[3 - gpu->curunifi] = I2F(param);
                 if (++gpu->curunifi == 4) {
@@ -365,7 +365,7 @@ void gpu_update_cur_fb(GPU* gpu) {
 
     gpu->cur_fb = fbcache_load(gpu, gpu->io.fb.colorbuf_loc << 3);
     gpu->cur_fb->depth_paddr = gpu->io.fb.depthbuf_loc << 3;
-    gpu->cur_fb->color_fmt = gpu->io.fb.colorbuf_fmt.fmt & 7;
+    gpu->cur_fb->color_fmt = gpu->io.fb.colorbuf_fmt.fmt;
     gpu->cur_fb->color_Bpp = gpu->io.fb.colorbuf_fmt.size + 2;
 
     linfo("drawing on fb %d at %x with depth buffer at %x",
@@ -449,7 +449,7 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
               dsttex->paddr);
 
         // need to handle more general cases at some point
-    
+
         if (srcgap == 0 && dstgap == 0) {
             int yoff = (srcpaddr - srcfb->color_paddr) /
                        (srcfb->width * srcfb->color_Bpp);
@@ -792,7 +792,7 @@ void gpu_drawarrays(GPU* gpu) {
     dispatch_vsh(gpu, cfg, gpu->io.geom.vtx_off, gpu->io.geom.nverts, vbuf);
 
     glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
-    glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode & 3], 0,
+    glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode], 0,
                  gpu->io.geom.nverts);
 }
 
@@ -825,7 +825,7 @@ void gpu_drawelements(GPU* gpu) {
 
     glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawElementsBaseVertex(
-        prim_mode[gpu->io.geom.prim_config.mode & 3], gpu->io.geom.nverts,
+        prim_mode[gpu->io.geom.prim_config.mode], gpu->io.geom.nverts,
         gpu->io.geom.indexfmt ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE, 0,
         -minind);
 }
@@ -843,7 +843,7 @@ void gpu_drawimmediate(GPU* gpu) {
     dispatch_vsh(gpu, cfg, 0, nverts, vbuf);
 
     glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
-    glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode & 3], 0, nverts);
+    glDrawArrays(prim_mode[gpu->io.geom.prim_config.mode], 0, nverts);
 
     Vec_free(gpu->immattrs);
 }
@@ -1050,15 +1050,15 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         }
     }
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                    texminfilter[regs->param.min_filter |
-                                 (regs->param.mipmapfilter & 1) << 1]);
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+        texminfilter[regs->param.min_filter | regs->param.mipmapfilter << 1]);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
                     texmagfilter[regs->param.mag_filter]);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
-                    texwrap[regs->param.wrap_s & 3]);
+                    texwrap[regs->param.wrap_s]);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
-                    texwrap[regs->param.wrap_t & 3]);
+                    texwrap[regs->param.wrap_t]);
     float bordercolor[4];
     COPYRGBA(bordercolor, regs->border);
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, bordercolor);
@@ -1084,8 +1084,8 @@ void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
     ubuf->tev[i].rgb.combiner = regs->combiner.rgb;
     ubuf->tev[i].a.combiner = regs->combiner.a;
     COPYRGBA(ubuf->tev[i].color, regs->color);
-    ubuf->tev[i].rgb.scale = 1 << (regs->scale.rgb & 3);
-    ubuf->tev[i].a.scale = 1 << (regs->scale.a & 3);
+    ubuf->tev[i].rgb.scale = 1 << (regs->scale.rgb);
+    ubuf->tev[i].a.scale = 1 << (regs->scale.a);
 }
 
 void gpu_update_gl_state(GPU* gpu) {
@@ -1093,7 +1093,7 @@ void gpu_update_gl_state(GPU* gpu) {
 
     UberUniforms ubuf;
 
-    switch (gpu->io.raster.facecull_config & 3) {
+    switch (gpu->io.raster.cullmode) {
         case 0:
         case 3:
             glDisable(GL_CULL_FACE);
@@ -1134,7 +1134,7 @@ void gpu_update_gl_state(GPU* gpu) {
         glDepthRangef(0, 1);
     }
 
-    ubuf.tex2coord = gpu->io.tex.config.tex2coord & 1;
+    ubuf.tex2coord = gpu->io.tex.config.tex2coord;
 
     if (gpu->io.tex.config.tex0enable) {
         gpu_load_texture(gpu, 0, &gpu->io.tex.tex0, gpu->io.tex.tex0_fmt);
@@ -1159,11 +1159,11 @@ void gpu_update_gl_state(GPU* gpu) {
     if (gpu->io.fb.color_op.frag_mode != 0) {
         return; // shadows or gas, ignore these for now
     }
-    if (gpu->io.fb.color_op.blend_mode == 1) {
+    if (gpu->io.fb.color_op.blend_mode) {
         glDisable(GL_COLOR_LOGIC_OP);
         glEnable(GL_BLEND);
-        glBlendEquationSeparate(blend_eq[gpu->io.fb.blend_func.rgb_eq & 7],
-                                blend_eq[gpu->io.fb.blend_func.a_eq & 7]);
+        glBlendEquationSeparate(blend_eq[gpu->io.fb.blend_func.rgb_eq],
+                                blend_eq[gpu->io.fb.blend_func.a_eq]);
         glBlendFuncSeparate(blend_func[gpu->io.fb.blend_func.rgb_src],
                             blend_func[gpu->io.fb.blend_func.rgb_dst],
                             blend_func[gpu->io.fb.blend_func.a_src],
@@ -1174,11 +1174,11 @@ void gpu_update_gl_state(GPU* gpu) {
     } else {
         glDisable(GL_BLEND);
         glEnable(GL_COLOR_LOGIC_OP);
-        glLogicOp(logic_ops[gpu->io.fb.logic_op & 0xf]);
+        glLogicOp(logic_ops[gpu->io.fb.logic_op]);
     }
 
-    ubuf.alphatest = gpu->io.fb.alpha_test.enable & 1;
-    ubuf.alphafunc = gpu->io.fb.alpha_test.func & 7;
+    ubuf.alphatest = gpu->io.fb.alpha_test.enable;
+    ubuf.alphafunc = gpu->io.fb.alpha_test.func;
     ubuf.alpharef = (float) gpu->io.fb.alpha_test.ref / 255;
 
     if (gpu->io.fb.stencil_test.enable) {
@@ -1188,12 +1188,12 @@ void gpu_update_gl_state(GPU* gpu) {
         } else {
             glStencilMask(0);
         }
-        glStencilFunc(compare_func[gpu->io.fb.stencil_test.func & 7],
+        glStencilFunc(compare_func[gpu->io.fb.stencil_test.func],
                       gpu->io.fb.stencil_test.ref,
                       gpu->io.fb.stencil_test.mask);
-        glStencilOp(stencil_op[gpu->io.fb.stencil_op.fail & 7],
-                    stencil_op[gpu->io.fb.stencil_op.zfail & 7],
-                    stencil_op[gpu->io.fb.stencil_op.zpass & 7]);
+        glStencilOp(stencil_op[gpu->io.fb.stencil_op.fail],
+                    stencil_op[gpu->io.fb.stencil_op.zfail],
+                    stencil_op[gpu->io.fb.stencil_op.zpass]);
     } else {
         glDisable(GL_STENCIL_TEST);
     }
@@ -1216,12 +1216,12 @@ void gpu_update_gl_state(GPU* gpu) {
     // write the depth buffer even if depth testing is disabled
     glEnable(GL_DEPTH_TEST);
     if (gpu->io.fb.color_mask.depthtest) {
-        glDepthFunc(compare_func[gpu->io.fb.color_mask.depthfunc & 7]);
+        glDepthFunc(compare_func[gpu->io.fb.color_mask.depthfunc]);
     } else {
         glDepthFunc(GL_ALWAYS);
     }
 
-    ubuf.numlights = (gpu->io.lighting.numlights & 7) + 1;
+    ubuf.numlights = gpu->io.lighting.numlights + 1;
     for (int i = 0; i < ubuf.numlights; i++) {
         // TODO: handle light permutation
         COPYRGB(ubuf.light[i].specular0, gpu->io.lighting.light[i].specular0);
