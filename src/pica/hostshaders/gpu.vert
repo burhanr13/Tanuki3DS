@@ -16,7 +16,9 @@ out vec4 normquat;
 out vec3 view;
 
 void main() {
-    gl_Position = a_pos;
+    vec4 pos = a_pos;
+    pos.z = pos.z * 2 + pos.w; // we need to recorrect the depth from -1,0 to -1,1
+    gl_Position = pos;
     
     color = a_color;
     texcoord0 = a_texcoord0;

@@ -1129,9 +1129,11 @@ void gpu_update_gl_state(GPU* gpu) {
     if (gpu->io.raster.depthmap_enable) {
         float offset = cvtf24(gpu->io.raster.depthmap_offset);
         float scale = cvtf24(gpu->io.raster.depthmap_scale);
-        glDepthRangef((offset - scale + 1) / 2, (offset + scale + 1) / 2);
+        // pica near plane is -1 and farplane is 0
+        glDepthRangef(offset - scale, offset);
     } else {
-        glDepthRangef(0, 1);
+        // default depth range maps -1 -> 1 and 0 -> 0
+        glDepthRangef(1, 0);
     }
 
     ubuf.tex2coord = gpu->io.tex.config.tex2coord;
