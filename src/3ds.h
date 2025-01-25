@@ -42,7 +42,6 @@ typedef struct _3DS {
     Scheduler sched;
 } E3DS;
 
-#define R(n) s->cpu.r[n]
 #define PTR(addr) ((void*) &s->virtmem[addr])
 
 #define PAGE_SIZE BIT(12)
@@ -54,7 +53,6 @@ typedef struct _3DS {
 #define VRAM_PBASE 0x1800'0000
 
 #define STACK_BASE 0x1000'0000
-#define STACK_SIZE BIT(14)
 
 #define LINEAR_HEAP_BASE 0x1400'0000
 

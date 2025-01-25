@@ -51,7 +51,7 @@ u32 load_elf(E3DS* s, char* filename) {
 
     s->romimage.fp = nullptr;
 
-    e3ds_vmmap(s, STACK_BASE - STACK_SIZE, STACK_SIZE, PERM_RW, MEMST_PRIVATE,
+    e3ds_vmmap(s, STACK_BASE - BIT(14), BIT(14), PERM_RW, MEMST_PRIVATE,
                false);
 
     return ehdr.e_entry;

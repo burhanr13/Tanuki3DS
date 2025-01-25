@@ -4,20 +4,20 @@
 
 void e3ds_restore_context(E3DS* s) {
     for (int i = 0; i < 16; i++) {
-        s->cpu.r[i] = CUR_THREAD->context.r[i];
-        s->cpu.d[i] = CUR_THREAD->context.d[i];
+        s->cpu.r[i] = CUR_THREAD->ctx.r[i];
+        s->cpu.d[i] = CUR_THREAD->ctx.d[i];
     }
-    s->cpu.cpsr.w = CUR_THREAD->context.cpsr;
-    s->cpu.fpscr.w = CUR_THREAD->context.fpscr;
+    s->cpu.cpsr.w = CUR_THREAD->ctx.cpsr;
+    s->cpu.fpscr.w = CUR_THREAD->ctx.fpscr;
 }
 
 void e3ds_save_context(E3DS* s) {
     for (int i = 0; i < 16; i++) {
-        CUR_THREAD->context.r[i] = s->cpu.r[i];
-        CUR_THREAD->context.d[i] = s->cpu.d[i];
+        CUR_THREAD->ctx.r[i] = s->cpu.r[i];
+        CUR_THREAD->ctx.d[i] = s->cpu.d[i];
     }
-    CUR_THREAD->context.cpsr = s->cpu.cpsr.w;
-    CUR_THREAD->context.fpscr = s->cpu.fpscr.w;
+    CUR_THREAD->ctx.cpsr = s->cpu.cpsr.w;
+    CUR_THREAD->ctx.fpscr = s->cpu.fpscr.w;
 }
 
 void thread_init(E3DS* s, u32 entrypoint) {
@@ -26,7 +26,6 @@ void thread_init(E3DS* s, u32 entrypoint) {
     s->process.handles[0] = &s->process.threads[tid]->hdr;
     s->process.handles[0]->refcount = 2;
 
-    load_context(s);
     CUR_THREAD->state = THRD_RUNNING;
 }
 
@@ -45,10 +44,10 @@ u32 thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
     }
     KThread* thrd = calloc(1, sizeof *thrd);
     thrd->hdr.type = KOT_THREAD;
-    thrd->context.arg = arg;
-    thrd->context.sp = stacktop;
-    thrd->context.pc = entrypoint;
-    thrd->context.cpsr = M_USER;
+    thrd->ctx.arg = arg;
+    thrd->ctx.sp = stacktop;
+    thrd->ctx.pc = entrypoint;
+    thrd->ctx.cpsr = M_USER;
     thrd->priority = priority;
     thrd->state = THRD_READY;
     thrd->id = tid;
@@ -72,8 +71,8 @@ void thread_reschedule(E3DS* s) {
         }
     }
     if (nexttid == -1) {
-            s->cpu.wfe = true;
-            linfo("all threads sleeping");
+        s->cpu.wfe = true;
+        linfo("all threads sleeping");
         return;
     } else {
         s->cpu.wfe = false;
@@ -82,14 +81,11 @@ void thread_reschedule(E3DS* s) {
     if (CUR_THREAD->id == nexttid) {
         linfo("not switching threads");
     } else {
-    linfo("switching from thread %d to thread %d", CUR_THREAD->id, nexttid);
-    save_context(s);
-    s->process.handles[0]->refcount--;
-    s->process.handles[0] = &s->process.threads[nexttid]->hdr;
-    s->process.handles[0]->refcount++;
-    load_context(s);
+        linfo("switching from thread %d to thread %d", CUR_THREAD->id, nexttid);
+        s->process.handles[0]->refcount--;
+        s->process.handles[0] = &s->process.threads[nexttid]->hdr;
+        s->process.handles[0]->refcount++;
     }
-    return;
 }
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
@@ -101,6 +97,7 @@ void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
         s64 timeCycles = timeout * CPU_CLK / 1'000'000'000;
         add_event(&s->sched, thread_wakeup_timeout, t->id, timeCycles);
     }
+    thread_reschedule(s);
 }
 
 void thread_wakeup_timeout(E3DS* s, u32 tid) {
@@ -119,7 +116,7 @@ void thread_wakeup_timeout(E3DS* s, u32 tid) {
 
 bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
     if (t->state != THRD_SLEEP) return false;
-    t->context.r[1] = klist_remove_key(&t->waiting_objs, reason);
+    t->ctx.r[1] = klist_remove_key(&t->waiting_objs, reason);
     if (!t->waiting_objs || !t->wait_all) {
         linfo("waking up thread %d", t->id);
         KListNode** cur = &t->waiting_objs;
@@ -129,6 +126,7 @@ bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
         }
         remove_event(&s->sched, thread_wakeup_timeout, t->id);
         t->state = THRD_READY;
+        thread_reschedule(s);
         return true;
     }
     return false;
@@ -142,7 +140,7 @@ void thread_kill(E3DS* s, KThread* t) {
     t->state = THRD_DEAD;
     auto cur = &t->waiting_thrds;
     while (*cur) {
-        thread_wakeup(s, (KThread*) (*cur)->key, &CUR_THREAD->hdr);
+        thread_wakeup(s, (KThread*) (*cur)->key, &t->hdr);
         klist_remove(cur);
     }
 
@@ -208,34 +206,34 @@ void mutex_release(E3DS* s, KMutex* mtx) {
     thread_reschedule(s);
 }
 
-bool sync_wait(E3DS* s, KObject* o) {
+bool sync_wait(E3DS* s, KThread* t, KObject* o) {
     switch (o->type) {
         case KOT_THREAD: {
             KThread* thr = (KThread*) o;
             if (thr->state == THRD_DEAD) return false;
-            klist_insert(&thr->waiting_thrds, &CUR_THREAD->hdr);
+            klist_insert(&thr->waiting_thrds, &t->hdr);
             return true;
         }
         case KOT_EVENT: {
             KEvent* event = (KEvent*) o;
             if (event->signal) return false;
-            klist_insert(&event->waiting_thrds, &CUR_THREAD->hdr);
+            klist_insert(&event->waiting_thrds, &t->hdr);
             return true;
         }
         case KOT_MUTEX: {
             KMutex* mtx = (KMutex*) o;
-            if (mtx->locker_thrd && mtx->locker_thrd != CUR_THREAD) {
-                klist_insert(&mtx->waiting_thrds, &CUR_THREAD->hdr);
+            if (mtx->locker_thrd && mtx->locker_thrd != t) {
+                klist_insert(&mtx->waiting_thrds, &t->hdr);
                 return true;
             }
-            mtx->locker_thrd = CUR_THREAD;
+            mtx->locker_thrd = t;
             return false;
         }
         case KOT_SEMAPHORE: {
             return true;
         }
         default:
-            R(0) = -1;
+            t->ctx.r[0] = -1;
             lerror("cannot wait on this %d", o->type);
             return false;
     }

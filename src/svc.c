@@ -7,6 +7,8 @@
 #include "svc_types.h"
 #include "thread.h"
 
+#define R(n) caller->ctx.r[n]
+
 #define MAKE_HANDLE(handle)                                                    \
     u32 handle = handle_new(s);                                                \
     if (!handle) {                                                             \
@@ -15,15 +17,20 @@
     }
 
 void e3ds_handle_svc(E3DS* s, u32 num) {
+    e3ds_save_context(s);
+
+    KThread* caller = CUR_THREAD;
     num &= 0xff;
     if (!svc_table[num]) {
         lerror("unknown svc 0x%x (0x%x,0x%x,0x%x,0x%x) at %08x (lr=%08x)", num,
-               R(0), R(1), R(2), R(3), s->cpu.pc, s->cpu.lr);
-        return;
+               R(0), R(1), R(2), R(3), R(15), R(14));
+    } else {
+        linfo("svc 0x%x: %s(0x%x,0x%x,0x%x,0x%x,0x%x) at %08x (lr=%08x)", num,
+              svc_names[num], R(0), R(1), R(2), R(3), R(4), R(15), R(14));
+        svc_table[num](s, caller);
     }
-    linfo("svc 0x%x: %s(0x%x,0x%x,0x%x,0x%x,0x%x) at %08x (lr=%08x)", num,
-          svc_names[num], R(0), R(1), R(2), R(3), R(4), R(15), R(14));
-    svc_table[num](s);
+
+    e3ds_restore_context(s);
 }
 
 DECL_SVC(ControlMemory) {
@@ -84,16 +91,16 @@ DECL_SVC(CreateThread) {
     s->process.threads[newtid]->hdr.refcount = 1;
     linfo("created thread with handle %x", handle);
 
+    thread_reschedule(s);
+
     R(0) = 0;
     R(1) = handle;
-
-    if (priority < CUR_THREAD->priority) thread_reschedule(s);
 }
 
 DECL_SVC(ExitThread) {
-    linfo("thread %d exiting", CUR_THREAD->id);
+    linfo("thread %d exiting", caller->id);
 
-    thread_kill(s, CUR_THREAD);
+    thread_kill(s, caller);
 
     thread_reschedule(s);
 }
@@ -101,21 +108,19 @@ DECL_SVC(ExitThread) {
 DECL_SVC(SleepThread) {
     s64 timeout = R(0) | (u64) R(1) << 32;
 
-    R(0) = 0;
-
     if (timeout == 0) {
         // timeout 0 will switch to a different thread without sleeping this
         // thread
         // since the scheduler always picks the thread with highest priority
         // we need to temporarily sleep this one so it does not get picked
-        auto curt = CUR_THREAD;
-        curt->state = THRD_SLEEP;
+        caller->state = THRD_SLEEP;
         thread_reschedule(s);
-        curt->state = THRD_READY;
+        caller->state = THRD_READY;
     } else {
-        thread_sleep(s, CUR_THREAD, timeout);
-        thread_reschedule(s);
+        thread_sleep(s, caller, timeout);
     }
+
+    R(0) = 0;
 }
 
 DECL_SVC(GetThreadPriority) {
@@ -138,16 +143,17 @@ DECL_SVC(SetThreadPriority) {
         return;
     }
 
-    R(0) = 0;
     t->priority = R(1);
     thread_reschedule(s);
+
+    R(0) = 0;
 }
 
 DECL_SVC(CreateMutex) {
     MAKE_HANDLE(handle);
 
     KMutex* mtx = mutex_create();
-    if (R(1)) mtx->locker_thrd = CUR_THREAD;
+    if (R(1)) mtx->locker_thrd = caller;
     mtx->hdr.refcount = 1;
     HANDLE_SET(handle, mtx);
 
@@ -167,8 +173,9 @@ DECL_SVC(ReleaseMutex) {
 
     linfo("releasing mutex %x", R(0));
 
-    R(0) = 0;
     mutex_release(s, m);
+
+    R(0) = 0;
 }
 
 DECL_SVC(CreateEvent) {
@@ -194,9 +201,9 @@ DECL_SVC(SignalEvent) {
     }
 
     linfo("signaling event %x", R(0));
+    event_signal(s, e);
 
     R(0) = 0;
-    event_signal(s, e);
 }
 
 DECL_SVC(ClearEvent) {
@@ -206,8 +213,8 @@ DECL_SVC(ClearEvent) {
         R(0) = -1;
         return;
     }
-    R(0) = 0;
     e->signal = false;
+    R(0) = 0;
 }
 
 DECL_SVC(CreateMemoryBlock) {
@@ -293,7 +300,7 @@ DECL_SVC(ArbitrateAddress) {
 
     KArbiter* arbiter = HANDLE_GET_TYPED(h, KOT_ARBITER);
     if (!arbiter) {
-        lerror("bad typed handle");
+        lerror("not an arbiter");
         R(0) = -1;
         return;
     }
@@ -335,17 +342,15 @@ DECL_SVC(ArbitrateAddress) {
                     klist_remove(toRemove);
                 }
             }
-            thread_reschedule(s);
             break;
         case ARBITRATE_WAIT:
         case ARBITRATE_DEC_WAIT:
             if (*(s32*) PTR(addr) < value) {
-                klist_insert(&arbiter->waiting_thrds, &CUR_THREAD->hdr);
-                klist_insert(&CUR_THREAD->waiting_objs, &arbiter->hdr);
-                CUR_THREAD->waiting_addr = addr;
+                klist_insert(&arbiter->waiting_thrds, &caller->hdr);
+                klist_insert(&caller->waiting_objs, &arbiter->hdr);
+                caller->waiting_addr = addr;
                 linfo("waiting on address %08x", addr);
-                thread_sleep(s, CUR_THREAD, -1);
-                thread_reschedule(s);
+                thread_sleep(s, caller, -1);
             }
             if (type == ARBITRATE_DEC_WAIT) {
                 *(s32*) PTR(addr) -= 1;
@@ -384,16 +389,17 @@ DECL_SVC(WaitSynchronization1) {
         R(0) = -1;
         return;
     }
+
     R(0) = 0;
 
-    if (sync_wait(s, obj)) {
+    if (sync_wait(s, caller, obj)) {
         linfo("waiting on handle %x", handle);
-        klist_insert(&CUR_THREAD->waiting_objs, obj);
-        thread_sleep(s, CUR_THREAD, timeout);
-        thread_reschedule(s);
+        klist_insert(&caller->waiting_objs, obj);
+        thread_sleep(s, caller, timeout);
     } else {
         linfo("did not need to wait for handle %x", handle);
     }
+
 }
 
 DECL_SVC(WaitSynchronizationN) {
@@ -405,38 +411,37 @@ DECL_SVC(WaitSynchronizationN) {
     bool wokeup = false;
     int wokeupi = 0;
 
+    R(0) = 0;
+
     for (int i = 0; i < count; i++) {
         KObject* obj = HANDLE_GET(handles[i]);
         if (!obj) {
             lerror("invalid handle %x", handles[i]);
             continue;
         }
-        if (sync_wait(s, obj)) {
+        if (sync_wait(s, caller, obj)) {
             linfo("waiting on handle %x", handles[i]);
-            klist_insert(&CUR_THREAD->waiting_objs, obj);
-            CUR_THREAD->waiting_objs->val = i;
+            klist_insert(&caller->waiting_objs, obj);
+            caller->waiting_objs->val = i;
         } else {
             linfo("handle %x already waited", handles[i]);
             wokeup = true;
             wokeupi = i;
-            break;
         }
     }
 
-    R(0) = 0;
-
-    if ((!waitAll && wokeup) || !CUR_THREAD->waiting_objs) {
+    if ((!waitAll && wokeup) || !caller->waiting_objs) {
         linfo("did not need to wait");
-        KListNode** cur = &CUR_THREAD->waiting_objs;
+        KListNode** cur = &caller->waiting_objs;
         while (*cur) {
-            sync_cancel(CUR_THREAD, (*cur)->key);
+            sync_cancel(caller, (*cur)->key);
             klist_remove(cur);
         }
         R(1) = wokeupi;
     } else {
         linfo("waiting on %d handles", count);
-        CUR_THREAD->wait_all = waitAll;
-        thread_sleep(s, CUR_THREAD, timeout);
+        caller->wait_all = waitAll;
+        thread_sleep(s, caller, timeout);
         thread_reschedule(s);
     }
 }
@@ -511,9 +516,9 @@ DECL_SVC(SendSyncRequest) {
         return;
     }
     R(0) = 0;
-    u32 cmd_addr = CUR_TLS + IPC_CMD_OFF;
+    u32 cmd_addr = GETTLS(caller) + IPC_CMD_OFF;
     IPCHeader cmd = *(IPCHeader*) PTR(cmd_addr);
-    session->handler(s, cmd, CUR_TLS + IPC_CMD_OFF, session->arg);
+    session->handler(s, cmd, cmd_addr, session->arg);
 }
 
 DECL_SVC(GetProcessId) {
