@@ -51,10 +51,13 @@ DECL_SVC(ControlMemory) {
                 R(1) = memory_virtalloc(s, addr0, size, perm, MEMST_PRIVATE);
             }
             break;
+        case MEMOP_MIRRORMAP:
+            R(1) = memory_virtmirror(s, addr1, addr0, size, perm);
+            break;
         default:
             lwarn("unknown memory op %d addr0=%08x addr1=%08x size=%x", memop,
                   addr0, addr1, size);
-            R(0) = -1;
+            R(0) = 0;
     }
 }
 
@@ -227,11 +230,12 @@ DECL_SVC(CreateMemoryBlock) {
     u32 perm = R(3);
 
     KSharedMem* shm = calloc(1, sizeof *shm);
+    shm->mapaddr = addr;
     shm->size = size;
     shm->hdr.refcount = 1;
     HANDLE_SET(handle, shm);
 
-    printfln("created memory block with handle %x at addr %x", handle, addr);
+    linfo("created memory block with handle %x at addr %x", handle, addr);
 
     R(0) = 0;
     R(1) = handle;
@@ -250,7 +254,16 @@ DECL_SVC(MapMemoryBlock) {
         return;
     }
 
-    printfln("mapping shared mem block %x at %08x", memblock, addr);
+    if (!addr) addr = shmem->mapaddr;
+
+    if (!shmem->paddr) {
+        lerror("mapping unallocated sharedmem");
+        R(0) = -1;
+        return;
+    }
+
+    linfo("mapping shared mem block %x of size %x at %08x", memblock,
+          shmem->size, addr);
 
     memory_virtmap(s, shmem->paddr, addr, shmem->size, perm, MEMST_SHARED);
 

@@ -37,6 +37,7 @@ void init_services(E3DS* s) {
     s->services.apt.nextparam.appid = APPID_HOMEMENU;
     s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
+    s->services.apt.shared_font.mapaddr = SHAREDFONTADDR;
     s->services.apt.shared_font.size = sizeof shared_font;
     sharedmem_alloc(s, &s->services.apt.shared_font);
     memcpy(PPTR(s->services.apt.shared_font.paddr), shared_font,

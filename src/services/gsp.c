@@ -50,6 +50,7 @@ DECL_PORT(gsp_gpu) {
             linfo("RegisterInterruptRelayQueue with event handle=%x, "
                   "shmemhandle=%x",
                   cmdbuf[3], shmemhandle);
+            s->services.gsp.registered = true;
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;
             cmdbuf[3] = 0;
@@ -138,6 +139,8 @@ void gsp_handle_event(E3DS* s, u32 arg) {
 
         s->frame_complete = true;
     }
+
+    if (!s->services.gsp.registered) return;
 
     auto interrupts = &GSPMEM->interrupts[0];
 

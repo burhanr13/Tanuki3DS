@@ -147,6 +147,7 @@ void memory_destroy(E3DS* s) {
 }
 
 u32 memory_physalloc(E3DS* s, u32 size) {
+    size = PGROUNDUP(size);
     u32 npage = PGROUNDUP(size) / PAGE_SIZE;
 
     auto cur = &s->pheap;
@@ -284,7 +285,7 @@ void print_vmblocks(VMBlock* vmblocks) {
     printf("\n");
 }
 
-void memory_virtmap(E3DS* s, u32 paddr, u32 vaddr, u32 size, u32 perm,
+u32 memory_virtmap(E3DS* s, u32 paddr, u32 vaddr, u32 size, u32 perm,
                     u32 state) {
     vaddr = PGROUNDDOWN(vaddr);
     paddr = PGROUNDDOWN(paddr);
@@ -308,9 +309,10 @@ void memory_virtmap(E3DS* s, u32 paddr, u32 vaddr, u32 size, u32 perm,
             exit(1);
         }
     }
+    return vaddr;
 }
 
-void memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size,
+u32 memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size,
                        u32 perm) {
     srcvaddr = PGROUNDDOWN(srcvaddr);
     dstvaddr = PGROUNDDOWN(dstvaddr);
@@ -330,7 +332,7 @@ void memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size,
 
         if (ent.state == MEMST_FREE) {
             lerror("invalid src address for mirrormap %08x", srcvaddr);
-            return;
+            return 0;
         }
 
         ptabwrite(s->process.ptab, dstvaddr, ent.paddr, perm, MEMST_ALIAS);
@@ -343,9 +345,11 @@ void memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size,
             exit(1);
         }
     }
+    return dstvaddr;
 }
 
 u32 memory_virtalloc(E3DS* s, u32 addr, u32 size, u32 perm, u32 state) {
+    size = PGROUNDUP(size);
     u32 paddr = memory_physalloc(s, size);
     memory_virtmap(s, paddr, addr, size, perm, state);
     s->process.used_memory += size;
@@ -353,6 +357,8 @@ u32 memory_virtalloc(E3DS* s, u32 addr, u32 size, u32 perm, u32 state) {
 }
 
 u32 memory_linearheap_grow(E3DS* s, u32 size, u32 perm) {
+    size = PGROUNDUP(size);
+
     auto linearblk = s->pheap.next;
     u32 npage = PGROUNDUP(size) / PAGE_SIZE;
 
