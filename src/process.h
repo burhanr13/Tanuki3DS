@@ -8,6 +8,8 @@
 typedef struct _KProcess {
     KObject hdr;
 
+    PageTable ptab;
+
     VMBlock vmblocks;
 
     KObject* handles[HANDLE_MAX];

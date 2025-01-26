@@ -25,11 +25,13 @@ typedef struct _3DS {
 
     GPU gpu;
 
-    int fcram_fd;
-    int vram_fd;
+    int mem_fd;
+    E3DSMemory* mem;
 
     u8* physmem;
     u8* virtmem;
+
+    FCRAMHeapNode pheap;
 
     KProcess process;
 
@@ -42,25 +44,12 @@ typedef struct _3DS {
     Scheduler sched;
 } E3DS;
 
-#define PTR(addr) ((void*) &s->virtmem[addr])
-
-#define PAGE_SIZE BIT(12)
-
-#define FCRAMSIZE BIT(27)
-#define VRAMSIZE (6 * BIT(20))
-
-#define FCRAM_PBASE 0x2000'0000
-#define VRAM_PBASE 0x1800'0000
+#define FCRAMUSERSIZE (96 * BIT(20))
 
 #define STACK_BASE 0x1000'0000
 
-#define LINEAR_HEAP_BASE 0x1400'0000
-
-#define VRAMBASE 0x1f00'0000
-
-#define DSPMEM 0x1ff50000
-#define DSPMEMSIZE BIT(15)
-#define DSPBUFBIT BIT(17)
+#define VRAM_VBASE 0x1f00'0000
+#define DSPRAM_VBASE 0x1ff0'0000
 
 #define CONFIG_MEM 0x1ff80000
 #define SHARED_PAGE 0x1ff81000

@@ -17,7 +17,7 @@ void e3ds_init(E3DS* s, char* romfile) {
 
     gpu_vshrunner_init(&s->gpu);
 
-    e3ds_memory_init(s);
+    memory_init(s);
 
     u32 entrypoint = 0;
 
@@ -43,18 +43,20 @@ void e3ds_init(E3DS* s, char* romfile) {
         exit(1);
     }
 
-    e3ds_vmmap(s, DSPMEM, DSPMEMSIZE, PERM_RW, MEMST_STATIC, false);
-    e3ds_vmmap(s, DSPMEM | DSPBUFBIT, DSPMEMSIZE, PERM_RW, MEMST_STATIC, false);
+    memory_virtmap(s, VRAM_PBASE, VRAM_VBASE, VRAM_SIZE, PERM_RW, MEMST_STATIC);
+    memory_virtmap(s, DSPRAM_PBASE, DSPRAM_VBASE, DSPRAM_SIZE, PERM_RW,
+                   MEMST_STATIC);
 
-    e3ds_vmmap(s, CONFIG_MEM, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
+    // config page and shared page are owned by kernel but whatever
+    memory_virtalloc(s, CONFIG_MEM, PAGE_SIZE, PERM_R, MEMST_STATIC);
     *(u8*) PTR(CONFIG_MEM + 0x14) = 1;
-    *(u32*) PTR(CONFIG_MEM + 0x40) = FCRAMSIZE;
+    *(u32*) PTR(CONFIG_MEM + 0x40) = FCRAMUSERSIZE;
 
-    e3ds_vmmap(s, SHARED_PAGE, PAGE_SIZE, PERM_R, MEMST_STATIC, false);
+    memory_virtalloc(s, SHARED_PAGE, PAGE_SIZE, PERM_R, MEMST_SHARED);
     *(u32*) PTR(SHARED_PAGE + 4) = 1;
 
-    e3ds_vmmap(s, TLS_BASE, TLS_SIZE * THREAD_MAX, PERM_RW, MEMST_PRIVATE,
-               false);
+    memory_virtalloc(s, TLS_BASE, TLS_SIZE * THREAD_MAX, PERM_RW,
+                     MEMST_PRIVATE);
 
     init_services(s);
 
@@ -74,7 +76,7 @@ void e3ds_destroy(E3DS* s) {
 
     if (s->romimage.fp) fclose(s->romimage.fp);
 
-    e3ds_memory_destroy(s);
+    memory_destroy(s);
 }
 
 void e3ds_update_datetime(E3DS* s) {

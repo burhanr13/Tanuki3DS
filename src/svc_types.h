@@ -27,11 +27,17 @@ enum {
 };
 
 enum {
-    MEMST_FREE = 0,
-    MEMST_STATIC = 3,
-    MEMST_CODE = 4,
-    MEMST_PRIVATE = 5,
-    MEMST_SHARED = 6,
+    MEMST_FREE,
+    MEMST_RESERVED,
+    MEMST_IO,
+    MEMST_STATIC,
+    MEMST_CODE,
+    MEMST_PRIVATE,
+    MEMST_SHARED,
+    MEMST_CONTINUOUS,
+    MEMST_ALIAS,
+    MEMST_ALIASCODE,
+    MEMST_LOCKED,
 };
 
 enum {

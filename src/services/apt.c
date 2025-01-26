@@ -126,7 +126,7 @@ DECL_PORT(apt) {
             linfo("GetSharedFont");
             cmdbuf[0] = IPCHDR(2, 2);
             cmdbuf[1] = 0;
-            cmdbuf[2] = s->services.apt.shared_font.vaddr;
+            cmdbuf[2] = SHAREDFONTADDR;
             cmdbuf[4] = srvobj_make_handle(s, &s->services.apt.shared_font.hdr);
             break;
         }

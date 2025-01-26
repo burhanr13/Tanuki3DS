@@ -42,23 +42,25 @@ DECL_SVC(ControlMemory) {
     u32 size = R(3);
     u32 perm = R(4);
 
-    if (linear && !addr0) addr0 = LINEAR_HEAP_BASE;
-
     R(0) = 0;
     switch (memop) {
         case MEMOP_ALLOC:
-            e3ds_vmmap(s, addr0, size, perm, MEMST_PRIVATE, linear);
-            R(1) = addr0;
+            if (linear) {
+                R(1) = memory_linearheap_grow(s, size, perm);
+            } else {
+                R(1) = memory_virtalloc(s, addr0, size, perm, MEMST_PRIVATE);
+            }
             break;
         default:
-            lwarn("unknown memory op %d", memop);
+            lwarn("unknown memory op %d addr0=%08x addr1=%08x size=%x", memop,
+                  addr0, addr1, size);
             R(0) = -1;
     }
 }
 
 DECL_SVC(QueryMemory) {
     u32 addr = R(2);
-    VMBlock* b = e3ds_vmquery(s, addr);
+    VMBlock* b = memory_virtquery(s, addr);
     R(0) = 0;
     R(1) = b->startpg << 12;
     R(2) = (b->endpg - b->startpg) << 12;
@@ -225,15 +227,11 @@ DECL_SVC(CreateMemoryBlock) {
     u32 perm = R(3);
 
     KSharedMem* shm = calloc(1, sizeof *shm);
-    shm->vaddr = addr;
     shm->size = size;
-    shm->mapped = true;
     shm->hdr.refcount = 1;
     HANDLE_SET(handle, shm);
 
-    linfo("created memory block with handle %x at addr %x", handle, addr);
-
-    e3ds_vmmap(s, addr, size, perm, MEMST_SHARED, false);
+    printfln("created memory block with handle %x at addr %x", handle, addr);
 
     R(0) = 0;
     R(1) = handle;
@@ -252,27 +250,9 @@ DECL_SVC(MapMemoryBlock) {
         return;
     }
 
-    if (addr && shmem->vaddr) lwarn("remapping a shared mem block");
+    printfln("mapping shared mem block %x at %08x", memblock, addr);
 
-    if (addr) {
-        shmem->vaddr = addr;
-    } else if (shmem->vaddr) {
-        addr = shmem->vaddr;
-    } else {
-        lwarn("trying to map at null");
-        R(0) = -1;
-        return;
-    }
-    shmem->mapped = true;
-
-    linfo("mapping shared mem block %x at %08x", memblock, addr);
-
-    e3ds_vmmap(s, addr, shmem->size ? shmem->size : PAGE_SIZE, perm,
-               MEMST_SHARED, false);
-
-    if (shmem->defaultdata) {
-        memcpy(PTR(addr), shmem->defaultdata, shmem->defaultdatalen);
-    }
+    memory_virtmap(s, shmem->paddr, addr, shmem->size, perm, MEMST_SHARED);
 
     R(0) = 0;
 }
@@ -399,7 +379,6 @@ DECL_SVC(WaitSynchronization1) {
     } else {
         linfo("did not need to wait for handle %x", handle);
     }
-
 }
 
 DECL_SVC(WaitSynchronizationN) {
@@ -555,7 +534,7 @@ DECL_SVC(GetResourceLimitLimitValues) {
     for (int i = 0; i < count; i++) {
         switch (names[i]) {
             case RES_MEMORY:
-                values[i] = FCRAMSIZE;
+                values[i] = FCRAMUSERSIZE;
                 linfo("memory: %08x", values[i]);
                 break;
             default:

@@ -91,8 +91,8 @@ float cvtf16(u32 i) {
 }
 
 bool is_valid_physmem(u32 addr) {
-    return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAMSIZE) ||
-           (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAMSIZE);
+    return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAM_SIZE) ||
+           (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAM_SIZE);
 }
 
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {

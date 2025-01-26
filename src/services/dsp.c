@@ -11,8 +11,9 @@ DECL_PORT(dsp) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x000c: {
+            linfo("ConvertProcessAddressFromDspDram");
             cmdbuf[0] = IPCHDR(2, 0);
-            cmdbuf[2] = DSPMEM + (cmdbuf[1] << 1) - 0x10000;
+            cmdbuf[2] = DSPRAM_VBASE + 0x40000 + (cmdbuf[1] << 1);
             cmdbuf[1] = 0;
             break;
         }

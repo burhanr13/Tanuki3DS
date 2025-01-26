@@ -2,9 +2,9 @@
 
 #include <string.h>
 
-#include "svc.h"
-
+#include "memory.h"
 #include "services.h"
+#include "svc.h"
 
 u8 shared_font[] = {
 #embed "sys_files/fonthdr.bin"
@@ -37,20 +37,26 @@ void init_services(E3DS* s) {
     s->services.apt.nextparam.appid = APPID_HOMEMENU;
     s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
-    s->services.apt.shared_font.defaultdata = shared_font;
-    s->services.apt.shared_font.defaultdatalen = sizeof shared_font;
-    s->services.apt.shared_font.vaddr = 0x1800'0000;
     s->services.apt.shared_font.size = sizeof shared_font;
+    sharedmem_alloc(s, &s->services.apt.shared_font);
+    memcpy(PPTR(s->services.apt.shared_font.paddr), shared_font,
+           sizeof shared_font);
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
+    sharedmem_alloc(s, &s->services.apt.capture_block);
 
     s->services.gsp.event = nullptr;
     srvobj_init(&s->services.gsp.sharedmem.hdr, KOT_SHAREDMEM);
+    s->services.gsp.sharedmem.size = sizeof(GSPSharedMem);
+    sharedmem_alloc(s, &s->services.gsp.sharedmem);
 
     s->services.dsp.event = nullptr;
     srvobj_init(&s->services.dsp.semEvent.hdr, KOT_EVENT);
 
     srvobj_init(&s->services.hid.sharedmem.hdr, KOT_SHAREDMEM);
+    s->services.hid.sharedmem.size = sizeof(HIDSharedMem);
+    sharedmem_alloc(s, &s->services.hid.sharedmem);
+
     for (int i = 0; i < HIDEVENT_MAX; i++) {
         srvobj_init(&s->services.hid.events[i].hdr, KOT_EVENT);
         s->services.hid.events[i].sticky = true;

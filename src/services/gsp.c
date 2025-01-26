@@ -5,7 +5,7 @@
 #include "../pica/gpu.h"
 #include "../scheduler.h"
 
-#define GSPMEM ((GSPSharedMem*) PTR(s->services.gsp.sharedmem.vaddr))
+#define GSPMEM ((GSPSharedMem*) PPTR(s->services.gsp.sharedmem.paddr))
 
 DECL_PORT(gsp_gpu) {
     u32* cmdbuf = PTR(cmd_addr);
@@ -134,14 +134,10 @@ void gsp_handle_event(E3DS* s, u32 arg) {
 
         linfo("vblank");
 
-        if (s->services.gsp.sharedmem.mapped) {
-            update_fbinfos(s);
-        }
+        update_fbinfos(s);
 
         s->frame_complete = true;
     }
-
-    if (!s->services.gsp.sharedmem.mapped) return;
 
     auto interrupts = &GSPMEM->interrupts[0];
 
@@ -159,8 +155,8 @@ void gsp_handle_event(E3DS* s, u32 arg) {
 }
 
 u32 vaddr_to_paddr(u32 vaddr) {
-    if (vaddr >= VRAMBASE) {
-        return vaddr - VRAMBASE + VRAM_PBASE;
+    if (vaddr >= VRAM_VBASE) {
+        return vaddr - VRAM_VBASE + VRAM_PBASE;
     }
     return vaddr - LINEAR_HEAP_BASE + FCRAM_PBASE;
 }
