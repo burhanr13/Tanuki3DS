@@ -2,6 +2,7 @@
 #define SERVICES_H
 
 #include "services/apt.h"
+#include "services/cecd.h"
 #include "services/cfg.h"
 #include "services/dsp.h"
 #include "services/fs.h"
@@ -20,6 +21,7 @@ typedef struct {
     HIDData hid;
     DSPData dsp;
     FSData fs;
+    CECDData cecd;
 
 } ServiceData;
 

@@ -62,6 +62,8 @@ void init_services(E3DS* s) {
         srvobj_init(&s->services.hid.events[i].hdr, KOT_EVENT);
         s->services.hid.events[i].sticky = true;
     }
+
+    srvobj_init(&s->services.cecd.cecinfo.hdr, KOT_EVENT);
 }
 
 KSession* session_create(PortRequestHandler f) {
@@ -127,6 +129,8 @@ DECL_PORT(srv) {
                 handler = port_handle_cfg;
             } else if (IS("y2r:u")) {
                 handler = port_handle_y2r;
+            } else if (IS("cecd:u")) {
+                handler = port_handle_cecd;
             } else {
                 lerror("unknown service '%.8s'", name);
                 u32 handle = handle_new(s);
