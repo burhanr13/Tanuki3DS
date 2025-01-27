@@ -16,6 +16,7 @@
 #define PGROUNDDOWN(a) ((a) & ~(PAGE_SIZE - 1))
 #define PGROUNDUP(a) (((a) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
 
+#ifdef FASTMEM
 #ifndef __linux__
 #define memfd_create(name, x)                                                  \
     ({                                                                         \
@@ -44,6 +45,7 @@ void sigsegv_handler(int sig, siginfo_t* info, void* ucontext) {
     }
     sigaction(sig, &(struct sigaction) {.sa_handler = SIG_DFL}, nullptr);
 }
+#endif
 
 u32 physaddr2memoff(u32 paddr) {
     if (FCRAM_PBASE <= paddr && paddr < FCRAM_PBASE + FCRAM_SIZE) {
@@ -56,10 +58,11 @@ u32 physaddr2memoff(u32 paddr) {
         return offsetof(E3DSMemory, dspram[paddr - DSPRAM_PBASE]);
     }
     lerror("unknown physical memory address %08x", paddr);
-    return sizeof(E3DSMemory);
+    exit(1);
 }
 
 void memory_init(E3DS* s) {
+#ifdef FASTMEM
     s->mem_fd = memfd_create(".3dsram", 0);
     if (s->mem_fd < 0 || ftruncate(s->mem_fd, sizeof(E3DSMemory)) < 0) {
         perror("memfd_create");
@@ -67,7 +70,11 @@ void memory_init(E3DS* s) {
     }
     s->mem = mmap(nullptr, sizeof(E3DSMemory), PROT_READ | PROT_WRITE,
                   MAP_SHARED, s->mem_fd, 0);
+#else
+    s->mem = calloc(1, sizeof *s->mem);
+#endif
 
+#ifdef FASTMEM
     s->physmem = mmap(nullptr, BITL(32), PROT_NONE,
                       MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
     s->virtmem = mmap(nullptr, BITL(32), PROT_NONE,
@@ -103,6 +110,9 @@ void memory_init(E3DS* s) {
         perror("mmap");
         exit(1);
     }
+#else
+    s->gpu.mem = s->mem;
+#endif
 
     s->pheap.startpg = FCRAM_SIZE / PAGE_SIZE;
     s->pheap.endpg = 0;
@@ -137,6 +147,7 @@ void memory_destroy(E3DS* s) {
         free(tmp);
     }
 
+#ifdef FASTMEM
     sigaction(SIGSEGV, &(struct sigaction) {.sa_handler = SIG_DFL}, nullptr);
     sigaction(SIGBUS, &(struct sigaction) {.sa_handler = SIG_DFL}, nullptr);
 
@@ -144,6 +155,9 @@ void memory_destroy(E3DS* s) {
     munmap(s->virtmem, BITL(32));
 
     close(s->mem_fd);
+#else
+    free(s->mem);
+#endif
 }
 
 u32 memory_physalloc(E3DS* s, u32 size) {
@@ -208,7 +222,7 @@ void* sw_pptr(E3DSMemory* m, u32 addr) {
 
 void* sw_vptr(E3DS* s, u32 addr) {
     auto ent = ptabread(s->process.ptab, addr);
-    return sw_pptr(s->mem, ent.paddr);
+    return sw_pptr(s->mem, ent.paddr + (addr & 0xfff));
 }
 
 void insert_vmblock(E3DS* s, u32 base, u32 size, u32 perm, u32 state) {
@@ -286,7 +300,7 @@ void print_vmblocks(VMBlock* vmblocks) {
 }
 
 u32 memory_virtmap(E3DS* s, u32 paddr, u32 vaddr, u32 size, u32 perm,
-                    u32 state) {
+                   u32 state) {
     vaddr = PGROUNDDOWN(vaddr);
     paddr = PGROUNDDOWN(paddr);
     size = PGROUNDUP(size);
@@ -301,6 +315,7 @@ u32 memory_virtmap(E3DS* s, u32 paddr, u32 vaddr, u32 size, u32 perm,
 
     for (int i = 0; i < npage; i++, vaddr += PAGE_SIZE, paddr += PAGE_SIZE) {
         ptabwrite(s->process.ptab, vaddr, paddr, perm, state);
+#ifdef FASTMEM
         void* ptr =
             mmap(&s->virtmem[vaddr], PAGE_SIZE, PROT_READ | PROT_WRITE,
                  MAP_SHARED | MAP_FIXED, s->mem_fd, physaddr2memoff(paddr));
@@ -308,12 +323,12 @@ u32 memory_virtmap(E3DS* s, u32 paddr, u32 vaddr, u32 size, u32 perm,
             perror("mmap");
             exit(1);
         }
+#endif
     }
     return vaddr;
 }
 
-u32 memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size,
-                       u32 perm) {
+u32 memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size, u32 perm) {
     srcvaddr = PGROUNDDOWN(srcvaddr);
     dstvaddr = PGROUNDDOWN(dstvaddr);
     size = PGROUNDUP(size);
@@ -336,7 +351,7 @@ u32 memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size,
         }
 
         ptabwrite(s->process.ptab, dstvaddr, ent.paddr, perm, MEMST_ALIAS);
-
+#ifdef FASTMEM
         void* ptr =
             mmap(&s->virtmem[dstvaddr], PAGE_SIZE, PROT_READ | PROT_WRITE,
                  MAP_SHARED | MAP_FIXED, s->mem_fd, physaddr2memoff(ent.paddr));
@@ -344,6 +359,7 @@ u32 memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size,
             perror("mmap");
             exit(1);
         }
+#endif
     }
     return dstvaddr;
 }

@@ -6,10 +6,10 @@ CXX := clang++-19
 CSTD := -std=gnu23
 CXXSTD := -std=gnu++23
 CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unused-result -Werror
-CFLAGS_RELEASE := -O3 -DJIT_FASTMEM
+CFLAGS_RELEASE := -O3
 CFLAGS_DEBUG := -g -fsanitize=address
 
-CPPFLAGS := -MP -MMD -D_GNU_SOURCE
+CPPFLAGS := -MP -MMD -D_GNU_SOURCE -DFASTMEM -DJIT_FASTMEM
 
 LDFLAGS := -lm -lSDL2
 

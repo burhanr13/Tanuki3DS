@@ -7,7 +7,7 @@
 
 // #define CPULOG
 // #define BREAK
-//  #define WATCH
+// #define WATCH
 // #define PATCHFN
 
 void cpu_init(E3DS* s) {

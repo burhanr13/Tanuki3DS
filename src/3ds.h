@@ -25,11 +25,13 @@ typedef struct _3DS {
 
     GPU gpu;
 
-    int mem_fd;
     E3DSMemory* mem;
 
+#ifdef FASTMEM
+    int mem_fd;
     u8* physmem;
     u8* virtmem;
+#endif
 
     FCRAMHeapNode pheap;
 

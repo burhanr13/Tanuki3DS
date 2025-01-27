@@ -6,6 +6,7 @@
 #include <stdatomic.h>
 
 #include "../common.h"
+#include "../memory.h"
 #include "renderer_gl.h"
 #include "shader.h"
 #include "shaderjit/shaderjit.h"
@@ -437,7 +438,11 @@ typedef struct _TexInfo {
 
 typedef struct _GPU {
 
+#ifdef FASTMEM
     u8* mem;
+#else
+    E3DSMemory* mem;
+#endif
 
     u32 progdata[SHADER_CODE_SIZE];
     u32 opdescs[SHADER_OPDESC_SIZE];

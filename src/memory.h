@@ -62,10 +62,13 @@ typedef struct {
 void* sw_pptr(E3DSMemory* m, u32 addr);
 void* sw_vptr(E3DS* s, u32 addr);
 
+#ifdef FASTMEM
 #define PPTR(addr) ((void*) &s->physmem[addr])
 #define PTR(addr) ((void*) &s->virtmem[addr])
-// #define PPTR(addr) sw_pptr(s->mem, addr)
-// #define PTR(addr) sw_vptr(s, addr)
+#else
+#define PPTR(addr) sw_pptr(s->mem, addr)
+#define PTR(addr) sw_vptr(s, addr)
+#endif
 
 void memory_init(E3DS* s);
 void memory_destroy(E3DS* s);
@@ -73,7 +76,7 @@ void memory_destroy(E3DS* s);
 u32 memory_physalloc(E3DS* s, u32 size);
 
 u32 memory_virtmap(E3DS* s, u32 paddr, u32 vaddr, u32 size, u32 perm,
-                    u32 state);
+                   u32 state);
 u32 memory_virtmirror(E3DS* s, u32 srcvaddr, u32 dstvaddr, u32 size, u32 perm);
 u32 memory_virtalloc(E3DS* s, u32 addr, u32 size, u32 perm, u32 state);
 u32 memory_linearheap_grow(E3DS* s, u32 size, u32 perm);
