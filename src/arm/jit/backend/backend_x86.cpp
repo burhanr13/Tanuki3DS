@@ -1,3 +1,5 @@
+#ifdef __x86_64__
+
 #include "backend_x86.h"
 
 #include <capstone/capstone.h>
@@ -1274,3 +1276,5 @@ void backend_x86_disassemble(void* backend) {
     cs_free(insn, count);
 }
 }
+
+#endif

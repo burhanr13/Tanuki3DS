@@ -6,7 +6,7 @@
 #include "renderer_gl.h"
 #include "shader.h"
 
-#define SHADERJIT
+// #define SHADERJIT
 
 #undef PTR
 #ifdef FASTMEM
@@ -377,7 +377,7 @@ void gpu_update_cur_fb(GPU* gpu) {
           gpu->cur_fb->depth_paddr);
 
     glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
-
+    
     u32 w = gpu->io.fb.dim.width;
     u32 h = gpu->io.fb.dim.height + 1;
 

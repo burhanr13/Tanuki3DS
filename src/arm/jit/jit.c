@@ -7,7 +7,7 @@
 
 // #define JIT_DISASM
 // #define JIT_CPULOG
-// #define IR_INTERPRET
+#define IR_INTERPRET
 // #define NO_OPTS
 // #define NO_LINKING
 

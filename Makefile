@@ -9,7 +9,7 @@ CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unu
 CFLAGS_RELEASE := -O3
 CFLAGS_DEBUG := -g -fsanitize=address
 
-CPPFLAGS := -MP -MMD -D_GNU_SOURCE -DFASTMEM -DJIT_FASTMEM
+CPPFLAGS := -MP -MMD -D_GNU_SOURCE
 
 LDFLAGS := -lm -lSDL2
 
@@ -20,12 +20,15 @@ else
 	LDFLAGS += -lcapstone
 endif
 
+ifeq ($(shell getconf PAGESIZE),4096)
+	CPPFLAGS += -DFASTMEM -DJIT_FASTMEM
+endif
+
 ifeq ($(shell uname),Darwin)
 	CC := $(shell brew --prefix)/opt/llvm/bin/clang
 	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
-	CFLAGS += -target x86_64-apple-darwin
-	CPPFLAGS += -I/usr/local/include
-	LDFLAGS := -L/usr/local/lib $(LDFLAGS)
+	CPPFLAGS += -I$(shell brew --prefix)/include -I/usr/local/include
+	LDFLAGS := -L$(shell brew --prefix)/lib -L/usr/local/lib $(LDFLAGS)
 	LDFLAGS += -framework OpenGL -lGLEW
 else
 	LDFLAGS += -lGL -lGLEW

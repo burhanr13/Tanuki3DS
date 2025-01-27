@@ -9,6 +9,14 @@
 #define backend_patch_links(block) backend_x86_patch_links(block)
 #define backend_free(backend) backend_x86_free(backend)
 #define backend_disassemble(backend) backend_x86_disassemble(backend)
+#elifdef __aarch64__
+#include "backend_arm.h"
+#define backend_generate_code(ir, regalloc, cpu)                               \
+    backend_arm_generate_code(ir, regalloc, cpu)
+#define backend_get_code(backend) backend_arm_get_code(backend)
+#define backend_patch_links(block) backend_arm_patch_links(block)
+#define backend_free(backend) backend_arm_free(backend)
+#define backend_disassemble(backend) backend_arm_disassemble(backend)
 #else
 #error("JIT not supported")
 #endif
