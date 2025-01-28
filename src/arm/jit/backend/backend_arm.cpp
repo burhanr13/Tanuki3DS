@@ -160,6 +160,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             jmptarget = -1;
             lastflags = 0;
         }
+        if (iropc_iscallback(inst.opcode)) lastflags = 0;
 
         switch (inst.opcode) {
             case IR_LOAD_REG: {

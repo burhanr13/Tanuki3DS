@@ -5,9 +5,9 @@
 #include "register_allocator.h"
 #include "translator.h"
 
-#define JIT_DISASM
-//#define JIT_CPULOG
-//#define IR_INTERPRET
+// #define JIT_DISASM
+// #define JIT_CPULOG
+// #define IR_INTERPRET
 // #define NO_OPTS
 // #define NO_LINKING
 
