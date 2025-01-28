@@ -9,15 +9,13 @@ CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unu
 CFLAGS_RELEASE := -O3
 CFLAGS_DEBUG := -g -fsanitize=address
 
-CPPFLAGS := -MP -MMD -D_GNU_SOURCE
+CPPFLAGS := -MP -MMD
 
-LDFLAGS := -lm -lSDL2
+LDFLAGS := -lm -lSDL2 -lcapstone
 
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto
 	CPPFLAGS += -DUSE_TFD -DNOPORTABLE
-else
-	LDFLAGS += -lcapstone
 endif
 
 ifeq ($(shell getconf PAGESIZE),4096)
