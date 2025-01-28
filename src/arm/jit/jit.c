@@ -5,17 +5,15 @@
 #include "register_allocator.h"
 #include "translator.h"
 
-// #define JIT_DISASM
-// #define JIT_CPULOG
-#define IR_INTERPRET
+#define JIT_DISASM
+//#define JIT_CPULOG
+//#define IR_INTERPRET
 // #define NO_OPTS
 // #define NO_LINKING
 
 #ifdef JIT_DISASM
 #define IR_DISASM
-#ifndef IR_INTERPRET
 #define BACKEND_DISASM
-#endif
 #endif
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {

@@ -24,6 +24,10 @@ ifeq ($(shell getconf PAGESIZE),4096)
 	CPPFLAGS += -DFASTMEM -DJIT_FASTMEM
 endif
 
+ifeq ($(shell uname -m),arm64)
+	LDFLAGS += -lxbyak_aarch64
+endif
+
 ifeq ($(shell uname),Darwin)
 	CC := $(shell brew --prefix)/opt/llvm/bin/clang
 	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++

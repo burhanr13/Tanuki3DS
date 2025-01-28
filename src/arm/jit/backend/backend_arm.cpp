@@ -3,9 +3,10 @@
 #include "backend_arm.h"
 
 #include <capstone/capstone.h>
+#include <vector>
 #include <xbyak_aarch64/xbyak_aarch64.h>
 
-#include <vector>
+using namespace Xbyak_aarch64;
 
 struct LinkPatch {
     u32 jmp_offset;
@@ -13,1234 +14,902 @@ struct LinkPatch {
     u32 addr;
 };
 
-// struct Code : Xbyak::CodeGenerator {
-//     RegAllocation* regalloc;
-//     HostRegAllocation hralloc;
-//     ArmCore* cpu;
+struct Code : Xbyak_aarch64::CodeGenerator {
+    RegAllocation* regalloc;
+    HostRegAllocation hralloc;
+    ArmCore* cpu;
 
-//     std::vector<Xbyak::Reg32> tempregs = {esi, edi, r8d, r9d, r10d, r11d};
-//     std::vector<Xbyak::Reg32> savedregs = {ebp, r12d, r13d, r14d, r15d};
-//     std::vector<Xbyak::Address> stackslots;
+    // x0-x2 scratch
+    // x3-x15 temp
+    // x16-x17 scratch
+    // x19-x28 saved
+    // x29 cpu ptr
 
-//     std::vector<LinkPatch> links;
+    const int tempBase = 3;
+    const int tempMax = 13;
+    const int savedBase = 19;
+    const int savedMax = 10;
 
-//     Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
+    std::vector<LinkPatch> links;
 
-//     ~Code() {
-//         hostregalloc_free(&hralloc);
-//     }
+    Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
 
-//     void print_hostregs() {
-//         printf("Host Regs:");
-//         for (u32 i = 0; i < hralloc.nregs; i++) {
-//             printf(" $%d:", i);
-//             auto& operand = _getOp(i);
-//             if (operand.isREG()) printf("%s", operand.toString());
-//             else printf("[rsp+%d]", 4 * hralloc.hostreg_info[i].index);
-//         }
-//         printf("\n");
-//     }
+    ~Code() {
+        hostregalloc_free(&hralloc);
+    }
 
-//     int getSPDisp() {
-//         int disp =
-//             (hralloc.count[REG_SAVED] + 2) * 8 + hralloc.count[REG_STACK] * 4;
-//         disp = (disp + 15) & ~15;
-//         disp -= (hralloc.count[REG_SAVED] + 2) * 8;
-//         return disp;
-//     }
+    void print_hostregs() {
+        printf("Host Regs:");
+        for (u32 i = 0; i < hralloc.nregs; i++) {
+            printf(" $%d:", i);
+            int operand = getOpForReg(i);
+            if (operand >= 32) {
+                operand -= 32;
+                printf("[sp, #0x%x]", 4 * operand);
+            } else {
+                printf("w%d", operand);
+            }
+        }
+        printf("\n");
+    }
 
-//     const Xbyak::Operand& _getOp(int i) {
-//         HostRegInfo hr = hralloc.hostreg_info[i];
-//         switch (hr.type) {
-//             case REG_TEMP:
-//                 return tempregs[hr.index];
-//             case REG_SAVED:
-//                 return savedregs[hr.index];
-//             case REG_STACK:
-//                 return stackslots[hr.index];
-//             default:
-//                 break;
-//         }
-//         return rdx;
-//     }
+    int getSPDisp() {
+        return (hralloc.count[REG_STACK] * 4 + 15) & ~15;
+    }
 
-//     const Xbyak::Operand& getOp(int i) {
-//         return _getOp(regalloc->reg_assn[i]);
-//     }
-// };
+    // returns:
+    // 0-31 : reg index
+    // 32+n : stack index
+    int getOpForReg(int i) {
+        HostRegInfo hr = hralloc.hostreg_info[i];
+        switch (hr.type) {
+            case REG_TEMP:
+                return tempBase + hr.index;
+            case REG_SAVED:
+                return savedBase + hr.index;
+            case REG_STACK:
+                return 32 + hr.index;
+            default: // unreachable
+                return 0;
+        }
+        // also unreachable
+        return 0;
+    }
 
-// #define CPU(m) (rbx + ((char*) &cpu->m - (char*) cpu))
+    int getOp(int i) {
+        int assn = regalloc->reg_assn[i];
+        if (assn == -1) return -1;
+        else return getOpForReg(assn);
+    }
+};
 
-// #define OP(op, dest, src)                                                      \
-//     ({                                                                         \
-//         if ((src).isMEM() && (dest).isMEM()) {                                 \
-//             mov(edx, src);                                                     \
-//             op(dest, edx);                                                     \
-//         } else op(dest, src);                                                  \
-//     })
+#define CPU(m) (ptr(x29, (u32) offsetof(ArmCore, m)))
 
-// #define LOAD(addr)                                                             \
-//     ({                                                                         \
-//         auto& dest = getOp(i);                                                 \
-//         OP(mov, dest, ptr[addr]);                                              \
-//     })
+#define _LOADOP(i, flbk)                                                       \
+    ({                                                                         \
+        auto dst = flbk;                                                       \
+        if (inst.imm##i) {                                                     \
+            mov(dst, inst.op##i);                                              \
+        } else {                                                               \
+            int op = getOp(inst.op##i);                                        \
+            if (op >= 32) {                                                    \
+                op -= 32;                                                      \
+                ldr(dst, ptr(sp, 4 * op));                                     \
+            } else {                                                           \
+                dst = WReg(op);                                                \
+            }                                                                  \
+        }                                                                      \
+        dst;                                                                   \
+    })
+#define LOADOP1() _LOADOP(1, w16)
+#define LOADOP2() _LOADOP(2, w17)
 
-// #define STORE(addr)                                                            \
-//     ({                                                                         \
-//         if (inst.imm2) {                                                       \
-//             mov(dword[addr], inst.op2);                                        \
-//         } else {                                                               \
-//             auto& src = getOp(inst.op2);                                       \
-//             OP(mov, ptr[addr], src);                                           \
-//         }                                                                      \
-//     })
+#define DSTREG()                                                               \
+    ({                                                                         \
+        int op = getOp(i);                                                     \
+        (op >= 32) ? w16 : WReg(op);                                           \
+    })
+#define STOREDST()                                                             \
+    ({                                                                         \
+        int op = getOp(i);                                                     \
+        if (op >= 32) {                                                        \
+            op -= 32;                                                          \
+            str(w16, ptr(sp, 4 * op));                                         \
+        }                                                                      \
+    })
 
-// #define SAMEREG(v1, v2) (regalloc->reg_assn[v1] == regalloc->reg_assn[v2])
+enum {
+    CLBK_LOAD8,
+    CLBK_LOAD16,
+    CLBK_LOAD32,
+    CLBK_STORE8,
+    CLBK_STORE16,
+    CLBK_STORE32,
 
-// #define BINARY(op)                                                             \
-//     ({                                                                         \
-//         bool op2eax = false;                                                   \
-//         if (!inst.imm2 && SAMEREG(inst.op2, i)) {                              \
-//             mov(eax, getOp(inst.op2));                                         \
-//             op2eax = true;                                                     \
-//         }                                                                      \
-//         auto& dest = getOp(i);                                                 \
-//         if (inst.imm1) {                                                       \
-//             mov(dest, inst.op1);                                               \
-//         } else if (!SAMEREG(inst.op1, i)) {                                    \
-//             OP(mov, dest, getOp(inst.op1));                                    \
-//         }                                                                      \
-//         if (op2eax) {                                                          \
-//             op(dest, eax);                                                     \
-//         } else if (inst.imm2) {                                                \
-//             op(dest, inst.op2);                                                \
-//         } else {                                                               \
-//             OP(op, dest, getOp(inst.op2));                                     \
-//         }                                                                      \
-//     })
+    CLBK_MAX
+};
 
-// Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
-//     : Xbyak::CodeGenerator(4096, Xbyak::AutoGrow), regalloc(regalloc),
-//       cpu(cpu) {
+Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
+    : Xbyak_aarch64::CodeGenerator(4096, Xbyak_aarch64::AutoGrow),
+      regalloc(regalloc), cpu(cpu) {
 
-//     hralloc =
-//         allocate_host_registers(regalloc, tempregs.size(), savedregs.size());
-//     for (u32 i = 0; i < hralloc.count[REG_STACK]; i++) {
-//         stackslots.push_back(dword[rsp + 4 * i]);
-//     }
+    hralloc = allocate_host_registers(regalloc, tempMax, savedMax);
 
-//     u32 flags_mask = 0;
-//     u32 lastflags = 0;
-//     u32 nlabels = 0;
-//     u32 jmptarget = -1;
+    u32 flags_mask = 0; // mask for which flags to store
+    u32 lastflags = 0;  // last var for which flags were set
 
-//     for (u32 i = 0; i < ir->code.size; i++) {
-//         while (i < ir->code.size && ir->code.d[i].opcode == IR_NOP) i++;
-//         if (i == ir->code.size) break;
-//         IRInstr inst = ir->code.d[i];
-//         if (i >= jmptarget && inst.opcode != IR_JELSE) {
-//             L(std::to_string(nlabels++));
-//             jmptarget = -1;
-//         }
-//         if (!(inst.opcode == IR_NOP || inst.opcode == IR_STORE_FLAG ||
-//               inst.opcode == IR_GETC || inst.opcode == IR_GETV ||
-//               inst.opcode == IR_GETN || inst.opcode == IR_GETZ))
-//             lastflags = 0;
-//         switch (inst.opcode) {
-//             case IR_LOAD_REG:
-//                 LOAD(CPU(r[inst.op1]));
-//                 break;
-//             case IR_STORE_REG:
-//                 STORE(CPU(r[inst.op1]));
-//                 break;
-//             case IR_LOAD_REG_USR: {
-//                 int rd = inst.op1;
-//                 if (rd < 13) {
-//                     LOAD(CPU(banked_r8_12[0][rd - 8]));
-//                 } else if (rd == 13) {
-//                     LOAD(CPU(banked_sp[0]));
-//                 } else if (rd == 14) {
-//                     LOAD(CPU(banked_lr[0]));
-//                 }
-//                 break;
-//             }
-//             case IR_STORE_REG_USR: {
-//                 int rd = inst.op1;
-//                 if (rd < 13) {
-//                     STORE(CPU(banked_r8_12[0][rd - 8]));
-//                 } else if (rd == 13) {
-//                     STORE(CPU(banked_sp[0]));
-//                 } else if (rd == 14) {
-//                     STORE(CPU(banked_lr[0]));
-//                 }
-//                 break;
-//             }
-//             case IR_LOAD_FLAG: {
-//                 LOAD(CPU(cpsr));
-//                 auto& dest = getOp(i);
-//                 shr(dest, 31 - inst.op1);
-//                 and_(dest, 1);
-//                 break;
-//             }
-//             case IR_STORE_FLAG: {
-//                 if (ir->code.d[i - 2].opcode != IR_STORE_FLAG) {
-//                     xor_(ecx, ecx);
-//                     flags_mask = 0;
-//                 }
-//                 if (inst.imm2) {
-//                     if (inst.op2) or_(ecx, BIT(31 - inst.op1));
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                     shl(edx, 31 - inst.op1);
-//                     or_(ecx, edx);
-//                 }
-//                 flags_mask |= BIT(31 - inst.op1);
-//                 if (ir->code.d[i + 2].opcode != IR_STORE_FLAG) {
-//                     and_(dword[CPU(cpsr)], ~flags_mask);
-//                     or_(dword[CPU(cpsr)], ecx);
-//                 }
-//                 break;
-//             }
-//             case IR_LOAD_CPSR:
-//                 LOAD(CPU(cpsr));
-//                 break;
-//             case IR_STORE_CPSR:
-//                 STORE(CPU(cpsr));
-//                 break;
-//             case IR_LOAD_SPSR:
-//                 LOAD(CPU(spsr));
-//                 break;
-//             case IR_STORE_SPSR:
-//                 STORE(CPU(spsr));
-//                 break;
-//             case IR_LOAD_THUMB: {
-//                 LOAD(CPU(cpsr));
-//                 auto& dest = getOp(i);
-//                 shr(dest, 5);
-//                 and_(dest, 1);
-//                 break;
-//             }
-//             case IR_STORE_THUMB: {
-//                 and_(dword[CPU(cpsr)], ~BIT(5));
-//                 if (inst.imm2) {
-//                     if (inst.op2) or_(dword[CPU(cpsr)], BIT(5));
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                     shl(edx, 5);
-//                     or_(dword[CPU(cpsr)], edx);
-//                 }
-//                 break;
-//             }
-//             case IR_VFP_DATA_PROC: {
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) exec_vfp_data_proc);
-//                 call(rax);
-//                 break;
-//             }
-//             case IR_VFP_LOAD_MEM: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) exec_vfp_load_mem);
-//                 call(rax);
-//                 break;
-//             }
-//             case IR_VFP_STORE_MEM: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) exec_vfp_store_mem);
-//                 call(rax);
-//                 break;
-//             }
-//             case IR_VFP_READ: {
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) exec_vfp_read);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_VFP_WRITE: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) exec_vfp_write);
-//                 call(rax);
-//                 break;
-//             }
-//             case IR_VFP_READ64L: {
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) exec_vfp_read64);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 shr(rax, 32);
-//                 mov(getOp(i + 1), eax);
-//                 i++;
-//                 break;
-//             }
-//             case IR_VFP_READ64H:
-//                 break;
-//             case IR_VFP_WRITE64L: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 IRInstr hinst = ir->code.d[i + 1];
-//                 if (hinst.imm2) {
-//                     mov(eax, hinst.op2);
-//                 } else {
-//                     mov(eax, getOp(hinst.op2));
-//                 }
-//                 shl(rax, 32);
-//                 or_(rdx, rax);
+    u32 jmptarget = -1;
 
-//                 mov(esi, inst.op1);
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) exec_vfp_write64);
-//                 call(rax);
-//                 i++;
-//                 break;
-//             }
-//             case IR_VFP_WRITE64H:
-//                 break;
-//             case IR_CP15_READ: {
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) cpu->cp15_read);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_CP15_WRITE: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) cpu->cp15_write);
-//                 call(rax);
-//                 break;
-//             }
-// #ifdef JIT_FASTMEM
-//             case IR_LOAD_MEM8: {
-//                 mov(rax, (u64) cpu->fastmem);
-//                 if (inst.imm1) {
-//                     mov(edx, inst.op1);
-//                 } else {
-//                     mov(edx, getOp(inst.op1));
-//                 }
-//                 movzx(eax, byte[rax + rdx]);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_LOAD_MEMS8: {
-//                 mov(rax, (u64) cpu->fastmem);
-//                 if (inst.imm1) {
-//                     mov(edx, inst.op1);
-//                 } else {
-//                     mov(edx, getOp(inst.op1));
-//                 }
-//                 movsx(eax, byte[rax + rdx]);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_LOAD_MEM16: {
-//                 mov(rax, (u64) cpu->fastmem);
-//                 if (inst.imm1) {
-//                     mov(edx, inst.op1);
-//                 } else {
-//                     mov(edx, getOp(inst.op1));
-//                 }
-//                 movzx(eax, word[rax + rdx]);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_LOAD_MEMS16: {
-//                 mov(rax, (u64) cpu->fastmem);
-//                 if (inst.imm1) {
-//                     mov(edx, inst.op1);
-//                 } else {
-//                     mov(edx, getOp(inst.op1));
-//                 }
-//                 movsx(eax, word[rax + rdx]);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_LOAD_MEM32: {
-//                 mov(rax, (u64) cpu->fastmem);
-//                 if (inst.imm1) {
-//                     mov(edx, inst.op1);
-//                 } else {
-//                     mov(edx, getOp(inst.op1));
-//                 }
-//                 mov(eax, dword[rax + rdx]);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_STORE_MEM8: {
-//                 mov(rax, (u64) cpu->fastmem);
-//                 if (inst.imm1) {
-//                     mov(edx, inst.op1);
-//                 } else {
-//                     mov(edx, getOp(inst.op1));
-//                 }
-//                 if (inst.imm2) {
-//                     mov(ecx, inst.op2);
-//                 } else {
-//                     mov(ecx, getOp(inst.op2));
-//                 }
-//                 mov(byte[rax + rdx], cl);
-//                 break;
-//             }
-//             case IR_STORE_MEM16: {
-//                 mov(rax, (u64) cpu->fastmem);
-//                 if (inst.imm1) {
-//                     mov(edx, inst.op1);
-//                 } else {
-//                     mov(edx, getOp(inst.op1));
-//                 }
-//                 if (inst.imm2) {
-//                     mov(ecx, inst.op2);
-//                 } else {
-//                     mov(ecx, getOp(inst.op2));
-//                 }
-//                 mov(word[rax + rdx], cx);
-//                 break;
-//             }
-//             case IR_STORE_MEM32: {
-//                 mov(rax, (u64) cpu->fastmem);
-//                 if (inst.imm1) {
-//                     mov(edx, inst.op1);
-//                 } else {
-//                     mov(edx, getOp(inst.op1));
-//                 }
-//                 if (inst.imm2) {
-//                     mov(ecx, inst.op2);
-//                 } else {
-//                     mov(ecx, getOp(inst.op2));
-//                 }
-//                 mov(dword[rax + rdx], ecx);
-//                 break;
-//             }
-// #else
-//             case IR_LOAD_MEM8: {
-//                 xor_(edx, edx);
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src != esi) mov(esi, src);
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) cpu->read8);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_LOAD_MEMS8: {
-//                 mov(edx, 1);
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src != esi) mov(esi, src);
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) cpu->read8);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_LOAD_MEM16: {
-//                 xor_(edx, edx);
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src != esi) mov(esi, src);
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) cpu->read16);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_LOAD_MEMS16: {
-//                 mov(edx, 1);
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src != esi) mov(esi, src);
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) cpu->read16);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_LOAD_MEM32: {
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src != esi) mov(esi, src);
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) cpu->read32);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_STORE_MEM8: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src != esi) mov(esi, src);
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) cpu->write8);
-//                 call(rax);
-//                 break;
-//             }
-//             case IR_STORE_MEM16: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src != esi) mov(esi, src);
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) cpu->write16);
-//                 call(rax);
-//                 break;
-//             }
-//             case IR_STORE_MEM32: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src != esi) mov(esi, src);
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) cpu->write32);
-//                 call(rax);
-//                 break;
-//             }
-// #endif
-//             case IR_MOV: {
-//                 auto& dst = getOp(i);
-//                 if (inst.imm2) {
-//                     mov(dst, inst.op2);
-//                 } else if (!SAMEREG(inst.op2, i)) {
-//                     OP(mov, dst, getOp(inst.op2));
-//                 }
-//                 break;
-//             }
-//             case IR_AND:
-//                 BINARY(and_);
-//                 break;
-//             case IR_OR:
-//                 BINARY(or_);
-//                 break;
-//             case IR_XOR:
-//                 BINARY(xor_);
-//                 break;
-//             case IR_NOT: {
-//                 auto& dst = getOp(i);
-//                 if (inst.imm2) {
-//                     mov(dst, inst.op2);
-//                 } else if (!SAMEREG(inst.op2, i)) {
-//                     OP(mov, dst, getOp(inst.op2));
-//                 }
-//                 not_(dst);
-//                 break;
-//             }
-//             case IR_LSL: {
-//                 bool op2eax = false;
-//                 if (!inst.imm2 && SAMEREG(inst.op2, i)) {
-//                     mov(eax, getOp(inst.op2));
-//                     op2eax = true;
-//                 }
-//                 auto& dest = getOp(i);
-//                 if (inst.imm1) {
-//                     mov(dest, inst.op1);
-//                 } else if (!SAMEREG(inst.op1, i)) {
-//                     OP(mov, dest, getOp(inst.op1));
-//                 }
-//                 if (inst.imm2) {
-//                     if (inst.op2 >= 32) {
-//                         mov(dest, 0);
-//                     } else {
-//                         shl(dest, inst.op2);
-//                     }
-//                 } else {
-//                     if (op2eax) {
-//                         mov(ecx, eax);
-//                     } else {
-//                         mov(ecx, getOp(inst.op2));
-//                     }
-//                     cmp(cl, 32);
-//                     inLocalLabel();
-//                     jb(".normal");
-//                     mov(dest, 0);
-//                     jmp(".end");
-//                     L(".normal");
-//                     shl(dest, cl);
-//                     L(".end");
-//                     outLocalLabel();
-//                 }
-//                 break;
-//             }
-//             case IR_LSR: {
-//                 bool op2eax = false;
-//                 if (!inst.imm2 && SAMEREG(inst.op2, i)) {
-//                     mov(eax, getOp(inst.op2));
-//                     op2eax = true;
-//                 }
-//                 auto& dest = getOp(i);
-//                 if (inst.imm1) {
-//                     mov(dest, inst.op1);
-//                 } else if (!SAMEREG(inst.op1, i)) {
-//                     OP(mov, dest, getOp(inst.op1));
-//                 }
-//                 if (inst.imm2) {
-//                     if (inst.op2 >= 32) {
-//                         mov(dest, 0);
-//                     } else {
-//                         shr(dest, inst.op2);
-//                     }
-//                 } else {
-//                     if (op2eax) {
-//                         mov(ecx, eax);
-//                     } else {
-//                         mov(ecx, getOp(inst.op2));
-//                     }
-//                     cmp(cl, 32);
-//                     inLocalLabel();
-//                     jb(".normal");
-//                     mov(dest, 0);
-//                     jmp(".end");
-//                     L(".normal");
-//                     shr(dest, cl);
-//                     L(".end");
-//                     outLocalLabel();
-//                 }
-//                 break;
-//             }
-//             case IR_ASR: {
-//                 bool op2eax = false;
-//                 if (!inst.imm2 && SAMEREG(inst.op2, i)) {
-//                     mov(eax, getOp(inst.op2));
-//                     op2eax = true;
-//                 }
-//                 auto& dest = getOp(i);
-//                 if (inst.imm1) {
-//                     mov(dest, inst.op1);
-//                 } else if (!SAMEREG(inst.op1, i)) {
-//                     OP(mov, dest, getOp(inst.op1));
-//                 }
-//                 if (inst.imm2) {
-//                     if (inst.op2 >= 32) {
-//                         sar(dest, 31);
-//                     } else {
-//                         sar(dest, inst.op2);
-//                     }
-//                 } else {
-//                     if (op2eax) {
-//                         mov(ecx, eax);
-//                     } else {
-//                         mov(ecx, getOp(inst.op2));
-//                     }
-//                     cmp(cl, 32);
-//                     inLocalLabel();
-//                     jb(".normal");
-//                     sar(dest, 31);
-//                     jmp(".end");
-//                     L(".normal");
-//                     sar(dest, cl);
-//                     L(".end");
-//                     outLocalLabel();
-//                 }
-//                 break;
-//             }
-//             case IR_ROR: {
-//                 bool op2eax = false;
-//                 if (!inst.imm2 && SAMEREG(inst.op2, i)) {
-//                     mov(eax, getOp(inst.op2));
-//                     op2eax = true;
-//                 }
-//                 auto& dest = getOp(i);
-//                 if (inst.imm1) {
-//                     mov(dest, inst.op1);
-//                 } else if (!SAMEREG(inst.op1, i)) {
-//                     OP(mov, dest, getOp(inst.op1));
-//                 }
-//                 if (inst.imm2) {
-//                     ror(dest, inst.op2);
-//                 } else {
-//                     if (op2eax) {
-//                         mov(ecx, eax);
-//                     } else {
-//                         mov(ecx, getOp(inst.op2));
-//                     }
-//                     ror(dest, cl);
-//                 }
-//                 break;
-//             }
-//             case IR_RRC: {
-//                 auto& dst = getOp(i);
-//                 if (inst.imm1) {
-//                     mov(dst, inst.op1);
-//                 } else if (!SAMEREG(inst.op1, i)) {
-//                     OP(mov, dst, getOp(inst.op1));
-//                 }
-//                 rcr(dst, 1);
-//                 break;
-//             }
-//             case IR_ADD:
-//                 BINARY(add);
-//                 break;
-//             case IR_SUB:
-//                 BINARY(sub);
-//                 if (ir->code.d[i + 1].opcode == IR_GETC) cmc();
-//                 break;
-//             case IR_ADC:
-//                 BINARY(adc);
-//                 break;
-//             case IR_SBC:
-//                 cmc();
-//                 BINARY(sbb);
-//                 if (ir->code.d[i + 1].opcode == IR_GETC) cmc();
-//                 break;
-//             case IR_MUL: {
-//                 IRInstr hinst = ir->code.d[i + 1];
-//                 if (hinst.opcode == IR_SMULH || hinst.opcode == IR_UMULH) {
-//                     if (inst.imm1) {
-//                         mov(eax, inst.op1);
-//                     } else {
-//                         mov(eax, getOp(inst.op1));
-//                     }
-//                     auto& msrc = inst.imm2 ? edx : getOp(inst.op2);
-//                     if (inst.imm2) mov(edx, inst.op2);
-//                     if (hinst.opcode == IR_SMULH) {
-//                         imul(msrc);
-//                     } else {
-//                         mul(msrc);
-//                     }
-//                     mov(getOp(i), eax);
-//                     mov(getOp(i + 1), edx);
-//                     i++;
-//                 } else {
-//                     auto& dest = getOp(i);
-//                     if (inst.imm2) {
-//                         if (inst.imm1) {
-//                             mov(dest, inst.op1 * inst.op2);
-//                         } else {
-//                             auto& mdst = dest.isMEM() ? edx : dest;
-//                             imul(mdst.getReg(), getOp(inst.op1), inst.op2);
-//                             if (dest.isMEM()) mov(dest, mdst);
-//                         }
-//                     } else {
-//                         bool op2eax = false;
-//                         if (!dest.isMEM() && SAMEREG(i, inst.op2)) {
-//                             mov(eax, getOp(inst.op2));
-//                             op2eax = true;
-//                         }
-//                         auto& mdst = dest.isMEM() ? edx : dest;
-//                         if (inst.imm1) {
-//                             mov(mdst, inst.op1);
-//                         } else {
-//                             mov(mdst, getOp(inst.op1));
-//                         }
-//                         if (op2eax) {
-//                             imul(mdst.getReg(), eax);
-//                         } else {
-//                             imul(mdst.getReg(), getOp(inst.op2));
-//                         }
-//                         if (dest.isMEM()) mov(dest, mdst);
-//                     }
-//                 }
-//                 break;
-//             }
-//             case IR_SMULH:
-//             case IR_UMULH: {
-//                 if (inst.imm1) {
-//                     mov(eax, inst.op1);
-//                 } else {
-//                     mov(eax, getOp(inst.op1));
-//                 }
-//                 auto& msrc = inst.imm2 ? edx : getOp(inst.op2);
-//                 if (inst.imm2) mov(edx, inst.op2);
-//                 if (inst.opcode == IR_SMULH) {
-//                     imul(msrc);
-//                 } else {
-//                     mul(msrc);
-//                 }
-//                 mov(getOp(i), edx);
-//                 break;
-//             }
-//             case IR_SMULW: {
-//                 if (inst.imm1) {
-//                     mov(eax, inst.op1);
-//                     movsxd(rax, eax);
-//                 } else {
-//                     movsxd(rax, getOp(inst.op1));
-//                 }
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                     movsxd(rdx, edx);
-//                 } else {
-//                     movsxd(rdx, getOp(inst.op2));
-//                 }
-//                 imul(rax, rdx);
-//                 sar(rax, 16);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_CLZ: {
-//                 auto& dest = getOp(i);
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                     lzcnt(edx, edx);
-//                     mov(dest, edx);
-//                 } else {
-//                     if (dest.isMEM()) {
-//                         lzcnt(edx, getOp(inst.op2));
-//                         mov(dest, edx);
-//                     } else {
-//                         lzcnt(dest.getReg(), getOp(inst.op2));
-//                     }
-//                 }
-//                 break;
-//             }
-//             case IR_REV: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 bswap(edx);
-//                 mov(getOp(i), edx);
-//                 break;
-//             }
-//             case IR_REV16: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 mov(ecx, edx);
-//                 and_(edx, 0xff00ff00);
-//                 and_(ecx, 0x00ff00ff);
-//                 shr(edx, 8);
-//                 shl(ecx, 8);
-//                 or_(edx, ecx);
-//                 mov(getOp(i), edx);
-//                 break;
-//             }
-//             case IR_USAT: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 mov(ecx, 0);
-//                 cmp(edx, ecx);
-//                 cmovl(edx, ecx);
-//                 mov(ecx, MASK(inst.op1));
-//                 cmp(edx, ecx);
-//                 cmovg(edx, ecx);
-//                 mov(getOp(i), edx);
-//                 break;
-//             }
-//             case IR_MEDIA_UADD8: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     mov(esi, getOp(inst.op1));
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) media_uadd8);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_MEDIA_UQSUB8: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     mov(esi, getOp(inst.op1));
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) media_uqsub8);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_MEDIA_QSUB8: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     mov(esi, getOp(inst.op1));
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) media_qsub8);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_MEDIA_SEL: {
-//                 if (inst.imm2) {
-//                     mov(edx, inst.op2);
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                 }
-//                 if (inst.imm1) {
-//                     mov(esi, inst.op1);
-//                 } else {
-//                     mov(esi, getOp(inst.op1));
-//                 }
-//                 mov(rdi, rbx);
-//                 mov(rax, (u64) media_sel);
-//                 call(rax);
-//                 mov(getOp(i), eax);
-//                 break;
-//             }
-//             case IR_GETN: {
-//                 auto& dest = getOp(i);
-//                 if (inst.imm2) {
-//                     mov(dest, inst.op2 >> 31);
-//                 } else {
-//                     if (lastflags != inst.op2) {
-//                         auto& src = getOp(inst.op2);
-//                         if (src.isMEM()) {
-//                             cmp(src, 0);
-//                         } else {
-//                             test(src.getReg(), src.getReg());
-//                         }
-//                         lahf();
-//                         lastflags = inst.op2;
-//                     }
-//                     if (dest.isMEM()) {
-//                         xor_(edx, edx);
-//                         test(ah, BIT(7));
-//                         setnz(dl);
-//                         mov(dest, edx);
-//                     } else {
-//                         xor_(dest, dest);
-//                         test(ah, BIT(7));
-//                         setnz(dest.getReg().cvt8());
-//                     }
-//                 }
-//                 break;
-//             }
-//             case IR_GETZ: {
-//                 auto& dest = getOp(i);
-//                 if (inst.imm2) {
-//                     mov(dest, inst.op2 == 0);
-//                 } else {
-//                     if (lastflags != inst.op2) {
-//                         auto& src = getOp(inst.op2);
-//                         if (src.isMEM()) {
-//                             cmp(src, 0);
-//                         } else {
-//                             test(src.getReg(), src.getReg());
-//                         }
-//                         lahf();
-//                         lastflags = inst.op2;
-//                     }
-//                     if (dest.isMEM()) {
-//                         xor_(edx, edx);
-//                         test(ah, BIT(6));
-//                         setnz(dl);
-//                         mov(dest, edx);
-//                     } else {
-//                         xor_(dest, dest);
-//                         test(ah, BIT(6));
-//                         setnz(dest.getReg().cvt8());
-//                     }
-//                 }
-//                 break;
-//             }
-//             case IR_GETC: {
-//                 if (lastflags != inst.op2) {
-//                     lahf();
-//                     seto(al);
-//                     lastflags = inst.op2;
-//                 }
-//                 auto& dest = getOp(i);
-//                 if (dest.isMEM()) {
-//                     xor_(edx, edx);
-//                     test(ah, BIT(0));
-//                     setnz(dl);
-//                     mov(dest, edx);
-//                 } else {
-//                     xor_(dest, dest);
-//                     test(ah, BIT(0));
-//                     setnz(dest.getReg().cvt8());
-//                 }
-//                 break;
-//             }
-//             case IR_SETC: {
-//                 if (inst.imm2) {
-//                     if (inst.op2) stc();
-//                     else clc();
-//                 } else {
-//                     mov(edx, getOp(inst.op2));
-//                     shr(edx, 1);
-//                 }
-//                 break;
-//             }
-//             case IR_GETCIFZ: {
-//                 if (inst.imm1) {
-//                     if (inst.op1) {
-//                         if (inst.imm2) {
-//                             mov(getOp(i), inst.op2);
-//                         } else {
-//                             OP(mov, getOp(i), getOp(inst.op2));
-//                         }
-//                     } else {
-//                         auto& dest = getOp(i);
-//                         setc(dl);
-//                         movzx(edx, dl);
-//                         mov(dest, edx);
-//                     }
-//                 } else {
-//                     setc(dl);
-//                     movzx(edx, dl);
-//                     auto& op1 = getOp(inst.op1);
-//                     if (op1.isMEM()) {
-//                         cmp(op1, 0);
-//                     } else {
-//                         test(op1.getReg(), op1.getReg());
-//                     }
-//                     if (inst.imm2) {
-//                         mov(ecx, inst.op2);
-//                         cmovne(edx, ecx);
-//                     } else {
-//                         cmovne(edx, getOp(inst.op2));
-//                     }
-//                     mov(getOp(i), edx);
-//                 }
-//                 break;
-//             }
-//             case IR_GETV: {
-//                 if (lastflags != inst.op2) {
-//                     lahf();
-//                     seto(al);
-//                     lastflags = inst.op2;
-//                 }
-//                 auto& dest = getOp(i);
-//                 if (dest.isMEM()) {
-//                     movzx(edx, al);
-//                     mov(dest, edx);
-//                 } else {
-//                     movzx(dest.getReg(), al);
-//                 }
-//                 break;
-//             }
-//             case IR_PCMASK: {
-//                 if (inst.imm1) {
-//                     mov(getOp(i), inst.op1 ? ~1 : ~3);
-//                 } else {
-//                     auto& op1 = getOp(inst.op1);
-//                     if (op1.isMEM()) {
-//                         cmp(op1, 0);
-//                     } else {
-//                         test(op1.getReg(), op1.getReg());
-//                     }
-//                     auto& dest = getOp(i);
-//                     if (dest.isMEM()) {
-//                         mov(ecx, ~3);
-//                         mov(edx, ~1);
-//                         cmovne(ecx, edx);
-//                         mov(dest, ecx);
-//                     } else {
-//                         mov(dest, ~3);
-//                         mov(edx, ~1);
-//                         cmovne(dest.getReg(), edx);
-//                     }
-//                 }
-//                 break;
-//             }
-//             case IR_JZ: {
-//                 jmptarget = inst.op2;
-//                 if (inst.imm1) {
-//                     if (!inst.op1) jmp(std::to_string(nlabels), T_NEAR);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src.isMEM()) {
-//                         cmp(src, 0);
-//                     } else {
-//                         test(src.getReg(), src.getReg());
-//                     }
-//                     jz(std::to_string(nlabels), T_NEAR);
-//                 }
-//                 break;
-//             }
-//             case IR_JNZ: {
-//                 jmptarget = inst.op2;
-//                 if (inst.imm1) {
-//                     if (inst.op1) jmp(std::to_string(nlabels), T_NEAR);
-//                 } else {
-//                     auto& src = getOp(inst.op1);
-//                     if (src.isMEM()) {
-//                         cmp(src, 0);
-//                     } else {
-//                         test(src.getReg(), src.getReg());
-//                     }
-//                     jnz(std::to_string(nlabels), T_NEAR);
-//                 }
-//                 break;
-//             }
-//             case IR_JELSE: {
-//                 jmptarget = inst.op2;
-//                 jmp(std::to_string(nlabels + 1), T_NEAR);
-//                 L(std::to_string(nlabels++));
-//                 break;
-//             }
-//             case IR_MODESWITCH: {
-//                 mov(rdi, rbx);
-//                 mov(esi, inst.op1);
-//                 mov(rax, (u64) cpu_update_mode);
-//                 call(rax);
-//                 break;
-//             }
-//             case IR_EXCEPTION: {
-//                 mov(rdi, rbx);
-//                 switch (inst.op1) {
-//                     case E_SWI:
-//                         mov(esi, (ArmInstr) {inst.op2}.sw_intr.arg);
-//                         mov(rax, (u64) cpu->handle_svc);
-//                         call(rax);
-//                         break;
-//                     case E_UND:
-//                         mov(esi, inst.op2);
-//                         mov(rax, (u64) cpu_undefined_fail);
-//                         call(rax);
-//                         break;
-//                 }
-//                 break;
-//             }
-//             case IR_WFE: {
-//                 mov(byte[CPU(wfe)], 1);
-//                 break;
-//             }
-//             case IR_BEGIN: {
-//                 push(rbx);
-//                 for (u32 i = 0; i < hralloc.count[REG_SAVED]; i++) {
-//                     push(savedregs[i].cvt64());
-//                 }
-//                 int spdisp = getSPDisp();
-//                 if (spdisp) sub(rsp, spdisp);
-//                 mov(rbx, (u64) cpu);
-//                 L("loopblock");
+    Label looplabel;
 
-//                 break;
-//             }
-//             case IR_END_RET:
-//             case IR_END_LINK:
-//             case IR_END_LOOP: {
+    Label clbks[CLBK_MAX] = {};
+    bool usingclbk[CLBK_MAX] = {};
+    u64 clbkptrs[CLBK_MAX] = {
+        (u64) cpu->read8,  (u64) cpu->read16,  (u64) cpu->read32,
+        (u64) cpu->write8, (u64) cpu->write16, (u64) cpu->write32,
+    };
 
-//                 sub(qword[CPU(cycles)], ir->numinstr);
+    std::vector<Label> labels;
 
-//                 if (inst.opcode == IR_END_LOOP) {
-//                     cmp(qword[CPU(cycles)], 0);
-//                     jg("loopblock");
-//                 }
+    for (u32 i = 0; i < ir->code.size; i++) {
+        while (i < ir->code.size && ir->code.d[i].opcode == IR_NOP) i++;
+        if (i == ir->code.size) break;
+        IRInstr inst = ir->code.d[i];
+        if (i >= jmptarget && inst.opcode != IR_JELSE) {
+            L(labels.back());
+            jmptarget = -1;
+            lastflags = 0;
+        }
 
-//                 int spdisp = getSPDisp();
-//                 if (spdisp) add(rsp, spdisp);
-//                 for (int i = hralloc.count[REG_SAVED] - 1; i >= 0; i--) {
-//                     pop(savedregs[i].cvt64());
-//                 }
+        switch (inst.opcode) {
+            case IR_LOAD_REG: {
+                auto dst = DSTREG();
+                ldr(dst, CPU(r[inst.op1]));
+                break;
+            }
+            case IR_STORE_REG: {
+                auto src = LOADOP2();
+                str(src, CPU(r[inst.op1]));
+                break;
+            }
+            case IR_LOAD_REG_USR: {
+                auto dst = DSTREG();
+                int rd = inst.op1;
+                if (rd < 13) {
+                    ldr(dst, CPU(banked_r8_12[0][rd - 8]));
+                } else if (rd == 13) {
+                    ldr(dst, CPU(banked_sp[0]));
+                } else if (rd == 14) {
+                    ldr(dst, CPU(banked_lr[0]));
+                }
+                break;
+            }
+            case IR_STORE_REG_USR: {
+                auto src = LOADOP2();
+                int rd = inst.op1;
+                if (rd < 13) {
+                    str(src, CPU(banked_r8_12[0][rd - 8]));
+                } else if (rd == 13) {
+                    str(src, CPU(banked_sp[0]));
+                } else if (rd == 14) {
+                    str(src, CPU(banked_lr[0]));
+                }
+                break;
+            }
+            case IR_LOAD_FLAG: {
+                auto dst = DSTREG();
+                ldr(dst, CPU(cpsr));
+                ubfx(dst, dst, 31 - inst.op1, 1);
+                break;
+            }
+            case IR_STORE_FLAG: {
+                if (ir->code.d[i - 2].opcode != IR_STORE_FLAG) {
+                    mov(w0, 0);
+                    flags_mask = 0;
+                }
+                auto src = LOADOP2();
+                bfi(w0, src, 31 - inst.op1, 1);
+                flags_mask |= BIT(31 - inst.op1);
+                if (ir->code.d[i + 2].opcode != IR_STORE_FLAG) {
+                    ldr(w1, CPU(cpsr));
+                    and_(w1, w1, ~flags_mask);
+                    orr(w1, w1, w0);
+                    str(w1, CPU(cpsr));
+                }
+                break;
+            }
+            case IR_LOAD_CPSR: {
+                auto dst = DSTREG();
+                ldr(dst, CPU(cpsr));
+                break;
+            }
+            case IR_STORE_CPSR: {
+                auto src = LOADOP2();
+                str(src, CPU(cpsr));
+                break;
+            }
+            case IR_LOAD_SPSR: {
+                auto dst = DSTREG();
+                ldr(dst, CPU(spsr));
+                break;
+            }
+            case IR_STORE_SPSR: {
+                auto src = LOADOP2();
+                str(src, CPU(spsr));
+                break;
+            }
+            case IR_LOAD_THUMB: {
+                auto dst = DSTREG();
+                ldr(dst, CPU(cpsr));
+                ubfx(dst, dst, 5, 1);
+                break;
+            }
+            case IR_STORE_THUMB: {
+                auto src = LOADOP2();
+                ldr(w0, CPU(cpsr));
+                bfi(w0, src, 5, 1);
+                str(w0, CPU(cpsr));
+                break;
+            }
+            case IR_VFP_DATA_PROC: {
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(x16, (u64) exec_vfp_data_proc);
+                blr(x16);
+                break;
+            }
+            case IR_VFP_LOAD_MEM: {
+                auto addr = LOADOP2();
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(w2, addr);
+                mov(x16, (u64) exec_vfp_load_mem);
+                blr(x16);
+                break;
+            }
+            case IR_VFP_STORE_MEM: {
+                auto addr = LOADOP2();
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(w2, addr);
+                mov(x16, (u64) exec_vfp_store_mem);
+                blr(x16);
+                break;
+            }
+            case IR_VFP_READ: {
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(x16, (u64) exec_vfp_read);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_VFP_WRITE: {
+                auto src = LOADOP2();
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(w2, src);
+                mov(x16, (u64) exec_vfp_write);
+                blr(x16);
+                break;
+            }
+            case IR_VFP_READ64L: {
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(x16, (u64) exec_vfp_read64);
+                blr(x16);
+                mov(dst, w0);
+                STOREDST();
+                i++;
+                auto dsth = DSTREG();
+                lsr(XReg(dsth.getIdx()), x0, 32);
+                break;
+            }
+            case IR_VFP_READ64H:
+                break;
+            case IR_VFP_WRITE64L: {
+                auto src = LOADOP2();
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                i++;
+                inst = ir->code.d[i];
+                auto srch = LOADOP2();
+                mov(w2, src);
+                bfi(x2, XReg(srch.getIdx()), 32, 32);
+                mov(x16, (u64) exec_vfp_write64);
+                blr(x16);
+                break;
+            }
+            case IR_VFP_WRITE64H:
+                break;
+            case IR_CP15_READ: {
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(x16, (u64) cpu->cp15_read);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_CP15_WRITE: {
+                auto src = LOADOP2();
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(w2, src);
+                mov(x16, (u64) cpu->cp15_write);
+                blr(x16);
+                break;
+            }
+            case IR_LOAD_MEM8: {
+                auto addr = LOADOP1();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, addr);
+                mov(w2, 0);
+                usingclbk[CLBK_LOAD8] = true;
+                ldr(x16, clbks[CLBK_LOAD8]);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_LOAD_MEMS8: {
+                auto addr = LOADOP1();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, addr);
+                mov(w2, 1);
+                usingclbk[CLBK_LOAD8] = true;
+                ldr(x16, clbks[CLBK_LOAD8]);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_LOAD_MEM16: {
+                auto addr = LOADOP1();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, addr);
+                mov(w2, 0);
+                usingclbk[CLBK_LOAD16] = true;
+                ldr(x16, clbks[CLBK_LOAD16]);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_LOAD_MEMS16: {
+                auto addr = LOADOP1();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, addr);
+                mov(w2, 1);
+                usingclbk[CLBK_LOAD16] = true;
+                ldr(x16, clbks[CLBK_LOAD16]);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_LOAD_MEM32: {
+                auto addr = LOADOP1();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, addr);
+                mov(w2, 0);
+                usingclbk[CLBK_LOAD32] = true;
+                ldr(x16, clbks[CLBK_LOAD32]);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_STORE_MEM8: {
+                auto addr = LOADOP1();
+                auto data = LOADOP2();
+                mov(x0, x29);
+                mov(w1, addr);
+                mov(w2, data);
+                usingclbk[CLBK_STORE8] = true;
+                ldr(x16, clbks[CLBK_STORE8]);
+                blr(x16);
+                break;
+            }
+            case IR_STORE_MEM16: {
+                auto addr = LOADOP1();
+                auto data = LOADOP2();
+                mov(x0, x29);
+                mov(w1, addr);
+                mov(w2, data);
+                usingclbk[CLBK_STORE16] = true;
+                ldr(x16, clbks[CLBK_STORE16]);
+                blr(x16);
+                break;
+            }
+            case IR_STORE_MEM32: {
+                auto addr = LOADOP1();
+                auto data = LOADOP2();
+                mov(x0, x29);
+                mov(w1, addr);
+                mov(w2, data);
+                usingclbk[CLBK_STORE32] = true;
+                ldr(x16, clbks[CLBK_STORE32]);
+                blr(x16);
+                break;
+            }
+            case IR_MOV: {
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                mov(dst, src);
+                break;
+            }
+            case IR_AND: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                ands(dst, src1, src2);
+                lastflags = i;
+                break;
+            }
+            case IR_OR: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                orr(dst, src1, src2);
+                break;
+            }
+            case IR_XOR: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                eor(dst, src1, src2);
+                break;
+            }
+            case IR_NOT: {
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                mvn(dst, src);
+                break;
+            }
+            case IR_LSL: {
+                auto src = LOADOP1();
+                auto dst = DSTREG();
+                if (inst.imm2) {
+                    if (inst.op2 >= 32) {
+                        mov(dst, 0);
+                    } else {
+                        lsl(dst, src, inst.op2);
+                    }
+                } else {
+                    auto shift = LOADOP2();
+                    Label lelse, lendif;
+                    cmp(shift, 32);
+                    bcs(lelse);
+                    lsl(dst, src, shift);
+                    b(lendif);
+                    L(lelse);
+                    mov(dst, 0);
+                    L(lendif);
 
-//                 if (inst.opcode == IR_END_LINK) {
-//                     inLocalLabel();
-//                     cmp(qword[CPU(cycles)], 0);
-//                     jle(".nolink");
-//                     pop(rbx);
-//                     links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
-//                                                  inst.op1, inst.op2});
-//                     nop(10);
-//                     jmp(rax);
-//                     L(".nolink");
-//                     outLocalLabel();
-//                 }
+                    lastflags = 0;
+                }
+                break;
+            }
+            case IR_LSR: {
+                auto src = LOADOP1();
+                auto dst = DSTREG();
+                if (inst.imm2) {
+                    if (inst.op2 >= 32) {
+                        mov(dst, 0);
+                    } else {
+                        lsr(dst, src, inst.op2);
+                    }
+                } else {
+                    auto shift = LOADOP2();
+                    Label lelse, lendif;
+                    cmp(shift, 32);
+                    bcs(lelse);
+                    lsr(dst, src, shift);
+                    b(lendif);
+                    L(lelse);
+                    mov(dst, 0);
+                    L(lendif);
 
-//                 pop(rbx);
-//                 ret();
-//                 break;
-//             }
-//             default:
-//                 break;
-//         }
-//     }
+                    lastflags = 0;
+                }
+                break;
+            }
+            case IR_ASR: {
+                auto src = LOADOP1();
+                auto dst = DSTREG();
+                if (inst.imm2) {
+                    if (inst.op2 >= 32) {
+                        asr(dst, src, 31);
+                    } else {
+                        asr(dst, src, inst.op2);
+                    }
+                } else {
+                    auto shift = LOADOP2();
+                    Label lelse, lendif;
+                    cmp(shift, 32);
+                    bcs(lelse);
+                    asr(dst, src, shift);
+                    b(lendif);
+                    L(lelse);
+                    asr(dst, src, 31);
+                    L(lendif);
 
-//     ready();
-// }
+                    lastflags = 0;
+                }
+                break;
+            }
+
+            case IR_ROR: {
+                auto src = LOADOP1();
+                auto dst = DSTREG();
+                if (inst.imm2) {
+                    ror(dst, src, inst.op2 % 32);
+                } else {
+                    auto shift = LOADOP2();
+                    ror(dst, src, shift);
+                }
+                break;
+            }
+            case IR_RRC: {
+                auto src = LOADOP1();
+                auto dst = DSTREG();
+                cset(w0, CS);
+                extr(dst, w0, src, 1);
+                break;
+            }
+            case IR_ADD: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                adds(dst, src1, src2);
+                lastflags = i;
+                break;
+            }
+            case IR_SUB: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                subs(dst, src1, src2);
+                lastflags = i;
+                break;
+            }
+            case IR_ADC: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                adcs(dst, src1, src2);
+                lastflags = i;
+                break;
+            }
+            case IR_SBC: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                sbcs(dst, src1, src2);
+                lastflags = i;
+                break;
+            }
+            case IR_MUL: {
+                IRInstr hinst = ir->code.d[i + 1];
+                if (hinst.opcode == IR_SMULH || hinst.opcode == IR_UMULH) {
+                    auto src1 = LOADOP1();
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    if (hinst.opcode == IR_SMULH) {
+                        smull(XReg(dst.getIdx()), src1, src2);
+                    } else {
+                        umull(XReg(dst.getIdx()), src1, src2);
+                    }
+                    STOREDST();
+                    i++;
+                    auto dsth = DSTREG();
+                    lsr(XReg(dsth.getIdx()), XReg(dst.getIdx()), 32);
+                } else {
+                    auto src1 = LOADOP1();
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    mul(dst, src1, src2);
+                }
+                break;
+            }
+            case IR_SMULH: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                smull(XReg(dst.getIdx()), src1, src2);
+                lsr(XReg(dst.getIdx()), XReg(dst.getIdx()), 32);
+                break;
+            }
+            case IR_UMULH: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                umull(XReg(dst.getIdx()), src1, src2);
+                lsr(XReg(dst.getIdx()), XReg(dst.getIdx()), 32);
+                break;
+            }
+            case IR_SMULW: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                smull(XReg(dst.getIdx()), src1, src2);
+                lsr(XReg(dst.getIdx()), XReg(dst.getIdx()), 16);
+                break;
+            }
+            case IR_CLZ: {
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                clz(dst, src);
+                break;
+            }
+            case IR_REV: {
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                rev(dst, src);
+                break;
+            }
+            case IR_REV16: {
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                rev16(dst, src);
+                break;
+            }
+            case IR_USAT: {
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                mov(w0, 0);
+                cmp(src, w0);
+                csel(dst, w0, src, LT);
+                mov(w0, MASK(inst.op1));
+                cmp(src, w0);
+                csel(dst, w0, dst, GT);
+                break;
+            }
+            case IR_MEDIA_UADD8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, src1);
+                mov(w2, src2);
+                mov(x16, (u64) media_uadd8);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_MEDIA_UQSUB8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, src1);
+                mov(w2, src2);
+                mov(x16, (u64) media_uqsub8);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_MEDIA_QSUB8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, src1);
+                mov(w2, src2);
+                mov(x16, (u64) media_qsub8);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_MEDIA_SEL: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, src1);
+                mov(w2, src2);
+                mov(x16, (u64) media_sel);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_GETN: {
+                auto dst = DSTREG();
+                if (inst.imm2) {
+                    mov(dst, inst.op2 >> 31);
+                } else {
+                    if (lastflags != inst.op2) {
+                        auto src = LOADOP2();
+                        tst(src, src);
+                        lastflags = inst.op2;
+                    }
+                    cset(dst, MI);
+                }
+                break;
+            }
+            case IR_GETZ: {
+                auto dst = DSTREG();
+                if (inst.imm2) {
+                    mov(dst, inst.op2 == 0);
+                } else {
+                    if (lastflags != inst.op2) {
+                        auto src = LOADOP2();
+                        tst(src, src);
+                        lastflags = inst.op2;
+                    }
+                    cset(dst, EQ);
+                }
+                break;
+            }
+            case IR_GETC: {
+                auto dst = DSTREG();
+                cset(dst, CS);
+                break;
+            }
+            case IR_SETC: {
+                auto src = LOADOP2();
+                cmp(src, 1);
+                lastflags = 0;
+                break;
+            }
+            case IR_GETCIFZ: {
+                auto cond = LOADOP1();
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                cset(w0, CS);
+                tst(cond, cond);
+                csel(dst, w0, src, EQ);
+                lastflags = 0;
+                break;
+            }
+            case IR_GETV: {
+                auto dst = DSTREG();
+                cset(dst, VS);
+                break;
+            }
+            case IR_PCMASK: {
+                auto src = LOADOP1();
+                auto dst = DSTREG();
+                lsl(dst, src, 1);
+                sub(dst, dst, 4);
+                break;
+            }
+            case IR_JZ: {
+                jmptarget = inst.op2;
+                labels.push_back(Label());
+                auto cond = LOADOP1();
+                cbz(cond, labels.back());
+                break;
+            }
+            case IR_JNZ: {
+                jmptarget = inst.op2;
+                labels.push_back(Label());
+                auto cond = LOADOP1();
+                cbnz(cond, labels.back());
+                break;
+            }
+            case IR_JELSE: {
+                jmptarget = inst.op2;
+                auto elselbl = labels.back();
+                labels.push_back(Label());
+                b(labels.back());
+                L(elselbl);
+                break;
+            }
+            case IR_MODESWITCH: {
+                mov(x0, x29);
+                mov(w1, inst.op1);
+                mov(x16, (u64) cpu_update_mode);
+                blr(x16);
+                break;
+            }
+            case IR_EXCEPTION: {
+                switch (inst.op1) {
+                    case E_SWI:
+                        mov(x0, x29);
+                        mov(w1, (ArmInstr) {inst.op2}.sw_intr.arg);
+                        mov(x16, (u64) cpu->handle_svc);
+                        blr(x16);
+                        break;
+                    case E_UND:
+                        mov(x0, x29);
+                        mov(w1, inst.op2);
+                        mov(x16, (u64) cpu_undefined_fail);
+                        blr(x16);
+                        break;
+                }
+                break;
+            }
+            case IR_WFE: {
+                mov(w0, 1);
+                strb(w0, CPU(wfe));
+                break;
+            }
+            case IR_BEGIN: {
+
+                stp(x29, x30, pre_ptr(sp, -0x10));
+                for (int i = 0; i < hralloc.count[REG_SAVED]; i += 2) {
+                    stp(XReg(savedBase + i), XReg(savedBase + i + 1),
+                        pre_ptr(sp, -0x10));
+                }
+                int spdisp = getSPDisp();
+                if (spdisp) sub(sp, sp, spdisp);
+
+                mov(x29, (u64) cpu);
+                L(looplabel);
+
+                break;
+            }
+            case IR_END_RET:
+            case IR_END_LINK:
+            case IR_END_LOOP: {
+                lastflags = 0;
+
+                ldr(x0, CPU(cycles));
+                sub(x0, x0, ir->numinstr);
+                str(x0, CPU(cycles));
+
+                // if (inst.opcode == IR_END_LOOP) {
+                //     cmp(x0, 0);
+                //     bgt(looplabel);
+                // }
+
+                int spdisp = getSPDisp();
+                if (spdisp) add(sp, sp, spdisp);
+                for (int i = (hralloc.count[REG_SAVED] - 1) & ~1; i >= 0;
+                     i -= 2) {
+                    ldp(XReg(savedBase + i), XReg(savedBase + i + 1),
+                        post_ptr(sp, 0x10));
+                }
+                ldp(x29, x30, post_ptr(sp, 0x10));
+
+                // if (inst.opcode == IR_END_LINK) {
+                //     inLocalLabel();
+                //     cmp(qword[CPU(cycles)], 0);
+                //     jle(".nolink");
+                //     pop(rbx);
+                //     links.push_back((LinkPatch) {(u32) (getCurr() -
+                //     getCode()),
+                //                                  inst.op1, inst.op2});
+                //     nop(10);
+                //     jmp(rax);
+                //     L(".nolink");
+                //     outLocalLabel();
+                // }
+
+                ret();
+                break;
+            }
+            default:
+                break;
+        }
+        STOREDST();
+    }
+
+    // align(8);
+    for (int i = 0; i < CLBK_MAX; i++) {
+        L(clbks[i]);
+        if (usingclbk[i]) {
+            dd(clbkptrs[i]);
+            dd(clbkptrs[i] >> 32);
+        }
+    }
+
+    ready();
+}
 
 extern "C" {
 
 void* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                                 ArmCore* cpu) {
-    // return new Code(ir, regalloc, cpu);
-    return nullptr;
+    return new Code(ir, regalloc, cpu);
 }
 
 JITFunc backend_arm_get_code(void* backend) {
-    // return (JITFunc) ((Code*) backend)->getCode();
-    return nullptr;
+    return (JITFunc) ((Code*) backend)->getCode();
 }
 
 void backend_arm_patch_links(JITBlock* block) {
@@ -1259,23 +928,23 @@ void backend_arm_patch_links(JITBlock* block) {
 }
 
 void backend_arm_free(void* backend) {
-    // delete ((Code*) backend);
+    delete ((Code*) backend);
 }
 
 void backend_arm_disassemble(void* backend) {
-    // Code* code = (Code*) backend;
-    // code->print_hostregs();
-    // csh handle;
-    // cs_insn* insn;
-    // cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
-    // size_t count =
-    //     cs_disasm(handle, code->getCode(), code->getSize(), 0, 0, &insn);
-    // printf("--------- JIT Disassembly at %p ------------\n", code->getCode());
-    // for (size_t i = 0; i < count; i++) {
-    //     printf("%04lx: %s %s\n", insn[i].address, insn[i].mnemonic,
-    //            insn[i].op_str);
-    // }
-    // cs_free(insn, count);
+    Code* code = (Code*) backend;
+    code->print_hostregs();
+    csh handle;
+    cs_insn* insn;
+    cs_open(CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN, &handle);
+    size_t count =
+        cs_disasm(handle, code->getCode(), code->getSize(), 0, 0, &insn);
+    printf("--------- JIT Disassembly at %p ------------\n", code->getCode());
+    for (size_t i = 0; i < count; i++) {
+        printf("%04lx: %s %s\n", insn[i].address, insn[i].mnemonic,
+               insn[i].op_str);
+    }
+    cs_free(insn, count);
 }
 }
 
