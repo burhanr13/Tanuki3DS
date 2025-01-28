@@ -9,7 +9,7 @@ CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unu
 CFLAGS_RELEASE := -O3
 CFLAGS_DEBUG := -g -fsanitize=address
 
-CPPFLAGS := -MP -MMD
+CPPFLAGS := -MP -MMD -D_GNU_SOURCE
 
 LDFLAGS := -lm -lSDL2 -lcapstone
 
