@@ -54,7 +54,7 @@ jobs:
         brew install llvm sdl2 glew xxhash xbyak capstone
         git clone https://github.com/fujitsu/xbyak_aarch64.git
         cd xbyak_aarch64
-        make install
+        sudo make install
         cd ..
     - name: build
       run: make USER=1
