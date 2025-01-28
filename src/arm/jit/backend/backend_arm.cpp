@@ -853,10 +853,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 sub(x0, x0, ir->numinstr);
                 str(x0, CPU(cycles));
 
-                // if (inst.opcode == IR_END_LOOP) {
-                //     cmp(x0, 0);
-                //     bgt(looplabel);
-                // }
+                if (inst.opcode == IR_END_LOOP) {
+                    cmp(x0, 0);
+                    bgt(looplabel);
+                }
 
                 int spdisp = getSPDisp();
                 if (spdisp) add(sp, sp, spdisp);
@@ -867,19 +867,19 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 }
                 ldp(x29, x30, post_ptr(sp, 0x10));
 
-                // if (inst.opcode == IR_END_LINK) {
-                //     inLocalLabel();
-                //     cmp(qword[CPU(cycles)], 0);
-                //     jle(".nolink");
-                //     pop(rbx);
-                //     links.push_back((LinkPatch) {(u32) (getCurr() -
-                //     getCode()),
-                //                                  inst.op1, inst.op2});
-                //     nop(10);
-                //     jmp(rax);
-                //     L(".nolink");
-                //     outLocalLabel();
-                // }
+                if (inst.opcode == IR_END_LINK) {
+                    Label nolink, linkaddr;
+                    cmp(x0, 0);
+                    ble(nolink);
+                    ldr(x16, linkaddr);
+                    br(x16);
+                    L(linkaddr);
+                    links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
+                                                 inst.op1, inst.op2});
+                    dd(0);
+                    dd(0);
+                    L(nolink);
+                }
 
                 ret();
                 break;
@@ -890,7 +890,6 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
         STOREDST();
     }
 
-    // align(8);
     for (int i = 0; i < CLBK_MAX; i++) {
         L(clbks[i]);
         if (usingclbk[i]) {
@@ -898,8 +897,6 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             dd(clbkptrs[i] >> 32);
         }
     }
-
-    ready();
 }
 
 extern "C" {
@@ -914,18 +911,16 @@ JITFunc backend_arm_get_code(void* backend) {
 }
 
 void backend_arm_patch_links(JITBlock* block) {
-    // Code* code = (Code*) block->backend;
-    // for (auto [offset, attrs, addr] : code->links) {
-    //     char* jmpsrc = (char*) code->getCode() + offset;
-    //     JITBlock* linkblock = get_jitblock(code->cpu, attrs, addr);
-    //     jmpsrc[0] = 0x48;
-    //     jmpsrc[1] = 0xb8;
-    //     *(u64*) &jmpsrc[2] = (u64) linkblock->code;
-    //     Vec_push(linkblock->linkingblocks,
-    //              ((BlockLocation) {block->attrs, block->start_addr}));
-    // }
+    Code* code = (Code*) block->backend;
+    for (auto [offset, attrs, addr] : code->links) {
+        char* linkaddr = (char*) code->getCode() + offset;
+        JITBlock* linkblock = get_jitblock(code->cpu, attrs, addr);
+        *(u64*) linkaddr = (u64) linkblock->code;
+        Vec_push(linkblock->linkingblocks,
+                 ((BlockLocation) {block->attrs, block->start_addr}));
+    }
 
-    // code->readyRE();
+    code->ready();
 }
 
 void backend_arm_free(void* backend) {
