@@ -642,9 +642,8 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 auto dst = GETDST(5);
 
                 setupMul(src1, src2);
-                fmul(dst.s4, src1.s4, v1.s4);
-                fadd(dst.s4, dst.s4, src3.s4);
-
+                fmul(v0.s4, src1.s4, v1.s4);
+                fadd(dst.s4, v0.s4, src3.s4);
                 STRDST(5);
                 break;
             }
