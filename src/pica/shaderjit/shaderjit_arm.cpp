@@ -9,7 +9,7 @@
 
 using namespace Xbyak_aarch64;
 
-#define JIT_DISASM
+// #define JIT_DISASM
 
 struct ShaderCode : Xbyak_aarch64::CodeGenerator {
 
@@ -206,16 +206,16 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
                 cset(dst, NE);
                 break;
             case 2:
-                cset(dst, LO);
+                cset(dst, LT);
                 break;
             case 3:
-                cset(dst, LS);
+                cset(dst, LE);
                 break;
             case 4:
-                cset(dst, HI);
+                cset(dst, GT);
                 break;
             case 5:
-                cset(dst, HS);
+                cset(dst, GE);
                 break;
             default:
                 mov(dst, 1);
@@ -347,12 +347,16 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 auto src2 = SRC2(1);
                 auto dst = GETDST(1);
                 setupMul(src1, src2);
+                mov(v1.s[3], wzr); // set w to 0 to do a 3d dot product
                 fmul(dst.s4, src1.s4, v1.s4);
                 // risc moment
-                faddp(s1, dst.s2);
-                mov(v0.s[0], dst.s[2]);
-                fadd(s1, s1, s0);
-                dup(dst.s4, v1.s[0]);
+                // s[0] <- s[1]+s[2] and s[1]<-s[2]+s[3]
+                // then s[0] <- s[0]+s[1]
+                faddp(dst.s4, dst.s4, dst.s4);
+                faddp(SReg(dst.getIdx()), dst.s2);
+                if (desc.destmask != BIT(3 - 0)) {
+                    dup(dst.s4, dst.s[0]);
+                }
                 STRDST(1);
                 break;
             }
@@ -363,11 +367,12 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 setupMul(src1, src2);
                 fmul(dst.s4, src1.s4, v1.s4);
                 // i love not having horizontal add
-                faddp(s1, dst.s2);
-                mov(dst.d[0], dst.d[1]);
-                faddp(s2, dst.s2);
-                fadd(s0, s1, s2);
-                dup(dst.s4, v0.s[0]);
+                faddp(dst.s4, dst.s4, dst.s4);
+                faddp(SReg(dst.getIdx()), dst.s2);
+                // only dup if writing to more than x
+                if (desc.destmask != BIT(3 - 0)) {
+                    dup(dst.s4, dst.s[0]);
+                }
                 STRDST(1);
                 break;
             }
@@ -391,11 +396,11 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 mov(src1.s[3], v3.s[0]);
                 setupMul(src1, src2);
                 fmul(dst.s4, src1.s4, v1.s4);
-                faddp(s1, dst.s2);
-                mov(dst.d[0], dst.d[1]);
-                faddp(s2, dst.s2);
-                fadd(s0, s1, s2);
-                dup(dst.s4, v0.s[0]);
+                faddp(dst.s4, dst.s4, dst.s4);
+                faddp(SReg(dst.getIdx()), dst.s2);
+                if (desc.destmask != BIT(3 - 0)) {
+                    dup(dst.s4, dst.s[0]);
+                }
                 STRDST(1);
                 break;
             }
@@ -434,16 +439,20 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
             case PICA_RCP: {
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                frecpe(s0, SReg(src.getIdx()));
-                dup(dst.s4, v0.s[0]);
+                frecpe(SReg(dst.getIdx()), SReg(src.getIdx()));
+                if (desc.destmask != BIT(3 - 0)) {
+                    dup(dst.s4, dst.s[0]);
+                }
                 STRDST(1);
                 break;
             }
             case PICA_RSQ: {
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                frsqrte(s0, SReg(src.getIdx()));
-                dup(dst.s4, v0.s[0]);
+                frsqrte(SReg(dst.getIdx()), SReg(src.getIdx()));
+                if (desc.destmask != BIT(3 - 0)) {
+                    dup(dst.s4, dst.s[0]);
+                }
                 STRDST(1);
                 break;
             }
@@ -461,7 +470,8 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
 
                 fcmge(dst.s4, src1.s4, src2.s4);
                 fmov(v1.s4, 1.0f);
-                and_(dst.b16, v1.b16, dst.b16);
+                // sets to 1.0f if the condition was true
+                and_(dst.b16, dst.b16, v1.b16);
                 STRDST(1);
                 break;
             }
@@ -477,15 +487,16 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 }
                 auto dst = GETDST(1);
 
-                fcmge(dst.s4, src1.s4, src2.s4);
+                // lt is just gt with operands reversed
+                fcmgt(dst.s4, src2.s4, src1.s4);
                 fmov(v1.s4, 1.0f);
-                bic(dst.b16, v1.b16, dst.b16);
+                and_(dst.b16, dst.b16, v1.b16);
                 STRDST(1);
                 break;
             }
             case PICA_MOVA: {
                 auto src = SRC1(1);
-                fcvtau(v0.s2, src.s2);
+                fcvtzs(v0.s2, src.s2);
                 if (desc.destmask & BIT(3 - 0)) {
                     mov(reg_ax, v0.s[0]);
                 }
@@ -677,7 +688,7 @@ void shaderjit_arm_disassemble(void* backend) {
     printf("--------- Shader JIT Disassembly at %p ------------\n",
            code->getCode());
     for (size_t i = 0; i < count; i++) {
-        printf("%04lx: %08x %s %s\n", insn[i].address, *(u32*) &insn[i].bytes,
+        printf("%04lx: %08x\t%s %s\n", insn[i].address, *(u32*) &insn[i].bytes,
                insn[i].mnemonic, insn[i].op_str);
     }
     cs_free(insn, count);
