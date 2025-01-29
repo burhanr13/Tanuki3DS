@@ -48,11 +48,6 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     RegAllocation regalloc = allocate_registers(&ir);
 
-#ifdef IR_DISASM
-    ir_disassemble(&ir);
-    regalloc_print(&regalloc);
-#endif
-
     block->backend = backend_generate_code(&ir, &regalloc, cpu);
     block->code = backend_get_code(block->backend);
 
@@ -61,6 +56,10 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     cpu->jit_cache[block->attrs][addr >> 16][(addr & 0xffff) >> 1] = block;
     backend_patch_links(block);
 
+#ifdef IR_DISASM
+    ir_disassemble(&ir);
+    regalloc_print(&regalloc);
+#endif
 #ifdef BACKEND_DISASM
     backend_disassemble(block->backend);
 #endif

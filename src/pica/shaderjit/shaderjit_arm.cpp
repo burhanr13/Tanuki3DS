@@ -9,7 +9,7 @@
 
 using namespace Xbyak_aarch64;
 
-#define JIT_DISASM
+// #define JIT_DISASM
 
 struct ShaderCode : Xbyak_aarch64::CodeGenerator {
 
@@ -33,14 +33,16 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
     std::map<u32, u32> entrypoints;
 
     ShaderCode()
-        : Xbyak_aarch64::CodeGenerator(4096, Xbyak_aarch64::AutoGrow),
-          jmplabels(SHADER_CODE_SIZE) {}
+        : Xbyak_aarch64::CodeGenerator(4096, Xbyak_aarch64::AutoGrow) {}
 
     u32 compileWithEntry(ShaderUnit* shu, u32 entry);
-    void compileBlock(ShaderUnit* shu, u32 start, u32 len);
+    void compileBlock(ShaderUnit* shu, u32 start, u32 len,
+                      bool isfunction = false);
 
     void compileAllEntries(ShaderUnit* shu) {
         reset();
+        jmplabels.clear();
+        jmplabels.resize(SHADER_CODE_SIZE);
         calls.clear();
         for (auto& e : entrypoints) {
             e.second = compileWithEntry(shu, e.first);
@@ -68,17 +70,20 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
         return getCode() + offset;
     }
 
-    void readsrc(VReg dst, u32 n, u8 idx, u8 swizzle, bool neg) {
+    VReg readsrc(VReg dst, u32 n, u8 idx, u8 swizzle, bool neg) {
         VReg src = v3;
+        if (swizzle == 0b00'01'10'11) {
+            src = dst;
+        }
         if (n < 0x10) {
-            ldr(q3, ptr(reg_v, 16 * n));
+            ldr(QReg(src.getIdx()), ptr(reg_v, 16 * n));
         } else if (n < 0x20) {
             n -= 0x10;
             src = VReg(reg_r + n);
         } else {
             n -= 0x20;
             if (idx == 0) {
-                ldr(q3, ptr(reg_c, 16 * n));
+                ldr(QReg(src.getIdx()), ptr(reg_c, 16 * n));
             } else {
                 switch (idx) {
                     case 1:
@@ -93,7 +98,7 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
                 }
                 add(w11, w11, n);
                 and_(w11, w11, 0x7f);
-                ldr(q3, ptr(reg_c, w11, UXTW, 4));
+                ldr(QReg(src.getIdx()), ptr(reg_c, w11, UXTW, 4));
             }
         }
 
@@ -127,41 +132,53 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
                     mov(dst.s[i], src.s[swizzleidx[i]]);
                 }
             }
+            if (neg) {
+                fneg(dst.s4, dst.s4);
+            }
+            return dst;
         } else {
-            mov(dst.b16, src.b16);
-        }
-        if (neg) {
-            fneg(dst.s4, dst.s4);
+            if (neg) {
+                fneg(dst.s4, src.s4);
+                return dst;
+            } else {
+                return src;
+            }
         }
     }
 
-    void writedest(VReg src, int n, u8 mask) {
+    // dest is either v0 or v16-v31
+    VReg getdest(int n, u8 mask) {
+        if (n >= 0x10 && mask == 0b1111) return VReg(reg_r + n - 0x10);
+        else return v0;
+    }
+
+    // the result will be in v0
+    void writedest(int n, u8 mask) {
         if (mask == 0b1111) {
             if (n < 0x10) {
-                str(QReg(src.getIdx()), ptr(reg_o, 16 * n));
+                str(q0, ptr(reg_o, 16 * n));
             } else {
-                n -= 0x10;
-                mov(VReg(reg_r + n).b16, src.b16);
+                // already handled by getdest
             }
         } else {
             // no blend on arm either :(
             if (n < 0x10) {
-                // optimize single element mask
+                // optimize storing single element mask to memory
                 switch (mask) {
                     case BIT(3 - 0):
-                        str(SReg(src.getIdx()), ptr(reg_o, 16 * n + 0));
+                        str(s0, ptr(reg_o, 16 * n + 0));
                         return;
                     case BIT(3 - 1):
-                        mov(src.s[0], src.s[1]);
-                        str(SReg(src.getIdx()), ptr(reg_o, 16 * n + 4));
+                        mov(v0.s[0], v0.s[1]);
+                        str(s0, ptr(reg_o, 16 * n + 4));
                         return;
                     case BIT(3 - 2):
-                        mov(src.s[0], src.s[2]);
-                        str(SReg(src.getIdx()), ptr(reg_o, 16 * n + 8));
+                        mov(v0.s[0], v0.s[2]);
+                        str(s0, ptr(reg_o, 16 * n + 8));
                         return;
                     case BIT(3 - 3):
-                        mov(src.s[0], src.s[3]);
-                        str(SReg(src.getIdx()), ptr(reg_o, 16 * n + 12));
+                        mov(v0.s[0], v0.s[3]);
+                        str(s0, ptr(reg_o, 16 * n + 12));
                         return;
                 }
             }
@@ -174,9 +191,10 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
             }
             for (int i = 0; i < 4; i++) {
                 if (mask & BIT(3 - i)) {
-                    mov(dst.s[i], src.s[i]);
+                    mov(dst.s[i], v0.s[i]);
                 }
             }
+            if (dst.getIdx() == 3) str(q3, ptr(reg_o, 16 * n));
         }
     }
 
@@ -206,7 +224,7 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
         }
     }
 
-    // true: bne, false: beq
+    // true: ne is true condition, false: eq is true condition
     bool condop(u32 op, bool refx, bool refy) {
         switch (op) {
             case 0:                 // OR
@@ -253,10 +271,11 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
 
     // 0 * anything is 0 (ieee noncompliant)
     // this is important to emulate
-    // zeros any lanes of v1 where v0 was 0
-    void setupMul() {
-        fcmeq(v3.s4, v0.s4, 0);
-        bic(v1.b16, v1.b16, v3.b16);
+    // zeros any lanes of src1 where src0 was 0
+    // modified src2 always goes into v1
+    void setupMul(VReg src1, VReg src2) {
+        fcmeq(v3.s4, src1.s4, 0);
+        bic(v1.b16, src2.b16, v3.b16);
     }
 };
 
@@ -282,8 +301,7 @@ u32 ShaderCode::compileWithEntry(ShaderUnit* shu, u32 entry) {
     ret();
 
     for (size_t i = callsStart; i < calls.size(); i++) {
-        str(x30, pre_ptr(sp, -16));
-        compileBlock(shu, calls[i].fmt2.dest, calls[i].fmt2.num);
+        compileBlock(shu, calls[i].fmt2.dest, calls[i].fmt2.num, true);
         ldr(x30, post_ptr(sp, 16));
         ret();
     }
@@ -294,12 +312,14 @@ u32 ShaderCode::compileWithEntry(ShaderUnit* shu, u32 entry) {
 #define SRC(v, i, _fmt)                                                        \
     readsrc(v, instr.fmt##_fmt.src##i, instr.fmt##_fmt.idx,                    \
             desc.src##i##swizzle, desc.src##i##neg)
-#define SRC1(v, fmt) SRC(v, 1, fmt)
-#define SRC2(v, fmt) SRC(v, 2, fmt)
-#define SRC3(v, fmt) SRC(v, 3, fmt)
-#define DEST(v, _fmt) writedest(v, instr.fmt##_fmt.dest, desc.destmask)
+#define SRC1(fmt) SRC(v0, 1, fmt)
+#define SRC2(fmt) SRC(v1, 2, fmt)
+#define SRC3(fmt) SRC(v2, 3, fmt)
+#define GETDST(_fmt) getdest(instr.fmt##_fmt.dest, desc.destmask)
+#define STRDST(_fmt) writedest(instr.fmt##_fmt.dest, desc.destmask)
 
-void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
+void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
+                              bool isfunction) {
     u32 pc = start;
     u32 end = start + len;
     if (end > SHADER_CODE_SIZE) end = SHADER_CODE_SIZE;
@@ -307,137 +327,166 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
     while (pc < end) {
         L(jmplabels[pc]);
 
+        if (pc == start && isfunction) {
+            // why cant this just be push {lr} like on arm32
+            str(x30, pre_ptr(sp, -16));
+        }
+
         PICAInstr instr = shu->code[pc++];
         OpDesc desc = shu->opdescs[instr.desc];
         switch (instr.opcode) {
             case PICA_ADD: {
-                SRC1(v0, 1);
-                SRC2(v1, 1);
-                fadd(v0.s4, v0.s4, v1.s4);
-                DEST(v0, 1);
+                auto src1 = SRC1(1);
+                auto src2 = SRC2(1);
+                auto dst = GETDST(1);
+                fadd(dst.s4, src1.s4, src2.s4);
+                STRDST(1);
                 break;
             }
             case PICA_DP3: {
-                SRC1(v0, 1);
-                SRC2(v1, 1);
-                setupMul();
-                fmul(v0.s4, v0.s4, v1.s4);
+                auto src1 = SRC1(1);
+                auto src2 = SRC2(1);
+                auto dst = GETDST(1);
+                setupMul(src1, src2);
+                fmul(dst.s4, src1.s4, v1.s4);
                 // risc moment
-                faddp(s1, v0.s2);
-                mov(v0.s[0], v0.s[2]);
+                faddp(s1, dst.s2);
+                mov(v0.s[0], dst.s[2]);
                 fadd(s1, s1, s0);
-                dup(v0.s4, v1.s[0]);
-                DEST(v0, 1);
+                dup(dst.s4, v1.s[0]);
+                STRDST(1);
                 break;
             }
             case PICA_DP4: {
-                SRC1(v0, 1);
-                SRC2(v1, 1);
-                setupMul();
+                auto src1 = SRC1(1);
+                auto src2 = SRC2(1);
+                auto dst = GETDST(1);
+                setupMul(src1, src2);
+                fmul(dst.s4, src1.s4, v1.s4);
                 // i love not having horizontal add
-                faddp(s1, v0.s2);
-                mov(v0.d[0], v0.d[1]);
-                faddp(s2, v0.s2);
+                faddp(s1, dst.s2);
+                mov(dst.d[0], dst.d[1]);
+                faddp(s2, dst.s2);
                 fadd(s0, s1, s2);
-                dup(v0.s4, v0.s[0]);
-                DEST(v0, 1);
+                dup(dst.s4, v0.s[0]);
+                STRDST(1);
                 break;
             }
             case PICA_DPH:
             case PICA_DPHI: {
+                VReg src1(0), src2(0);
                 if (instr.opcode == PICA_DPH) {
-                    SRC1(v0, 1);
-                    SRC2(v1, 1);
+                    src1 = SRC1(1);
+                    src2 = SRC2(1);
                 } else {
-                    SRC1(v0, 1i);
-                    SRC2(v1, 1i);
+                    src1 = SRC1(1i);
+                    src2 = SRC2(1i);
                 }
+                auto dst = GETDST(1);
+
                 fmov(s3, 1.0f);
-                mov(v0.s[3], v3.s[0]);
-                setupMul();
-                faddp(s1, v0.s2);
-                mov(v0.d[0], v0.d[1]);
-                faddp(s2, v0.s2);
+                if (src1.getIdx() != 0) {
+                    mov(v0.b16, src1.b16);
+                    src1 = v0; // need to move into v0 since modifying it
+                }
+                mov(src1.s[3], v3.s[0]);
+                setupMul(src1, src2);
+                fmul(dst.s4, src1.s4, v1.s4);
+                faddp(s1, dst.s2);
+                mov(dst.d[0], dst.d[1]);
+                faddp(s2, dst.s2);
                 fadd(s0, s1, s2);
-                dup(v0.s4, v0.s[0]);
-                DEST(v0, 1);
+                dup(dst.s4, v0.s[0]);
+                STRDST(1);
                 break;
             }
             case PICA_MUL: {
-                SRC1(v0, 1);
-                SRC2(v1, 1);
-                setupMul();
-                fmul(v0.s4, v0.s4, v1.s4);
-                DEST(v0, 1);
+                auto src1 = SRC1(1);
+                auto src2 = SRC2(1);
+                auto dst = GETDST(1);
+                setupMul(src1, src2);
+                fmul(dst.s4, src1.s4, v1.s4);
+                STRDST(1);
                 break;
             }
             case PICA_FLR: {
-                SRC1(v0, 1);
-                frintm(v0.s4, v0.s4);
-                DEST(v0, 1);
+                auto src = SRC1(1);
+                auto dst = GETDST(1);
+                frintm(dst.s4, src.s4);
+                STRDST(1);
                 break;
             }
             case PICA_MIN: {
-                SRC1(v0, 1);
-                SRC2(v1, 1);
-                fmin(v0.s4, v0.s4, v1.s4);
-                DEST(v0, 1);
+                auto src1 = SRC1(1);
+                auto src2 = SRC2(1);
+                auto dst = GETDST(1);
+                fmin(dst.s4, src1.s4, src2.s4);
+                STRDST(1);
                 break;
             }
             case PICA_MAX: {
-                SRC1(v0, 1);
-                SRC2(v1, 1);
-                fmax(v0.s4, v0.s4, v1.s4);
-                DEST(v0, 1);
+                auto src1 = SRC1(1);
+                auto src2 = SRC2(1);
+                auto dst = GETDST(1);
+                fmax(dst.s4, src1.s4, src2.s4);
+                STRDST(1);
                 break;
             }
             case PICA_RCP: {
-                SRC1(v0, 1);
-                frecpe(s0, s0);
-                dup(v0.s4, v0.s[0]);
-                DEST(v0, 1);
+                auto src = SRC1(1);
+                auto dst = GETDST(1);
+                frecpe(s0, SReg(src.getIdx()));
+                dup(dst.s4, v0.s[0]);
+                STRDST(1);
                 break;
             }
             case PICA_RSQ: {
-                SRC1(v0, 1);
-                frsqrte(s0, s0);
-                dup(v0.s4, v0.s[0]);
-                DEST(v0, 1);
+                auto src = SRC1(1);
+                auto dst = GETDST(1);
+                frsqrte(s0, SReg(src.getIdx()));
+                dup(dst.s4, v0.s[0]);
+                STRDST(1);
                 break;
             }
             case PICA_SGE:
             case PICA_SGEI: {
-                if (instr.opcode == PICA_SLT) {
-                    SRC1(v0, 1);
-                    SRC2(v1, 1);
+                VReg src1(0), src2(0);
+                if (instr.opcode == PICA_DPH) {
+                    src1 = SRC1(1);
+                    src2 = SRC2(1);
                 } else {
-                    SRC1(v0, 1i);
-                    SRC2(v1, 1i);
+                    src1 = SRC1(1i);
+                    src2 = SRC2(1i);
                 }
-                fcmge(v0.s4, v0.s4, v1.s4);
+                auto dst = GETDST(1);
+
+                fcmge(dst.s4, src1.s4, src2.s4);
                 fmov(v1.s4, 1.0f);
-                and_(v0.b16, v0.b16, v1.b16);
-                DEST(v0, 1);
+                and_(dst.b16, v1.b16, dst.b16);
+                STRDST(1);
                 break;
             }
             case PICA_SLT:
             case PICA_SLTI: {
-                if (instr.opcode == PICA_SLT) {
-                    SRC1(v0, 1);
-                    SRC2(v1, 1);
+                VReg src1(0), src2(0);
+                if (instr.opcode == PICA_DPH) {
+                    src1 = SRC1(1);
+                    src2 = SRC2(1);
                 } else {
-                    SRC1(v0, 1i);
-                    SRC2(v1, 1i);
+                    src1 = SRC1(1i);
+                    src2 = SRC2(1i);
                 }
-                fcmge(v0.s4, v0.s4, v1.s4);
+                auto dst = GETDST(1);
+
+                fcmge(dst.s4, src1.s4, src2.s4);
                 fmov(v1.s4, 1.0f);
-                bic(v0.b16, v1.b16, v0.b16);
-                DEST(v0, 1);
+                bic(dst.b16, v1.b16, dst.b16);
+                STRDST(1);
                 break;
             }
             case PICA_MOVA: {
-                SRC1(v0, 1);
-                fcvtau(v0.s2, v0.s2);
+                auto src = SRC1(1);
+                fcvtau(v0.s2, src.s2);
                 if (desc.destmask & BIT(3 - 0)) {
                     mov(reg_ax, v0.s[0]);
                 }
@@ -447,8 +496,12 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
                 break;
             }
             case PICA_MOV: {
-                SRC1(v0, 1);
-                DEST(v0, 1);
+                auto src = SRC1(1);
+                auto dst = GETDST(1);
+                if (src.getIdx() != dst.getIdx()) {
+                    mov(dst.b16, src.b16);
+                }
+                STRDST(1);
                 break;
             }
             case PICA_NOP:
@@ -477,8 +530,8 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
                         condop(instr.fmt2.op, instr.fmt2.refx, instr.fmt2.refy);
                 }
                 if (instr.opcode != PICA_CALL) {
-                    if (cond) bne(lelse);
-                    else beq(lelse);
+                    if (cond) beq(lelse);
+                    else bne(lelse);
                 }
                 bl(jmplabels[instr.fmt2.dest]);
                 L(lelse);
@@ -507,15 +560,15 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
                     cond =
                         condop(instr.fmt2.op, instr.fmt2.refx, instr.fmt2.refy);
                 }
-                if (cond) bne(lelse);
-                else beq(lelse);
+                if (cond) beq(lelse);
+                else bne(lelse);
 
                 compileBlock(shu, pc, instr.fmt2.dest - pc);
                 if (instr.fmt2.num) {
                     b(lendif);
                     L(lelse);
                     compileBlock(shu, instr.fmt2.dest, instr.fmt2.num);
-                    b(lendif);
+                    L(lendif);
                 } else {
                     L(lelse);
                 }
@@ -564,12 +617,12 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
                 break;
             }
             case PICA_CMP ... PICA_CMP + 1: {
-                SRC1(v0, 1c);
-                SRC2(v1, 1c);
-                fcmp(s0, s1);
+                auto src1 = SRC1(1c);
+                auto src2 = SRC2(1c);
+                fcmp(SReg(src1.getIdx()), SReg(src2.getIdx()));
                 compare(reg_cmpx, instr.fmt1c.cmpx);
-                mov(v0.s[0], v0.s[1]);
-                mov(v1.s[0], v1.s[1]);
+                mov(v0.s[0], src1.s[1]);
+                mov(v1.s[0], src2.s[1]);
                 fcmp(s0, s1);
                 compare(reg_cmpy, instr.fmt1c.cmpy);
                 break;
@@ -577,20 +630,22 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
             case PICA_MAD ... PICA_MAD + 0xf: {
                 desc = shu->opdescs[instr.fmt5.desc];
 
-                SRC1(v0, 5);
+                auto src1 = SRC1(5);
+                VReg src2(0), src3(0);
                 if (instr.fmt5.opcode & 1) {
-                    SRC2(v1, 5);
-                    SRC3(v2, 5);
+                    src2 = SRC2(5);
+                    src3 = SRC3(5);
                 } else {
-                    SRC2(v1, 5i);
-                    SRC3(v2, 5i);
+                    src2 = SRC2(5i);
+                    src3 = SRC3(5i);
                 }
+                auto dst = GETDST(5);
 
-                setupMul();
-                fmul(v0.s4, v0.s4, v1.s4);
-                fadd(v0.s4, v0.s4, v2.s4);
+                setupMul(src1, src2);
+                fmul(dst.s4, src1.s4, v1.s4);
+                fadd(dst.s4, dst.s4, src3.s4);
 
-                DEST(v0, 5);
+                STRDST(5);
                 break;
             }
             default:

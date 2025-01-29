@@ -85,7 +85,7 @@ struct Code : Xbyak_aarch64::CodeGenerator {
 
 #define CPU(m) (ptr(x29, (u32) offsetof(ArmCore, m)))
 
-#define _LOADOP(i, flbk)                                                       \
+#define LOADOP(i, flbk)                                                        \
     ({                                                                         \
         auto dst = flbk;                                                       \
         if (inst.imm##i) {                                                     \
@@ -101,8 +101,16 @@ struct Code : Xbyak_aarch64::CodeGenerator {
         }                                                                      \
         dst;                                                                   \
     })
-#define LOADOP1() _LOADOP(1, w16)
-#define LOADOP2() _LOADOP(2, w17)
+#define LOADOP1() LOADOP(1, w16)
+#define LOADOP2() LOADOP(2, w17)
+
+#define MOVOP(i, dst)                                                          \
+    ({                                                                         \
+        auto src = LOADOP(i, dst);                                             \
+        if (src.getIdx() != dst.getIdx()) mov(dst, src);                       \
+    })
+#define MOVOP1(dst) MOVOP(1, dst)
+#define MOVOP2(dst) MOVOP(2, dst)
 
 #define DSTREG()                                                               \
     ({                                                                         \
@@ -208,8 +216,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mov(w0, 0);
                     flags_mask = 0;
                 }
-                auto src = LOADOP2();
-                bfi(w0, src, 31 - inst.op1, 1);
+                if (inst.imm2) {
+                    if (inst.op2) orr(w0, w0, BIT(31 - inst.op1));
+                } else {
+                    auto src = LOADOP2();
+                    bfi(w0, src, 31 - inst.op1, 1);
+                }
                 flags_mask |= BIT(31 - inst.op1);
                 if (ir->code.d[i + 2].opcode != IR_STORE_FLAG) {
                     ldr(w1, CPU(cpsr));
@@ -260,19 +272,17 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_LOAD_MEM: {
-                auto addr = LOADOP2();
                 mov(x0, x29);
                 mov(w1, inst.op1);
-                mov(w2, addr);
+                MOVOP2(w2);
                 mov(x16, (u64) exec_vfp_load_mem);
                 blr(x16);
                 break;
             }
             case IR_VFP_STORE_MEM: {
-                auto addr = LOADOP2();
                 mov(x0, x29);
                 mov(w1, inst.op1);
-                mov(w2, addr);
+                MOVOP2(w2);
                 mov(x16, (u64) exec_vfp_store_mem);
                 blr(x16);
                 break;
@@ -287,10 +297,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_WRITE: {
-                auto src = LOADOP2();
                 mov(x0, x29);
                 mov(w1, inst.op1);
-                mov(w2, src);
+                MOVOP2(w2);
                 mov(x16, (u64) exec_vfp_write);
                 blr(x16);
                 break;
@@ -344,10 +353,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_LOAD_MEM8: {
-                auto addr = LOADOP1();
                 auto dst = DSTREG();
                 mov(x0, x29);
-                mov(w1, addr);
+                MOVOP1(w1);
                 mov(w2, 0);
                 usingclbk[CLBK_LOAD8] = true;
                 ldr(x16, clbks[CLBK_LOAD8]);
@@ -356,10 +364,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_LOAD_MEMS8: {
-                auto addr = LOADOP1();
                 auto dst = DSTREG();
                 mov(x0, x29);
-                mov(w1, addr);
+                MOVOP1(w1);
                 mov(w2, 1);
                 usingclbk[CLBK_LOAD8] = true;
                 ldr(x16, clbks[CLBK_LOAD8]);
@@ -368,10 +375,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_LOAD_MEM16: {
-                auto addr = LOADOP1();
                 auto dst = DSTREG();
                 mov(x0, x29);
-                mov(w1, addr);
+                MOVOP1(w1);
                 mov(w2, 0);
                 usingclbk[CLBK_LOAD16] = true;
                 ldr(x16, clbks[CLBK_LOAD16]);
@@ -380,10 +386,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_LOAD_MEMS16: {
-                auto addr = LOADOP1();
                 auto dst = DSTREG();
                 mov(x0, x29);
-                mov(w1, addr);
+                MOVOP1(w1);
                 mov(w2, 1);
                 usingclbk[CLBK_LOAD16] = true;
                 ldr(x16, clbks[CLBK_LOAD16]);
@@ -392,11 +397,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_LOAD_MEM32: {
-                auto addr = LOADOP1();
                 auto dst = DSTREG();
                 mov(x0, x29);
-                mov(w1, addr);
-                mov(w2, 0);
+                MOVOP1(w1);
                 usingclbk[CLBK_LOAD32] = true;
                 ldr(x16, clbks[CLBK_LOAD32]);
                 blr(x16);
@@ -404,33 +407,27 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_STORE_MEM8: {
-                auto addr = LOADOP1();
-                auto data = LOADOP2();
                 mov(x0, x29);
-                mov(w1, addr);
-                mov(w2, data);
+                MOVOP1(w1);
+                MOVOP2(w2);
                 usingclbk[CLBK_STORE8] = true;
                 ldr(x16, clbks[CLBK_STORE8]);
                 blr(x16);
                 break;
             }
             case IR_STORE_MEM16: {
-                auto addr = LOADOP1();
-                auto data = LOADOP2();
                 mov(x0, x29);
-                mov(w1, addr);
-                mov(w2, data);
+                MOVOP1(w1);
+                MOVOP2(w2);
                 usingclbk[CLBK_STORE16] = true;
                 ldr(x16, clbks[CLBK_STORE16]);
                 blr(x16);
                 break;
             }
             case IR_STORE_MEM32: {
-                auto addr = LOADOP1();
-                auto data = LOADOP2();
                 mov(x0, x29);
-                mov(w1, addr);
-                mov(w2, data);
+                MOVOP1(w1);
+                MOVOP2(w2);
                 usingclbk[CLBK_STORE32] = true;
                 ldr(x16, clbks[CLBK_STORE32]);
                 blr(x16);
@@ -873,6 +870,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     ble(nolink);
                     ldr(x16, linkaddr);
                     br(x16);
+                    align(8);
                     L(linkaddr);
                     links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
                                                  inst.op1, inst.op2});
@@ -890,6 +888,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
         STOREDST();
     }
 
+    align(8);
     for (int i = 0; i < CLBK_MAX; i++) {
         if (usingclbk[i]) {
             L(clbks[i]);

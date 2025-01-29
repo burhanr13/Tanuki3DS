@@ -52,7 +52,7 @@ jobs:
     - name: install dependencies
       run: |
         brew install llvm sdl2 glew xxhash xbyak capstone
-        git clone https://github.com/fujitsu/xbyak_aarch64.git
+        git clone https://github.com/burhanr13/xbyak_aarch64.git
         cd xbyak_aarch64
         sudo make install
         cd ..

@@ -19,7 +19,7 @@ You need the following dependencies installed to build and run:
 - xxhash (build only)
 - capstone (build only)
 
-They can all be installed with your local package manager (brew on macos, apt on ubuntu, etc). Additionally, to compile on arm64 you will need [xbyak_aarch64](https://github.com/fujitsu/xbyak_aarch64) which you need to manually build and install.
+They can all be installed with your local package manager (brew on macos, apt on ubuntu, etc). Additionally, to compile on arm64 you will need [xbyak_aarch64](https://github.com/burhanr13/xbyak_aarch64) which you need to manually build and install.
 
 To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23 such as `clang-19` for both linux and MacOS. For MacOS it can be installed via brew. Windows support is planned.
 
