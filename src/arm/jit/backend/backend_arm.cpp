@@ -225,7 +225,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 flags_mask |= BIT(31 - inst.op1);
                 if (ir->code.d[i + 2].opcode != IR_STORE_FLAG) {
                     ldr(w1, CPU(cpsr));
-                    and_(w1, w1, ~flags_mask);
+                    and_imm(w1, w1, ~flags_mask, w2);
                     orr(w1, w1, w0);
                     str(w1, CPU(cpsr));
                 }
@@ -440,25 +440,55 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_AND: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
-                auto dst = DSTREG();
-                ands(dst, src1, src2);
+                if (inst.imm2) {
+                    auto src1 = LOADOP1();
+                    auto dst = DSTREG();
+                    ands_imm(dst, src1, inst.op2, w17);
+                } else if (inst.imm1) {
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    ands_imm(dst, src2, inst.op1, w16);
+                } else {
+                    auto src1 = LOADOP1();
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    ands(dst, src1, src2);
+                }
                 lastflags = i;
                 break;
             }
             case IR_OR: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
-                auto dst = DSTREG();
-                orr(dst, src1, src2);
+                if (inst.imm2) {
+                    auto src1 = LOADOP1();
+                    auto dst = DSTREG();
+                    orr_imm(dst, src1, inst.op2, w17);
+                } else if (inst.imm1) {
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    orr_imm(dst, src2, inst.op1, w16);
+                } else {
+                    auto src1 = LOADOP1();
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    orr(dst, src1, src2);
+                }
                 break;
             }
             case IR_XOR: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
-                auto dst = DSTREG();
-                eor(dst, src1, src2);
+                if (inst.imm2) {
+                    auto src1 = LOADOP1();
+                    auto dst = DSTREG();
+                    eor_imm(dst, src1, inst.op2, w17);
+                } else if (inst.imm1) {
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    eor_imm(dst, src2, inst.op1, w16);
+                } else {
+                    auto src1 = LOADOP1();
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    eor(dst, src1, src2);
+                }
                 break;
             }
             case IR_NOT: {
@@ -559,18 +589,34 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_ADD: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
-                auto dst = DSTREG();
-                adds(dst, src1, src2);
+                if (inst.imm2) {
+                    auto src1 = LOADOP1();
+                    auto dst = DSTREG();
+                    adds_imm(dst, src1, inst.op2, w17);
+                } else if (inst.imm1) {
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    adds_imm(dst, src2, inst.op1, w16);
+                } else {
+                    auto src1 = LOADOP1();
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    adds(dst, src1, src2);
+                }
                 lastflags = i;
                 break;
             }
             case IR_SUB: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
-                auto dst = DSTREG();
-                subs(dst, src1, src2);
+                if (inst.imm2) {
+                    auto src1 = LOADOP1();
+                    auto dst = DSTREG();
+                    subs_imm(dst, src1, inst.op2, w17);
+                } else {
+                    auto src1 = LOADOP1();
+                    auto src2 = LOADOP2();
+                    auto dst = DSTREG();
+                    subs(dst, src1, src2);
+                }
                 lastflags = i;
                 break;
             }
