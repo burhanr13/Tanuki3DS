@@ -6,7 +6,7 @@
 #include "renderer_gl.h"
 #include "shader.h"
 
-// #define SHADERJIT
+#define SHADERJIT
 
 #undef PTR
 #ifdef FASTMEM

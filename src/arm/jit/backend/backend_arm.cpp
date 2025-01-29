@@ -483,7 +483,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     auto shift = LOADOP2();
                     Label lelse, lendif;
                     cmp(shift, 32);
-                    bcs(lelse);
+                    b(HS, lelse);
                     lsl(dst, src, shift);
                     b(lendif);
                     L(lelse);
@@ -507,7 +507,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     auto shift = LOADOP2();
                     Label lelse, lendif;
                     cmp(shift, 32);
-                    bcs(lelse);
+                    b(HS, lelse);
                     lsr(dst, src, shift);
                     b(lendif);
                     L(lelse);
@@ -531,7 +531,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     auto shift = LOADOP2();
                     Label lelse, lendif;
                     cmp(shift, 32);
-                    bcs(lelse);
+                    b(HS, lelse);
                     asr(dst, src, shift);
                     b(lendif);
                     L(lelse);
@@ -891,8 +891,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
     }
 
     for (int i = 0; i < CLBK_MAX; i++) {
-        L(clbks[i]);
         if (usingclbk[i]) {
+            L(clbks[i]);
             dd(clbkptrs[i]);
             dd(clbkptrs[i] >> 32);
         }
