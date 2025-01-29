@@ -9,7 +9,7 @@
 
 using namespace Xbyak_aarch64;
 
-// #define JIT_DISASM
+#define JIT_DISASM
 
 struct ShaderCode : Xbyak_aarch64::CodeGenerator {
 
@@ -87,16 +87,15 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
             } else {
                 switch (idx) {
                     case 1:
-                        mov(w11, reg_ax);
+                        add(w11, reg_ax, n);
                         break;
                     case 2:
-                        mov(w11, reg_ay);
+                        add(w11, reg_ay, n);
                         break;
                     case 3:
-                        mov(w11, reg_al);
+                        add(w11, reg_al, n);
                         break;
                 }
-                add(w11, w11, n);
                 and_(w11, w11, 0x7f);
                 ldr(QReg(src.getIdx()), ptr(reg_c, w11, UXTW, 4));
             }
@@ -451,7 +450,7 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
             case PICA_SGE:
             case PICA_SGEI: {
                 VReg src1(0), src2(0);
-                if (instr.opcode == PICA_DPH) {
+                if (instr.opcode == PICA_SGE) {
                     src1 = SRC1(1);
                     src2 = SRC2(1);
                 } else {
@@ -469,7 +468,7 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
             case PICA_SLT:
             case PICA_SLTI: {
                 VReg src1(0), src2(0);
-                if (instr.opcode == PICA_DPH) {
+                if (instr.opcode == PICA_SLT) {
                     src1 = SRC1(1);
                     src2 = SRC2(1);
                 } else {
@@ -678,10 +677,11 @@ void shaderjit_arm_disassemble(void* backend) {
     printf("--------- Shader JIT Disassembly at %p ------------\n",
            code->getCode());
     for (size_t i = 0; i < count; i++) {
-        printf("%04lx: %s %s\n", insn[i].address, insn[i].mnemonic,
-               insn[i].op_str);
+        printf("%04lx: %08x %s %s\n", insn[i].address, *(u32*) &insn[i].bytes,
+               insn[i].mnemonic, insn[i].op_str);
     }
     cs_free(insn, count);
+    cs_close(&handle);
 }
 }
 

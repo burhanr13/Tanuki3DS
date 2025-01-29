@@ -982,10 +982,11 @@ void backend_arm_disassemble(void* backend) {
         cs_disasm(handle, code->getCode(), code->getSize(), 0, 0, &insn);
     printf("--------- JIT Disassembly at %p ------------\n", code->getCode());
     for (size_t i = 0; i < count; i++) {
-        printf("%04lx: %s %s\n", insn[i].address, insn[i].mnemonic,
-               insn[i].op_str);
+        printf("%04lx: %08x %s %s\n", insn[i].address, *(u32*) &insn[i].bytes,
+               insn[i].mnemonic, insn[i].op_str);
     }
     cs_free(insn, count);
+    cs_close(&handle);
 }
 }
 
