@@ -5,9 +5,14 @@
 Tanuki3DS is a 3DS emulator for MacOS and Linux written in C which aims to be simple, fast, and compatible. Currently it can play a handful of games at full speed and supports some nice features like controller support and video upscaling. If you have any questions, you can join our [discord server](https://discord.gg/6ya65fvD3g).
 
 ## Download
-update this when merging
 
-You can download a stable release from the releases tab, or the latest builds for [Linux](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux.zip) or [MacOS](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos.zip).
+You can download a stable release from the releases tab, or the latest build below:
+
+| Download |
+| -------- |
+| [Linux](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux.zip) | 
+| [MacOS (Intel)](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86.zip) |
+[MacOS (ARM)](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm.zip) |
 
 <img src=images/oot3d.png width=300><img src=images/mk7.png width=300>
 
