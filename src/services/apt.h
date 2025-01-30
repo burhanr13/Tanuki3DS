@@ -4,8 +4,6 @@
 #include "../srv.h"
 #include "../thread.h"
 
-#define SHAREDFONTADDR 0x1800'0000
-
 enum {
     APTCMD_NONE,
     APTCMD_WAKEUP,

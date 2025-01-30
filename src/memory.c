@@ -201,6 +201,7 @@ PageEntry ptabread(PageTable ptab, u32 vaddr) {
     }
     if (res.state == MEMST_FREE) {
         lerror("invalid virtual memory address %08x", vaddr);
+        exit(1);
     }
     return res;
 }

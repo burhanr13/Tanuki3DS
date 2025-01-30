@@ -37,9 +37,12 @@ void init_services(E3DS* s) {
     s->services.apt.nextparam.appid = APPID_HOMEMENU;
     s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
-    s->services.apt.shared_font.mapaddr = SHAREDFONTADDR;
     s->services.apt.shared_font.size = sizeof shared_font;
     sharedmem_alloc(s, &s->services.apt.shared_font);
+    // the shared font is treated as part of the linear heap
+    // so its paddr and vaddr must be related appropriately
+    s->services.apt.shared_font.mapaddr =
+        s->services.apt.shared_font.paddr - FCRAM_PBASE + LINEAR_HEAP_BASE;
     memcpy(PPTR(s->services.apt.shared_font.paddr), shared_font,
            sizeof shared_font);
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
