@@ -17,6 +17,10 @@ extern bool g_infologs;
                          __func__ __VA_OPT__(, ) __VA_ARGS__)                  \
                 : (void) 0)
 
+#define ldebug(format, ...)                                                    \
+    printf("\e[36m[DEBUG](%s) " format "\e[0m\n",                            \
+           __func__ __VA_OPT__(, ) __VA_ARGS__)
+
 #define lwarn(format, ...)                                                     \
     printf("\e[33m[WARNING](%s) " format "\e[0m\n",                            \
            __func__ __VA_OPT__(, ) __VA_ARGS__)

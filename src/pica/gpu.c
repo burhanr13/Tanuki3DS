@@ -108,7 +108,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     gpu->io.w[id] &= ~mask;
     gpu->io.w[id] |= param & mask;
     switch (id) {
-        // this is a slow way to maybe ensure texture cache coherency
+        // this is a slow way to ensure texture cache coherency
         // case GPUREG(tex.config):
         //     if (gpu->io.tex.config.clearcache) {
         //         while (gpu->textures.size) {
