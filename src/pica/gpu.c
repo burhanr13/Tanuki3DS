@@ -368,6 +368,8 @@ void gpu_update_cur_fb(GPU* gpu) {
         return;
 
     // little hack to make arisoturas sm64 port work
+    // it clears the depthbuffer by binding it as the colorbuffer
+    // and drawing on it
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].depth_paddr == gpu->io.fb.colorbuf_loc << 3) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
