@@ -221,7 +221,7 @@ void* sw_pptr(E3DSMemory* m, u32 addr) {
 
 void* sw_vptr(E3DS* s, u32 addr) {
     auto ent = ptabread(s->process.ptab, addr);
-    return sw_pptr(s->mem, ent.paddr + (addr & 0xfff));
+    return sw_pptr(s->mem, ent.paddr + addr % PAGE_SIZE);
 }
 
 void insert_vmblock(E3DS* s, u32 base, u32 size, u32 perm, u32 state) {

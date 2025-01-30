@@ -1,3 +1,5 @@
+#ifdef __x86_64__
+
 #include "backend_x86.h"
 
 #include <capstone/capstone.h>
@@ -67,7 +69,7 @@ struct Code : Xbyak::CodeGenerator {
     }
 };
 
-#define CPU(m) (rbx + ((char*) &cpu->m - (char*) cpu))
+#define CPU(m) (rbx + offsetof(ArmCore, m))
 
 #define OP(op, dest, src)                                                      \
     ({                                                                         \
@@ -1274,3 +1276,5 @@ void backend_x86_disassemble(void* backend) {
     cs_free(insn, count);
 }
 }
+
+#endif

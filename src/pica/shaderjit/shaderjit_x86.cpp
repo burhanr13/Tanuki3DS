@@ -1,3 +1,5 @@
+#ifdef __x86_64__
+
 #include "shaderjit_x86.h"
 
 #include <capstone/capstone.h>
@@ -557,3 +559,5 @@ void shaderjit_x86_disassemble(void* backend) {
     cs_free(insn, count);
 }
 }
+
+#endif

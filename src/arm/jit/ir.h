@@ -25,12 +25,12 @@ typedef enum {
     IR_STORE_FLAG,    // -iv
     IR_LOAD_REG_USR,  // ri-
     IR_STORE_REG_USR, // -iv
-    IR_LOAD_CPSR,     // ri-
-    IR_STORE_CPSR,    // -iv
-    IR_LOAD_SPSR,     // ri-
-    IR_STORE_SPSR,    // -iv
-    IR_LOAD_THUMB,    // ri-
-    IR_STORE_THUMB,   // -iv
+    IR_LOAD_CPSR,     // r--
+    IR_STORE_CPSR,    // --v
+    IR_LOAD_SPSR,     // r--
+    IR_STORE_SPSR,    // --v
+    IR_LOAD_THUMB,    // r--
+    IR_STORE_THUMB,   // --v
 
     // memory access instructions
     IR_LOAD_MEM8,   // rv-

@@ -444,21 +444,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
             case IR_BEGIN:
                 break;
             case IR_END_LINK:
-                cpu->cycles -= block->numinstr;
-                if (cpu->cycles > 0) {
-                    JITBlock* next = get_jitblock(cpu, OP(1), OP(2));
-                    if (next) {
-                        jit_exec(next);
-                        return;
-                    }
-                }
-                return;
             case IR_END_LOOP:
-                cpu->cycles -= block->numinstr;
-                if (cpu->cycles > 0) {
-                    ir_interpret(block, cpu);
-                }
-                return;
             case IR_END_RET:
                 cpu->cycles -= block->numinstr;
                 return;

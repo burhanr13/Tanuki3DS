@@ -23,7 +23,7 @@ jobs:
         name: Tanuki3DS-linux
         path: ./ctremu
         
-  macos-build:
+  macos-x86-build:
     runs-on: macos-13
     steps:
     - uses: actions/checkout@v4
@@ -38,9 +38,36 @@ jobs:
         brew install dylibbundler imagemagick
         ./.github/mac-bundle.sh
         codesign --force -s - -vvvv Tanuki3DS.app
-        zip -r Tanuki3DS-macos Tanuki3DS.app
+        zip -r Tanuki3DS-macos-x86 Tanuki3DS.app
 
     - uses: actions/upload-artifact@v4
       with:
-        name: Tanuki3DS-macos
-        path: ./Tanuki3DS-macos.zip
+        name: Tanuki3DS-macos-x86
+        path: ./Tanuki3DS-macos-x86.zip
+
+  macos-arm-build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: install dependencies
+      run: |
+        brew install llvm sdl2 glew xxhash xbyak capstone
+        git clone https://github.com/burhanr13/xbyak_aarch64.git
+        cd xbyak_aarch64
+        sudo make install
+        cd ..
+    - name: build
+      run: make USER=1
+
+    # taken from panda3ds
+    - name: create app bundle
+      run: |
+        brew install dylibbundler imagemagick
+        ./.github/mac-bundle.sh
+        codesign --force -s - -vvvv Tanuki3DS.app
+        zip -r Tanuki3DS-macos-arm Tanuki3DS.app
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Tanuki3DS-macos-arm
+        path: ./Tanuki3DS-macos-arm.zip

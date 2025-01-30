@@ -23,12 +23,19 @@ typedef struct {
     RegType type;
 } HostRegInfo;
 
+// reg_info is the vector of virtual registers
+// reg_assn is the assignment of SSA vars to the regs in reg_info
+// vars without an assignment have index -1
+// nassns is the length of reg_assn
 typedef struct {
     Vector(RegInfo) reg_info;
     u32* reg_assn;
     u32 nassns;
 } RegAllocation;
 
+// hostreg_info is the array of host regs corresponding to each virtual reg_info
+// count is the number of registers of each type
+// nregs is the length of hostreg_info
 typedef struct {
     HostRegInfo* hostreg_info;
     u32 count[REG_MAX];
