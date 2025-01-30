@@ -496,6 +496,7 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
             }
             case PICA_MOVA: {
                 auto src = SRC1(1);
+                // this needs to be zs, or won't work   
                 fcvtzs(v0.s2, src.s2);
                 if (desc.destmask & BIT(3 - 0)) {
                     mov(reg_ax, v0.s[0]);
@@ -600,8 +601,7 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 ubfx(w12, w11, 16, 8);
                 add(reg_al, reg_al, w12);
                 add(loopcount, loopcount, 1);
-                ubfx(w11, w11, 0, 8);
-                cmp(loopcount, w11);
+                cmp(loopcount, w11, UXTB);
                 bls(loop);
 
                 ldr(loopcount, post_ptr(sp, 16));

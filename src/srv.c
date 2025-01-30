@@ -67,6 +67,9 @@ void init_services(E3DS* s) {
     }
 
     srvobj_init(&s->services.cecd.cecinfo.hdr, KOT_EVENT);
+
+    srvobj_init(&s->services.y2r.transferend.hdr, KOT_EVENT);
+    s->services.y2r.transferend.sticky = true;
 }
 
 KSession* session_create(PortRequestHandler f) {

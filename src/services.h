@@ -23,6 +23,7 @@ typedef struct {
     DSPData dsp;
     FSData fs;
     CECDData cecd;
+    Y2RData y2r;
 
 } ServiceData;
 

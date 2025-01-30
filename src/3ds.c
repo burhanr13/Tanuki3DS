@@ -19,6 +19,8 @@ void e3ds_init(E3DS* s, char* romfile) {
 
     memory_init(s);
 
+    init_services(s); // start up and allocate memory for services first
+
     u32 entrypoint = 0;
 
     char* ext = strrchr(romfile, '.');
@@ -57,8 +59,6 @@ void e3ds_init(E3DS* s, char* romfile) {
 
     memory_virtalloc(s, TLS_BASE, TLS_SIZE * THREAD_MAX, PERM_RW,
                      MEMST_PRIVATE);
-
-    init_services(s);
 
     thread_init(s, entrypoint);
 
