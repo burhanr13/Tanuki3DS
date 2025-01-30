@@ -367,6 +367,18 @@ void gpu_update_cur_fb(GPU* gpu) {
         gpu->cur_fb->color_paddr == (gpu->io.fb.colorbuf_loc << 3))
         return;
 
+    // little hack to make arisoturas sm64 port work
+    for (int i = 0; i < FB_MAX; i++) {
+        if (gpu->fbs.d[i].depth_paddr == gpu->io.fb.colorbuf_loc << 3) {
+            LRU_use(gpu->fbs, &gpu->fbs.d[i]);
+            glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
+            glClearDepthf(0);
+            glDepthMask(true);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            linfo("lmao");
+        }
+    }
+
     gpu->cur_fb = fbcache_load(gpu, gpu->io.fb.colorbuf_loc << 3);
     gpu->cur_fb->depth_paddr = gpu->io.fb.depthbuf_loc << 3;
     gpu->cur_fb->color_fmt = gpu->io.fb.colorbuf_fmt.fmt;
@@ -377,7 +389,7 @@ void gpu_update_cur_fb(GPU* gpu) {
           gpu->cur_fb->depth_paddr);
 
     glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
-    
+
     u32 w = gpu->io.fb.dim.width;
     u32 h = gpu->io.fb.dim.height + 1;
 
