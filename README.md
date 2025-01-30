@@ -12,7 +12,7 @@ You can download a stable release from the releases tab, or the latest build bel
 | -------- |
 | [Linux](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux.zip) | 
 | [MacOS (Intel)](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86.zip) |
-[MacOS (ARM)](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm.zip) |
+| [MacOS (ARM)](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm.zip) |
 
 <img src=images/oot3d.png width=300><img src=images/mk7.png width=300>
 
@@ -20,9 +20,9 @@ You can download a stable release from the releases tab, or the latest build bel
 You need the following dependencies installed to build and run:
 - sdl2
 - glew
+- capstone
 - xbyak (build only)
 - xxhash (build only)
-- capstone (build only)
 
 They can all be installed with your local package manager (brew on macos, apt on ubuntu, etc). Additionally, to compile on arm64 you will need [xbyak_aarch64](https://github.com/burhanr13/xbyak_aarch64) which you need to manually build and install.
 
