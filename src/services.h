@@ -8,6 +8,7 @@
 #include "services/fs.h"
 #include "services/gsp.h"
 #include "services/hid.h"
+#include "services/ldr.h"
 #include "services/y2r.h"
 
 #include "thread.h"

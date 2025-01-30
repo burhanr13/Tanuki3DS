@@ -46,7 +46,7 @@ typedef struct _3DS {
     Scheduler sched;
 } E3DS;
 
-#define FCRAMUSERSIZE (96 * BIT(20))
+#define FCRAMUSERSIZE (64 * BIT(20))
 
 #define STACK_BASE 0x1000'0000
 

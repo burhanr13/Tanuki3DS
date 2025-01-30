@@ -312,7 +312,7 @@ DECL_PORT_ARG(fs_selfncch, base) {
             u32 size = cmdbuf[3];
             void* data = PTR(cmdbuf[5]);
 
-            linfo("reading at offset 0x%lx, size 0x%x", offset, size);
+            linfo("reading at offset 0x%lx, size 0x%x to 0x%x", offset, size, cmdbuf[5]);
 
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;

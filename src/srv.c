@@ -131,6 +131,8 @@ DECL_PORT(srv) {
                 handler = port_handle_y2r;
             } else if (IS("cecd:u")) {
                 handler = port_handle_cecd;
+            } else if (IS("ldr:ro")) {
+                handler = port_handle_ldr_ro;
             } else {
                 lerror("unknown service '%.8s'", name);
                 u32 handle = handle_new(s);
