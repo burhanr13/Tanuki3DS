@@ -57,6 +57,7 @@ u32 physaddr2memoff(u32 paddr) {
         return offsetof(E3DSMemory, dspram[paddr - DSPRAM_PBASE]);
     }
     lerror("unknown physical memory address %08x", paddr);
+    cpu_print_state(&ctremu.system.cpu);
     exit(1);
 }
 
@@ -201,6 +202,7 @@ PageEntry ptabread(PageTable ptab, u32 vaddr) {
     }
     if (res.state == MEMST_FREE) {
         lerror("invalid virtual memory address %08x", vaddr);
+        cpu_print_state(&ctremu.system.cpu);
         exit(1);
     }
     return res;

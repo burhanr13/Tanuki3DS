@@ -36,7 +36,7 @@ void destroy_jit_block(JITBlock* block);
 void jit_exec(JITBlock* block);
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr);
 
-void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr);
+void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 len);
 void jit_free_all(ArmCore* cpu);
 
 void arm_exec_jit(ArmCore* cpu);

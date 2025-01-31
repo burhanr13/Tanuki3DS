@@ -24,6 +24,7 @@ typedef struct {
     FSData fs;
     CECDData cecd;
     Y2RData y2r;
+    LDRData ldr;
 
 } ServiceData;
 

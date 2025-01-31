@@ -115,6 +115,7 @@ void jit_exec(JITBlock* block) {
 // 64 root entries corresponding to low 6 bits of cpsr of the block
 // then BIT(16) entries corresponding to bit[31:16] of start addr
 // then BIT(15) entries corresponding to bit[15:1] of start addr
+// jit blocks will never cross page boundaries
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
     u32 addrhi = addr >> 16;
     u32 addrlo = (addr & 0xffff) >> 1;
@@ -141,24 +142,42 @@ JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
     return block;
 }
 
-void jit_free_all(ArmCore* cpu) {
+// start is page aligned
+void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 len) {
+    start_addr = start_addr & ~MASK(16);
+    u32 startpg = start_addr >> 16;
+    u32 endpg = startpg + (len >> 16);
+    len = (len & MASK(16)) >> 1;
     for (int i = 0; i < 64; i++) {
-        if (cpu->jit_cache[i]) {
-            for (int j = 0; j < BIT(16); j++) {
-                if (cpu->jit_cache[i][j]) {
-                    for (int k = 0; k < BIT(16) >> 1; k++) {
-                        if (cpu->jit_cache[i][j][k]) {
-                            destroy_jit_block(cpu->jit_cache[i][j][k]);
-                            cpu->jit_cache[i][j][k] = nullptr;
-                        }
-                    }
-                    free(cpu->jit_cache[i][j]);
-                    cpu->jit_cache[i][j] = nullptr;
+        if (!cpu->jit_cache[i]) continue;
+        for (int j = startpg; j <= endpg; j++) {
+            if (!cpu->jit_cache[i][j]) continue;
+            for (int k = 0; k < len; k++) {
+                if (cpu->jit_cache[i][j][k]) {
+                    destroy_jit_block(cpu->jit_cache[i][j][k]);
+                    cpu->jit_cache[i][j][k] = nullptr;
                 }
             }
-            free(cpu->jit_cache[i]);
-            cpu->jit_cache[i] = nullptr;
         }
+    }
+}
+
+void jit_free_all(ArmCore* cpu) {
+    for (int i = 0; i < 64; i++) {
+        if (!cpu->jit_cache[i]) continue;
+        for (int j = 0; j < BIT(16); j++) {
+            if (!cpu->jit_cache[i][j]) continue;
+            for (int k = 0; k < BIT(16) >> 1; k++) {
+                if (cpu->jit_cache[i][j][k]) {
+                    destroy_jit_block(cpu->jit_cache[i][j][k]);
+                    cpu->jit_cache[i][j][k] = nullptr;
+                }
+            }
+            free(cpu->jit_cache[i][j]);
+            cpu->jit_cache[i][j] = nullptr;
+        }
+        free(cpu->jit_cache[i]);
+        cpu->jit_cache[i] = nullptr;
     }
 }
 

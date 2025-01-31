@@ -17,6 +17,10 @@ DECL_PORT(cfg) {
             // these are currently set to reasonable defaults
             // in the future it should be possible to change these
             switch (blkid) {
+                case 0x30001: {
+                    *(u64*) ptr = 0;
+                    break;
+                }
                 case 0x50005: {
                     float* block = ptr;
                     block[0] = 62.0f;

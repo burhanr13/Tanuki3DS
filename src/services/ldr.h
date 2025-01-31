@@ -3,18 +3,82 @@
 
 #include "../srv.h"
 
+typedef struct {
+    u32 crs_addr;
+} LDRData;
+
+enum {
+    CROSEG_TEXT,
+    CROSEG_RODATA,
+    CROSEG_DATA,
+    CROSEG_BSS,
+};
+
 typedef union {
     u32 raw;
     struct {
-        u32 segment : 4;
+        u32 id : 4;
         u32 offset : 28;
     };
-} SegmentOffset;
+} SegmentTag;
 
 typedef struct {
     u32 addr;
     u32 size;
 } CROField;
+
+typedef struct {
+    u32 addr;
+    u32 size;
+    u32 id;
+} CROSegment;
+
+typedef struct {
+    u32 name_addr;
+    SegmentTag loc;
+} CRONamedExport;
+
+typedef struct {
+    SegmentTag loc;
+} CROIndexedExport;
+
+typedef struct {
+    u32 name_addr;
+    u32 patches_addr;
+} CRONamedImport;
+
+typedef struct {
+    u32 index;
+    u32 patches_addr;
+} CROIndexedImport;
+
+typedef struct {
+    SegmentTag loc;
+    u32 patches_addr;
+} CROAnonImport;
+
+typedef struct {
+    u32 name_addr;
+    CROField indexed;
+    CROField anon;
+} CROImportModule;
+
+typedef struct {
+    SegmentTag loc;
+    u8 type;
+    u8 end;
+    u8 loaded;
+    u8 _pad;
+    u32 addend;
+} CROImportPatch;
+
+typedef struct {
+    SegmentTag loc;
+    u8 type;
+    u8 segid;
+    u8 _pad[2];
+    u32 addend;
+} CROInternalPatch;
 
 typedef struct {
     u8 hash[0x80];
@@ -26,10 +90,10 @@ typedef struct {
     u32 bsssz;
     u32 _unk98;
     u32 _unk9c;
-    SegmentOffset nnrocontrolobject;
-    SegmentOffset onload;
-    SegmentOffset onexit;
-    SegmentOffset onunresolved;
+    SegmentTag nnrocontrolobject;
+    SegmentTag onload;
+    SegmentTag onexit;
+    SegmentTag onunresolved;
     CROField code;
     CROField data;
     CROField modulename;
@@ -40,7 +104,7 @@ typedef struct {
         CROField strings;
         CROField nametree;
     } exports;
-    CROField import_table;
+    CROField import_modules;
     CROField external_patches;
     struct {
         CROField named_symbols;
@@ -55,6 +119,6 @@ typedef struct {
 
 DECL_PORT(ldr_ro);
 
-void cro_relocate_hdr(E3DS* s, u32 vaddr);
+void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink);
 
 #endif
