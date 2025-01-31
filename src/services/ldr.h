@@ -119,6 +119,8 @@ typedef struct {
 
 DECL_PORT(ldr_ro);
 
+void cro_relocate(E3DS* s, u32 vaddr);
 void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink);
+void ldr_unload_cro(E3DS* s, u32 vaddr);
 
 #endif

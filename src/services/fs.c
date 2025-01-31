@@ -12,10 +12,18 @@
 
 enum {
     SYSFILE_MIIDATA = 1,
+    SYSFILE_BADWORDLIST = 2,
+    SYSFILE_COUNTRYLIST = 3,
 };
 
 u8 mii_data[] = {
 #embed "../sys_files/mii.app.romfs"
+};
+u8 badwordlist[] = {
+#embed "../sys_files/badwords.app.romfs"
+};
+u8 country_list[] = {
+#embed "../sys_files/countrylist.app.romfs"
 };
 
 char* archive_basepath(u64 archive) {
@@ -143,7 +151,7 @@ DECL_PORT(fs) {
             } else {
                 cmdbuf[1] = FSERR_OPEN;
             }
-            
+
             break;
         }
         case 0x0808: {
@@ -312,7 +320,8 @@ DECL_PORT_ARG(fs_selfncch, base) {
             u32 size = cmdbuf[3];
             void* data = PTR(cmdbuf[5]);
 
-            linfo("reading at offset 0x%lx, size 0x%x to 0x%x", offset, size, cmdbuf[5]);
+            linfo("reading at offset 0x%lx, size 0x%x to 0x%x", offset, size,
+                  cmdbuf[5]);
 
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
@@ -362,6 +371,16 @@ DECL_PORT_ARG(fs_sysfile, file) {
             srcdata = mii_data;
             srcsize = sizeof mii_data;
             linfo("accessing mii data");
+            break;
+        case SYSFILE_BADWORDLIST:
+            srcdata = badwordlist;
+            srcsize = sizeof badwordlist;
+            linfo("accessing bad word list");
+            break;
+        case SYSFILE_COUNTRYLIST:
+            srcdata = country_list;
+            srcsize = sizeof country_list;
+            linfo("accessing country list");
             break;
         default:
             lerror("unknown system file %x", file);
@@ -627,11 +646,19 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
             if (pathtype == FSPATH_BINARY) {
                 u64* lowpath = path;
                 switch (*lowpath) {
-                    case 0x0004009b00010202:
+                    case 0x0004'009b'0001'0202:
                         linfo("opening mii data archive");
                         return (u64) 0x2345678a | (u64) SYSFILE_MIIDATA << 32;
+                    case 0x0004'00db'0001'0302:
+                        linfo("opening badwords list archive");
+                        return (u64) 0x2345678a | (u64) SYSFILE_BADWORDLIST
+                                                      << 32;
+                    case 0x0004'009b'0001'0402:
+                        linfo("opening country list archive");
+                        return (u64) 0x2345678a | (u64) SYSFILE_COUNTRYLIST
+                                                      << 32;
                     default:
-                        lwarn("unknown ncch archive %lx", *lowpath);
+                        lwarn("unknown ncch archive %016lx", *lowpath);
                         return -1;
                 }
             } else {
@@ -771,7 +798,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             if (pathtype == FSPATH_BINARY) {
                 u32* path = rawpath;
                 if (path[0] == 0 && path[2] == 0) {
-                    linfo("opening romfs");
+                    linfo("opening system file");
                     return session_create_arg(port_handle_fs_sysfile,
                                               archive >> 32);
                 } else {
@@ -779,7 +806,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                     return 0;
                 }
             } else {
-                lerror("unknown selfNCCH(0x234578a) file path type");
+                lerror("unknown ncch file path type");
                 return nullptr;
             }
             break;

@@ -6,9 +6,9 @@
 #include "services.h"
 #include "svc.h"
 
-u8 shared_font[] = {
-#embed "sys_files/fonthdr.bin"
-    ,
+// apt sets the first word to 2 when done loading
+// the actual font data is at 0x80
+u8 shared_font[] = {2, [0x80] =
 #embed "sys_files/font.bcfnt"
 };
 
