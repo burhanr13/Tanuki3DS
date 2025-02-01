@@ -57,7 +57,7 @@ jobs:
       run: |
         brew update
         brew install llvm sdl3 glew xxhash capstone
-        git clone https://github.com/burhanr13/xbyak_aarch64.git
+        git clone https://github.com/fujitsu/xbyak_aarch64.git
         cd xbyak_aarch64
         sudo make install
     - name: build
