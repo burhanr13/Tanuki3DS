@@ -14,12 +14,11 @@ jobs:
       run: |
         sudo apt update
         sudo apt install clang-19 libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
-        git clone https://github.com/libsdl-org/SDL.git
-        cd SDL
-        mkdir build
-        cd build
-        cmake ..
-        sudo make install
+    - uses: libsdl-org/setup-sdl@main
+      with:
+        version: 3-latest
+        build-type: Release
+        install-linux-dependencies: true
     - name: build
       run: make USER=1
     - uses: actions/upload-artifact@v4
