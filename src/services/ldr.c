@@ -4,6 +4,72 @@
 #include "../arm/jit/jit.h"
 #include "../memory.h"
 
+DECL_PORT(ldr_ro) {
+    u32* cmdbuf = PTR(cmd_addr);
+    switch (cmd.command) {
+        case 0x0001: {
+            u32 crssrc = cmdbuf[1];
+            u32 size = cmdbuf[2];
+            u32 crsdst = cmdbuf[3];
+            ldebug("Initialize with crs=%08x dst=%08x sz=%x", crssrc, crsdst,
+                  size);
+
+            memory_virtmirror(s, crssrc, crsdst, size, PERM_R);
+            s->services.ldr.crs_addr = crsdst;
+            cro_relocate(s, crsdst);
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
+        case 0x0002:
+            linfo("LoadCRR");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        case 0x0004:
+            // same as 4?
+        case 0x0009: {
+            u32 srcaddr = cmdbuf[1];
+            u32 dstaddr = cmdbuf[2];
+            u32 size = cmdbuf[3];
+            u32 dataaddr = cmdbuf[4];
+            u32 datasize = cmdbuf[6];
+            u32 bssaddr = cmdbuf[7];
+            u32 bsssize = cmdbuf[8];
+            bool autolink = cmdbuf[9];
+            ldebug("LoadCRO with src=%08x dst=%08x size=%x data=%08x,sz=%x "
+                   "bss=%08x,sz=%x autolink=%d",
+                   srcaddr, dstaddr, size, dataaddr, datasize, bssaddr, bsssize,
+                   autolink);
+
+            memory_virtmirror(s, srcaddr, dstaddr, size, PERM_RX);
+
+            ldr_load_cro(s, dstaddr, dataaddr, bssaddr, autolink);
+
+            jit_invalidate_range(&s->cpu, dstaddr, size);
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
+        case 0x0005: {
+            u32 addr = cmdbuf[1];
+            ldebug("UnloadCRO at %08x", addr);
+            ldr_unload_cro(s, addr);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
+        default:
+            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
+                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+    }
+}
+
 void cro_relocate(E3DS* s, u32 vaddr) {
     CROHeader* hdr = PTR(vaddr);
 
@@ -53,77 +119,13 @@ void cro_relocate(E3DS* s, u32 vaddr) {
     }
 }
 
-DECL_PORT(ldr_ro) {
-    u32* cmdbuf = PTR(cmd_addr);
-    switch (cmd.command) {
-        case 0x0001: {
-            u32 crssrc = cmdbuf[1];
-            u32 size = cmdbuf[2];
-            u32 crsdst = cmdbuf[3];
-            linfo("Initialize with crs=%08x dst=%08x sz=%x", crssrc, crsdst,
-                  size);
-
-            memory_virtmirror(s, crssrc, crsdst, size, PERM_R);
-            s->services.ldr.crs_addr = crsdst;
-            cro_relocate(s, crsdst);
-
-            cmdbuf[0] = IPCHDR(1, 0);
-            cmdbuf[1] = 0;
-            break;
-        }
-        case 0x0002:
-            linfo("LoadCRR");
-            cmdbuf[0] = IPCHDR(1, 0);
-            cmdbuf[1] = 0;
-            break;
-        case 0x0004:
-            // same as 4?
-        case 0x0009: {
-            u32 srcaddr = cmdbuf[1];
-            u32 dstaddr = cmdbuf[2];
-            u32 size = cmdbuf[3];
-            u32 dataaddr = cmdbuf[4];
-            u32 datasize = cmdbuf[6];
-            u32 bssaddr = cmdbuf[7];
-            u32 bsssize = cmdbuf[8];
-            bool autolink = cmdbuf[9];
-            linfo("LoadCRO with src=%08x dst=%08x size=%x data=%08x,sz=%x "
-                  "bss=%08x,sz=%x autolink=%d",
-                  srcaddr, dstaddr, size, dataaddr, datasize, bssaddr, bsssize,
-                  autolink);
-
-            memory_virtmirror(s, srcaddr, dstaddr, size, PERM_RX);
-
-            ldr_load_cro(s, dstaddr, dataaddr, bssaddr, autolink);
-
-            jit_invalidate_range(&s->cpu, dstaddr, size);
-
-            cmdbuf[0] = IPCHDR(1, 0);
-            cmdbuf[1] = 0;
-            break;
-        }
-        case 0x0005: {
-            u32 addr = cmdbuf[1];
-            linfo("UnloadCRO at %08x", addr);
-            ldr_unload_cro(s, addr);
-            cmdbuf[0] = IPCHDR(1, 0);
-            cmdbuf[1] = 0;
-            break;
-        }
-        default:
-            lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
-                  cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
-            cmdbuf[0] = IPCHDR(1, 0);
-            cmdbuf[1] = 0;
-            break;
-    }
-}
-
 #define SEGTAGADDR(segs, loc) (segs[loc.id].addr + loc.offset)
 
 #define PATCH(rel, sym, segs)                                                  \
     ({                                                                         \
         u32 addr = SEGTAGADDR(segs, rel.loc);                                  \
+        ldebug("patching %08x with symbol at %08x type=%x addend=%x", addr,    \
+               sym, rel.type, rel.addend);                                     \
         switch (rel.type) {                                                    \
             case 0:                                                            \
                 break;                                                         \
@@ -153,8 +155,8 @@ void import_symbols(E3DS* s, u32 srcaddr, u32 dstaddr,
     CROHeader* src = PTR(srcaddr);
     CROHeader* dst = PTR(dstaddr);
 
-    linfo("importing symbols from %s to %s", PTR(src->name_addr),
-          PTR(dst->name_addr));
+    ldebug("importing symbols from %s to %s", PTR(src->name_addr),
+           PTR(dst->name_addr));
 
     CROSegment* srcsegs = PTR(src->segmenttable.addr);
     CROSegment* dstsegs = PTR(dst->segmenttable.addr);
@@ -191,8 +193,8 @@ void import_named_symbols(E3DS* s, u32 srcaddr, u32 dstaddr) {
     CROHeader* src = PTR(srcaddr);
     CROHeader* dst = PTR(dstaddr);
 
-    linfo("importing named symbols from %s to %s", PTR(src->name_addr),
-          PTR(dst->name_addr));
+    ldebug("importing named symbols from %s to %s", PTR(src->name_addr),
+           PTR(dst->name_addr));
 
     CROSegment* srcsegs = PTR(src->segmenttable.addr);
     CROSegment* dstsegs = PTR(dst->segmenttable.addr);
@@ -217,7 +219,7 @@ void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink) {
     cro_relocate(s, vaddr);
 
     char* name = PTR(hdr->name_addr);
-    linfo("loading cro %s", name);
+    ldebug("loading cro %s", name);
 
     CROSegment* segs = PTR(hdr->segmenttable.addr);
 
@@ -233,8 +235,8 @@ void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink) {
             segs[i].addr += vaddr;
         }
 
-        linfo("segment %d (addr=%08x,size=%x)", segs[i].id, segs[i].addr,
-              segs[i].size);
+        ldebug("segment %d (addr=%08x,size=%x)", segs[i].id, segs[i].addr,
+               segs[i].size);
     }
 
     // relocations

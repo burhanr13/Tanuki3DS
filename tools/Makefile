@@ -4,9 +4,13 @@ ifeq ($(shell uname),Darwin)
 	CC := $(shell brew --prefix)/opt/llvm/bin/clang
 endif
 
-.PHONY: extractcode
-extractcode: bin/extractcode
-bin/extractcode: extractcode.c
+EXECS := extractcode extractcxi
+
+EXECS := $(EXECS:%=bin/%)
+
+all: $(EXECS)
+
+bin/%: %.c
 	$(CC) -std=c23 -O3 -o $@ $^
 
 .PHONY: clean
