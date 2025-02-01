@@ -11,11 +11,11 @@ CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE
 
-LDFLAGS := -lm -lSDL2 -lcapstone
+LDFLAGS := -lm -lSDL3 -lcapstone
 
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto
-	CPPFLAGS += -DUSE_TFD -DNOPORTABLE
+	CPPFLAGS += -DNOPORTABLE
 endif
 
 ifeq ($(shell getconf PAGESIZE),4096)

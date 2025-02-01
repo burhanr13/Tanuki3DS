@@ -68,6 +68,6 @@ typedef struct {
 
 void renderer_gl_setup(GLState* state, GPU* gpu);
 
-void render_gl_main(GLState* state);
+void render_gl_main(GLState* state, int view_w, int view_h);
 
 #endif

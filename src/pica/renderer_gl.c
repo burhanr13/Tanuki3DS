@@ -160,7 +160,7 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
     glBindVertexArray(state->gpuvao);
 }
 
-void render_gl_main(GLState* state) {
+void render_gl_main(GLState* state, int view_w, int view_h) {
     glUseProgram(state->mainprogram);
     glBindVertexArray(state->mainvao);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -181,15 +181,12 @@ void render_gl_main(GLState* state) {
 
     glActiveTexture(GL_TEXTURE0);
 
-    glViewport(0, SCREEN_HEIGHT * ctremu.videoscale,
-               SCREEN_WIDTH * ctremu.videoscale,
-               SCREEN_HEIGHT * ctremu.videoscale);
+    glViewport(0, view_h / 2, view_w, view_h / 2);
     glBindTexture(GL_TEXTURE_2D, state->textop);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    glViewport((SCREEN_WIDTH - SCREEN_WIDTH_BOT) / 2 * ctremu.videoscale, 0,
-               SCREEN_WIDTH_BOT * ctremu.videoscale,
-               SCREEN_HEIGHT * ctremu.videoscale);
+    glViewport(view_w * (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / (2 * SCREEN_WIDTH),
+               0, view_w * SCREEN_WIDTH_BOT / SCREEN_WIDTH, view_h / 2);
     glBindTexture(GL_TEXTURE_2D, state->texbot);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

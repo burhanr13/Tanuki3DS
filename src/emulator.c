@@ -44,6 +44,9 @@ int emulator_init() {
 
 void emulator_quit() {
     e3ds_destroy(&ctremu.system);
+
+    free(ctremu.romfilenoext);
+    free(ctremu.romfile);
 }
 
 void emulator_reset() {
@@ -81,6 +84,6 @@ void emulator_read_args(int argc, char** argv) {
     argc -= optind;
     argv += optind;
     if (argc >= 1) {
-        ctremu.romfile = argv[0];
+        ctremu.romfile = strdup(argv[0]);
     }
 }
