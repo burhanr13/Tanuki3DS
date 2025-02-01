@@ -9,6 +9,14 @@
 #define FS_FILE_MAX 32
 
 enum {
+    ARCHIVE_SELFNCCH = 3,
+    ARCHIVE_SAVEDATA = 4,
+    ARCHIVE_EXTSAVEDATA = 6,
+    ARCHIVE_SHAREDEXTDATA = 7,
+    ARCHIVE_SDMC = 9,
+};
+
+enum {
     FSPATH_INVALID,
     FSPATH_EMPTY,
     FSPATH_BINARY,
@@ -16,9 +24,11 @@ enum {
     FSPATH_UTF16
 };
 
+// games actually care about which filesystem errors we return
 enum {
-    FSERR_CREATE = 0xC82044BE,
-    FSERR_OPEN = 0xC8804471,
+    FSERR_CREATE = 0xc82044Be,
+    FSERR_OPEN = 0xc8804471,
+    FSERR_ARCHIVE = 0xc8f04560,
 };
 
 typedef struct {
