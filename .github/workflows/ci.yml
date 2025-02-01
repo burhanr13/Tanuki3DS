@@ -13,9 +13,11 @@ jobs:
     - name: install dependencies
       run: |
         sudo apt install clang-19 libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
-        # wget https://apt.llvm.org/llvm.sh
-        # chmod +x llvm.sh
-        # sudo ./llvm.sh 19
+        git clone https://github.com/libsdl-org/SDL.git
+        mkdir build
+        cd build
+        cmake ..
+        sudo make install
     - name: build
       run: make USER=1
     - uses: actions/upload-artifact@v4
@@ -52,11 +54,10 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 glew xxhash xbyak capstone
+        brew install llvm sdl3 glew xxhash capstone
         git clone https://github.com/burhanr13/xbyak_aarch64.git
         cd xbyak_aarch64
         sudo make install
-        cd ..
     - name: build
       run: make USER=1
 

@@ -21,8 +21,8 @@ You need the following dependencies installed to build and run:
 - sdl3
 - glew
 - capstone
-- xbyak (build only)
-- xxhash (build only)
+- xxhash
+- xbyak (x86 only)
 - [xbyak_aarch64](https://github.com/burhanr13/xbyak_aarch64) (arm64 only)
 
 To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23 such as `clang-19` for both linux and MacOS. For MacOS it can be installed via brew. Windows support is planned.

@@ -9,9 +9,9 @@ CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-unused-variable -Wno-unu
 CFLAGS_RELEASE := -O3
 CFLAGS_DEBUG := -g -fsanitize=address
 
-CPPFLAGS := -MP -MMD -D_GNU_SOURCE
+CPPFLAGS := -MP -MMD -D_GNU_SOURCE -I/usr/local/include
 
-LDFLAGS := -lm -lSDL3 -lcapstone
+LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone
 
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto
@@ -29,8 +29,8 @@ endif
 ifeq ($(shell uname),Darwin)
 	CC := $(shell brew --prefix)/opt/llvm/bin/clang
 	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
-	CPPFLAGS += -I$(shell brew --prefix)/include -I/usr/local/include
-	LDFLAGS := -L$(shell brew --prefix)/lib -L/usr/local/lib $(LDFLAGS)
+	CPPFLAGS += -I$(shell brew --prefix)/include
+	LDFLAGS := -L$(shell brew --prefix)/lib $(LDFLAGS)
 	LDFLAGS += -framework OpenGL -lGLEW
 else
 	LDFLAGS += -lGL -lGLEW
