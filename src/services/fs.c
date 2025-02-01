@@ -59,6 +59,7 @@ FILE* open_formatinfo(u64 archive, bool write) {
     if (!basepath) {
         return nullptr;
     }
+    mkdir(basepath, S_IRWXU);
     char* fipath;
     asprintf(&fipath, "%s/.formatinfo", basepath);
     FILE* fp = fopen(fipath, write ? "wb" : "rb");
@@ -297,7 +298,7 @@ DECL_PORT(fs) {
             u32 pathtype = cmdbuf[2];
             void* path = PTR(cmdbuf[5]);
 
-            ldebug("GetFormatInfo for %x", archive);
+            linfo("GetFormatInfo for %x", archive);
 
             cmdbuf[0] = IPCHDR(5, 0);
 
@@ -332,7 +333,7 @@ DECL_PORT(fs) {
             u32 numfiles = cmdbuf[6];
             bool duplicate = cmdbuf[9];
 
-            ldebug(
+            linfo(
                 "FormatSaveData for archive %x with numfiles=%d and numdirs=%d",
                 archive, numfiles, numdirs);
 
@@ -690,7 +691,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
             break;
         case ARCHIVE_SAVEDATA: {
             if (pathtype == FSPATH_EMPTY) {
-                ldebug("opening save data");
+                linfo("opening save data");
                 char* apath = archive_basepath(4);
                 mkdir(apath, S_IRWXU);
                 free(apath);
@@ -703,7 +704,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
         case ARCHIVE_EXTSAVEDATA: {
             if (pathtype == FSPATH_BINARY) {
                 u32* lowpath = path;
-                ldebug("opening extsavedata", id, lowpath[1]);
+                linfo("opening extsavedata", id, lowpath[1]);
                 u64 aid = 6;
                 char* apath = archive_basepath(aid);
                 mkdir(apath, S_IRWXU);
@@ -718,7 +719,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
         case ARCHIVE_SHAREDEXTDATA: {
             if (pathtype == FSPATH_BINARY) {
                 u32* lowpath = path;
-                ldebug("opening shared extdata", id, lowpath[1]);
+                linfo("opening shared extdata", id, lowpath[1]);
                 if (lowpath[1] != 0xf000'000b) lerror("unknown shared extdata");
                 u64 aid = 7;
                 char* apath = archive_basepath(aid);
