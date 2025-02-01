@@ -7,15 +7,15 @@ on:
 
 jobs:
   linux-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        sudo apt install libsdl2-dev libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 19
+        sudo apt install clang-19 libsdl3-dev libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
+        # wget https://apt.llvm.org/llvm.sh
+        # chmod +x llvm.sh
+        # sudo ./llvm.sh 19
     - name: build
       run: make USER=1
     - uses: actions/upload-artifact@v4
@@ -28,7 +28,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
-      run: brew install llvm sdl2 glew xxhash xbyak capstone
+      run: brew install llvm sdl3 glew xxhash xbyak capstone
     - name: build
       run: make USER=1
 
@@ -51,7 +51,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
-        brew install llvm sdl2 glew xxhash xbyak capstone
+        brew install llvm sdl3 glew xxhash xbyak capstone
         git clone https://github.com/burhanr13/xbyak_aarch64.git
         cd xbyak_aarch64
         sudo make install
