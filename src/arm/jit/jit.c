@@ -9,7 +9,7 @@
 // #define JIT_CPULOG
 // #define IR_INTERPRET
 // #define NO_OPTS
-#define NO_LINKING
+// #define NO_LINKING
 
 #ifdef JIT_DISASM
 #define IR_DISASM
@@ -33,7 +33,7 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 #ifndef NO_OPTS
     optimize_loadstore(&ir);
     optimize_constprop(&ir);
-    // optimize_literals(&ir, cpu);
+    optimize_literals(&ir, cpu);
     optimize_chainjumps(&ir);
     optimize_loadstore(&ir);
     optimize_constprop(&ir);
@@ -80,8 +80,6 @@ void destroy_jit_block(JITBlock* block) {
     irblock_free(block->ir);
     free(block->ir);
 #endif
-
-    ldebug("destroying jit block at %08x", block->start_addr);
 
     block->cpu->jit_cache[block->attrs][block->start_addr >> 16]
                          [(block->start_addr & 0xffff) >> 1] = nullptr;
@@ -146,7 +144,6 @@ JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
 
 // start is page aligned
 void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 len) {
-    ldebug("invalidating jit range %08x-%08x", start_addr, start_addr + len);
     u32 end_addr = start_addr + len;
     u32 startpg = start_addr >> 16;
     u32 endpg = end_addr >> 16;
