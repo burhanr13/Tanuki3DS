@@ -12,6 +12,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: install dependencies
       run: |
+        sudo apt update
         sudo apt install clang-19 libglew-dev libxxhash-dev libxbyak-dev libcapstone-dev
         git clone https://github.com/libsdl-org/SDL.git
         mkdir build
