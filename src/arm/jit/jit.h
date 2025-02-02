@@ -30,6 +30,8 @@ typedef struct _JITBlock {
 
 } JITBlock;
 
+extern bool g_jit_opt_literals;
+
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr);
 void destroy_jit_block(JITBlock* block);
 

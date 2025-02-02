@@ -42,8 +42,8 @@ typedef int64_t s64;
 typedef float fvec[4];
 typedef float fvec2[2];
 
-#define BIT(n) (1U << (n))
-#define BITL(n) (1UL << (n))
+#define BIT(n) (1u << (n))
+#define BITL(n) (1ull << (n))
 #define MASK(n) (BIT(n) - 1)
 #define MASKL(n) (BITL(n) - 1)
 

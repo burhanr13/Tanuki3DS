@@ -134,7 +134,7 @@ DECL_PORT(srv) {
                 handler = port_handle_hid;
             } else if (IS("dsp::DSP")) {
                 handler = port_handle_dsp;
-            } else if (IS("cfg:u")) {
+            } else if (IS("cfg:u") || IS("cfg:s")) {
                 handler = port_handle_cfg;
             } else if (IS("y2r:u")) {
                 handler = port_handle_y2r;

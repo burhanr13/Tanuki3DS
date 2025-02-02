@@ -27,8 +27,9 @@ u8 country_list[] = {
 };
 
 char* archive_basepath(u64 archive) {
-    switch (archive << 32 >> 32) {
-        case ARCHIVE_SAVEDATA: {
+    switch (archive & MASKL(32)) {
+        case ARCHIVE_SAVEDATA:
+        case ARCHIVE_SYSTEMSAVEDATA: {
             char* basepath;
             asprintf(&basepath, "system/savedata/%s", ctremu.romfilenoext);
             return basepath;
@@ -700,7 +701,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
         case ARCHIVE_SAVEDATA: {
             if (pathtype == FSPATH_EMPTY) {
                 linfo("opening save data");
-                char* apath = archive_basepath(4);
+                char* apath = archive_basepath(ARCHIVE_SAVEDATA);
                 mkdir(apath, S_IRWXU);
                 free(apath);
                 return 4;
@@ -712,8 +713,8 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
         case ARCHIVE_EXTSAVEDATA: {
             if (pathtype == FSPATH_BINARY) {
                 u32* lowpath = path;
-                linfo("opening extsavedata", id, lowpath[1]);
-                u64 aid = 6;
+                linfo("opening ext save data");
+                u64 aid = ARCHIVE_EXTSAVEDATA;
                 char* apath = archive_basepath(aid);
                 mkdir(apath, S_IRWXU);
                 free(apath);
@@ -727,7 +728,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
         case ARCHIVE_SHAREDEXTDATA: {
             if (pathtype == FSPATH_BINARY) {
                 u32* lowpath = path;
-                linfo("opening shared extdata", id, lowpath[1]);
+                linfo("opening shared extdata");
                 if (lowpath[1] != 0xf000'000b) lerror("unknown shared extdata");
                 u64 aid = 7;
                 char* apath = archive_basepath(aid);
@@ -739,6 +740,20 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
                 return -1;
             }
             break;
+        }
+        case ARCHIVE_SYSTEMSAVEDATA: {
+            if (pathtype == FSPATH_BINARY) {
+                u32* lowpath = path;
+                linfo("opening system save data", id, lowpath[1]);
+                u64 aid = ARCHIVE_SYSTEMSAVEDATA;
+                char* apath = archive_basepath(aid);
+                mkdir(apath, S_IRWXU);
+                free(apath);
+                return aid;
+            } else {
+                lerror("unknown file path type");
+                return -1;
+            }
         }
         case ARCHIVE_SDMC: {
             if (pathtype == FSPATH_EMPTY) {
@@ -794,7 +809,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
 
 KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                        u32 pathsize, u32 flags) {
-    switch (archive << 32 >> 32) {
+    switch (archive & MASKL(32)) {
         case ARCHIVE_SELFNCCH: {
             if (pathtype == FSPATH_BINARY) {
                 u32* path = rawpath;
@@ -837,6 +852,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
         case ARCHIVE_SAVEDATA:
         case ARCHIVE_EXTSAVEDATA:
         case ARCHIVE_SHAREDEXTDATA:
+        case ARCHIVE_SYSTEMSAVEDATA:
         case ARCHIVE_SDMC: {
 
             int fd = -1;
@@ -929,10 +945,11 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
 
 bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
                     u32 flags, u64 filesize) {
-    switch (archive << 32 >> 32) {
+    switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
         case ARCHIVE_EXTSAVEDATA:
         case ARCHIVE_SHAREDEXTDATA:
+        case ARCHIVE_SYSTEMSAVEDATA:
         case ARCHIVE_SDMC: {
             char* filepath =
                 create_text_path(archive, pathtype, rawpath, pathsize);
@@ -958,10 +975,12 @@ bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
 }
 
 bool fs_delete_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
-    switch (archive << 32 >> 32) {
-        case 4:
-        case 7:
-        case 9: {
+    switch (archive & MASKL(32)) {
+        case ARCHIVE_SAVEDATA:
+        case ARCHIVE_EXTSAVEDATA:
+        case ARCHIVE_SHAREDEXTDATA:
+        case ARCHIVE_SYSTEMSAVEDATA:
+        case ARCHIVE_SDMC: {
             char* filepath =
                 create_text_path(archive, pathtype, rawpath, pathsize);
 
@@ -980,10 +999,11 @@ bool fs_delete_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
 
 KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                       u32 pathsize) {
-    switch (archive << 32 >> 32) {
+    switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
         case ARCHIVE_EXTSAVEDATA:
         case ARCHIVE_SHAREDEXTDATA:
+        case ARCHIVE_SYSTEMSAVEDATA:
         case ARCHIVE_SDMC: {
 
             int fd = -1;
@@ -1024,10 +1044,11 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
 }
 
 bool fs_create_dir(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
-    switch (archive << 32 >> 32) {
+    switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
         case ARCHIVE_EXTSAVEDATA:
         case ARCHIVE_SHAREDEXTDATA:
+        case ARCHIVE_SYSTEMSAVEDATA:
         case ARCHIVE_SDMC: {
             char* filepath =
                 create_text_path(archive, pathtype, rawpath, pathsize);

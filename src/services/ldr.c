@@ -8,6 +8,9 @@ DECL_PORT(ldr_ro) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0001: {
+            // if this game uses cros it doesn't get to optimize literals anymore
+            g_jit_opt_literals = false;
+
             u32 crssrc = cmdbuf[1];
             u32 size = cmdbuf[2];
             u32 crsdst = cmdbuf[3];
@@ -28,8 +31,8 @@ DECL_PORT(ldr_ro) {
             cmdbuf[1] = 0;
             break;
         case 0x0004:
-            // same as 4?
-        case 0x0009: {
+        case 0x0009: // same as 4?
+        {
             u32 srcaddr = cmdbuf[1];
             u32 dstaddr = cmdbuf[2];
             u32 size = cmdbuf[3];
@@ -227,17 +230,23 @@ void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink) {
     ldebug("loading cro %s", name);
 
     CROSegment* segs = PTR(hdr->segmenttable.addr);
+    // when patching symbols in data it needs to be done in
+    // the cro itself not in the external data buffer
+    CROSegment patchsegs[4];
 
     for (int i = 0; i < 4; i++) {
         if (segs[i].id != i) {
             break;
         }
+
+        segs[i].addr += vaddr;
+        patchsegs[i] = segs[i];
+
+        // set data and bss to point to user buffers
         if (segs[i].id == CROSEG_BSS) {
             segs[i].addr = bss;
         } else if (segs[i].id == CROSEG_DATA) {
             segs[i].addr = data;
-        } else {
-            segs[i].addr += vaddr;
         }
 
         ldebug("segment %d (addr=%08x,size=%x)", segs[i].id, segs[i].addr,
@@ -249,7 +258,7 @@ void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink) {
     CROInternalPatch* rels = PTR(hdr->internal_patches.addr);
     for (int i = 0; i < hdr->internal_patches.size; i++) {
         u32 base = segs[rels[i].segid].addr;
-        PATCH(rels[i], base, segs);
+        PATCH(rels[i], base, patchsegs);
     }
 
     // exports

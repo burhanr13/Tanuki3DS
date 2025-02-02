@@ -16,6 +16,8 @@
 #define BACKEND_DISASM
 #endif
 
+bool g_jit_opt_literals = true;
+
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
     block->attrs = cpu->cpsr.w & 0x3f;
@@ -33,7 +35,7 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 #ifndef NO_OPTS
     optimize_loadstore(&ir);
     optimize_constprop(&ir);
-    optimize_literals(&ir, cpu);
+    if (g_jit_opt_literals) optimize_literals(&ir, cpu);
     optimize_chainjumps(&ir);
     optimize_loadstore(&ir);
     optimize_constprop(&ir);

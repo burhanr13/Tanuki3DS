@@ -478,6 +478,10 @@ DECL_SVC(GetProcessInfo) {
 
     R(0) = 0;
     switch (type) {
+        case 0x01: // ???
+            R(1) = sizeof s->process.handles;
+            R(2) = 0;
+            break;
         case 0x02:
             R(1) = s->process.used_memory;
             R(2) = 0;
