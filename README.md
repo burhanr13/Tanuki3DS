@@ -46,13 +46,14 @@ The keyboard controls are as follows:
 | `Dpad` | `Arrow keys` |
 | `Start` | `Return` |
 | `Select` | `RShift` |
-| Pause/Unpause | `F5` |
-| Toggle speedup | `Tab` |
+| Pause/Resume | `F5` |
+| Toggle fast-forward | `Tab` |
 | Reset | `F1` |
+| Switch game | `F2` |
 
 The touch screen can be used with the mouse.
 
-You can also connect a controller and use controlle input.
+You can also connect a controller and use controller input.
 
 ## Compatibility
 

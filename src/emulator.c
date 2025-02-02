@@ -18,20 +18,11 @@ const char usage[] = "ctremu [options] [romfile]\n"
                      "-v -- disable vsync\n"
                      "-sN -- upscale by N\n";
 
-// the romfile should already have been set from read_args
-int emulator_init() {
+void emulator_init() {
     if (!ctremu.romfile) {
         eprintf(usage);
-        return -1;
+        exit(1);
     }
-
-    ctremu.romfilenodir = strrchr(ctremu.romfile, '/');
-    if (ctremu.romfilenodir) ctremu.romfilenodir++;
-    else ctremu.romfilenodir = ctremu.romfile;
-    ctremu.romfilenoext = strdup(ctremu.romfilenodir);
-
-    char* c = strrchr(ctremu.romfilenoext, '.');
-    if (c) *c = '\0';
 
     mkdir("system", S_IRWXU);
     mkdir("system/savedata", S_IRWXU);
@@ -40,7 +31,6 @@ int emulator_init() {
 
     emulator_reset();
 
-    return 0;
 }
 
 void emulator_quit() {
@@ -48,6 +38,20 @@ void emulator_quit() {
 
     free(ctremu.romfilenoext);
     free(ctremu.romfile);
+}
+
+void emulator_set_rom(const char* filename) {
+    free(ctremu.romfile);
+    free(ctremu.romfilenoext);
+
+    ctremu.romfile = strdup(filename);
+
+    ctremu.romfilenodir = strrchr(ctremu.romfile, '/');
+    if (ctremu.romfilenodir) ctremu.romfilenodir++;
+    else ctremu.romfilenodir = ctremu.romfile;
+    ctremu.romfilenoext = strdup(ctremu.romfilenodir);
+    char* c = strrchr(ctremu.romfilenoext, '.');
+    if (c) *c = '\0';
 }
 
 void emulator_reset() {
@@ -90,6 +94,6 @@ void emulator_read_args(int argc, char** argv) {
     argc -= optind;
     argv += optind;
     if (argc >= 1) {
-        ctremu.romfile = strdup(argv[0]);
+        emulator_set_rom(argv[0]);
     }
 }

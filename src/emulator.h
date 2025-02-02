@@ -20,7 +20,6 @@ typedef struct {
 
     E3DS system;
 
-
 } EmulatorState;
 
 extern EmulatorState ctremu;
@@ -28,8 +27,9 @@ extern EmulatorState ctremu;
 #define EMUNAME "Tanuki3DS"
 
 void emulator_read_args(int argc, char** argv);
+void emulator_set_rom(const char* filename);
 
-int emulator_init();
+void emulator_init();
 void emulator_quit();
 
 void emulator_reset();
