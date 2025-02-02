@@ -399,6 +399,14 @@ DECL_PORT(fs) {
 
 DECL_PORT_ARG(fs_selfncch, base) {
     u32* cmdbuf = PTR(cmd_addr);
+
+    if (!s->romimage.fp) {
+        lerror("there is no romfs");
+        cmdbuf[0] = IPCHDR(1, 0);
+        cmdbuf[1] = -1;
+        return;
+    }
+
     switch (cmd.command) {
         case 0x0802: {
             u64 offset = cmdbuf[1];
@@ -1037,5 +1045,14 @@ bool fs_create_dir(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
         default:
             lerror("unknown archive %llx", archive);
             return false;
+    }
+}
+
+void fs_close_all_files(E3DS* s) {
+    for (int i = 0; i < FS_FILE_MAX; i++) {
+        if (s->services.fs.files[i]) fclose(s->services.fs.files[i]);
+    }
+    for (int i = 0; i < FS_FILE_MAX; i++) {
+        if (s->services.fs.dirs[i]) closedir(s->services.fs.dirs[i]);
     }
 }

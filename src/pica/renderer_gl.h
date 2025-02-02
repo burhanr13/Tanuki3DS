@@ -66,7 +66,8 @@ typedef struct {
 
 } GLState;
 
-void renderer_gl_setup(GLState* state, GPU* gpu);
+void renderer_gl_init(GLState* state, GPU* gpu);
+void renderer_gl_destroy(GLState* state);
 
 void render_gl_main(GLState* state, int view_w, int view_h);
 

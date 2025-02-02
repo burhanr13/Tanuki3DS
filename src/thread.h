@@ -62,6 +62,7 @@ typedef struct {
 
 typedef struct {
     KObject hdr;
+    KListNode* waiting_thrds;
 } KSemaphore;
 
 typedef struct {

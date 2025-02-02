@@ -356,6 +356,7 @@ DECL_SVC(ArbitrateAddress) {
 DECL_SVC(CloseHandle) {
     u32 handle = R(0);
     KObject* obj = HANDLE_GET(handle);
+    HANDLE_SET(handle, nullptr);
     if (!obj) {
         lerror("invalid handle");
         R(0) = 0;
@@ -364,7 +365,6 @@ DECL_SVC(CloseHandle) {
     R(0) = 0;
     if (!--obj->refcount) {
         linfo("destroying object of handle %x", handle);
-        HANDLE_SET(handle, nullptr);
         kobject_destroy(s, obj);
     }
 }

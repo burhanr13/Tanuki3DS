@@ -67,4 +67,6 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                       u32 pathsize);
 bool fs_create_dir(u64 archive, u32 pathtype, void* rawpath, u32 pathsize);
 
+void fs_close_all_files(E3DS* s);
+
 #endif

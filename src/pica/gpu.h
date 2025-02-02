@@ -479,6 +479,7 @@ typedef struct _GPU {
         pthread_mutex_t mtx;
 
         atomic_int cur;
+        bool die;
 
         int base;
         void* attrcfg;
@@ -519,6 +520,7 @@ typedef union {
          ._i)
 
 void gpu_vshrunner_init(GPU* gpu);
+void gpu_vshrunner_destroy(GPU* gpu);
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool top);

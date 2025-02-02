@@ -59,7 +59,7 @@ GLuint make_shader(const char* vert, const char* frag) {
     return program;
 }
 
-void renderer_gl_setup(GLState* state, GPU* gpu) {
+void renderer_gl_init(GLState* state, GPU* gpu) {
     state->gpu = gpu;
 
     state->mainprogram = make_shader(mainvertsource, mainfragsource);
@@ -158,6 +158,27 @@ void renderer_gl_setup(GLState* state, GPU* gpu) {
 
     glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
+}
+
+void renderer_gl_destroy(GLState* state) {
+    glDeleteProgram(state->mainprogram);
+    glDeleteProgram(state->gpuprogram);
+    glDeleteVertexArrays(1, &state->mainvao);
+    glDeleteVertexArrays(1, &state->gpuvao);
+    glDeleteBuffers(1, &state->mainvbo);
+    glDeleteBuffers(1, &state->gpuvbo);
+    glDeleteBuffers(1, &state->ubo);
+    glDeleteBuffers(1, &state->gpuebo);
+    glDeleteTextures(1, &state->textop);
+    glDeleteTextures(1, &state->texbot);
+    for (int i = 0; i < FB_MAX; i++) {
+        glDeleteFramebuffers(1, &state->gpu->fbs.d[i].fbo);
+        glDeleteTextures(1, &state->gpu->fbs.d[i].color_tex);
+        glDeleteTextures(1, &state->gpu->fbs.d[i].depth_tex);
+    }
+    for (int i = 0; i < TEX_MAX; i++) {
+        glDeleteTextures(1, &state->gpu->textures.d[i].tex);
+    }
 }
 
 void render_gl_main(GLState* state, int view_w, int view_h) {

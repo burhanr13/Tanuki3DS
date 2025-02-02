@@ -48,6 +48,7 @@ The keyboard controls are as follows:
 | `Select` | `RShift` |
 | Pause/Unpause | `F5` |
 | Toggle speedup | `Tab` |
+| Reset | `F1` |
 
 The touch screen can be used with the mouse.
 

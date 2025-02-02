@@ -209,19 +209,19 @@ void mutex_release(E3DS* s, KMutex* mtx) {
 bool sync_wait(E3DS* s, KThread* t, KObject* o) {
     switch (o->type) {
         case KOT_THREAD: {
-            KThread* thr = (KThread*) o;
+            auto thr = (KThread*) o;
             if (thr->state == THRD_DEAD) return false;
             klist_insert(&thr->waiting_thrds, &t->hdr);
             return true;
         }
         case KOT_EVENT: {
-            KEvent* event = (KEvent*) o;
+            auto event = (KEvent*) o;
             if (event->signal) return false;
             klist_insert(&event->waiting_thrds, &t->hdr);
             return true;
         }
         case KOT_MUTEX: {
-            KMutex* mtx = (KMutex*) o;
+            auto mtx = (KMutex*) o;
             if (mtx->locker_thrd && mtx->locker_thrd != t) {
                 klist_insert(&mtx->waiting_thrds, &t->hdr);
                 return true;
@@ -230,6 +230,8 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
             return false;
         }
         case KOT_SEMAPHORE: {
+            auto sem = (KSemaphore*) o;
+            klist_insert(&sem->waiting_thrds, &t->hdr);
             return true;
         }
         default:
@@ -242,18 +244,23 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
 void sync_cancel(KThread* t, KObject* o) {
     switch (o->type) {
         case KOT_EVENT: {
-            KEvent* event = (KEvent*) o;
+            auto event = (KEvent*) o;
             klist_remove_key(&event->waiting_thrds, &t->hdr);
             break;
         }
         case KOT_MUTEX: {
-            KMutex* mutex = (KMutex*) o;
+            auto mutex = (KMutex*) o;
             klist_remove_key(&mutex->waiting_thrds, &t->hdr);
             break;
         }
         case KOT_THREAD: {
-            KThread* thread = (KThread*) o;
+            auto thread = (KThread*) o;
             klist_remove_key(&thread->waiting_thrds, &t->hdr);
+            break;
+        }
+        case KOT_SEMAPHORE: {
+            auto sem = (KSemaphore*) o;
+            klist_remove_key(&sem->waiting_thrds, &t->hdr);
             break;
         }
         default:

@@ -22,6 +22,9 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_TAB:
             ctremu.uncap = !ctremu.uncap;
             break;
+        case SDLK_F1:
+            emulator_reset();
+            break;
         default:
             break;
     }

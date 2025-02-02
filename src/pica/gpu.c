@@ -736,6 +736,8 @@ void vsh_thrd_func(GPU* gpu) {
         gpu->vsh_runner.thread[id].ready = false;
         pthread_mutex_unlock(&gpu->vsh_runner.mtx);
 
+        if(gpu->vsh_runner.die) return;
+        
         vsh_run_range(gpu, gpu->vsh_runner.attrcfg,
                       gpu->vsh_runner.base + gpu->vsh_runner.thread[id].off,
                       gpu->vsh_runner.thread[id].off,
@@ -761,6 +763,21 @@ void gpu_vshrunner_init(GPU* gpu) {
     }
 
     LRU_init(gpu->vshaders);
+}
+
+void gpu_vshrunner_destroy(GPU* gpu) {
+    gpu->vsh_runner.die = true;
+    for (int i = 0; i < VSH_THREADS; i++) {
+        gpu->vsh_runner.thread[i].ready = true;
+    }
+    pthread_cond_broadcast(&gpu->vsh_runner.cv1);
+    pthread_mutex_unlock(&gpu->vsh_runner.mtx);
+    for (int i = 0; i < VSH_THREADS; i++) {
+        pthread_join(gpu->vsh_runner.thread[i].thd, nullptr);
+    }
+    pthread_mutex_destroy(&gpu->vsh_runner.mtx);
+    pthread_cond_destroy(&gpu->vsh_runner.cv1);
+    pthread_cond_destroy(&gpu->vsh_runner.cv2);
 }
 
 void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {

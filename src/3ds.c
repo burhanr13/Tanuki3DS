@@ -63,16 +63,27 @@ void e3ds_init(E3DS* s, char* romfile) {
     thread_init(s, entrypoint);
 
     s->process.hdr.type = KOT_PROCESS;
-    s->process.hdr.refcount = 1;
+    s->process.hdr.refcount = 2; // so closing this handle won't cause problems
     s->process.handles[1] = &s->process.hdr;
 
     add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
 
-    renderer_gl_setup(&s->gpu.gl, &s->gpu);
+    renderer_gl_init(&s->gpu.gl, &s->gpu);
 }
 
 void e3ds_destroy(E3DS* s) {
     cpu_free(s);
+
+    gpu_vshrunner_destroy(&s->gpu);
+
+    renderer_gl_destroy(&s->gpu.gl);
+
+    for (int i = 0; i < HANDLE_MAX; i++) {
+        if (s->process.handles[i] && !--s->process.handles[i]->refcount)
+            kobject_destroy(s, s->process.handles[i]);
+    }
+
+    fs_close_all_files(s);
 
     if (s->romimage.fp) fclose(s->romimage.fp);
 

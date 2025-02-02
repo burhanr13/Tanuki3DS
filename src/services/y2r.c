@@ -16,7 +16,7 @@ DECL_PORT(y2r) {
             cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
             cmdbuf[3] = srvobj_make_handle(s, &s->services.y2r.transferend.hdr);
-            linfo("GetTransferEndEvent with handle %x", cmdbuf[2]);
+            linfo("GetTransferEndEvent with handle %x", cmdbuf[3]);
             break;
         }
         case 0x0026:
