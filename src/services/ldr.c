@@ -12,7 +12,7 @@ DECL_PORT(ldr_ro) {
             u32 size = cmdbuf[2];
             u32 crsdst = cmdbuf[3];
             ldebug("Initialize with crs=%08x dst=%08x sz=%x", crssrc, crsdst,
-                  size);
+                   size);
 
             memory_virtmirror(s, crssrc, crsdst, size, PERM_R);
             s->services.ldr.crs_addr = crsdst;
@@ -202,7 +202,12 @@ void import_named_symbols(E3DS* s, u32 srcaddr, u32 dstaddr) {
     CRONamedImport* named = PTR(dst->imports.named_symbols.addr);
     for (int i = 0; i < dst->imports.named_symbols.size; i++) {
         char* name = PTR(named[i].name_addr);
-        auto loc = search_named_symbol(s, srcaddr, name);
+        SegmentTag loc;
+        if (strcmp(name, "__aeabi_atexit")) {
+            loc = search_named_symbol(s, srcaddr, name);
+        } else {
+            loc = search_named_symbol(s, srcaddr, "nnroAeabiAtexit_");
+        }
         if (loc.raw == -1) continue;
 
         linfo("symbol %s", name);
@@ -247,59 +252,56 @@ void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink) {
         PATCH(rels[i], base, segs);
     }
 
-    if (autolink) {
+    // exports
+    u32 cur = s->services.ldr.crs_addr;
+    while (cur) {
+        CROHeader* curhdr = PTR(cur);
 
-        // exports
+        CROImportModule* mod = nullptr;
+        CROImportModule* modtab = PTR(curhdr->import_modules.addr);
+        for (int i = 0; i < curhdr->import_modules.size; i++) {
+            if (!strcmp(name, PTR(modtab[i].name_addr))) {
+                mod = &modtab[i];
+                break;
+            }
+        }
+        if (!mod) {
+            cur = curhdr->next;
+            continue;
+        }
+
+        import_symbols(s, vaddr, cur, mod);
+
+        cur = curhdr->next;
+    }
+
+    // imports
+    CROImportModule* modtab = PTR(hdr->import_modules.addr);
+    for (int i = 0; i < hdr->import_modules.size; i++) {
+        char* importname = PTR(modtab[i].name_addr);
         u32 cur = s->services.ldr.crs_addr;
         while (cur) {
             CROHeader* curhdr = PTR(cur);
-
-            CROImportModule* mod = nullptr;
-            CROImportModule* modtab = PTR(curhdr->import_modules.addr);
-            for (int i = 0; i < curhdr->import_modules.size; i++) {
-                if (!strcmp(name, PTR(modtab[i].name_addr))) {
-                    mod = &modtab[i];
-                    break;
-                }
+            if (!strcmp(importname, PTR(curhdr->name_addr))) {
+                break;
             }
-            if (!mod) {
-                cur = curhdr->next;
-                continue;
-            }
-
-            import_symbols(s, vaddr, cur, mod);
 
             cur = curhdr->next;
         }
+        if (!cur) continue;
 
-        // imports
-        CROImportModule* modtab = PTR(hdr->import_modules.addr);
-        for (int i = 0; i < hdr->import_modules.size; i++) {
-            char* importname = PTR(modtab[i].name_addr);
-            u32 cur = s->services.ldr.crs_addr;
-            while (cur) {
-                CROHeader* curhdr = PTR(cur);
-                if (!strcmp(importname, PTR(curhdr->name_addr))) {
-                    break;
-                }
+        import_symbols(s, cur, vaddr, &modtab[i]);
+    }
 
-                cur = curhdr->next;
-            }
-            if (!cur) continue;
+    // named symbols (this is going to be really inefficient)
+    cur = s->services.ldr.crs_addr;
+    while (cur) {
+        CROHeader* curhdr = PTR(cur);
 
-            import_symbols(s, cur, vaddr, &modtab[i]);
-        }
+        import_named_symbols(s, cur, vaddr);
+        import_named_symbols(s, vaddr, cur);
 
-        // named symbols (this is going to be really inefficient)
-        cur = s->services.ldr.crs_addr;
-        while (cur) {
-            CROHeader* curhdr = PTR(cur);
-
-            import_named_symbols(s, cur, vaddr);
-            import_named_symbols(s, vaddr, cur);
-
-            cur = curhdr->next;
-        }
+        cur = curhdr->next;
     }
 
     // insert into the link list
@@ -362,13 +364,12 @@ void ldr_unload_cro(E3DS* s, u32 vaddr) {
     // reset patches
     CROImportPatch* extrels = PTR(hdr->external_patches.addr);
     for (int i = 0; i < hdr->external_patches.size; i++) {
-        if (!extrels[i].loaded) continue;
-        PATCH(extrels[i], onunresolved, segs);
+        *(u32*) PTR(SEGTAGADDR(segs, extrels[i].loc)) = 0;
         extrels[i].loaded = 0;
     }
     CROInternalPatch* intrels = PTR(hdr->internal_patches.addr);
     for (int i = 0; i < hdr->internal_patches.size; i++) {
-        PATCH(intrels[i], onunresolved, segs);
+        *(u32*) PTR(SEGTAGADDR(segs, intrels[i].loc)) = 0;
     }
 
     // reset segment table
