@@ -893,7 +893,7 @@ DECL_ARM_COMPILE(half_trans) {
 }
 
 DECL_ARM_COMPILE(single_trans) {
-    if (instr.cond == 0xf) {
+    if (instr.cond == 0xf) { // stub pld
         return true;
     }
 

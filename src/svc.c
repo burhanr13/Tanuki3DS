@@ -58,6 +58,8 @@ DECL_SVC(ControlMemory) {
             lwarn("unknown memory op %d addr0=%08x addr1=%08x size=%x", memop,
                   addr0, addr1, size);
             R(0) = 0;
+            R(1) = addr0;
+            break;
     }
 }
 
@@ -228,6 +230,7 @@ DECL_SVC(CreateMemoryBlock) {
     u32 perm = R(3);
 
     KSharedMem* shm = calloc(1, sizeof *shm);
+    shm->hdr.type = KOT_SHAREDMEM;
     shm->mapaddr = addr;
     shm->size = size;
     shm->hdr.refcount = 1;

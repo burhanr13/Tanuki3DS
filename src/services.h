@@ -9,6 +9,7 @@
 #include "services/gsp.h"
 #include "services/hid.h"
 #include "services/ldr.h"
+#include "services/nwm.h"
 #include "services/y2r.h"
 
 #include "thread.h"

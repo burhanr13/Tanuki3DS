@@ -10,6 +10,8 @@
 // #define WATCH
 // #define PATCHFN
 
+bool g_cpulog;
+
 void cpu_init(E3DS* s) {
     s->cpu.read8 = (void*) cpu_read8;
     s->cpu.read16 = (void*) cpu_read16;
@@ -41,9 +43,11 @@ bool cpu_run(E3DS* s, int cycles) {
         }
 #endif
 #ifdef CPULOG
-        printf("executing at %08x\n", s->cpu.pc);
-        cpu_print_state(&s->cpu);
-        // cpu_print_vfp_state(&s->cpu);
+        if (g_cpulog) {
+            printf("executing at %08x\n", s->cpu.pc);
+            cpu_print_state(&s->cpu);
+            // cpu_print_vfp_state(&s->cpu);
+        }
 #endif
 #ifdef PATCHFN
         if (s->cpu.pc == PATCHFN) s->cpu.pc = s->cpu.lr;

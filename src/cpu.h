@@ -5,6 +5,8 @@
 #include "arm/arm_core.h"
 #include "common.h"
 
+extern bool g_cpulog;
+
 void cpu_init(E3DS* s);
 void cpu_free(E3DS* s);
 

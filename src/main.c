@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "3ds.h"
+#include "cpu.h"
 #include "emulator.h"
 #include "pica/renderer_gl.h"
 
@@ -66,6 +67,9 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_F2:
             load_rom_dialog();
             emulator_reset();
+            break;
+        case SDLK_F4:
+            g_cpulog = !g_cpulog;
             break;
         default:
             break;
