@@ -8,14 +8,15 @@ DECL_PORT(ldr_ro) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0001: {
-            // if this game uses cros it doesn't get to optimize literals anymore
+            // if this game uses cros it doesn't get to optimize literals
+            // anymore
             g_jit_opt_literals = false;
 
             u32 crssrc = cmdbuf[1];
             u32 size = cmdbuf[2];
             u32 crsdst = cmdbuf[3];
-            ldebug("Initialize with crs=%08x dst=%08x sz=%x", crssrc, crsdst,
-                   size);
+            linfo("Initialize with crs=%08x dst=%08x sz=%x", crssrc, crsdst,
+                  size);
 
             memory_virtmirror(s, crssrc, crsdst, size, PERM_R);
             s->services.ldr.crs_addr = crsdst;
@@ -41,10 +42,10 @@ DECL_PORT(ldr_ro) {
             u32 bssaddr = cmdbuf[7];
             u32 bsssize = cmdbuf[8];
             bool autolink = cmdbuf[9];
-            ldebug("LoadCRO with src=%08x dst=%08x size=%x data=%08x,sz=%x "
-                   "bss=%08x,sz=%x autolink=%d",
-                   srcaddr, dstaddr, size, dataaddr, datasize, bssaddr, bsssize,
-                   autolink);
+            linfo("LoadCRO with src=%08x dst=%08x size=%x data=%08x,sz=%x "
+                  "bss=%08x,sz=%x autolink=%d",
+                  srcaddr, dstaddr, size, dataaddr, datasize, bssaddr, bsssize,
+                  autolink);
 
             memory_virtmirror(s, srcaddr, dstaddr, size, PERM_RX);
 
@@ -58,7 +59,7 @@ DECL_PORT(ldr_ro) {
         }
         case 0x0005: {
             u32 addr = cmdbuf[1];
-            ldebug("UnloadCRO at %08x", addr);
+            linfo("UnloadCRO at %08x", addr);
             ldr_unload_cro(s, addr);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
@@ -127,8 +128,8 @@ void cro_relocate(E3DS* s, u32 vaddr) {
 #define PATCH(rel, sym, segs)                                                  \
     ({                                                                         \
         u32 addr = SEGTAGADDR(segs, rel.loc);                                  \
-        ldebug("patching %08x with symbol at %08x type=%x addend=%x", addr,    \
-               sym, rel.type, rel.addend);                                     \
+        linfo("patching %08x with symbol at %08x type=%x addend=%x", addr,     \
+              sym, rel.type, rel.addend);                                      \
         switch (rel.type) {                                                    \
             case 0:                                                            \
                 break;                                                         \
@@ -158,8 +159,8 @@ void import_symbols(E3DS* s, u32 srcaddr, u32 dstaddr,
     CROHeader* src = PTR(srcaddr);
     CROHeader* dst = PTR(dstaddr);
 
-    ldebug("importing symbols from %s to %s", PTR(src->name_addr),
-           PTR(dst->name_addr));
+    linfo("importing symbols from %s to %s", PTR(src->name_addr),
+          PTR(dst->name_addr));
 
     CROSegment* srcsegs = PTR(src->segmenttable.addr);
     CROSegment* dstsegs = PTR(dst->segmenttable.addr);
@@ -196,8 +197,8 @@ void import_named_symbols(E3DS* s, u32 srcaddr, u32 dstaddr) {
     CROHeader* src = PTR(srcaddr);
     CROHeader* dst = PTR(dstaddr);
 
-    ldebug("importing named symbols from %s to %s", PTR(src->name_addr),
-           PTR(dst->name_addr));
+    linfo("importing named symbols from %s to %s", PTR(src->name_addr),
+          PTR(dst->name_addr));
 
     CROSegment* srcsegs = PTR(src->segmenttable.addr);
     CROSegment* dstsegs = PTR(dst->segmenttable.addr);
@@ -227,7 +228,7 @@ void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink) {
     cro_relocate(s, vaddr);
 
     char* name = PTR(hdr->name_addr);
-    ldebug("loading cro %s", name);
+    linfo("loading cro %s", name);
 
     CROSegment* segs = PTR(hdr->segmenttable.addr);
     // when patching symbols in data it needs to be done in
@@ -249,8 +250,8 @@ void ldr_load_cro(E3DS* s, u32 vaddr, u32 data, u32 bss, bool autolink) {
             segs[i].addr = data;
         }
 
-        ldebug("segment %d (addr=%08x,size=%x)", segs[i].id, segs[i].addr,
-               segs[i].size);
+        linfo("segment %d (addr=%08x,size=%x)", segs[i].id, segs[i].addr,
+              segs[i].size);
     }
 
     // relocations
