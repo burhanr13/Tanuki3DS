@@ -12,9 +12,10 @@
 bool g_infologs = false;
 EmulatorState ctremu;
 
-const char usage[] = "ctremu [options] <romfile>\n"
+const char usage[] = "ctremu [options] [romfile]\n"
                      "-h -- print help\n"
                      "-l -- enable info logging\n"
+                     "-v -- disable vsync\n"
                      "-sN -- upscale by N\n";
 
 // the romfile should already have been set from read_args
@@ -61,9 +62,10 @@ void emulator_reset() {
 
 void emulator_read_args(int argc, char** argv) {
     ctremu.videoscale = 1;
+    ctremu.vsync = true;
 
     char c;
-    while ((c = getopt(argc, argv, "hls:")) != -1) {
+    while ((c = getopt(argc, argv, "hlvs:")) != -1) {
         switch (c) {
             case 'l':
                 g_infologs = true;
@@ -72,6 +74,10 @@ void emulator_read_args(int argc, char** argv) {
                 int scale = atoi(optarg);
                 if (scale <= 0) eprintf("invalid scale factor");
                 else ctremu.videoscale = scale;
+                break;
+            }
+            case 'v': {
+                ctremu.vsync = false;
                 break;
             }
             case '?':

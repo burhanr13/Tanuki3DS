@@ -14,11 +14,12 @@ typedef struct {
     bool running;
     bool uncap;
     bool pause;
-    bool mute;
+
+    bool vsync;
+    int videoscale;
 
     E3DS system;
 
-    int videoscale;
 
 } EmulatorState;
 

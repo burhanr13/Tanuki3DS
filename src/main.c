@@ -164,13 +164,19 @@ int main(int argc, char** argv) {
         }
     }
 
-    SDL_RaiseWindow(window);
-
 #ifdef NOPORTABLE
     char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
     chdir(prefpath);
     SDL_free(prefpath);
 #endif
+
+    SDL_RaiseWindow(window);
+
+    if (ctremu.vsync) {
+        if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
+    } else {
+        SDL_GL_SetSwapInterval(0);
+    }
 
     if (emulator_init() < 0) {
         SDL_Quit();
@@ -228,7 +234,7 @@ int main(int argc, char** argv) {
 
         update_input(&ctremu.system, controller, w, h);
 
-        if (!ctremu.uncap) {
+        if (!(ctremu.uncap || ctremu.vsync)) {
             cur_time = SDL_GetTicksNS();
             elapsed = cur_time - prev_time;
             Sint64 wait = frame_ticks - elapsed;
