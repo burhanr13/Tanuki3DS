@@ -66,5 +66,5 @@ Note: We do not have any official web page other than the Github repo.
 - [3DBrew](https://www.3dbrew.org) is the main source of documentation on the 3DS
 - [GBATEK](https://www.problemkaputt.de/gbatek.htm) is used for low level hardware documentation
 - [libctru](https://github.com/devkitPro/libctru) and [citro3d](https://github.com/devkitPro/citro3d) are libraries for developing homebrew software on the 3DS and are useful as documentation on the operating system and GPU respectively
-- [Citra](https://github.com/PabloMK7/citra), [3dmoo](https://github.com/plutooo/3dmoo), and [Panda3DS](https://github.com/wheremyfoodat/Panda3DS) are HLE 3DS emulators which served as a reference at various points, as well as inspiration for this project
+- [Panda3DS](https://github.com/wheremyfoodat/Panda3DS), [Citra](https://github.com/PabloMK7/citra), and [3dmoo](https://github.com/plutooo/3dmoo) are HLE 3DS emulators which served as a reference at various points, as well as inspiration for this project
 - [citra_system_archives](https://github.com/B3n30/citra_system_archives) is used for generating system file replacements
