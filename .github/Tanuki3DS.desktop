@@ -3,4 +3,5 @@ Name=Tanuki3DS
 Type=Application
 Exec=ctremu
 Icon=tanuki3ds
+Categories=Game;Emulator;
 PrefersNonDefaultGPU=true
