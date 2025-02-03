@@ -141,8 +141,9 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
     int x = xf, y = yf;
 
     if (pressed) {
-        x -= view_w * (SCREEN_WIDTH - SCREEN_WIDTH_BOT) / (2 * SCREEN_WIDTH);
-        x = x * SCREEN_WIDTH / view_w;
+        x -= view_w * (SCREEN_WIDTH_TOP - SCREEN_WIDTH_BOT) /
+             (2 * SCREEN_WIDTH_TOP);
+        x = x * SCREEN_WIDTH_TOP / view_w;
         y -= view_h / 2;
         y = y * 2 * SCREEN_HEIGHT / view_h;
         if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
@@ -167,7 +168,7 @@ int main(int argc, char** argv) {
 #ifdef GLDEBUGCTX
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
-    g_window = SDL_CreateWindow(EMUNAME, SCREEN_WIDTH * ctremu.videoscale,
+    g_window = SDL_CreateWindow(EMUNAME, SCREEN_WIDTH_TOP * ctremu.videoscale,
                                 2 * SCREEN_HEIGHT * ctremu.videoscale,
                                 SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
@@ -230,7 +231,7 @@ int main(int argc, char** argv) {
             } while (ctremu.uncap && elapsed < frame_ticks);
         }
 
-        const float aspect = (float) SCREEN_WIDTH / (2 * SCREEN_HEIGHT);
+        const float aspect = (float) SCREEN_WIDTH_TOP / (2 * SCREEN_HEIGHT);
         SDL_SetWindowAspectRatio(g_window, aspect, aspect);
         int w, h;
         SDL_GetWindowSizeInPixels(g_window, &w, &h);

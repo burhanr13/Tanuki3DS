@@ -16,8 +16,13 @@
 #define CPU_CLK 268000000
 #define FPS 60
 
-#define SCREEN_WIDTH 400
+enum {
+    SCREEN_TOP,
+    SCREEN_BOT,
+};
+#define SCREEN_WIDTH_TOP 400
 #define SCREEN_WIDTH_BOT 320
+#define SCREEN_WIDTH(s) (s == SCREEN_TOP ? SCREEN_WIDTH_TOP : SCREEN_WIDTH_BOT)
 #define SCREEN_HEIGHT 240
 
 typedef struct _3DS {
@@ -40,7 +45,7 @@ typedef struct _3DS {
     ServiceData services;
 
     RomImage romimage;
-    
+
     bool frame_complete;
 
     Scheduler sched;

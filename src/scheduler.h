@@ -22,7 +22,7 @@ typedef struct {
 
     E3DS* master;
 
-    FIFO(SchedulerEvent, EVENT_MAX) event_queue;
+    FIFO(SchedulerEvent, 8) event_queue;
 } Scheduler;
 
 void run_to_present(Scheduler* sched);

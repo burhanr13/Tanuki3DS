@@ -18,7 +18,7 @@ extern bool g_infologs;
                 : (void) 0)
 
 #define ldebug(format, ...)                                                    \
-    printf("\e[36m[DEBUG](%s) " format "\e[0m\n",                            \
+    printf("\e[36m[DEBUG](%s) " format "\e[0m\n",                              \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
 
 #define lwarn(format, ...)                                                     \
@@ -38,6 +38,8 @@ typedef uint32_t u32;
 typedef int32_t s32;
 typedef uint64_t u64;
 typedef int64_t s64;
+#define ubi(n) unsigned _BitInt(n)
+#define sbi(n) signed _BitInt(n)
 
 typedef float fvec[4];
 typedef float fvec2[2];
@@ -47,24 +49,23 @@ typedef float fvec2[2];
 #define MASK(n) (BIT(n) - 1)
 #define MASKL(n) (BITL(n) - 1)
 
-#define FIFO(T, N)                                                             \
+#define FIFO(T, bits)                                                          \
     struct {                                                                   \
-        T d[N];                                                                \
-        u32 head;                                                              \
-        u32 tail;                                                              \
+        T d[BIT(bits)];                                                        \
+        ubi(bits) head;                                                        \
+        ubi(bits) tail;                                                        \
         u32 size;                                                              \
     }
 
 #define FIFO_MAX(f) (sizeof((f).d) / sizeof((f).d[0]))
-#define FIFO_push(f, v)                                                        \
-    ((f).d[(f).tail++] = v, (f).tail &= FIFO_MAX(f) - 1, (f).size++)
-#define FIFO_pop(f, v)                                                         \
-    (v = (f).d[(f).head++], (f).head &= FIFO_MAX(f) - 1, (f).size--)
+#define FIFO_push(f, v) ((f).d[(f).tail++] = v, (f).size++)
+#define FIFO_pop(f, v) (v = (f).d[(f).head++], (f).size--)
 #define FIFO_peek(f) ((f).d[(f).head])
+#define FIFO_back(f) ((f).d[(f).tail - (typeof((f).tail)) 1])
 #define FIFO_foreach(i, f)                                                     \
     for (u32 _i = 0, i = (f).head; _i < (f).size;                              \
-         _i++, i = (i + 1) & (FIFO_MAX(f) - 1))
-#define FIFO_clear(f) ((f).d[0] = (f).head = (f).tail = (f).size = 0)
+         _i++, i = (typeof((f).head)) ((f).head + _i))
+#define FIFO_clear(f) ((f).head = (f).tail = (f).size = 0)
 
 #define StaticVector(T, N)                                                     \
     struct {                                                                   \

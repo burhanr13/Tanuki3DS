@@ -7,6 +7,13 @@
 
 #define GSPMEM ((GSPSharedMem*) PPTR(s->services.gsp.sharedmem.paddr))
 
+u32 vaddr_to_paddr(u32 vaddr) {
+    if (vaddr >= VRAM_VBASE) {
+        return vaddr - VRAM_VBASE + VRAM_PBASE;
+    }
+    return vaddr - LINEAR_HEAP_BASE + FCRAM_PBASE;
+}
+
 DECL_PORT(gsp_gpu) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
@@ -101,26 +108,18 @@ void update_fbinfos(E3DS* s) {
     // we don't really care and just use whatever one we can and this
     // is kept track of by storing the most recent fbs for a screen in a fifo
 
-    auto fbtop = &GSPMEM->fbinfo[0].top;
-    auto fbbot = &GSPMEM->fbinfo[0].bot;
+    for (int i = 0; i < 2; i++) {
+        auto fb = &GSPMEM->fbinfo[0][i];
+        if (fb->newdataflag) {
+            linfo("%s fb idx %d [0] l %08x r %08x [1] l %08x r %08x",
+                  i == SCREEN_TOP ? "top" : "bot", fb->idx,
+                  fb->fbs[0].left_vaddr, fb->fbs[0].right_vaddr,
+                  fb->fbs[1].left_vaddr, fb->fbs[1].right_vaddr);
 
-    if (fbtop->newdataflag) {
-        linfo("top fb idx %d [0] l %08x r %08x [1] l %08x r %08x", fbtop->idx,
-              fbtop->fbs[0].left_vaddr, fbtop->fbs[0].right_vaddr,
-              fbtop->fbs[1].left_vaddr, fbtop->fbs[1].right_vaddr);
-
-        FIFO_push(s->services.gsp.toplcdfbs,
-                  fbtop->fbs[1 - fbtop->idx].left_vaddr);
-        fbtop->newdataflag = 0;
-    }
-    if (fbbot->newdataflag) {
-        linfo("bot fb idx %d [0] l %08x r %08x [1] l %08x r %08x", fbbot->idx,
-              fbbot->fbs[0].left_vaddr, fbbot->fbs[0].right_vaddr,
-              fbbot->fbs[1].left_vaddr, fbbot->fbs[1].right_vaddr);
-
-        FIFO_push(s->services.gsp.botlcdfbs,
-                  fbbot->fbs[1 - fbbot->idx].left_vaddr);
-        fbbot->newdataflag = 0;
+            FIFO_push(s->services.gsp.lcdfbs[i],
+                      fb->fbs[1 - fb->idx].left_vaddr);
+            fb->newdataflag = 0;
+        }
     }
 }
 
@@ -155,13 +154,6 @@ void gsp_handle_event(E3DS* s, u32 arg) {
         linfo("signaling gsp event %d", arg);
         event_signal(s, s->services.gsp.event);
     }
-}
-
-u32 vaddr_to_paddr(u32 vaddr) {
-    if (vaddr >= VRAM_VBASE) {
-        return vaddr - VRAM_VBASE + VRAM_PBASE;
-    }
-    return vaddr - LINEAR_HEAP_BASE + FCRAM_PBASE;
 }
 
 void gsp_handle_command(E3DS* s) {
@@ -235,22 +227,15 @@ void gsp_handle_command(E3DS* s) {
 
             update_fbinfos(s);
 
-            for (int i = 0; i < 4; i++) {
-                int yoff = addrout - s->services.gsp.toplcdfbs.d[i];
-                yoff /= wout * fmtBpp[fmtout];
-                if (abs(yoff) < hout / 2) {
-                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
-                                         scalex, scaley, true);
-                    break;
-                }
-            }
-            for (int i = 0; i < 4; i++) {
-                int yoff = addrout - s->services.gsp.botlcdfbs.d[i];
-                yoff /= wout * fmtBpp[fmtout];
-                if (abs(yoff) < hout / 2) {
-                    gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin), yoff,
-                                         scalex, scaley, false);
-                    break;
+            for (int screen = 0; screen < 2; screen++) {
+                for (int i = 0; i < 4; i++) {
+                    int yoff = addrout - s->services.gsp.lcdfbs[screen].d[i];
+                    yoff /= wout * fmtBpp[fmtout];
+                    if (abs(yoff) < hout / 2) {
+                        gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin),
+                                             yoff, scalex, scaley, screen);
+                        break;
+                    }
                 }
             }
 

@@ -63,9 +63,7 @@ typedef struct {
 
 typedef struct {
     GSPInterruptQueue interrupts[8];
-    struct {
-        GSPFBInfo top, bot;
-    } fbinfo[12];
+    GSPFBInfo fbinfo[12][2];
     GSPCommandQueue commands[4];
 } GSPSharedMem;
 
@@ -74,8 +72,7 @@ typedef struct {
     KSharedMem sharedmem;
     bool registered;
 
-    FIFO(u32, 4) toplcdfbs;
-    FIFO(u32, 4) botlcdfbs;
+    FIFO(u32, 2) lcdfbs[2];
 } GSPData;
 
 DECL_PORT(gsp_gpu);

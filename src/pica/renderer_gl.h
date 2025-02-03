@@ -59,8 +59,7 @@ typedef struct {
     GLuint gpuebo;
     GLuint gpuprogram;
 
-    GLuint textop;
-    GLuint texbot;
+    GLuint screentex[2];
 
     GLuint ubo;
 

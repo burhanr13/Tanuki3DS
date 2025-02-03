@@ -421,7 +421,7 @@ void gpu_update_cur_fb(GPU* gpu) {
 }
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
-                          bool scaley, bool top) {
+                          bool scaley, int screenid) {
 
     // the source can be offset into or before an existing framebuffer, so we
     // need to account for this
@@ -439,17 +439,17 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
     if (!fb) return;
     LRU_use(gpu->fbs, fb);
 
-    linfo("display transfer fb at %x to %s", paddr, top ? "top" : "bot");
+    linfo("display transfer fb at %x to %s", paddr,
+          screenid == SCREEN_TOP ? "top" : "bot");
 
-    glBindTexture(GL_TEXTURE_2D, top ? gpu->gl.textop : gpu->gl.texbot);
+    glBindTexture(GL_TEXTURE_2D, gpu->gl.screentex[screenid]);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
-    u32 scwidth = top ? SCREEN_WIDTH : SCREEN_WIDTH_BOT;
 
     glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
-                     (fb->height - scwidth + yoff + yoffsrc) *
+                     (fb->height - SCREEN_WIDTH(screenid) + yoff + yoffsrc) *
                          ctremu.videoscale,
                      (SCREEN_HEIGHT << scalex) * ctremu.videoscale,
-                     (scwidth << scaley) * ctremu.videoscale, 0);
+                     (SCREEN_WIDTH(screenid) << scaley) * ctremu.videoscale, 0);
 }
 
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
@@ -736,8 +736,8 @@ void vsh_thrd_func(GPU* gpu) {
         gpu->vsh_runner.thread[id].ready = false;
         pthread_mutex_unlock(&gpu->vsh_runner.mtx);
 
-        if(gpu->vsh_runner.die) return;
-        
+        if (gpu->vsh_runner.die) return;
+
         vsh_run_range(gpu, gpu->vsh_runner.attrcfg,
                       gpu->vsh_runner.base + gpu->vsh_runner.thread[id].off,
                       gpu->vsh_runner.thread[id].off,
