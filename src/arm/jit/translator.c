@@ -638,9 +638,9 @@ DECL_ARM_COMPILE(pack_sat) {
             EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
         }
     } else if (instr.pack_sat.x) {
+        EMIT_LOAD_REG(instr.pack_sat.rm);
+        if (instr.pack_sat.shift) EMITVI(ROR, LASTV, instr.pack_sat.shift);
         if (instr.pack_sat.s) {
-            EMIT_LOAD_REG(instr.pack_sat.rm);
-            if (instr.pack_sat.shift) EMITVI(ROR, LASTV, instr.pack_sat.shift);
             u32 ext = instr.pack_sat.h ? 16 : 24;
             EMITVI(LSL, LASTV, ext);
             if (instr.pack_sat.u) {
@@ -653,10 +653,14 @@ DECL_ARM_COMPILE(pack_sat) {
                 EMIT_LOAD_REG(instr.pack_sat.rn);
                 EMITVV(ADD, vres, LASTV);
             }
-            EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
         } else {
-            lwarn("unknown xt16 at %08x", addr);
+            if (instr.pack_sat.u && !instr.pack_sat.h) {
+                EMITVI(AND, LASTV, 0x00ff00ff);
+            } else {
+                lwarn("unknown xt16 %08x at %08x", instr.w, addr);
+            }
         }
+        EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
     } else {
         u32 op1 =
             instr.pack_sat.u << 2 | instr.pack_sat.s << 1 | instr.pack_sat.h;
