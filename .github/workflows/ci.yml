@@ -31,7 +31,9 @@ jobs:
     - name: build
       run: make USER=1
     - name: create appimage
-      run: ./.github/linux-appimage.sh
+      run: |
+        sudo apt install libfuse2
+        ./.github/linux-appimage.sh
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-linux-binary
