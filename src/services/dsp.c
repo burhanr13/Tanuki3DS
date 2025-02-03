@@ -34,6 +34,13 @@ DECL_PORT(dsp) {
             if (size == 30) {
                 memcpy(buf, dsp_addrs, sizeof dsp_addrs);
             }
+
+            // but you can also read it all at once
+            if (size == 32) {
+                *(u16*) buf = 15;
+                memcpy(buf + 2, dsp_addrs, sizeof dsp_addrs);
+            }
+
             linfo("ReadPipeIfPossible with size 0x%x", size);
             break;
         }
