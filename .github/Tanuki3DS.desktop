@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Tanuki3DS
+Type=Application
+Exec=ctremu
+Icon=tanuki3ds
+PrefersNonDefaultGPU=true

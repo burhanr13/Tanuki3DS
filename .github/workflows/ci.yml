@@ -30,10 +30,16 @@ jobs:
         sudo make install
     - name: build
       run: make USER=1
+    - name: create appimage
+      run: ./.github/linux-appimage.sh
     - uses: actions/upload-artifact@v4
       with:
-        name: Tanuki3DS-linux
+        name: Tanuki3DS-linux-binary
         path: ./ctremu
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Tanuki3DS-linux-appimage
+        path: ./Tanuki3DS-x86_64.AppImage
         
   macos-x86-build:
     runs-on: macos-13
@@ -50,12 +56,12 @@ jobs:
         brew install dylibbundler imagemagick
         ./.github/mac-bundle.sh
         codesign --force -s - -vvvv Tanuki3DS.app
-        zip -r Tanuki3DS-macos-x86 Tanuki3DS.app
+        zip -r Tanuki3DS-macos-x86_64 Tanuki3DS.app
 
     - uses: actions/upload-artifact@v4
       with:
-        name: Tanuki3DS-macos-x86
-        path: ./Tanuki3DS-macos-x86.zip
+        name: Tanuki3DS-macos-x86_64
+        path: ./Tanuki3DS-macos-x86_64.zip
 
   macos-arm-build:
     runs-on: macos-latest
@@ -77,9 +83,9 @@ jobs:
         brew install dylibbundler imagemagick
         ./.github/mac-bundle.sh
         codesign --force -s - -vvvv Tanuki3DS.app
-        zip -r Tanuki3DS-macos-arm Tanuki3DS.app
+        zip -r Tanuki3DS-macos-arm64 Tanuki3DS.app
 
     - uses: actions/upload-artifact@v4
       with:
-        name: Tanuki3DS-macos-arm
-        path: ./Tanuki3DS-macos-arm.zip
+        name: Tanuki3DS-macos-arm64
+        path: ./Tanuki3DS-macos-arm64.zip
