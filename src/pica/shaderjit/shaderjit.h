@@ -4,7 +4,7 @@
 #include "../../common.h"
 #include "../shader.h"
 
-#define VSH_MAX 8
+#define VSH_MAX 16
 
 typedef struct _GPU GPU;
 
