@@ -700,8 +700,9 @@ DECL_ARM_COMPILE(parallel_arith) {
                             EMITVV(MEDIA_UADD8, vrn, vrm);
                             EMITV_STORE_REG(instr.parallel_arith.rd, LASTV);
                             break;
-                        default:
-                            lwarn("unknown parallel arith uxxx8 %08x", instr.w);
+                        case 3:
+                            EMITVV(MEDIA_USUB8, vrn, vrm);
+                            EMITV_STORE_REG(instr.parallel_arith.rd, LASTV);
                             break;
                     }
                 } else {
@@ -711,13 +712,13 @@ DECL_ARM_COMPILE(parallel_arith) {
             case 2:
                 if (instr.parallel_arith.b) {
                     switch (instr.parallel_arith.op2) {
+                        case 0:
+                            EMITVV(MEDIA_UQADD8, vrn, vrm);
+                            EMITV_STORE_REG(instr.parallel_arith.rd, LASTV);
+                            break;
                         case 3:
                             EMITVV(MEDIA_UQSUB8, vrn, vrm);
                             EMITV_STORE_REG(instr.parallel_arith.rd, LASTV);
-                            break;
-                        default:
-                            lwarn("unknown parallel arith uqxxx8 %08x",
-                                  instr.w);
                             break;
                     }
                 } else {
@@ -725,11 +726,39 @@ DECL_ARM_COMPILE(parallel_arith) {
                 }
                 break;
             case 3:
-                lwarn("unknown parallel arith uhxxxx %08x", instr.w);
+                if (instr.parallel_arith.b) {
+                    switch (instr.parallel_arith.op2) {
+                        case 0:
+                            EMITVV(MEDIA_UHADD8, vrn, vrm);
+                            EMITV_STORE_REG(instr.parallel_arith.rd, LASTV);
+                            break;
+                        default:
+                            lwarn("unknown parallel arith uhsub8 %08x",
+                                  instr.w);
+                            break;
+                    }
+                } else {
+                    lwarn("unknown parallel arith uqxxx16 %08x", instr.w);
+                }
                 break;
         }
     } else {
         switch (instr.parallel_arith.op1) {
+            case 1:
+                if (instr.parallel_arith.b) {
+                    switch (instr.parallel_arith.op2) {
+                        case 0:
+                            lwarn("unknown parallel arith sadd8 %08x", instr.w);
+                            break;
+                        case 3:
+                            EMITVV(MEDIA_SSUB8, vrn, vrm);
+                            EMITV_STORE_REG(instr.parallel_arith.rd, LASTV);
+                            break;
+                    }
+                } else {
+                    lwarn("unknown parallel arith sxxx16 %08x", instr.w);
+                }
+                break;
             case 2:
                 if (instr.parallel_arith.b) {
                     switch (instr.parallel_arith.op2) {
@@ -738,8 +767,7 @@ DECL_ARM_COMPILE(parallel_arith) {
                             EMITV_STORE_REG(instr.parallel_arith.rd, LASTV);
                             break;
                         default:
-                            lwarn("unknown parallel arith qxxx8 %08x",
-                                  instr.w);
+                            lwarn("unknown parallel arith qxxx8 %08x", instr.w);
                             break;
                     }
                 } else {
@@ -748,9 +776,6 @@ DECL_ARM_COMPILE(parallel_arith) {
                 break;
             case 3:
                 lwarn("unknown parallel arith shxxxx %08x", instr.w);
-                break;
-            default:
-                lwarn("unknown parallel arith sxxxx %08x", instr.w);
                 break;
         }
     }

@@ -111,11 +111,15 @@ typedef enum {
     IR_REV16, // r-v
     IR_USAT,  // riv
 
-    // media instructions
-    IR_MEDIA_UADD8,  // rvv
-    IR_MEDIA_UQSUB8, // rvv
-    IR_MEDIA_QSUB8, // rvv
-    IR_MEDIA_SEL, // rvv
+    // media instructions (all rvv)
+    IR_MEDIA_UADD8,
+    IR_MEDIA_USUB8,
+    IR_MEDIA_UQADD8,
+    IR_MEDIA_UQSUB8,
+    IR_MEDIA_UHADD8,
+    IR_MEDIA_SSUB8,
+    IR_MEDIA_QSUB8,
+    IR_MEDIA_SEL,
 
     // flag instructions, these always appear in groups of alternating get flag
     // + store flag

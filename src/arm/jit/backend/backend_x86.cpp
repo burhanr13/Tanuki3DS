@@ -905,6 +905,40 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(getOp(i), eax);
                 break;
             }
+            case IR_MEDIA_USUB8: {
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                if (inst.imm1) {
+                    mov(esi, inst.op1);
+                } else {
+                    mov(esi, getOp(inst.op1));
+                }
+                mov(rdi, rbx);
+                mov(rax, (u64) media_usub8);
+                call(rax);
+                mov(getOp(i), eax);
+                break;
+            }
+            case IR_MEDIA_UQADD8: {
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                if (inst.imm1) {
+                    mov(esi, inst.op1);
+                } else {
+                    mov(esi, getOp(inst.op1));
+                }
+                mov(rdi, rbx);
+                mov(rax, (u64) media_uqadd8);
+                call(rax);
+                mov(getOp(i), eax);
+                break;
+            }
             case IR_MEDIA_UQSUB8: {
                 if (inst.imm2) {
                     mov(edx, inst.op2);
@@ -918,6 +952,40 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 }
                 mov(rdi, rbx);
                 mov(rax, (u64) media_uqsub8);
+                call(rax);
+                mov(getOp(i), eax);
+                break;
+            }
+            case IR_MEDIA_UHADD8: {
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                if (inst.imm1) {
+                    mov(esi, inst.op1);
+                } else {
+                    mov(esi, getOp(inst.op1));
+                }
+                mov(rdi, rbx);
+                mov(rax, (u64) media_uhadd8);
+                call(rax);
+                mov(getOp(i), eax);
+                break;
+            }
+            case IR_MEDIA_SSUB8: {
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                if (inst.imm1) {
+                    mov(esi, inst.op1);
+                } else {
+                    mov(esi, getOp(inst.op1));
+                }
+                mov(rdi, rbx);
+                mov(rax, (u64) media_ssub8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;

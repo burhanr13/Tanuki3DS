@@ -54,7 +54,11 @@ bool iropc_iscallback(IROpcode opc) {
         case IR_CP15_READ:
         case IR_CP15_WRITE:
         case IR_MEDIA_UADD8:
+        case IR_MEDIA_USUB8:
+        case IR_MEDIA_UQADD8:
         case IR_MEDIA_UQSUB8:
+        case IR_MEDIA_UHADD8:
+        case IR_MEDIA_SSUB8:
         case IR_MEDIA_QSUB8:
         case IR_MEDIA_SEL:
             return true;
@@ -71,6 +75,8 @@ bool iropc_ispure(IROpcode opc) {
         case IR_SBC:
         case IR_GETCIFZ:
         case IR_MEDIA_UADD8:
+        case IR_MEDIA_USUB8:
+        case IR_MEDIA_SSUB8:
         case IR_MEDIA_SEL:
             return false;
         default:
@@ -374,8 +380,24 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 v[i] = media_uadd8(cpu, OP(1), OP(2));
                 break;
             }
+            case IR_MEDIA_USUB8: {
+                v[i] = media_usub8(cpu, OP(1), OP(2));
+                break;
+            }
+            case IR_MEDIA_UQADD8: {
+                v[i] = media_uqadd8(cpu, OP(1), OP(2));
+                break;
+            }
             case IR_MEDIA_UQSUB8: {
                 v[i] = media_uqsub8(cpu, OP(1), OP(2));
+                break;
+            }
+            case IR_MEDIA_UHADD8: {
+                v[i] = media_uhadd8(cpu, OP(1), OP(2));
+                break;
+            }
+            case IR_MEDIA_SSUB8: {
+                v[i] = media_ssub8(cpu, OP(1), OP(2));
                 break;
             }
             case IR_MEDIA_QSUB8: {
@@ -666,6 +688,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
             DISASM(end_link, 0, 1, 1);
         case IR_END_LOOP:
             DISASM(end_loop, 0, 0, 0);
+        default:
+            printf("unknown");
     }
 }
 

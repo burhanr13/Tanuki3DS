@@ -9,6 +9,8 @@
 // #define BREAK
 // #define WATCH
 // #define PATCHFN
+// #define RWATCH
+// #define RWATCHLEN
 
 bool g_cpulog;
 
@@ -61,14 +63,32 @@ bool cpu_run(E3DS* s, int cycles) {
 }
 
 u32 cpu_read8(E3DS* s, u32 addr, bool sx) {
+#ifdef RWATCH
+    if (RWATCH <= addr && addr < RWATCH + RWATCHLEN) {
+        printfln("read8 [%08x]", addr);
+        cpu_print_state(&s->cpu);
+    }
+#endif
     if (sx) return *(s8*) PTR(addr);
     else return *(u8*) PTR(addr);
 }
 u32 cpu_read16(E3DS* s, u32 addr, bool sx) {
+#ifdef RWATCH
+    if (RWATCH <= addr && addr < RWATCH + RWATCHLEN) {
+        printfln("read16 [%08x]", addr);
+        cpu_print_state(&s->cpu);
+    }
+#endif
     if (sx) return *(s16*) PTR(addr);
     else return *(u16*) PTR(addr);
 }
 u32 cpu_read32(E3DS* s, u32 addr) {
+#ifdef RWATCH
+    if (RWATCH <= addr && addr < RWATCH + RWATCHLEN) {
+        printfln("read32 [%08x]", addr);
+        cpu_print_state(&s->cpu);
+    }
+#endif
     return *(u32*) PTR(addr);
 }
 

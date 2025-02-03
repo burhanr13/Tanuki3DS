@@ -724,14 +724,56 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(dst, w0);
                 break;
             }
-            case IR_MEDIA_UQSUB8: {
+            case IR_MEDIA_USUB8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
                 mov(x0, x29);
                 mov(w1, src1);
                 mov(w2, src2);
-                mov(x16, (u64) media_uqsub8);
+                mov(x16, (u64) media_usub8);
+                blr(x16);
+                mov(dst, w0);
+                break;
+            }
+            case IR_MEDIA_UQADD8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                mov(v0.s[0], src1);
+                mov(v1.s[0], src2);
+                uqadd(v0.b8, v0.b8, v1.b8);
+                mov(dst, v0.s[0]);
+                break;
+            }
+            case IR_MEDIA_UQSUB8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                mov(v0.s[0], src1);
+                mov(v1.s[0], src2);
+                uqsub(v0.b8, v0.b8, v1.b8);
+                mov(dst, v0.s[0]);
+                break;
+            }
+            case IR_MEDIA_UHADD8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                mov(v0.s[0], src1);
+                mov(v1.s[0], src2);
+                uhadd(v0.b8, v0.b8, v1.b8);
+                mov(dst, v0.s[0]);
+                break;
+            }
+            case IR_MEDIA_SSUB8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                mov(x0, x29);
+                mov(w1, src1);
+                mov(w2, src2);
+                mov(x16, (u64) media_ssub8);
                 blr(x16);
                 mov(dst, w0);
                 break;
@@ -740,12 +782,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(x0, x29);
-                mov(w1, src1);
-                mov(w2, src2);
-                mov(x16, (u64) media_qsub8);
-                blr(x16);
-                mov(dst, w0);
+                mov(v0.s[0], src1);
+                mov(v1.s[0], src2);
+                sqsub(v0.b8, v0.b8, v1.b8);
+                mov(dst, v0.s[0]);
                 break;
             }
             case IR_MEDIA_SEL: {
