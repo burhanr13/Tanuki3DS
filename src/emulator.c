@@ -55,6 +55,8 @@ void emulator_reset() {
         e3ds_destroy(&ctremu.system);
     }
 
+    if (!ctremu.romfile) return;
+
     e3ds_init(&ctremu.system, ctremu.romfile);
 
     ctremu.initialized = true;

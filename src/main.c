@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -60,8 +61,8 @@ void read_args(int argc, char** argv) {
 void file_callback(void*, char** files, int n) {
     if (files && files[0]) {
         emulator_set_rom(files[0]);
+        g_fileloaded = true;
     }
-    g_fileloaded = true;
 }
 
 void load_rom_dialog() {
@@ -221,6 +222,10 @@ int main(int argc, char** argv) {
     char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
     chdir(prefpath);
     SDL_free(prefpath);
+    int logfd =
+        open("ctremu.log", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
+    dup2(logfd, STDOUT_FILENO);
+    close(logfd);
 #endif
 
     if (ctremu.vsync) {
