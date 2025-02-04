@@ -8,8 +8,16 @@
 #include "emulator.h"
 #include "pica/renderer_gl.h"
 
+const char usage[] = "ctremu [options] [romfile]\n"
+                     "-h -- print help\n"
+                     "-l -- enable info logging\n"
+                     "-v -- disable vsync\n"
+                     "-sN -- upscale by N\n";
+
 SDL_Window* g_window;
 SDL_Gamepad* g_gamepad;
+
+bool g_fileloaded;
 
 #ifdef GLDEBUGCTX
 void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
@@ -18,11 +26,42 @@ void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
 }
 #endif
 
-void file_callback(bool* done, char** files, int n) {
+void read_args(int argc, char** argv) {
+    char c;
+    while ((c = getopt(argc, argv, "hlvs:")) != -1) {
+        switch (c) {
+            case 'l':
+                g_infologs = true;
+                break;
+            case 's': {
+                int scale = atoi(optarg);
+                if (scale <= 0) eprintf("invalid scale factor");
+                else ctremu.videoscale = scale;
+                break;
+            }
+            case 'v': {
+                ctremu.vsync = false;
+                break;
+            }
+            case '?':
+            case 'h':
+            default:
+                eprintf(usage);
+                exit(0);
+        }
+    }
+    argc -= optind;
+    argv += optind;
+    if (argc >= 1) {
+        emulator_set_rom(argv[0]);
+    }
+}
+
+void file_callback(void*, char** files, int n) {
     if (files && files[0]) {
         emulator_set_rom(files[0]);
     }
-    *done = true;
+    g_fileloaded = true;
 }
 
 void load_rom_dialog() {
@@ -31,26 +70,9 @@ void load_rom_dialog() {
         .pattern = "3ds;cci;cxi;app;elf",
     };
 
-    bool done = false;
-    SDL_PumpEvents();
-    SDL_ShowOpenFileDialog((SDL_DialogFileCallback) file_callback, &done,
+    ctremu.pause = true;
+    SDL_ShowOpenFileDialog((SDL_DialogFileCallback) file_callback, nullptr,
                            g_window, &filetypes, 1, nullptr, false);
-    while (!done) {
-        SDL_Event e;
-        SDL_WaitEvent(&e);
-        switch (e.type) {
-            case SDL_EVENT_QUIT:
-                exit(1);
-                break;
-            case SDL_EVENT_GAMEPAD_ADDED:
-                if (!g_gamepad) g_gamepad = SDL_OpenGamepad(e.gdevice.which);
-                break;
-            case SDL_EVENT_GAMEPAD_REMOVED:
-                g_gamepad = nullptr;
-                break;
-        }
-    }
-    SDL_RaiseWindow(g_window);
 }
 
 void hotkey_press(SDL_Keycode key) {
@@ -66,7 +88,6 @@ void hotkey_press(SDL_Keycode key) {
             break;
         case SDLK_F2:
             load_rom_dialog();
-            emulator_reset();
             break;
         case SDLK_F4:
             g_cpulog = !g_cpulog;
@@ -157,7 +178,9 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
 }
 
 int main(int argc, char** argv) {
-    emulator_read_args(argc, argv);
+    emulator_init();
+
+    read_args(argc, argv);
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
 
@@ -190,10 +213,8 @@ int main(int argc, char** argv) {
 
     if (!ctremu.romfile) {
         load_rom_dialog();
-        if (!ctremu.romfile) {
-            lerror("no file");
-            exit(1);
-        }
+    } else {
+        emulator_reset();
     }
 
 #ifdef NOPORTABLE
@@ -208,8 +229,6 @@ int main(int argc, char** argv) {
         SDL_GL_SetSwapInterval(0);
     }
 
-    emulator_init();
-
     Uint64 prev_time = SDL_GetTicksNS();
     Uint64 prev_fps_update = prev_time;
     Uint64 prev_fps_frame = 0;
@@ -221,7 +240,13 @@ int main(int argc, char** argv) {
         Uint64 cur_time;
         Uint64 elapsed;
 
-        if (!(ctremu.pause)) {
+        if (g_fileloaded) {
+            g_fileloaded = false;
+            emulator_reset();
+            ctremu.pause = false;
+        }
+
+        if (!ctremu.pause) {
             do {
                 e3ds_run_frame(&ctremu.system);
                 frame++;
@@ -236,7 +261,7 @@ int main(int argc, char** argv) {
         int w, h;
         SDL_GetWindowSizeInPixels(g_window, &w, &h);
 
-        render_gl_main(&ctremu.system.gpu.gl, w, h);
+        if (!ctremu.pause) render_gl_main(&ctremu.system.gpu.gl, w, h);
 
         SDL_GL_SwapWindow(g_window);
 
@@ -259,7 +284,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        update_input(&ctremu.system, g_gamepad, w, h);
+        if (!ctremu.pause) update_input(&ctremu.system, g_gamepad, w, h);
 
         if (!(ctremu.uncap || ctremu.vsync)) {
             cur_time = SDL_GetTicksNS();

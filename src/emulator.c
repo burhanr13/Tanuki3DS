@@ -12,32 +12,28 @@
 bool g_infologs = false;
 EmulatorState ctremu;
 
-const char usage[] = "ctremu [options] [romfile]\n"
-                     "-h -- print help\n"
-                     "-l -- enable info logging\n"
-                     "-v -- disable vsync\n"
-                     "-sN -- upscale by N\n";
-
 void emulator_init() {
-    if (!ctremu.romfile) {
-        eprintf(usage);
-        exit(1);
-    }
-
     mkdir("system", S_IRWXU);
     mkdir("system/savedata", S_IRWXU);
     mkdir("system/extdata", S_IRWXU);
     mkdir("system/sdmc", S_IRWXU);
 
-    emulator_reset();
-
+    // config files ?
+    ctremu.videoscale = 1;
+    ctremu.vsync = true;
 }
 
 void emulator_quit() {
-    e3ds_destroy(&ctremu.system);
+    if (ctremu.initialized) {
+        e3ds_destroy(&ctremu.system);
+        ctremu.initialized = false;
+    }
 
     free(ctremu.romfilenoext);
     free(ctremu.romfile);
+    ctremu.romfile = nullptr;
+    ctremu.romfilenodir = nullptr;
+    ctremu.romfilenoext = nullptr;
 }
 
 void emulator_set_rom(const char* filename) {
@@ -62,38 +58,4 @@ void emulator_reset() {
     e3ds_init(&ctremu.system, ctremu.romfile);
 
     ctremu.initialized = true;
-}
-
-void emulator_read_args(int argc, char** argv) {
-    ctremu.videoscale = 1;
-    ctremu.vsync = true;
-
-    char c;
-    while ((c = getopt(argc, argv, "hlvs:")) != -1) {
-        switch (c) {
-            case 'l':
-                g_infologs = true;
-                break;
-            case 's': {
-                int scale = atoi(optarg);
-                if (scale <= 0) eprintf("invalid scale factor");
-                else ctremu.videoscale = scale;
-                break;
-            }
-            case 'v': {
-                ctremu.vsync = false;
-                break;
-            }
-            case '?':
-            case 'h':
-            default:
-                eprintf(usage);
-                exit(0);
-        }
-    }
-    argc -= optind;
-    argv += optind;
-    if (argc >= 1) {
-        emulator_set_rom(argv[0]);
-    }
 }

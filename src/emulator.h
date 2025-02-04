@@ -26,7 +26,6 @@ extern EmulatorState ctremu;
 
 #define EMUNAME "Tanuki3DS"
 
-void emulator_read_args(int argc, char** argv);
 void emulator_set_rom(const char* filename);
 
 void emulator_init();
