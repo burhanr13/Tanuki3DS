@@ -53,6 +53,7 @@ void emulator_set_rom(const char* filename) {
 void emulator_reset() {
     if (ctremu.initialized) {
         e3ds_destroy(&ctremu.system);
+        ctremu.initialized = false;
     }
 
     if (!ctremu.romfile) return;

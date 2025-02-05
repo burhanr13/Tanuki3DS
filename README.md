@@ -19,7 +19,7 @@ You can download a stable release from the releases tab, or the latest build bel
 | MacOS | [x86_64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) <br> [arm64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) | 
 
 ## Usage
-Launching the app will give you a prompt to select the game file (currently supports .elf, .3ds/.cci, .cxi/.app files, roms must be decrypted).
+Launching the app should give you a prompt to select the game file (currently supports .elf, .3ds/.cci, .cxi/.app files, roms must be decrypted). You can also start a game by dropping its file onto the window.
 
 You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 

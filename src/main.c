@@ -16,9 +16,11 @@ const char usage[] = "ctremu [options] [romfile]\n"
                      "-sN -- upscale by N\n";
 
 SDL_Window* g_window;
+
+SDL_JoystickID g_gamepad_id;
 SDL_Gamepad* g_gamepad;
 
-bool g_fileloaded;
+bool g_pending_reset;
 
 #ifdef GLDEBUGCTX
 void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
@@ -61,7 +63,7 @@ void read_args(int argc, char** argv) {
 void file_callback(void*, char** files, int n) {
     if (files && files[0]) {
         emulator_set_rom(files[0]);
-        g_fileloaded = true;
+        g_pending_reset = true;
     }
 }
 
@@ -215,7 +217,7 @@ int main(int argc, char** argv) {
     if (!ctremu.romfile) {
         load_rom_dialog();
     } else {
-        emulator_reset();
+        g_pending_reset = true;
     }
 
 #ifdef NOPORTABLE
@@ -245,10 +247,11 @@ int main(int argc, char** argv) {
         Uint64 cur_time;
         Uint64 elapsed;
 
-        if (g_fileloaded) {
-            g_fileloaded = false;
+        if (g_pending_reset) {
+            g_pending_reset = false;
             emulator_reset();
             ctremu.pause = false;
+            SDL_RaiseWindow(g_window);
         }
 
         if (!ctremu.pause) {
@@ -280,11 +283,19 @@ int main(int argc, char** argv) {
                     hotkey_press(e.key.key);
                     break;
                 case SDL_EVENT_GAMEPAD_ADDED:
-                    if (!g_gamepad)
-                        g_gamepad = SDL_OpenGamepad(e.gdevice.which);
+                    if (!g_gamepad) {
+                        g_gamepad_id = e.gdevice.which;
+                        g_gamepad = SDL_OpenGamepad(g_gamepad_id);
+                    }
                     break;
                 case SDL_EVENT_GAMEPAD_REMOVED:
-                    g_gamepad = nullptr;
+                    if (g_gamepad && e.gdevice.which == g_gamepad_id) {
+                        g_gamepad = nullptr;
+                    }
+                    break;
+                case SDL_EVENT_DROP_FILE:
+                    emulator_set_rom(e.drop.data);
+                    g_pending_reset = true;
                     break;
             }
         }
