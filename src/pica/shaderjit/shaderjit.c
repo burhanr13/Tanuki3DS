@@ -1,6 +1,5 @@
 #include "shaderjit.h"
 
-#define XXH_INLINE_ALL
 #include <xxh3.h>
 
 #include "../gpu.h"

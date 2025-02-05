@@ -103,8 +103,6 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 
-    LRU_init(gpu->fbs);
-
     GLuint fbos[FB_MAX];
     glGenFramebuffers(FB_MAX, fbos);
     GLuint colorbufs[FB_MAX];
@@ -117,8 +115,6 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         gpu->fbs.d[i].color_tex = colorbufs[i];
         gpu->fbs.d[i].depth_tex = depthbufs[i];
     }
-
-    LRU_init(gpu->textures);
 
     GLuint textures[TEX_MAX];
     glGenTextures(TEX_MAX, textures);

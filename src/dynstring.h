@@ -17,6 +17,11 @@ static inline void ds_init(DynString* s, size_t len) {
     *s->cur = '\0';
 }
 
+static inline void ds_free(DynString* s) {
+    free(s->str);
+    *s = (DynString) {};
+}
+
 static inline void ds_printf(DynString* s, const char* fmt, ...) {
     va_list v;
     while (true) {

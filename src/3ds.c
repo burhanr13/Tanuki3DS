@@ -15,11 +15,12 @@ void e3ds_init(E3DS* s, char* romfile) {
 
     cpu_init(s);
 
+    gpu_init(&s->gpu);
     gpu_vshrunner_init(&s->gpu);
 
     memory_init(s);
 
-    init_services(s); // start up and allocate memory for services first
+    services_init(s); // start up and allocate memory for services first
 
     u32 entrypoint = 0;
 

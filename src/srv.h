@@ -17,7 +17,8 @@ typedef union {
 } IPCHeader;
 
 #define IPCHDR(normal, translate)                                              \
-    ((IPCHeader){.paramsize_normal = normal, .paramsize_translate = translate} \
+    ((IPCHeader) {.paramsize_normal = normal,                                  \
+                  .paramsize_translate = translate}                            \
          .w)
 
 typedef void (*PortRequestHandler)(E3DS* s, IPCHeader cmd, u32 cmd_addr);
@@ -31,7 +32,7 @@ typedef struct {
     u64 arg;
 } KSession;
 
-void init_services(E3DS* s);
+void services_init(E3DS* s);
 
 KSession* session_create(PortRequestHandler f);
 KSession* session_create_arg(PortRequestHandlerArg f, u64 arg);

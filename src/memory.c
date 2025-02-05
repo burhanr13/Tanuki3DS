@@ -146,6 +146,9 @@ void memory_destroy(E3DS* s) {
         s->process.vmblocks.next = s->process.vmblocks.next->next;
         free(tmp);
     }
+    for (int i = 0; i < BIT(10); i++) {
+        free(s->process.ptab[i]);
+    }
 
 #ifdef FASTMEM
     sigaction(SIGSEGV, &(struct sigaction) {.sa_handler = SIG_DFL}, nullptr);
@@ -153,6 +156,7 @@ void memory_destroy(E3DS* s) {
 
     munmap(s->physmem, BITL(32));
     munmap(s->virtmem, BITL(32));
+    munmap(s->mem, sizeof(E3DSMemory));
 
     close(s->mem_fd);
 #else

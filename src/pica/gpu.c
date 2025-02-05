@@ -5,8 +5,10 @@
 #include "etc1.h"
 #include "renderer_gl.h"
 #include "shader.h"
+#include "shadergen.h"
 
 #define SHADERJIT
+#define SHADERGEN
 
 #undef PTR
 #ifdef FASTMEM
@@ -97,6 +99,13 @@ float cvtf16(u32 i) {
 bool is_valid_physmem(u32 addr) {
     return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAM_SIZE) ||
            (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAM_SIZE);
+}
+
+void gpu_init(GPU* gpu) {
+    LRU_init(gpu->fbs);
+    LRU_init(gpu->textures);
+    LRU_init(gpu->vshaders);
+    LRU_init(gpu->fshaders);
 }
 
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
@@ -761,8 +770,6 @@ void gpu_vshrunner_init(GPU* gpu) {
         pthread_create(&gpu->vsh_runner.thread[i].thd, nullptr,
                        (void*) vsh_thrd_func, gpu);
     }
-
-    LRU_init(gpu->vshaders);
 }
 
 void gpu_vshrunner_destroy(GPU* gpu) {
@@ -1136,7 +1143,9 @@ void load_texenv(UberUniforms* ubuf, FragUniforms* fbuf, int i,
 void gpu_update_gl_state(GPU* gpu) {
     gpu_update_cur_fb(gpu);
 
-    UberUniforms ubuf;
+    // ensure unused entries are 0 so the hashing is consistent
+    UberUniforms ubuf = {};
+
     FragUniforms fbuf;
 
     switch (gpu->io.raster.cullmode) {
@@ -1288,5 +1297,11 @@ void gpu_update_gl_state(GPU* gpu) {
     glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
 
-    gpu_gl_load_prog(&gpu->gl, gpu->gl.gpu_vs, gpu->gl.gpu_uberfs);
+#ifdef SHADERGEN
+    GLuint fs = shader_gen_get(gpu, &ubuf);
+#else
+    GLuint fs = gpu->gl.gpu_uberfs;
+#endif
+
+    gpu_gl_load_prog(&gpu->gl, gpu->gl.gpu_vs, fs);
 }
