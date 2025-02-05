@@ -30,20 +30,19 @@ uniform sampler2D tex2;
 #define L_TWOSIDED 1
 
 struct TevControl {
-    int src0;
-    int op0;
-    int src1;
-    int op1;
-    int src2;
-    int op2;
-    int combiner;
+    uint src0;
+    uint op0;
+    uint src1;
+    uint op1;
+    uint src2;
+    uint op2;
+    uint combiner;
     float scale;
 };
 
 struct Tev {
     TevControl rgb;
     TevControl a;
-    vec4 color;
 };
 
 struct Light {
@@ -52,23 +51,29 @@ struct Light {
     vec3 diffuse;
     vec3 ambient;
     vec4 vec;
-    int config;
 };
 
 layout (std140) uniform UberUniforms {
     Tev tev[6];
-    vec4 tev_buffer_color;
 
-    int tev_update_rgb;
-    int tev_update_alpha;
+    uint tev_update_rgb;
+    uint tev_update_alpha;
     bool tex2coord;
+
+    uint light_config[8];
+    uint numlights;
+
+    bool alphatest;
+    uint alphafunc;
+};
+
+layout (std140) uniform FragUniforms {
+    vec4 tev_color[6];
+    vec4 tev_buffer_color;
 
     Light light[8];
     vec4 ambient_color;
-    int numlights;
 
-    bool alphatest;
-    int alphafunc;
     float alpharef;
 };
 
@@ -94,7 +99,7 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
         primary.rgb += light[i].ambient;
 
         vec3 l;
-        if (BIT(light[i].config, L_DIRECTIONAL)) {
+        if (BIT(light_config[i], L_DIRECTIONAL)) {
             l = normalize(quatrot(nq, light[i].vec.xyz));
         } else {
             l = normalize(quatrot(nq, view + light[i].vec.xyz));
@@ -207,7 +212,7 @@ void main() {
 
     vec4 next_buffer = tev_buffer_color;
     for (int i = 0; i < 6; i++) {
-        tev_srcs[TEVSRC_CONSTANT] = tev[i].color;
+        tev_srcs[TEVSRC_CONSTANT] = tev_color[i];
 
         vec4 res;
         res.rgb = tev_combine_rgb(i);

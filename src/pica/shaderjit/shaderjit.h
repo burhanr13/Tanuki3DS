@@ -18,8 +18,6 @@ typedef struct _ShaderJitBlock {
     struct _ShaderJitBlock* prev;
 } ShaderJitBlock;
 
-typedef LRUCache(ShaderJitBlock, VSH_MAX) ShaderCache;
-
 ShaderJitFunc shaderjit_get(GPU* gpu, ShaderUnit* shu);
 
 #endif

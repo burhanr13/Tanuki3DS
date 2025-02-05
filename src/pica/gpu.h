@@ -463,7 +463,7 @@ typedef struct _GPU {
 
     LRUCache(TexInfo, TEX_MAX) textures;
 
-    ShaderCache vshaders;
+    LRUCache(ShaderJitBlock, VSH_MAX) vshaders;
 
     struct {
         struct {
