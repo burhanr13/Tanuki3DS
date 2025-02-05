@@ -24,7 +24,7 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
 
         char* source = shader_gen_fs(ubuf);
 
-        //printf(source);
+        printf(source);
 
         glShaderSource(block->fs, 1, &(const char*) {source}, nullptr);
         free(source);
@@ -377,8 +377,8 @@ char* shader_gen_fs(UberUniforms* ubuf) {
 
     if (lighting) {
         // stub rn
-        ds_printf(&s, "vec4 light0 = color;\n");
-        ds_printf(&s, "vec4 light1 = vec4(0);\n");
+        ds_printf(&s, "vec4 light0 = vec4(0.5);\n");
+        ds_printf(&s, "vec4 light1 = vec4(vec3(0), 0.5);\n");
     }
     if (tex0) {
         ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");

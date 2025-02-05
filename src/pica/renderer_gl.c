@@ -123,6 +123,7 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     }
 
     glBindVertexArray(state->gpuvao);
+    state->curprogram = state->mainprogram;
 }
 
 void renderer_gl_destroy(GLState* state) {
@@ -187,6 +188,7 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
 #endif
 
     glBindVertexArray(state->gpuvao);
+    state->curprogram = state->mainprogram;
 }
 
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
@@ -219,6 +221,6 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         glUniformBlockBinding(
             ent->prog, glGetUniformBlockIndex(ent->prog, "FragUniforms"), 1);
     } else {
-        glUseProgram(ent->prog);
+        if (state->curprogram != ent->prog) glUseProgram(ent->prog);
     }
 }
