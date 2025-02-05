@@ -213,3 +213,7 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
     glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
 }
+
+void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
+    
+}
