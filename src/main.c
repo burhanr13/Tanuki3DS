@@ -181,6 +181,17 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
 }
 
 int main(int argc, char** argv) {
+    
+#ifdef NOPORTABLE
+    char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
+    chdir(prefpath);
+    SDL_free(prefpath);
+    int logfd =
+        open("ctremu.log", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
+    dup2(logfd, STDOUT_FILENO);
+    close(logfd);
+#endif
+    
     emulator_init();
 
     read_args(argc, argv);
@@ -219,16 +230,6 @@ int main(int argc, char** argv) {
     } else {
         g_pending_reset = true;
     }
-
-#ifdef NOPORTABLE
-    char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
-    chdir(prefpath);
-    SDL_free(prefpath);
-    int logfd =
-        open("ctremu.log", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
-    dup2(logfd, STDOUT_FILENO);
-    close(logfd);
-#endif
 
     if (ctremu.vsync) {
         if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
