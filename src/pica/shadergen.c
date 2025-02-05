@@ -24,7 +24,7 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
 
         char* source = shader_gen_fs(ubuf);
 
-        printf(source);
+        //printf(source);
 
         glShaderSource(block->fs, 1, &(const char*) {source}, nullptr);
         free(source);

@@ -53,7 +53,7 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glCompileShader(state->gpu_uberfs);
 
     LRU_init(state->progcache);
-    
+
     glGenBuffers(1, &state->uber_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, state->uber_ubo);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, state->uber_ubo);
@@ -210,14 +210,15 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         glAttachShader(ent->prog, ent->vs);
         glAttachShader(ent->prog, ent->fs);
         glLinkProgram(ent->prog);
+        glUseProgram(ent->prog);
+        glUniform1i(glGetUniformLocation(ent->prog, "tex0"), 0);
+        glUniform1i(glGetUniformLocation(ent->prog, "tex1"), 1);
+        glUniform1i(glGetUniformLocation(ent->prog, "tex2"), 2);
+        glUniformBlockBinding(
+            ent->prog, glGetUniformBlockIndex(ent->prog, "UberUniforms"), 0);
+        glUniformBlockBinding(
+            ent->prog, glGetUniformBlockIndex(ent->prog, "FragUniforms"), 1);
+    } else {
+        glUseProgram(ent->prog);
     }
-
-    glUseProgram(ent->prog);
-    glUniform1i(glGetUniformLocation(ent->prog, "tex0"), 0);
-    glUniform1i(glGetUniformLocation(ent->prog, "tex1"), 1);
-    glUniform1i(glGetUniformLocation(ent->prog, "tex2"), 2);
-    glUniformBlockBinding(ent->prog,
-                          glGetUniformBlockIndex(ent->prog, "UberUniforms"), 0);
-    glUniformBlockBinding(ent->prog,
-                          glGetUniformBlockIndex(ent->prog, "FragUniforms"), 1);
 }

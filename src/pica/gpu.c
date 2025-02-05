@@ -1292,14 +1292,14 @@ void gpu_update_gl_state(GPU* gpu) {
     }
     COPYRGB(fbuf.ambient_color, gpu->io.lighting.ambient);
 
-    glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
     glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
 
 #ifdef SHADERGEN
     GLuint fs = shader_gen_get(gpu, &ubuf);
 #else
+    glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
     GLuint fs = gpu->gl.gpu_uberfs;
 #endif
 
