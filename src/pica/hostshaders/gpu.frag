@@ -13,7 +13,7 @@ uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
-#define BIT(k, n) ((k&(1<<n))!=0)
+#define BIT(k, n) ((k&(1u<<n))!=0)
 
 #define TEVSRC_COLOR 0
 #define TEVSRC_LIGHT_PRIMARY 1
@@ -123,7 +123,7 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
 
 vec4 tev_srcs[16];
 
-vec3 tev_operand_rgb(vec4 v, int op) {
+vec3 tev_operand_rgb(vec4 v, uint op) {
     switch (op) {
         case 0: return v.rgb;
         case 1: return 1 - v.rgb;
@@ -139,7 +139,7 @@ vec3 tev_operand_rgb(vec4 v, int op) {
     }
 }
 
-float tev_operand_alpha(vec4 v, int op) {
+float tev_operand_alpha(vec4 v, uint op) {
     switch (op) {
         case 0: return v.a;
         case 1: return 1 - v.a;
@@ -153,7 +153,7 @@ float tev_operand_alpha(vec4 v, int op) {
     }
 }
 
-vec3 tev_combine_rgb(int i) {
+vec3 tev_combine_rgb(uint i) {
 #define SRC(n) tev_operand_rgb(tev_srcs[tev[i].rgb.src##n], tev[i].rgb.op##n)
     switch (tev[i].rgb.combiner) {
         case 0: return SRC(0);
@@ -171,7 +171,7 @@ vec3 tev_combine_rgb(int i) {
 #undef SRC
 }
 
-float tev_combine_alpha(int i) {
+float tev_combine_alpha(uint i) {
 #define SRC(n) tev_operand_alpha(tev_srcs[tev[i].a.src##n], tev[i].a.op##n)
     switch (tev[i].a.combiner) {
         case 0: return SRC(0);
@@ -211,7 +211,7 @@ void main() {
     tev_srcs[TEVSRC_TEX2] = texture(tex2, tex2coord ? texcoord1 : texcoord2);
 
     vec4 next_buffer = tev_buffer_color;
-    for (int i = 0; i < 6; i++) {
+    for (uint i = 0; i < 6; i++) {
         tev_srcs[TEVSRC_CONSTANT] = tev_color[i];
 
         vec4 res;
