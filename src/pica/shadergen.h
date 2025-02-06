@@ -25,8 +25,7 @@ enum {
 
 // light config bits
 enum {
-    L_DIRECTIONAL,
-    L_TWOSIDED
+    L_DIRECTIONAL = BIT(0),
 };
 
 typedef struct _FSHCacheEntry {

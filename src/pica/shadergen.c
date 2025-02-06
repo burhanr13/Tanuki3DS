@@ -34,7 +34,7 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
     return block->fs;
 }
 
-char* fs_header = R"(
+const char fs_header[] = R"(
 #version 410 core
 
 in vec4 color;
@@ -75,6 +75,53 @@ vec3 quatrot(vec4 q, vec3 v) {
 
 )";
 
+const char light_setup[] = R"(
+vec4 lprimary = vec4(0);
+vec4 lsecondary = vec4(0);
+
+lprimary.rgb = ambient_color.rgb;
+lprimary.a = 1;
+
+lsecondary.a = 0.5;
+
+vec4 nq = normalize(normquat);
+vec3 v = normalize(quatrot(nq, view));
+vec3 l, h;
+
+)";
+
+const char lighting_stub[] = R"(
+{
+float diffuselevel = max(l.z, 0);
+lprimary.rgb += diffuselevel * light[%1$d].diffuse;
+
+lprimary.rgb = min(lprimary.rgb, 1);
+
+float speclevel = pow(max(h.z, 0), 3);
+lsecondary.rgb += speclevel * light[%1$d].specular0;
+
+lsecondary.rgb = min(lsecondary.rgb, 1);
+}
+)";
+
+void write_lighting(DynString* s, UberUniforms* ubuf) {
+    ds_printf(s, light_setup);
+
+    for (int i = 0; i < ubuf->numlights; i++) {
+        ds_printf(s, "lprimary.rgb += light[%d].ambient;\n", i);
+
+        if (ubuf->light[i].config & L_DIRECTIONAL) {
+            ds_printf(s, "l = normalize(quatrot(nq, light[%d].vec.xyz));\n", i);
+        } else {
+            ds_printf(s,
+                      "l = normalize(quatrot(nq, view + light[%d].vec.xyz));\n", i);
+        }
+        ds_printf(s, "h = normalize(l + v);\n");
+
+        ds_printf(s, lighting_stub, i);
+    }
+}
+
 #define CHECKSRC(s)                                                            \
     ({                                                                         \
         if (s == TEVSRC_LIGHT_PRIMARY || s == TEVSRC_LIGHT_SECONDARY)          \
@@ -89,9 +136,9 @@ const char* tevsrc_str(int i, u32 tevsrc) {
         case TEVSRC_COLOR:
             return "color";
         case TEVSRC_LIGHT_PRIMARY:
-            return "light0";
+            return "lprimary";
         case TEVSRC_LIGHT_SECONDARY:
-            return "light1";
+            return "lsecondary";
         case TEVSRC_TEX0:
             return "tex0c";
         case TEVSRC_TEX1:
@@ -193,6 +240,9 @@ void write_operand_a(DynString* s, const char* srcstr, u32 op) {
             ds_printf(s, "%s.a", srcstr);
     }
 }
+
+#define NEEDSCLAMP(combiner)                                                   \
+    (!(combiner == 0 || combiner == 1 || combiner == 4))
 
 void write_combiner_rgb(DynString* s, UberUniforms* ubuf, int i) {
 #define SRC(n)                                                                 \
@@ -371,14 +421,12 @@ char* shader_gen_fs(UberUniforms* ubuf) {
         CHECKSRC(ubuf->tev[i].a.src2);
     }
 
-    ds_printf(&s, "%s", fs_header);
+    ds_printf(&s, fs_header);
 
     ds_printf(&s, "void main() {\n");
 
     if (lighting) {
-        // stub rn
-        ds_printf(&s, "vec4 light0 = vec4(0.5);\n");
-        ds_printf(&s, "vec4 light1 = vec4(vec3(0), 0.5);\n");
+        write_lighting(&s, ubuf);
     }
     if (tex0) {
         ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
@@ -416,7 +464,10 @@ char* shader_gen_fs(UberUniforms* ubuf) {
             }
 
             ds_printf(&s, "cur = tmp;\n");
-            needsclamp = true;
+
+            // no clamp for combiners nothing, mod, or interp
+            needsclamp = NEEDSCLAMP(ubuf->tev[i].rgb.combiner) ||
+                         NEEDSCLAMP(ubuf->tev[i].a.combiner);
         }
         if (ubuf->tev[i].rgb.scale != 1.0f) {
             ds_printf(&s, "cur.rgb *= %f;\n", ubuf->tev[i].rgb.scale);

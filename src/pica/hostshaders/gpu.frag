@@ -27,7 +27,6 @@ uniform sampler2D tex2;
 #define TEVSRC_PREVIOUS 15
 
 #define L_DIRECTIONAL 0
-#define L_TWOSIDED 1
 
 struct TevControl {
     uint src0;
@@ -209,8 +208,8 @@ void main() {
     tev_srcs[TEVSRC_TEX0] = texture(tex0, texcoord0);
     tev_srcs[TEVSRC_TEX1] = texture(tex1, texcoord1);
     tev_srcs[TEVSRC_TEX2] = texture(tex2, tex2coord ? texcoord1 : texcoord2);
+    tev_srcs[TEVSRC_BUFFER] = tev_buffer_color;
 
-    vec4 next_buffer = tev_buffer_color;
     for (uint i = 0; i < 6; i++) {
         tev_srcs[TEVSRC_CONSTANT] = tev_color[i];
 
@@ -226,13 +225,11 @@ void main() {
 
         res = clamp(res, 0, 1);
 
-        tev_srcs[TEVSRC_BUFFER] = next_buffer;
-
         if (BIT(tev_update_rgb, i)) {
-            next_buffer.rgb = res.rgb;
+            tev_srcs[TEVSRC_BUFFER].rgb = res.rgb;
         }
         if (BIT(tev_update_alpha, i)) {
-            next_buffer.a = res.a;
+            tev_srcs[TEVSRC_BUFFER].a = res.a;
         }
 
         tev_srcs[TEVSRC_PREVIOUS] = res;
