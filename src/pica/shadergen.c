@@ -20,14 +20,15 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
     if (block->hash != hash) {
         block->hash = hash;
         glDeleteShader(block->fs);
-        block->fs = glCreateShader(GL_FRAGMENT_SHADER);
 
         char* source = shader_gen_fs(ubuf);
 
+        block->fs = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(block->fs, 1, &(const char*) {source}, nullptr);
+        glCompileShader(block->fs);
+
         free(source);
 
-        glCompileShader(block->fs);
     }
     return block->fs;
 }

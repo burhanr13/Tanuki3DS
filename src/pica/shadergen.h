@@ -5,7 +5,7 @@
 #include "../dynstring.h"
 #include "renderer_gl.h"
 
-#define FSH_MAX 128
+#define FSH_MAX 256
 
 typedef struct _GPU GPU;
 
