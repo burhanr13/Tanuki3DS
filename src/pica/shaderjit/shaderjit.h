@@ -14,11 +14,8 @@ typedef struct _ShaderJitBlock {
     u64 hash;
     void* backend;
 
-    struct _ShaderJitBlock* next;
-    struct _ShaderJitBlock* prev;
+    struct _ShaderJitBlock *next, *prev;
 } ShaderJitBlock;
-
-typedef LRUCache(ShaderJitBlock, VSH_MAX) ShaderCache;
 
 ShaderJitFunc shaderjit_get(GPU* gpu, ShaderUnit* shu);
 

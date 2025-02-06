@@ -13,7 +13,7 @@ uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
-#define BIT(k, n) ((k&(1<<n))!=0)
+#define BIT(k, n) ((k&(1u<<n))!=0)
 
 #define TEVSRC_COLOR 0
 #define TEVSRC_LIGHT_PRIMARY 1
@@ -27,23 +27,21 @@ uniform sampler2D tex2;
 #define TEVSRC_PREVIOUS 15
 
 #define L_DIRECTIONAL 0
-#define L_TWOSIDED 1
 
 struct TevControl {
-    int src0;
-    int op0;
-    int src1;
-    int op1;
-    int src2;
-    int op2;
-    int combiner;
+    uint src0;
+    uint op0;
+    uint src1;
+    uint op1;
+    uint src2;
+    uint op2;
+    uint combiner;
     float scale;
 };
 
 struct Tev {
     TevControl rgb;
     TevControl a;
-    vec4 color;
 };
 
 struct Light {
@@ -52,23 +50,29 @@ struct Light {
     vec3 diffuse;
     vec3 ambient;
     vec4 vec;
-    int config;
 };
 
 layout (std140) uniform UberUniforms {
     Tev tev[6];
-    vec4 tev_buffer_color;
 
-    int tev_update_rgb;
-    int tev_update_alpha;
+    uint tev_update_rgb;
+    uint tev_update_alpha;
     bool tex2coord;
+
+    uint light_config[8];
+    uint numlights;
+
+    bool alphatest;
+    uint alphafunc;
+};
+
+layout (std140) uniform FragUniforms {
+    vec4 tev_color[6];
+    vec4 tev_buffer_color;
 
     Light light[8];
     vec4 ambient_color;
-    int numlights;
 
-    bool alphatest;
-    int alphafunc;
     float alpharef;
 };
 
@@ -94,7 +98,7 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
         primary.rgb += light[i].ambient;
 
         vec3 l;
-        if (BIT(light[i].config, L_DIRECTIONAL)) {
+        if (BIT(light_config[i], L_DIRECTIONAL)) {
             l = normalize(quatrot(nq, light[i].vec.xyz));
         } else {
             l = normalize(quatrot(nq, view + light[i].vec.xyz));
@@ -118,7 +122,7 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
 
 vec4 tev_srcs[16];
 
-vec3 tev_operand_rgb(vec4 v, int op) {
+vec3 tev_operand_rgb(vec4 v, uint op) {
     switch (op) {
         case 0: return v.rgb;
         case 1: return 1 - v.rgb;
@@ -134,7 +138,7 @@ vec3 tev_operand_rgb(vec4 v, int op) {
     }
 }
 
-float tev_operand_alpha(vec4 v, int op) {
+float tev_operand_alpha(vec4 v, uint op) {
     switch (op) {
         case 0: return v.a;
         case 1: return 1 - v.a;
@@ -148,7 +152,7 @@ float tev_operand_alpha(vec4 v, int op) {
     }
 }
 
-vec3 tev_combine_rgb(int i) {
+vec3 tev_combine_rgb(uint i) {
 #define SRC(n) tev_operand_rgb(tev_srcs[tev[i].rgb.src##n], tev[i].rgb.op##n)
     switch (tev[i].rgb.combiner) {
         case 0: return SRC(0);
@@ -166,7 +170,7 @@ vec3 tev_combine_rgb(int i) {
 #undef SRC
 }
 
-float tev_combine_alpha(int i) {
+float tev_combine_alpha(uint i) {
 #define SRC(n) tev_operand_alpha(tev_srcs[tev[i].a.src##n], tev[i].a.op##n)
     switch (tev[i].a.combiner) {
         case 0: return SRC(0);
@@ -204,10 +208,10 @@ void main() {
     tev_srcs[TEVSRC_TEX0] = texture(tex0, texcoord0);
     tev_srcs[TEVSRC_TEX1] = texture(tex1, texcoord1);
     tev_srcs[TEVSRC_TEX2] = texture(tex2, tex2coord ? texcoord1 : texcoord2);
+    tev_srcs[TEVSRC_BUFFER] = tev_buffer_color;
 
-    vec4 next_buffer = tev_buffer_color;
-    for (int i = 0; i < 6; i++) {
-        tev_srcs[TEVSRC_CONSTANT] = tev[i].color;
+    for (uint i = 0; i < 6; i++) {
+        tev_srcs[TEVSRC_CONSTANT] = tev_color[i];
 
         vec4 res;
         res.rgb = tev_combine_rgb(i);
@@ -221,13 +225,11 @@ void main() {
 
         res = clamp(res, 0, 1);
 
-        tev_srcs[TEVSRC_BUFFER] = next_buffer;
-
         if (BIT(tev_update_rgb, i)) {
-            next_buffer.rgb = res.rgb;
+            tev_srcs[TEVSRC_BUFFER].rgb = res.rgb;
         }
         if (BIT(tev_update_alpha, i)) {
-            next_buffer.a = res.a;
+            tev_srcs[TEVSRC_BUFFER].a = res.a;
         }
 
         tev_srcs[TEVSRC_PREVIOUS] = res;

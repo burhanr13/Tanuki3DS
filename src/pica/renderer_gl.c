@@ -18,51 +18,21 @@ const char gpufragsource[] = {
 #embed "hostshaders/gpu.frag"
     , '\0'};
 
-GLuint make_shader(const char* vert, const char* frag) {
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vert, nullptr);
-    glCompileShader(vertexShader);
-    int success;
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infolog[512];
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infolog);
-        printf("Error compiling vertex shader: %s\n", infolog);
-        exit(1);
-    }
-
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &frag, nullptr);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infolog[512];
-        glGetShaderInfoLog(fragmentShader, 512, nullptr, infolog);
-        printf("Error compiling fragment shader: %s\n", infolog);
-        exit(1);
-    }
-
-    GLuint program = glCreateProgram();
-    glAttachShader(program, vertexShader);
-    glAttachShader(program, fragmentShader);
-    glLinkProgram(program);
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infolog[512];
-        glGetProgramInfoLog(program, 512, nullptr, infolog);
-        printf("Error linking program: %s\n", infolog);
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    return program;
-}
-
 void renderer_gl_init(GLState* state, GPU* gpu) {
     state->gpu = gpu;
 
-    state->mainprogram = make_shader(mainvertsource, mainfragsource);
+    auto mainvs = glCreateShader(GL_VERTEX_SHADER);
+    auto mainfs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(mainvs, 1, &(const char*) {mainvertsource}, nullptr);
+    glShaderSource(mainfs, 1, &(const char*) {mainfragsource}, nullptr);
+    glCompileShader(mainvs);
+    glCompileShader(mainfs);
+    state->mainprogram = glCreateProgram();
+    glAttachShader(state->mainprogram, mainvs);
+    glAttachShader(state->mainprogram, mainfs);
+    glLinkProgram(state->mainprogram);
+    glDeleteShader(mainvs);
+    glDeleteShader(mainfs);
     glUseProgram(state->mainprogram);
     glUniform1i(glGetUniformLocation(state->mainprogram, "screen"), 0);
 
@@ -73,19 +43,24 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glBindBuffer(GL_ARRAY_BUFFER, state->mainvbo);
     glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
 
-    state->gpuprogram = make_shader(gpuvertsource, gpufragsource);
-    glUseProgram(state->gpuprogram);
-    glUniform1i(glGetUniformLocation(state->gpuprogram, "tex0"), 0);
-    glUniform1i(glGetUniformLocation(state->gpuprogram, "tex1"), 1);
-    glUniform1i(glGetUniformLocation(state->gpuprogram, "tex2"), 2);
+    state->gpu_vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(state->gpu_vs, 1, &(const char*) {gpuvertsource}, nullptr);
+    glCompileShader(state->gpu_vs);
 
-    glUniformBlockBinding(
-        state->gpuprogram,
-        glGetUniformBlockIndex(state->gpuprogram, "UberUniforms"), 0);
+    state->gpu_uberfs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(state->gpu_uberfs, 1, &(const char*) {gpufragsource},
+                   nullptr);
+    glCompileShader(state->gpu_uberfs);
 
-    glGenBuffers(1, &state->ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, state->ubo);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, state->ubo);
+    LRU_init(state->progcache);
+
+    glGenBuffers(1, &state->uber_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, state->uber_ubo);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, state->uber_ubo);
+
+    glGenBuffers(1, &state->frag_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, state->frag_ubo);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, state->frag_ubo);
 
     glGenVertexArrays(1, &state->gpuvao);
     glBindVertexArray(state->gpuvao);
@@ -128,8 +103,6 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 
-    LRU_init(gpu->fbs);
-
     GLuint fbos[FB_MAX];
     glGenFramebuffers(FB_MAX, fbos);
     GLuint colorbufs[FB_MAX];
@@ -143,26 +116,32 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         gpu->fbs.d[i].depth_tex = depthbufs[i];
     }
 
-    LRU_init(gpu->textures);
-
     GLuint textures[TEX_MAX];
     glGenTextures(TEX_MAX, textures);
     for (int i = 0; i < TEX_MAX; i++) {
         gpu->textures.d[i].tex = textures[i];
     }
 
-    glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
+    state->curprogram = state->mainprogram;
 }
 
 void renderer_gl_destroy(GLState* state) {
     glDeleteProgram(state->mainprogram);
-    glDeleteProgram(state->gpuprogram);
+    glDeleteShader(state->gpu_vs);
+    glDeleteShader(state->gpu_uberfs);
+    for (int i = 0; i < MAX_PROGRAM; i++) {
+        glDeleteProgram(state->progcache.d[i].prog);
+    }
+    for (int i = 0; i < FSH_MAX; i++) {
+        glDeleteShader(state->gpu->fshaders.d[i].fs);
+    }
     glDeleteVertexArrays(1, &state->mainvao);
     glDeleteVertexArrays(1, &state->gpuvao);
     glDeleteBuffers(1, &state->mainvbo);
     glDeleteBuffers(1, &state->gpuvbo);
-    glDeleteBuffers(1, &state->ubo);
+    glDeleteBuffers(1, &state->uber_ubo);
+    glDeleteBuffers(1, &state->frag_ubo);
     glDeleteBuffers(1, &state->gpuebo);
     glDeleteTextures(1, &state->screentex[SCREEN_TOP]);
     glDeleteTextures(1, &state->screentex[SCREEN_BOT]);
@@ -201,7 +180,8 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
     glBindTexture(GL_TEXTURE_2D, state->screentex[SCREEN_TOP]);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    glViewport(view_w * (SCREEN_WIDTH_TOP - SCREEN_WIDTH_BOT) / (2 * SCREEN_WIDTH_TOP),
+    glViewport(view_w * (SCREEN_WIDTH_TOP - SCREEN_WIDTH_BOT) /
+                   (2 * SCREEN_WIDTH_TOP),
                0, view_w * SCREEN_WIDTH_BOT / SCREEN_WIDTH_TOP, view_h / 2);
     glBindTexture(GL_TEXTURE_2D, state->screentex[SCREEN_BOT]);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -210,6 +190,40 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 #endif
 
-    glUseProgram(state->gpuprogram);
     glBindVertexArray(state->gpuvao);
+    state->curprogram = state->mainprogram;
+}
+
+void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
+    GLuint prog;
+    ProgCacheEntry* ent = nullptr;
+    for (int i = 0; i < MAX_PROGRAM; i++) {
+        ent = &state->progcache.d[i];
+        if ((ent->vs == vs && ent->fs == fs) ||
+            (ent->vs == 0 && ent->fs == 0)) {
+            break;
+        }
+    }
+    if (!ent) ent = LRU_eject(state->progcache);
+    LRU_use(state->progcache, ent);
+
+    if (ent->vs != vs || ent->fs != fs) {
+        glDeleteProgram(ent->prog);
+        ent->vs = vs;
+        ent->fs = fs;
+        ent->prog = glCreateProgram();
+        glAttachShader(ent->prog, ent->vs);
+        glAttachShader(ent->prog, ent->fs);
+        glLinkProgram(ent->prog);
+        glUseProgram(ent->prog);
+        glUniform1i(glGetUniformLocation(ent->prog, "tex0"), 0);
+        glUniform1i(glGetUniformLocation(ent->prog, "tex1"), 1);
+        glUniform1i(glGetUniformLocation(ent->prog, "tex2"), 2);
+        glUniformBlockBinding(
+            ent->prog, glGetUniformBlockIndex(ent->prog, "UberUniforms"), 0);
+        glUniformBlockBinding(
+            ent->prog, glGetUniformBlockIndex(ent->prog, "FragUniforms"), 1);
+    } else {
+        if (state->curprogram != ent->prog) glUseProgram(ent->prog);
+    }
 }

@@ -16,6 +16,8 @@ LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto
 	CPPFLAGS += -DNOPORTABLE
+else
+	CFLAGS_RELEASE += -g
 endif
 
 ifeq ($(shell getconf PAGESIZE),4096)

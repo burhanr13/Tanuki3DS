@@ -10,6 +10,7 @@
 #include "renderer_gl.h"
 #include "shader.h"
 #include "shaderjit/shaderjit.h"
+#include "shadergen.h"
 
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
@@ -413,8 +414,7 @@ typedef struct _FBInfo {
     u32 color_fmt;
     u32 color_Bpp;
 
-    struct _FBInfo* next;
-    struct _FBInfo* prev;
+    struct _FBInfo *next, *prev;
 
     u32 fbo;
     u32 color_tex;
@@ -427,8 +427,7 @@ typedef struct _TexInfo {
     u32 fmt;
     u32 size;
 
-    struct _TexInfo* next;
-    struct _TexInfo* prev;
+    struct _TexInfo *next, *prev;
 
     u32 tex;
 } TexInfo;
@@ -463,7 +462,8 @@ typedef struct _GPU {
 
     LRUCache(TexInfo, TEX_MAX) textures;
 
-    ShaderCache vshaders;
+    LRUCache(ShaderJitBlock, VSH_MAX) vshaders;
+    LRUCache(FSHCacheEntry, FSH_MAX) fshaders;
 
     struct {
         struct {
@@ -518,6 +518,8 @@ typedef union {
          u32 _i;                                                               \
      }) {f})                                                                   \
          ._i)
+
+void gpu_init(GPU* gpu);
 
 void gpu_vshrunner_init(GPU* gpu);
 void gpu_vshrunner_destroy(GPU* gpu);

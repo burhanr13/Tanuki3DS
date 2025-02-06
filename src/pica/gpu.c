@@ -5,8 +5,10 @@
 #include "etc1.h"
 #include "renderer_gl.h"
 #include "shader.h"
+#include "shadergen.h"
 
 #define SHADERJIT
+#define SHADERGEN
 
 #undef PTR
 #ifdef FASTMEM
@@ -97,6 +99,13 @@ float cvtf16(u32 i) {
 bool is_valid_physmem(u32 addr) {
     return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAM_SIZE) ||
            (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAM_SIZE);
+}
+
+void gpu_init(GPU* gpu) {
+    LRU_init(gpu->fbs);
+    LRU_init(gpu->textures);
+    LRU_init(gpu->vshaders);
+    LRU_init(gpu->fshaders);
 }
 
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
@@ -761,8 +770,6 @@ void gpu_vshrunner_init(GPU* gpu) {
         pthread_create(&gpu->vsh_runner.thread[i].thd, nullptr,
                        (void*) vsh_thrd_func, gpu);
     }
-
-    LRU_init(gpu->vshaders);
 }
 
 void gpu_vshrunner_destroy(GPU* gpu) {
@@ -1112,7 +1119,8 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, regs->lod.max);
 }
 
-void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
+void load_texenv(UberUniforms* ubuf, FragUniforms* fbuf, int i,
+                 TexEnvRegs* regs) {
     ubuf->tev[i].rgb.src0 = regs->source.rgb0;
     ubuf->tev[i].rgb.src1 = regs->source.rgb1;
     ubuf->tev[i].rgb.src2 = regs->source.rgb2;
@@ -1127,7 +1135,7 @@ void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
     ubuf->tev[i].a.op2 = regs->operand.a2;
     ubuf->tev[i].rgb.combiner = regs->combiner.rgb;
     ubuf->tev[i].a.combiner = regs->combiner.a;
-    COPYRGBA(ubuf->tev[i].color, regs->color);
+    COPYRGBA(fbuf->tev_color[i], regs->color);
     ubuf->tev[i].rgb.scale = 1 << (regs->scale.rgb);
     ubuf->tev[i].a.scale = 1 << (regs->scale.a);
 }
@@ -1135,7 +1143,10 @@ void load_texenv(UberUniforms* ubuf, int i, TexEnvRegs* regs) {
 void gpu_update_gl_state(GPU* gpu) {
     gpu_update_cur_fb(gpu);
 
-    UberUniforms ubuf;
+    // ensure unused entries are 0 so the hashing is consistent
+    UberUniforms ubuf = {};
+
+    FragUniforms fbuf;
 
     switch (gpu->io.raster.cullmode) {
         case 0:
@@ -1192,15 +1203,15 @@ void gpu_update_gl_state(GPU* gpu) {
         gpu_load_texture(gpu, 2, &gpu->io.tex.tex2, gpu->io.tex.tex2_fmt);
     }
 
-    load_texenv(&ubuf, 0, &gpu->io.tex.tev0);
-    load_texenv(&ubuf, 1, &gpu->io.tex.tev1);
-    load_texenv(&ubuf, 2, &gpu->io.tex.tev2);
-    load_texenv(&ubuf, 3, &gpu->io.tex.tev3);
-    load_texenv(&ubuf, 4, &gpu->io.tex.tev4);
-    load_texenv(&ubuf, 5, &gpu->io.tex.tev5);
+    load_texenv(&ubuf, &fbuf, 0, &gpu->io.tex.tev0);
+    load_texenv(&ubuf, &fbuf, 1, &gpu->io.tex.tev1);
+    load_texenv(&ubuf, &fbuf, 2, &gpu->io.tex.tev2);
+    load_texenv(&ubuf, &fbuf, 3, &gpu->io.tex.tev3);
+    load_texenv(&ubuf, &fbuf, 4, &gpu->io.tex.tev4);
+    load_texenv(&ubuf, &fbuf, 5, &gpu->io.tex.tev5);
     ubuf.tev_update_rgb = gpu->io.tex.tev_buffer.update_rgb;
     ubuf.tev_update_alpha = gpu->io.tex.tev_buffer.update_alpha;
-    COPYRGBA(ubuf.tev_buffer_color, gpu->io.tex.tev5.buffer_color);
+    COPYRGBA(fbuf.tev_buffer_color, gpu->io.tex.tev5.buffer_color);
 
     if (gpu->io.fb.color_op.frag_mode != 0) {
         return; // shadows or gas, ignore these for now
@@ -1225,7 +1236,7 @@ void gpu_update_gl_state(GPU* gpu) {
 
     ubuf.alphatest = gpu->io.fb.alpha_test.enable;
     ubuf.alphafunc = gpu->io.fb.alpha_test.func;
-    ubuf.alpharef = (float) gpu->io.fb.alpha_test.ref / 255;
+    fbuf.alpharef = (float) gpu->io.fb.alpha_test.ref / 255;
 
     if (gpu->io.fb.stencil_test.enable) {
         glEnable(GL_STENCIL_TEST);
@@ -1270,16 +1281,27 @@ void gpu_update_gl_state(GPU* gpu) {
     ubuf.numlights = gpu->io.lighting.numlights + 1;
     for (int i = 0; i < ubuf.numlights; i++) {
         // TODO: handle light permutation
-        COPYRGB(ubuf.light[i].specular0, gpu->io.lighting.light[i].specular0);
-        COPYRGB(ubuf.light[i].specular1, gpu->io.lighting.light[i].specular1);
-        COPYRGB(ubuf.light[i].diffuse, gpu->io.lighting.light[i].diffuse);
-        COPYRGB(ubuf.light[i].ambient, gpu->io.lighting.light[i].ambient);
-        ubuf.light[i].vec[0] = cvtf16(gpu->io.lighting.light[i].vec.x);
-        ubuf.light[i].vec[1] = cvtf16(gpu->io.lighting.light[i].vec.y);
-        ubuf.light[i].vec[2] = cvtf16(gpu->io.lighting.light[i].vec.z);
+        COPYRGB(fbuf.light[i].specular0, gpu->io.lighting.light[i].specular0);
+        COPYRGB(fbuf.light[i].specular1, gpu->io.lighting.light[i].specular1);
+        COPYRGB(fbuf.light[i].diffuse, gpu->io.lighting.light[i].diffuse);
+        COPYRGB(fbuf.light[i].ambient, gpu->io.lighting.light[i].ambient);
+        fbuf.light[i].vec[0] = cvtf16(gpu->io.lighting.light[i].vec.x);
+        fbuf.light[i].vec[1] = cvtf16(gpu->io.lighting.light[i].vec.y);
+        fbuf.light[i].vec[2] = cvtf16(gpu->io.lighting.light[i].vec.z);
         ubuf.light[i].config = gpu->io.lighting.light[i].config;
     }
-    COPYRGB(ubuf.ambient_color, gpu->io.lighting.ambient);
+    COPYRGB(fbuf.ambient_color, gpu->io.lighting.ambient);
 
+    glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
+
+#ifdef SHADERGEN
+    GLuint fs = shader_gen_get(gpu, &ubuf);
+#else
+    glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
+    GLuint fs = gpu->gl.gpu_uberfs;
+#endif
+
+    gpu_gl_load_prog(&gpu->gl, gpu->gl.gpu_vs, fs);
 }
