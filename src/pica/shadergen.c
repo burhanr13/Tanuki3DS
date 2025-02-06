@@ -28,7 +28,6 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
         glCompileShader(block->fs);
 
         free(source);
-
     }
     return block->fs;
 }
@@ -113,7 +112,8 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
             ds_printf(s, "l = normalize(quatrot(nq, light[%d].vec.xyz));\n", i);
         } else {
             ds_printf(s,
-                      "l = normalize(quatrot(nq, view + light[%d].vec.xyz));\n", i);
+                      "l = normalize(quatrot(nq, view + light[%d].vec.xyz));\n",
+                      i);
         }
         ds_printf(s, "h = normalize(l + v);\n");
 
@@ -402,6 +402,13 @@ const char* alphatest_str(int alphafunc) {
     }
 }
 
+const char tev_setup[] = R"(
+vec4 cur = vec4(0);
+vec4 buf = tev_buffer_color;
+vec4 next_buf = tev_buffer_color;
+vec4 tmp;
+)";
+
 char* shader_gen_fs(UberUniforms* ubuf) {
     DynString s;
     ds_init(&s, 8192);
@@ -438,10 +445,9 @@ char* shader_gen_fs(UberUniforms* ubuf) {
                   ubuf->tex2coord ? 1 : 2);
     }
 
-    ds_printf(&s, "vec4 cur = vec4(0);\n");
-    ds_printf(&s, "vec4 buf = tev_buffer_color;\n");
-    ds_printf(&s, "vec4 tmp;\n\n");
+    ds_printf(&s, tev_setup);
 
+    bool update_buffer = false;
     for (int i = 0; i < 6; i++) {
         // check for do nothing stage
         bool skiprgb = ubuf->tev[i].rgb.combiner == 0 &&
@@ -477,11 +483,15 @@ char* shader_gen_fs(UberUniforms* ubuf) {
             needsclamp = true;
         }
         if (needsclamp) ds_printf(&s, "cur = clamp(cur, 0, 1);\n");
+
+        if (update_buffer) ds_printf(&s, "buf = next_buf;\n");
         if (ubuf->tev_update_rgb & BIT(i)) {
-            ds_printf(&s, "buf.rgb = cur.rgb;\n");
+            ds_printf(&s, "next_buf.rgb = cur.rgb;\n");
+            update_buffer = true;
         }
         if (ubuf->tev_update_alpha & BIT(i)) {
-            ds_printf(&s, "buf.a = cur.a;\n");
+            ds_printf(&s, "next_buf.a = cur.a;\n");
+            update_buffer = true;
         }
     }
 

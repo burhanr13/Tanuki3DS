@@ -210,6 +210,8 @@ void main() {
     tev_srcs[TEVSRC_TEX2] = texture(tex2, tex2coord ? texcoord1 : texcoord2);
     tev_srcs[TEVSRC_BUFFER] = tev_buffer_color;
 
+    vec4 next_buf = tev_buffer_color;
+
     for (uint i = 0; i < 6; i++) {
         tev_srcs[TEVSRC_CONSTANT] = tev_color[i];
 
@@ -225,11 +227,13 @@ void main() {
 
         res = clamp(res, 0, 1);
 
+        tev_srcs[TEVSRC_BUFFER] = next_buf;
+
         if (BIT(tev_update_rgb, i)) {
-            tev_srcs[TEVSRC_BUFFER].rgb = res.rgb;
+            next_buf.rgb = res.rgb;
         }
         if (BIT(tev_update_alpha, i)) {
-            tev_srcs[TEVSRC_BUFFER].a = res.a;
+            next_buf.a = res.a;
         }
 
         tev_srcs[TEVSRC_PREVIOUS] = res;
