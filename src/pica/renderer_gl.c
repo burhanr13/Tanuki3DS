@@ -133,6 +133,9 @@ void renderer_gl_destroy(GLState* state) {
     for (int i = 0; i < MAX_PROGRAM; i++) {
         glDeleteProgram(state->progcache.d[i].prog);
     }
+    for (int i = 0; i < FSH_MAX; i++) {
+        glDeleteShader(state->gpu->fshaders.d[i].fs);
+    }
     glDeleteVertexArrays(1, &state->mainvao);
     glDeleteVertexArrays(1, &state->gpuvao);
     glDeleteBuffers(1, &state->mainvbo);
