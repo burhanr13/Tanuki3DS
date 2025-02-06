@@ -300,9 +300,9 @@ void write_combiner_rgb(DynString* s, UberUniforms* ubuf, int i) {
         case 9:
             ds_printf(s, "(");
             SRC(0);
-            ds_printf(s, " * ");
+            ds_printf(s, " + ");
             SRC(1);
-            ds_printf(s, ") + ");
+            ds_printf(s, ") * ");
             SRC(2);
             break;
         default:
@@ -368,9 +368,9 @@ void write_combiner_a(DynString* s, UberUniforms* ubuf, int i) {
         case 9:
             ds_printf(s, "(");
             SRC(0);
-            ds_printf(s, " * ");
+            ds_printf(s, " + ");
             SRC(1);
-            ds_printf(s, ") + ");
+            ds_printf(s, ") * ");
             SRC(2);
             break;
         default:
@@ -441,7 +441,7 @@ char* shader_gen_fs(UberUniforms* ubuf) {
 
     ds_printf(&s, "vec4 cur = vec4(0);\n");
     ds_printf(&s, "vec4 buf = tev_buffer_color;\n");
-    ds_printf(&s, "vec4 tmp;\n");
+    ds_printf(&s, "vec4 tmp;\n\n");
 
     for (int i = 0; i < 6; i++) {
         // check for do nothing stage
@@ -451,7 +451,7 @@ char* shader_gen_fs(UberUniforms* ubuf) {
         bool skipa = ubuf->tev[i].a.combiner == 0 && ubuf->tev[i].a.op0 == 0 &&
                      ubuf->tev[i].a.src0 == TEVSRC_PREVIOUS;
         bool needsclamp = false; // dont clamp if we didnt do anything
-        if (!skiprgb && !skipa) {
+        if (!(skiprgb && skipa)) {
             ds_printf(&s, "tmp.rgb = ");
             write_combiner_rgb(&s, ubuf, i);
             ds_printf(&s, ";\n");
