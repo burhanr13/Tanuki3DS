@@ -22,6 +22,8 @@ SDL_Gamepad* g_gamepad;
 
 bool g_pending_reset;
 
+char* oldcwd;
+
 #ifdef GLDEBUGCTX
 void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
                    GLsizei length, const char* message, const void* userParam) {
@@ -56,7 +58,14 @@ void read_args(int argc, char** argv) {
     argc -= optind;
     argv += optind;
     if (argc >= 1) {
-        emulator_set_rom(argv[0]);
+        if (argv[0][0] == '/') {
+            emulator_set_rom(argv[0]);
+        } else {
+            char* path;
+            asprintf(&path, "%s/%s", oldcwd, argv[0]);
+            emulator_set_rom(path);
+            free(path);
+        }
     }
 }
 
@@ -181,7 +190,8 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
 }
 
 int main(int argc, char** argv) {
-    
+    oldcwd = realpath(".", nullptr);
+
 #ifdef NOPORTABLE
     char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
     chdir(prefpath);
@@ -191,7 +201,7 @@ int main(int argc, char** argv) {
     dup2(logfd, STDOUT_FILENO);
     close(logfd);
 #endif
-    
+
     emulator_init();
 
     read_args(argc, argv);
@@ -335,6 +345,8 @@ int main(int argc, char** argv) {
     SDL_Quit();
 
     emulator_quit();
+
+    free(oldcwd);
 
     return 0;
 }
