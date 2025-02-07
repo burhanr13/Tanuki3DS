@@ -58,6 +58,7 @@ jobs:
     # taken from panda3ds
     - name: create app bundle
       run: |
+        rm /usr/local/bin/idle3
         brew install dylibbundler imagemagick
         ./.github/mac-bundle.sh
         codesign --force -s - -vvvv Tanuki3DS.app
