@@ -7,9 +7,6 @@
 #include "shader.h"
 #include "shadergen.h"
 
-#define SHADERJIT
-#define SHADERGEN
-
 #undef PTR
 #ifdef FASTMEM
 #define PTR(addr) ((void*) &gpu->mem[addr])
@@ -726,11 +723,7 @@ void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
     init_vsh(gpu, &vsh);
     for (int i = 0; i < count; i++) {
         load_vtx(gpu, cfg, srcoff + i, vsh.v);
-#ifdef SHADERJIT
-        gpu->vsh_runner.jitfunc(&vsh);
-#else
-        pica_shader_exec(&vsh);
-#endif
+        gpu->vsh_runner.shaderfunc(&vsh);
         store_vtx(gpu, dstoff + i, vbuf, vsh.o);
     }
 }
@@ -765,7 +758,7 @@ void gpu_vshrunner_init(GPU* gpu) {
     pthread_cond_init(&gpu->vsh_runner.cv1, nullptr);
     pthread_cond_init(&gpu->vsh_runner.cv2, nullptr);
 
-    for (int i = 0; i < VSH_THREADS; i++) {
+    for (int i = 0; i < ctremu.vshthreads; i++) {
         gpu->vsh_runner.thread[i].ready = false;
         pthread_create(&gpu->vsh_runner.thread[i].thd, nullptr,
                        (void*) vsh_thrd_func, gpu);
@@ -774,12 +767,12 @@ void gpu_vshrunner_init(GPU* gpu) {
 
 void gpu_vshrunner_destroy(GPU* gpu) {
     gpu->vsh_runner.die = true;
-    for (int i = 0; i < VSH_THREADS; i++) {
+    for (int i = 0; i < ctremu.vshthreads; i++) {
         gpu->vsh_runner.thread[i].ready = true;
     }
     pthread_cond_broadcast(&gpu->vsh_runner.cv1);
     pthread_mutex_unlock(&gpu->vsh_runner.mtx);
-    for (int i = 0; i < VSH_THREADS; i++) {
+    for (int i = 0; i < ctremu.vshthreads; i++) {
         pthread_join(gpu->vsh_runner.thread[i].thd, nullptr);
     }
     pthread_mutex_destroy(&gpu->vsh_runner.mtx);
@@ -788,42 +781,40 @@ void gpu_vshrunner_destroy(GPU* gpu) {
 }
 
 void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
-#ifdef SHADERJIT
-    if (gpu->sh_dirty) {
-        ShaderUnit shu;
-        init_vsh(gpu, &shu);
-        gpu->vsh_runner.jitfunc = shaderjit_get(gpu, &shu);
-        gpu->sh_dirty = false;
+    if (ctremu.shaderjit) {
+        if (gpu->sh_dirty) {
+            ShaderUnit shu;
+            init_vsh(gpu, &shu);
+            gpu->vsh_runner.shaderfunc = shaderjit_get(gpu, &shu);
+            gpu->sh_dirty = false;
+        }
+    } else {
+        gpu->vsh_runner.shaderfunc = pica_shader_exec;
     }
-#endif
 
-#if VSH_THREADS == 0
-    vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
-#else
-    if (count < VSH_THREADS) {
+    if (count < ctremu.vshthreads || ctremu.vshthreads < 2) {
         vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
     } else {
         gpu->vsh_runner.attrcfg = attrcfg;
         gpu->vsh_runner.vbuf = vbuf;
         gpu->vsh_runner.base = base;
 
-        for (int i = 0; i < VSH_THREADS; i++) {
-            gpu->vsh_runner.thread[i].off = i * (count / VSH_THREADS);
-            gpu->vsh_runner.thread[i].count = count / VSH_THREADS;
+        for (int i = 0; i < ctremu.vshthreads; i++) {
+            gpu->vsh_runner.thread[i].off = i * (count / ctremu.vshthreads);
+            gpu->vsh_runner.thread[i].count = count / ctremu.vshthreads;
         }
-        gpu->vsh_runner.thread[VSH_THREADS - 1].count =
-            count - gpu->vsh_runner.thread[VSH_THREADS - 1].off;
+        gpu->vsh_runner.thread[ctremu.vshthreads - 1].count =
+            count - gpu->vsh_runner.thread[ctremu.vshthreads - 1].off;
 
         gpu->vsh_runner.cur = 0;
-        for (int i = 0; i < VSH_THREADS; i++) {
+        for (int i = 0; i < ctremu.vshthreads; i++) {
             gpu->vsh_runner.thread[i].ready = true;
         }
         pthread_cond_broadcast(&gpu->vsh_runner.cv1);
-        while (gpu->vsh_runner.cur < VSH_THREADS) {
+        while (gpu->vsh_runner.cur < ctremu.vshthreads) {
             pthread_cond_wait(&gpu->vsh_runner.cv2, &gpu->vsh_runner.mtx);
         }
     }
-#endif
 }
 
 void gpu_drawarrays(GPU* gpu) {
@@ -1295,13 +1286,14 @@ void gpu_update_gl_state(GPU* gpu) {
     glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
 
-#ifdef SHADERGEN
-    GLuint fs = shader_gen_get(gpu, &ubuf);
-#else
-    glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
-    GLuint fs = gpu->gl.gpu_uberfs;
-#endif
+    GLuint fs;
+    if (ctremu.ubershader) {
+        glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
+        fs = gpu->gl.gpu_uberfs;
+    } else {
+        fs = shader_gen_get(gpu, &ubuf);
+    }
 
     gpu_gl_load_prog(&gpu->gl, gpu->gl.gpu_vs, fs);
 }

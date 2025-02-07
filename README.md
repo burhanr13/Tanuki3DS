@@ -21,6 +21,8 @@ You can download a stable release from the releases tab, or the latest build bel
 ## Usage
 Launching the app should give you a prompt to select the game file (currently supports .elf, .3ds/.cci, .cxi/.app files, roms must be decrypted). You can also start a game by dropping its file onto the window.
 
+You can modify emulator settings in the generated config file.
+
 You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 
 The keyboard controls are as follows:
@@ -52,6 +54,7 @@ You need the following dependencies installed to build and run:
 - glew
 - capstone
 - xxhash
+- libconfuse
 - xbyak (x86 only)
 - xbyak_aarch64 (arm64 only)
 

@@ -11,7 +11,7 @@ CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE -I/usr/local/include
 
-LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone
+LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone -lconfuse
 
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto

@@ -1,9 +1,9 @@
 #include "emulator.h"
 
 #include <fcntl.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
+
+#include <confuse.h>
 
 #include "3ds.h"
 #include "emulator.h"
@@ -12,15 +12,54 @@
 bool g_infologs = false;
 EmulatorState ctremu;
 
+void load_config() {
+    cfg_opt_t opts[] = {
+        CFG_BOOL("verbose_log", cfg_false, 0),
+        CFG_BOOL("vsync", cfg_true, 0),
+        CFG_INT("video_scale", 1, 0),
+        CFG_BOOL("shaderjit", cfg_true, 0),
+        CFG_INT("vsh_threads", 0, 0),
+        CFG_BOOL("ubershader", cfg_false, 0),
+        CFG_END(),
+    };
+    cfg_t* cfg = cfg_init(opts, 0);
+
+    auto res = cfg_parse(cfg, "config.txt");
+    if (res != CFG_SUCCESS) {
+        lwarn("regenerating config file");
+        FILE* fp = fopen("config.txt", "w");
+        if (fp) {
+            cfg_print(cfg, fp);
+            fclose(fp);
+        }
+    }
+
+    g_infologs = cfg_getbool(cfg, "verbose_log");
+    ctremu.vsync = cfg_getbool(cfg, "vsync");
+    ctremu.videoscale = cfg_getint(cfg, "video_scale");
+    if (ctremu.videoscale < 1) ctremu.videoscale = 1;
+    ctremu.shaderjit = cfg_getbool(cfg, "shaderjit");
+    ctremu.vshthreads = cfg_getint(cfg, "vsh_threads");
+    if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
+    if (ctremu.vshthreads > MAX_VSH_THREADS)
+        ctremu.vshthreads = MAX_VSH_THREADS;
+    ctremu.ubershader = cfg_getbool(cfg, "ubershader");
+
+    cfg_free(cfg);
+}
+
 void emulator_init() {
     mkdir("system", S_IRWXU);
     mkdir("system/savedata", S_IRWXU);
     mkdir("system/extdata", S_IRWXU);
     mkdir("system/sdmc", S_IRWXU);
 
-    // config files ?
     ctremu.videoscale = 1;
     ctremu.vsync = true;
+    ctremu.shaderjit = true;
+    ctremu.vshthreads = 0;
+
+    load_config();
 }
 
 void emulator_quit() {

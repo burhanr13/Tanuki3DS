@@ -15,7 +15,7 @@
 #define GPUREG(r) ((offsetof(GPU, io.r) - offsetof(GPU, io)) >> 2)
 #define GPUREG_MAX 0x300
 
-#define VSH_THREADS 4
+#define MAX_VSH_THREADS 16
 
 typedef union {
     float semantics[24];
@@ -472,7 +472,7 @@ typedef struct _GPU {
             bool ready;
             int off;
             int count;
-        } thread[VSH_THREADS];
+        } thread[MAX_VSH_THREADS];
 
         pthread_cond_t cv1;
         pthread_cond_t cv2;
@@ -485,7 +485,7 @@ typedef struct _GPU {
         void* attrcfg;
         void* vbuf;
 
-        ShaderJitFunc jitfunc;
+        ShaderJitFunc shaderfunc;
     } vsh_runner;
 
     GLState gl;

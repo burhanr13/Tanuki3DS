@@ -17,9 +17,12 @@ log*
 
 ctremu*
 *.app
+
 system*
+config.txt
 
 perf*
+*.trace
 *.rdc
 
 .DS_Store
