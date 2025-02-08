@@ -27,6 +27,9 @@ endif
 ifeq ($(shell uname -m),arm64)
 	LDFLAGS += -lxbyak_aarch64
 endif
+ifeq ($(shell uname -m),aarch64)
+	LDFLAGS += -lxbyak_aarch64
+endif
 
 ifeq ($(shell uname),Darwin)
 	CC := $(shell brew --prefix)/opt/llvm/bin/clang
