@@ -33,7 +33,7 @@ void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
 
 void read_args(int argc, char** argv) {
     char c;
-    while ((c = getopt(argc, argv, "hlvs:")) != -1) {
+    while ((c = getopt(argc, argv, "hlvs:")) != (char) -1) {
         switch (c) {
             case 'l':
                 g_infologs = true;

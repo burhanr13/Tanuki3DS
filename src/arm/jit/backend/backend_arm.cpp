@@ -501,7 +501,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     auto shift = LOADOP2();
                     Label lelse, lendif;
                     cmp(shift, 32);
-                    b(HS, lelse);
+                    bhs(lelse);
                     lsl(dst, src, shift);
                     b(lendif);
                     L(lelse);
@@ -525,7 +525,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     auto shift = LOADOP2();
                     Label lelse, lendif;
                     cmp(shift, 32);
-                    b(HS, lelse);
+                    bhs(lelse);
                     lsr(dst, src, shift);
                     b(lendif);
                     L(lelse);
@@ -549,7 +549,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     auto shift = LOADOP2();
                     Label lelse, lendif;
                     cmp(shift, 32);
-                    b(HS, lelse);
+                    bhs(lelse);
                     asr(dst, src, shift);
                     b(lendif);
                     L(lelse);
