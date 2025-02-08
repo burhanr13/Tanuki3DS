@@ -84,7 +84,7 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-linux-arm-appimage
-        path: ./Tanuki3DS-x86_64.AppImage
+        path: ./Tanuki3DS-aarch64.AppImage
         
   macos-x86-build:
     runs-on: macos-13
