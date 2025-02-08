@@ -659,6 +659,7 @@ DECL_ARM_COMPILE(pack_sat) {
             } else {
                 lwarn("unknown xt16 %08x at %08x", instr.w, addr);
             }
+            if (instr.pack_sat.rn != 15) lwarn("unknown uxtab16");
         }
         EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
     } else {

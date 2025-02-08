@@ -81,6 +81,8 @@ struct Code : Xbyak_aarch64::CodeGenerator {
         if (assn == -1) return -1;
         else return getOpForReg(assn);
     }
+
+    void compileVFPDataProc(ArmInstr inst);
 };
 
 #define CPU(m) (ptr(x29, (u32) offsetof(ArmCore, m)))
@@ -265,10 +267,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_DATA_PROC: {
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                mov(x16, (u64) exec_vfp_data_proc);
-                blr(x16);
+                compileVFPDataProc(ArmInstr(inst.op1));
                 break;
             }
             case IR_VFP_LOAD_MEM: {
@@ -980,6 +979,274 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             L(clbks[i]);
             dd(clbkptrs[i]);
             dd(clbkptrs[i] >> 32);
+        }
+    }
+}
+
+#define LDSN() ldr(s0, CPU(s[vn]))
+#define LDSM() ldr(s1, CPU(s[vm]))
+#define LDSD() ldr(s2, CPU(s[vd]))
+#define LDSNM()                                                                \
+    LDSN();                                                                    \
+    LDSM()
+#define LDSDM()                                                                \
+    LDSD();                                                                    \
+    LDSM()
+#define LDSNMD()                                                               \
+    LDSNM();                                                                   \
+    LDSD()
+#define STSD() str(s0, CPU(s[vd]))
+
+#define LDDN() ldr(d0, CPU(d[vn]))
+#define LDDM() ldr(d1, CPU(d[vm]))
+#define LDDD() ldr(d2, CPU(d[vd]))
+#define LDDNM()                                                                \
+    LDDN();                                                                    \
+    LDDM()
+#define LDDDM()                                                                \
+    LDDD();                                                                    \
+    LDDM()
+#define LDDNMD()                                                               \
+    LDDNM();                                                                   \
+    LDDD()
+#define STDD() str(d0, CPU(d[vd]))
+
+void Code::compileVFPDataProc(ArmInstr instr) {
+    bool dp = instr.cp_data_proc.cpnum & 1;
+    u32 vd = instr.cp_data_proc.crd;
+    u32 vn = instr.cp_data_proc.crn;
+    u32 vm = instr.cp_data_proc.crm;
+    if (!dp) {
+        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+        vn = vn << 1 | (instr.cp_data_proc.cp >> 2);
+        vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+    }
+    bool op = instr.cp_data_proc.cp & 2;
+
+    switch (instr.cp_data_proc.cpopc & 0b1011) {
+        case 0:
+            if (op) {
+                if (dp) {
+                    LDDNMD();
+                    fmsub(d0, d0, d1, d2);
+                    STDD();
+                } else {
+                    LDSNMD();
+                    fmsub(s0, s0, s1, s2);
+                    STSD();
+                }
+            } else {
+                if (dp) {
+                    LDDNMD();
+                    fmadd(d0, d0, d1, d2);
+                    STDD();
+                } else {
+                    LDSNMD();
+                    fmadd(s0, s0, s1, s2);
+                    STSD();
+                }
+            }
+            break;
+        case 1:
+            if (op) {
+                if (dp) {
+                    LDDNMD();
+                    fnmadd(d0, d0, d1, d2);
+                    STDD();
+                } else {
+                    LDSNMD();
+                    fnmadd(s0, s0, s1, s2);
+                    STSD();
+                }
+            } else {
+                if (dp) {
+                    LDDNMD();
+                    fnmsub(d0, d0, d1, d2);
+                    STDD();
+                } else {
+                    LDSNMD();
+                    fnmsub(s0, s0, s1, s2);
+                    STSD();
+                }
+            }
+            break;
+        case 2:
+            if (dp) {
+                LDDNM();
+                if (op) fnmul(d0, d0, d1);
+                else fmul(d0, d0, d1);
+                STDD();
+            } else {
+                LDSNM();
+                if (op) fnmul(s0, s0, s1);
+                else fmul(s0, s0, s1);
+                STSD();
+            }
+            break;
+        case 3:
+            if (op) {
+                if (dp) {
+                    LDDNM();
+                    fsub(d0, d0, d1);
+                    STDD();
+                } else {
+                    LDSNM();
+                    fsub(s0, s0, s1);
+                    STSD();
+                }
+            } else {
+                if (dp) {
+                    LDDNM();
+                    fadd(d0, d0, d1);
+                    STDD();
+                } else {
+                    LDSNM();
+                    fadd(s0, s0, s1);
+                    STSD();
+                }
+            }
+            break;
+        case 8:
+            if (dp) {
+                LDDNM();
+                fdiv(d0, d0, d1);
+                STDD();
+            } else {
+                LDSNM();
+                fdiv(s0, s0, s1);
+                STSD();
+            }
+            break;
+        case 11: {
+            op = instr.cp_data_proc.cp & 4;
+            switch (instr.cp_data_proc.crn) {
+                case 0:
+                    if (op) {
+                        if (dp) {
+                            LDDM();
+                            fabs(d0, d1);
+                            STDD();
+                        } else {
+                            LDSM();
+                            fabs(s0, s1);
+                            STSD();
+                        }
+                    } else {
+                        if (dp) {
+                            LDDM();
+                            fmov(d0, d1);
+                            STDD();
+                        } else {
+                            LDSM();
+                            fmov(s0, s1);
+                            STSD();
+                        }
+                    }
+                    break;
+                case 1:
+                    if (op) {
+                        if (dp) {
+                            LDDM();
+                            fsqrt(d0, d1);
+                            STDD();
+                        } else {
+                            LDSM();
+                            fsqrt(s0, s1);
+                            STSD();
+                        }
+                    } else {
+                        if (dp) {
+                            LDDM();
+                            fneg(d0, d1);
+                            STDD();
+                        } else {
+                            LDSM();
+                            fneg(s0, s1);
+                            STSD();
+                        }
+                    }
+                    break;
+                case 4:
+                case 5:
+                    if (dp) {
+                        if (instr.cp_data_proc.crn & 1) {
+                            LDDD();
+                            fcmp(d2, 0);
+                        } else {
+                            LDDDM();
+                            fcmp(d2, d1);
+                        }
+                    } else {
+                        if (instr.cp_data_proc.crn & 1) {
+                            LDSD();
+                            fcmp(s2, 0);
+                        } else {
+                            LDSDM();
+                            fcmp(s2, s1);
+                        }
+                    }
+                    mrs(x0, 3, 3, 4, 2, 0); // mrs x0, nzcv
+                    // arm32 flags should be the same as arm64 flags
+                    ldr(w1, CPU(fpscr));
+                    ubfx(w0, w0, 28, 4);
+                    bfi(w1, w0, 28, 4);
+                    str(w1, CPU(fpscr));
+                    break;
+                case 7:
+                    if (dp) {
+                        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+                        LDDM();
+                        fcvt(s0, d1);
+                        STSD();
+                    } else {
+                        vd = vd >> 1;
+                        LDSM();
+                        fcvt(d0, s1);
+                        STDD();
+                    }
+                    break;
+                case 8:
+                    ldr(w0, CPU(is[vm]));
+                    if (dp) {
+                        vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+                        if (op) {
+                            scvtf(d0, w0);
+                        } else {
+                            ucvtf(d0, w0);
+                        }
+                        STDD();
+                    } else {
+                        if (op) {
+                            scvtf(s0, w0);
+                        } else {
+                            ucvtf(s0, w0);
+                        }
+                        STSD();
+                    }
+                    break;
+                case 12:
+                case 13:
+                    // TODO: deal with rounding mode properly
+                    if (dp) {
+                        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+                        LDDM();
+                        if (instr.cp_data_proc.crn & 1) {
+                            fcvtzs(w0, d1);
+                        } else {
+                            fcvtzu(w0, d1);
+                        }
+                    } else {
+                        LDSM();
+                        if (instr.cp_data_proc.crn & 1) {
+                            fcvtzs(w0, s1);
+                        } else {
+                            fcvtzu(w0, s1);
+                        }
+                    }
+                    str(w0, CPU(is[vd]));
+                    break;
+            }
+            break;
         }
     }
 }
