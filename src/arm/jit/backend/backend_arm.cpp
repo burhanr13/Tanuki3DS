@@ -14,6 +14,22 @@ struct LinkPatch {
     u32 addr;
 };
 
+enum {
+    CB_LOAD8,
+    CB_LOAD16,
+    CB_LOAD32,
+    CB_STORE8,
+    CB_STORE16,
+    CB_STORE32,
+
+    CB_LOADF32,
+    CB_LOADF64,
+    CB_STOREF32,
+    CB_STOREF64,
+
+    CB_MAX
+};
+
 struct Code : Xbyak_aarch64::CodeGenerator {
     RegAllocation* regalloc;
     HostRegAllocation hralloc;
@@ -31,6 +47,9 @@ struct Code : Xbyak_aarch64::CodeGenerator {
     const int savedMax = 10;
 
     std::vector<LinkPatch> links;
+
+    Label cblabels[CB_MAX] = {};
+    bool usingcb[CB_MAX] = {};
 
     Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
 
@@ -82,10 +101,40 @@ struct Code : Xbyak_aarch64::CodeGenerator {
         else return getOpForReg(assn);
     }
 
-    void compileVFPDataProc(ArmInstr inst);
+    void compileCBCall(int cb) {
+        usingcb[cb] = true;
+        ldr(x16, cblabels[cb]);
+        blr(x16);
+    }
+
+    void placeCBLiterals() {
+        u64 cbptrs[CB_MAX] = {
+            (u64) cpu->read8,    (u64) cpu->read16,  (u64) cpu->read32,
+            (u64) cpu->write8,   (u64) cpu->write16, (u64) cpu->write32,
+            (u64) cpu->readf32,  (u64) cpu->readf64, (u64) cpu->writef32,
+            (u64) cpu->writef64,
+        };
+        align(8);
+        for (int i = 0; i < CB_MAX; i++) {
+            if (usingcb[i]) {
+                L(cblabels[i]);
+                dd(cbptrs[i]);
+                dd(cbptrs[i] >> 32);
+            }
+        }
+    }
+
+    void compileVFPDataProc(ArmInstr instr);
+    void compileVFPLoadMem(ArmInstr instr, WReg addr);
+    void compileVFPStoreMem(ArmInstr instr, WReg addr);
+    void compileVFPRead(ArmInstr instr, WReg dst);
+    void compileVFPWrite(ArmInstr instr, WReg src);
+    void compileVFPRead64(ArmInstr instr, WReg dst, bool hi);
+    void compileVFPWrite64(ArmInstr instr, WReg src, bool hi);
 };
 
-#define CPU(m) (ptr(x29, (u32) offsetof(ArmCore, m)))
+#define CPU(m, ...)                                                            \
+    (ptr(x29, (u32) offsetof(ArmCore, m) __VA_OPT__(+) __VA_ARGS__))
 
 #define LOADOP(i, flbk)                                                        \
     ({                                                                         \
@@ -128,17 +177,6 @@ struct Code : Xbyak_aarch64::CodeGenerator {
         }                                                                      \
     })
 
-enum {
-    CLBK_LOAD8,
-    CLBK_LOAD16,
-    CLBK_LOAD32,
-    CLBK_STORE8,
-    CLBK_STORE16,
-    CLBK_STORE32,
-
-    CLBK_MAX
-};
-
 Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
     : Xbyak_aarch64::CodeGenerator(4096, Xbyak_aarch64::AutoGrow),
       regalloc(regalloc), cpu(cpu) {
@@ -151,13 +189,6 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
     u32 jmptarget = -1;
 
     Label looplabel;
-
-    Label clbks[CLBK_MAX] = {};
-    bool usingclbk[CLBK_MAX] = {};
-    u64 clbkptrs[CLBK_MAX] = {
-        (u64) cpu->read8,  (u64) cpu->read16,  (u64) cpu->read32,
-        (u64) cpu->write8, (u64) cpu->write16, (u64) cpu->write32,
-    };
 
     std::vector<Label> labels;
 
@@ -271,68 +302,45 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_LOAD_MEM: {
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                MOVOP2(w2);
-                mov(x16, (u64) exec_vfp_load_mem);
-                blr(x16);
+                auto addr = LOADOP2();
+                compileVFPLoadMem(ArmInstr(inst.op1), addr);
                 break;
             }
             case IR_VFP_STORE_MEM: {
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                MOVOP2(w2);
-                mov(x16, (u64) exec_vfp_store_mem);
-                blr(x16);
+                auto addr = LOADOP2();
+                compileVFPStoreMem(ArmInstr(inst.op1), addr);
                 break;
             }
             case IR_VFP_READ: {
                 auto dst = DSTREG();
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                mov(x16, (u64) exec_vfp_read);
-                blr(x16);
-                mov(dst, w0);
+                compileVFPRead(ArmInstr(inst.op1), dst);
                 break;
             }
             case IR_VFP_WRITE: {
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                MOVOP2(w2);
-                mov(x16, (u64) exec_vfp_write);
-                blr(x16);
+                auto src = LOADOP2();
+                compileVFPWrite(ArmInstr(inst.op1), src);
                 break;
             }
             case IR_VFP_READ64L: {
                 auto dst = DSTREG();
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                mov(x16, (u64) exec_vfp_read64);
-                blr(x16);
-                mov(dst, w0);
-                STOREDST();
-                i++;
-                auto dsth = DSTREG();
-                lsr(XReg(dsth.getIdx()), x0, 32);
+                compileVFPRead64(ArmInstr(inst.op1), dst, false);
                 break;
             }
-            case IR_VFP_READ64H:
+            case IR_VFP_READ64H: {
+                auto dst = DSTREG();
+                compileVFPRead64(ArmInstr(inst.op1), dst, true);
                 break;
+            }
             case IR_VFP_WRITE64L: {
                 auto src = LOADOP2();
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                i++;
-                inst = ir->code.d[i];
-                auto srch = LOADOP2();
-                mov(w2, src);
-                bfi(x2, XReg(srch.getIdx()), 32, 32);
-                mov(x16, (u64) exec_vfp_write64);
-                blr(x16);
+                compileVFPWrite64(ArmInstr(inst.op1), src, false);
                 break;
             }
-            case IR_VFP_WRITE64H:
+            case IR_VFP_WRITE64H: {
+                auto src = LOADOP2();
+                compileVFPWrite64(ArmInstr(inst.op1), src, true);
                 break;
+            }
             case IR_CP15_READ: {
                 auto dst = DSTREG();
                 mov(x0, x29);
@@ -356,9 +364,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(x0, x29);
                 MOVOP1(w1);
                 mov(w2, 0);
-                usingclbk[CLBK_LOAD8] = true;
-                ldr(x16, clbks[CLBK_LOAD8]);
-                blr(x16);
+                compileCBCall(CB_LOAD8);
                 mov(dst, w0);
                 break;
             }
@@ -367,9 +373,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(x0, x29);
                 MOVOP1(w1);
                 mov(w2, 1);
-                usingclbk[CLBK_LOAD8] = true;
-                ldr(x16, clbks[CLBK_LOAD8]);
-                blr(x16);
+                compileCBCall(CB_LOAD8);
                 mov(dst, w0);
                 break;
             }
@@ -378,9 +382,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(x0, x29);
                 MOVOP1(w1);
                 mov(w2, 0);
-                usingclbk[CLBK_LOAD16] = true;
-                ldr(x16, clbks[CLBK_LOAD16]);
-                blr(x16);
+                compileCBCall(CB_LOAD16);
                 mov(dst, w0);
                 break;
             }
@@ -389,9 +391,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(x0, x29);
                 MOVOP1(w1);
                 mov(w2, 1);
-                usingclbk[CLBK_LOAD16] = true;
-                ldr(x16, clbks[CLBK_LOAD16]);
-                blr(x16);
+                compileCBCall(CB_LOAD16);
                 mov(dst, w0);
                 break;
             }
@@ -399,9 +399,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 auto dst = DSTREG();
                 mov(x0, x29);
                 MOVOP1(w1);
-                usingclbk[CLBK_LOAD32] = true;
-                ldr(x16, clbks[CLBK_LOAD32]);
-                blr(x16);
+                compileCBCall(CB_LOAD32);
                 mov(dst, w0);
                 break;
             }
@@ -409,27 +407,21 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(x0, x29);
                 MOVOP1(w1);
                 MOVOP2(w2);
-                usingclbk[CLBK_STORE8] = true;
-                ldr(x16, clbks[CLBK_STORE8]);
-                blr(x16);
+                compileCBCall(CB_STORE8);
                 break;
             }
             case IR_STORE_MEM16: {
                 mov(x0, x29);
                 MOVOP1(w1);
                 MOVOP2(w2);
-                usingclbk[CLBK_STORE16] = true;
-                ldr(x16, clbks[CLBK_STORE16]);
-                blr(x16);
+                compileCBCall(CB_STORE16);
                 break;
             }
             case IR_STORE_MEM32: {
                 mov(x0, x29);
                 MOVOP1(w1);
                 MOVOP2(w2);
-                usingclbk[CLBK_STORE32] = true;
-                ldr(x16, clbks[CLBK_STORE32]);
-                blr(x16);
+                compileCBCall(CB_STORE32);
                 break;
             }
             case IR_MOV: {
@@ -973,14 +965,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
         STOREDST();
     }
 
-    align(8);
-    for (int i = 0; i < CLBK_MAX; i++) {
-        if (usingclbk[i]) {
-            L(clbks[i]);
-            dd(clbkptrs[i]);
-            dd(clbkptrs[i] >> 32);
-        }
-    }
+    placeCBLiterals();
 }
 
 #define LDSN() ldr(s0, CPU(s[vn]))
@@ -1248,6 +1233,163 @@ void Code::compileVFPDataProc(ArmInstr instr) {
             }
             break;
         }
+    }
+}
+
+void Code::compileVFPRead(ArmInstr instr, WReg dst) {
+    if (instr.cp_reg_trans.cpopc == 7) {
+        if (instr.cp_reg_trans.crn == 1) {
+            ldr(dst, CPU(fpscr));
+        } else {
+            lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
+            mov(dst, 0);
+        }
+        return;
+    }
+
+    u32 vn = instr.cp_reg_trans.crn << 1;
+    if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
+    else vn |= instr.cp_reg_trans.cp >> 2;
+
+    ldr(dst, CPU(s[vn]));
+}
+
+void Code::compileVFPWrite(ArmInstr instr, WReg src) {
+    if (instr.cp_reg_trans.cpopc == 7) {
+        if (instr.cp_reg_trans.crn == 1) {
+            str(src, CPU(fpscr));
+        } else {
+            lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
+        }
+        return;
+    }
+
+    u32 vn = instr.cp_reg_trans.crn << 1;
+    if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
+    else vn |= instr.cp_reg_trans.cp >> 2;
+
+    str(src, CPU(s[vn]));
+}
+
+void Code::compileVFPRead64(ArmInstr instr, WReg dst, bool hi) {
+    if (instr.cp_double_reg_trans.cpnum & 1) {
+        u32 vm = instr.cp_double_reg_trans.crm;
+        if (hi) {
+            ldr(dst, CPU(d[vm], 4));
+        } else {
+            ldr(dst, CPU(d[vm]));
+        }
+    } else {
+        u32 vm = instr.cp_double_reg_trans.crm << 1 |
+                 ((instr.cp_double_reg_trans.cp >> 1) & 1);
+        if (hi) {
+            ldr(dst, CPU(s[vm + 1]));
+        } else {
+            ldr(dst, CPU(s[vm]));
+        }
+    }
+}
+
+void Code::compileVFPWrite64(ArmInstr instr, WReg src, bool hi) {
+    if (instr.cp_double_reg_trans.cpnum & 1) {
+        u32 vm = instr.cp_double_reg_trans.crm;
+        if (hi) {
+            str(src, CPU(d[vm], 4));
+        } else {
+            str(src, CPU(d[vm]));
+        }
+    } else {
+        u32 vm = instr.cp_double_reg_trans.crm << 1 |
+                 ((instr.cp_double_reg_trans.cp >> 1) & 1);
+        if (hi) {
+            if (vm < 31) str(src, CPU(s[vm + 1]));
+        } else {
+            str(src, CPU(s[vm]));
+        }
+    }
+}
+
+void Code::compileVFPLoadMem(ArmInstr instr, WReg addr) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    if (rcount > 1) {
+        str(x19, pre_ptr(sp, -16));
+        mov(w19, addr);
+        addr = w19;
+    }
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+            mov(x0, x29);
+            mov(w1, addr);
+            compileCBCall(CB_LOADF64);
+            str(d0, CPU(d[(vd + i) & 15]));
+            if (i < rcount - 1) add(addr, addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+            mov(x0, x29);
+            mov(w1, addr);
+            compileCBCall(CB_LOADF32);
+            str(s0, CPU(s[(vd + i) & 31]));
+            if (i < rcount - 1) add(addr, addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        ldr(x19, post_ptr(sp, 16));
+    }
+}
+
+void Code::compileVFPStoreMem(ArmInstr instr, WReg addr) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    if (rcount > 1) {
+        str(x19, pre_ptr(sp, -16));
+        mov(w19, addr);
+        addr = w19;
+    }
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+            mov(x0, x29);
+            mov(w1, addr);
+            ldr(d0, CPU(d[(vd + i) & 15]));
+            compileCBCall(CB_STOREF64);
+            if (i < rcount - 1) add(addr, addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+            mov(x0, x29);
+            mov(w1, addr);
+            ldr(s0, CPU(s[(vd + i) & 31]));
+            compileCBCall(CB_STOREF32);
+            if (i < rcount - 1) add(addr, addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        ldr(x19, post_ptr(sp, 16));
     }
 }
 
