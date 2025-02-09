@@ -4,6 +4,8 @@
 #include "../srv.h"
 #include "../thread.h"
 
+#define APT_MAX_PARAMSIZE 4096
+
 enum {
     APTCMD_NONE,
     APTCMD_WAKEUP,
@@ -13,6 +15,7 @@ enum {
 
 enum {
     APPID_HOMEMENU = 0x101,
+    APPID_SWKBD = 0x401,
     APPID_MIISELECTOR = 0x402,
     APPID_ERRDISP = 0x406,
 };
@@ -29,6 +32,8 @@ typedef struct {
     struct {
         u32 appid;
         u32 cmd;
+        u32 paramsize;
+        u8 param[APT_MAX_PARAMSIZE];
         KObject* kobj;
     } nextparam;
 } APTData;

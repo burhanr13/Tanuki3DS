@@ -249,7 +249,8 @@ DECL_PORT(fs) {
             }
 
             // cannot open these archives if they haven't been formatted yet
-            if (handle == ARCHIVE_SAVEDATA || handle == ARCHIVE_EXTSAVEDATA) {
+            if (handle == ARCHIVE_SAVEDATA || handle == ARCHIVE_EXTSAVEDATA ||
+                handle == ARCHIVE_SYSTEMSAVEDATA) {
                 FILE* fp = open_formatinfo(handle, false);
                 if (!fp) {
                     cmdbuf[1] = FSERR_ARCHIVE;
@@ -306,7 +307,7 @@ DECL_PORT(fs) {
             FILE* fp = open_formatinfo(fs_open_archive(archive, pathtype, path),
                                        false);
             if (!fp) {
-                lwarn("opening unformatted archive");
+                lwarn("opening unformatted archive %x", archive);
                 cmdbuf[1] = FSERR_ARCHIVE;
                 break;
             }
@@ -352,8 +353,6 @@ DECL_PORT(fs) {
         case 0x0851: {
             u32 numdirs = cmdbuf[5];
             u32 numfiles = cmdbuf[6];
-            void* smdhfile = PTR(cmdbuf[11]);
-            u32 smdhsize = cmdbuf[9];
 
             linfo("CreateExtSaveData with numfiles=%d numdirs=%d", numfiles,
                   numdirs);
@@ -367,6 +366,24 @@ DECL_PORT(fs) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
 
+            break;
+        }
+        case 0x0856: {
+            u32 numdirs = cmdbuf[5];
+            u32 numfiles = cmdbuf[6];
+            bool duplicate = cmdbuf[9];
+
+            linfo("CreateSystemSaveData with numfiles=%d numdirs=%d", numfiles,
+                  numdirs);
+
+            FILE* fp = open_formatinfo(ARCHIVE_SYSTEMSAVEDATA, true);
+            fwrite(&numfiles, sizeof(u32), 1, fp);
+            fwrite(&numdirs, sizeof(u32), 1, fp);
+            fwrite(&duplicate, sizeof(bool), 1, fp);
+            fclose(fp);
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         }
         case 0x0861: {
@@ -1056,9 +1073,10 @@ bool fs_create_dir(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
             linfo("creating directory %s", filepath);
 
             if (mkdir(filepath, S_IRWXU) < 0) {
-                linfo("cannot create directory");
+                lwarn("cannot create directory");
                 free(filepath);
-                return false;
+                // stub until delete directory is implemented
+                return true;
             }
             free(filepath);
             return true;
