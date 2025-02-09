@@ -6,12 +6,7 @@
 #include "services.h"
 #include "svc.h"
 
-// the first 128 bytes of the font contain some information
-// needed for it to work
-// the actual font data is at 0x80
 u8 shared_font[] = {
-#embed "sys_files/fonthdr.bin"
-    ,
 #embed "sys_files/font.bcfnt"
 };
 
@@ -46,8 +41,12 @@ void services_init(E3DS* s) {
     // so its paddr and vaddr must be related appropriately
     s->services.apt.shared_font.mapaddr =
         s->services.apt.shared_font.paddr - FCRAM_PBASE + LINEAR_HEAP_BASE;
-    memcpy(PPTR(s->services.apt.shared_font.paddr), shared_font,
-           sizeof shared_font);
+    u32* fontdest = PPTR(s->services.apt.shared_font.paddr);
+    fontdest[0] = 2;                  // 2 = font loaded
+    fontdest[1] = 1;                  // region
+    fontdest[2] = sizeof shared_font; // size
+    // font is at offset 0x80 of the memory block
+    memcpy((void*) fontdest + 0x80, shared_font, sizeof shared_font);
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
     sharedmem_alloc(s, &s->services.apt.capture_block);
