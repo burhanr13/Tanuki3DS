@@ -110,7 +110,7 @@ typedef struct _ArmCore {
 
     u32 vector_base;
 
-    long cycles;
+    s64 cycles;
 
     bool wfe;
 

@@ -114,6 +114,12 @@ DECL_PORT(cfg) {
             cmdbuf[1] = 0;
             cmdbuf[2] = 1;
             break;
+        case 0x0005:
+            linfo("GetSystemModel");
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 0; // old 3ds
+            break;
         case 0x0009:
             linfo("GetCountryCode");
             cmdbuf[0] = IPCHDR(2, 0);

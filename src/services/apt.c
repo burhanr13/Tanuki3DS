@@ -2,6 +2,12 @@
 
 #include "../3ds.h"
 
+void apt_resume_app(E3DS* s) {
+    s->services.apt.nextparam.appid = APPID_HOMEMENU;
+    s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
+    event_signal(s, &s->services.apt.resume_event);
+}
+
 DECL_PORT(apt) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
@@ -28,6 +34,10 @@ DECL_PORT(apt) {
             linfo("Enable");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
+            apt_resume_app(s);
+            // home menu needs this to be signaled again after a while for some reason
+            // add_event(&s->sched, (SchedEventHandler) apt_resume_app, 0,
+            //           CPU_CLK / FPS);
             break;
         case 0x0006: {
             u32 appid = cmdbuf[1];
@@ -166,7 +176,7 @@ DECL_PORT(apt) {
             u32 paramsize = cmdbuf[1];
             u32 type = cmdbuf[2];
             u32 paramaddr = cmdbuf[0x41];
-            lwarn("GetStartupArgument type %d", type    );
+            lwarn("GetStartupArgument type %d", type);
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = 1; // exists

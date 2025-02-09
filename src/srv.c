@@ -30,10 +30,6 @@ void services_init(E3DS* s) {
     srvobj_init(&s->services.apt.notif_event.hdr, KOT_EVENT);
     s->services.apt.notif_event.sticky = true;
     srvobj_init(&s->services.apt.resume_event.hdr, KOT_EVENT);
-    s->services.apt.resume_event.sticky = true;
-    s->services.apt.resume_event.signal = true;
-    s->services.apt.nextparam.appid = APPID_HOMEMENU;
-    s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
     s->services.apt.shared_font.size = sizeof shared_font;
     sharedmem_alloc(s, &s->services.apt.shared_font);
