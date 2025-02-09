@@ -781,9 +781,6 @@ u32 disasm_instr(ShaderUnit* shu, u32 pc) {
             }
             break;
         }
-        default:
-            printf("unknown");
-            break;
     }
     return pc;
 }
@@ -804,12 +801,6 @@ void disasm_block(ShaderUnit* shu, u32 start, u32 num) {
 }
 
 void pica_shader_disasm(ShaderUnit* shu) {
-    for (int i = 0; i < 8; i++) {
-        printf("const fvec c%d = ", 95 - i);
-        print_fvec(shu->c[95 - i]);
-        printf("\n");
-    }
-
     disasm.depth = 0;
     Vec_init(disasm.calls);
     disasm.farthestjmp = 0;

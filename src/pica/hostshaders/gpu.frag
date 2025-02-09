@@ -4,6 +4,7 @@ in vec4 color;
 in vec2 texcoord0;
 in vec2 texcoord1;
 in vec2 texcoord2;
+in float texcoordw;
 in vec4 normquat;
 in vec3 view;
 
@@ -242,6 +243,5 @@ void main() {
     fragclr = tev_srcs[TEVSRC_PREVIOUS];
 
     if (alphatest && !run_alphatest(fragclr.a)) discard;
-
 }
 

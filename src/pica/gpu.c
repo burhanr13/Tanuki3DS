@@ -5,6 +5,7 @@
 #include "etc1.h"
 #include "renderer_gl.h"
 #include "shader.h"
+#include "shaderdec.h"
 #include "shadergen.h"
 
 #undef PTR
@@ -863,6 +864,14 @@ void gpu_drawelements(GPU* gpu) {
         prim_mode[gpu->io.geom.prim_config.mode], gpu->io.geom.nverts,
         gpu->io.geom.indexfmt ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE, 0,
         -minind);
+
+    static bool p = false;
+    if (!p) {
+        char* s = shader_dec_vs(gpu);
+        printf("%s", s);
+        free(s);
+        p = true;
+    }
 }
 
 void gpu_drawimmediate(GPU* gpu) {
