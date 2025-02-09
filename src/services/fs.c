@@ -642,8 +642,10 @@ DECL_PORT_ARG(fs_dir, fd) {
             struct dirent* ent;
             int i = 0;
             for (; i < count; i++) {
-                while ((ent = readdir(dp)) && (!strcmp(ent->d_name, ".") ||
-                                               !strcmp(ent->d_name, "..")));
+                while ((ent = readdir(dp)) &&
+                       (!strcmp(ent->d_name, ".") ||
+                        !strcmp(ent->d_name, "..") ||
+                        !strcmp(ent->d_name, ".formatinfo")));
                 if (!ent) {
                     linfo("ran out of entries");
                     break;
