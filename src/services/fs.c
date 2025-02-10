@@ -17,13 +17,13 @@ enum {
 };
 
 u8 mii_data[] = {
-#embed "../sys_files/mii.app.romfs"
+#embed "../../sys_files/mii.app.romfs"
 };
 u8 badwordlist[] = {
-#embed "../sys_files/badwords.app.romfs"
+#embed "../../sys_files/badwords.app.romfs"
 };
 u8 country_list[] = {
-#embed "../sys_files/countrylist.app.romfs"
+#embed "../../sys_files/countrylist.app.romfs"
 };
 
 char* archive_basepath(u64 archive) {

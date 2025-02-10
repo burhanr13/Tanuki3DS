@@ -22,7 +22,7 @@ struct {
 #define SRVCOUNT (sizeof srvhandlers / sizeof srvhandlers[0])
 
 u8 shared_font[] = {
-#embed "sys_files/font.bcfnt"
+#embed "../sys_files/font.bcfnt"
 };
 
 void srvobj_init(KObject* hdr, KObjType t) {
