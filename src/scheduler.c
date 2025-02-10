@@ -36,9 +36,9 @@ void add_event(Scheduler* sched, SchedEventHandler f, u32 event_arg,
     }
 
     FIFO_push(sched->event_queue,
-              ((SchedulerEvent){.handler = f,
-                                .time = sched->now + reltime,
-                                .arg = event_arg}));
+              ((SchedulerEvent) {.handler = f,
+                                 .time = sched->now + reltime,
+                                 .arg = event_arg}));
 
     u32 i = (sched->event_queue.tail - 1) % EVENT_MAX;
     while (i != sched->event_queue.head &&

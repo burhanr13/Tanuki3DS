@@ -1,7 +1,7 @@
 #include "register_allocator.h"
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 void find_uses(IRBlock* block, u32* vuses) {
     for (int i = 0; i < block->code.size; i++) {
@@ -52,7 +52,7 @@ RegAllocation allocate_registers(IRBlock* block) {
             }
             if (assignment == -1) {
                 assignment = reg_active.size;
-                Vec_push(ret.reg_info, ((RegInfo){0, REG_TEMP}));
+                Vec_push(ret.reg_info, ((RegInfo) {0, REG_TEMP}));
                 Vec_push(reg_active, true);
             }
             ret.reg_info.d[assignment].uses += 1 + vuses[i];
@@ -87,7 +87,7 @@ HostRegAllocation allocate_host_registers(RegAllocation* regalloc, u32 ntemp,
     HostRegAllocation ret = {};
     ret.nregs = nregs;
     if (!nregs) return ret;
-    
+
     ret.hostreg_info = calloc(nregs, sizeof(HostRegInfo));
     int sorted[nregs];
     for (int i = 0; i < nregs; i++) sorted[i] = i;
