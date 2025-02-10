@@ -27,7 +27,7 @@ void swkbd_run(E3DS* s, u32 paramsvaddr, u32 shmemvaddr) {
 
     u16* outtxt = PTR(shmemvaddr);
 
-    char text[] = "lmao";
+    char text[] = "ctremu";
 
     out->text_offset = 0;
     out->text_length = sizeof text;
