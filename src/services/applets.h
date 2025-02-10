@@ -1,8 +1,8 @@
 #ifndef APPLETS_H
 #define APPLETS_H
 
-#include "3ds.h"
-#include "common.h"
+#include <3ds.h>
+#include <common.h>
 
 typedef struct _3DS E3DS;
 

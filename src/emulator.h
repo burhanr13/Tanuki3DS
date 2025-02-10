@@ -1,9 +1,8 @@
 #ifndef EMULATOR_H
 #define EMULATOR_H
 
-#include "common.h"
-
-#include "3ds.h"
+#include <3ds.h>
+#include <common.h>
 
 typedef struct {
     char* romfile;

@@ -1,7 +1,9 @@
 #include "gpu.h"
 
-#include "../3ds.h"
-#include "../emulator.h"
+#include <3ds.h>
+#include <emulator.h>
+#include <kernel/memory.h>
+
 #include "etc1.h"
 #include "renderer_gl.h"
 #include "shader.h"

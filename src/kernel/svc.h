@@ -1,7 +1,7 @@
 #ifndef SVC_H
 #define SVC_H
 
-#include "3ds.h"
+#include <3ds.h>
 
 #define SVC_MAX BIT(8)
 

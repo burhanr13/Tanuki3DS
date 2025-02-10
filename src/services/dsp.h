@@ -1,10 +1,9 @@
 #ifndef DSP_H
 #define DSP_H
 
-#include "../memory.h"
-#include "../srv.h"
-#include "../svc_types.h"
-#include "../thread.h"
+#include <kernel/thread.h>
+
+#include "srv.h"
 
 typedef struct {
     KEvent* event;

@@ -1,7 +1,8 @@
 #include "renderer_gl.h"
 
-#include "../3ds.h"
-#include "../emulator.h"
+#include <3ds.h>
+#include <emulator.h>
+
 #include "gpu.h"
 
 const char mainvertsource[] = {

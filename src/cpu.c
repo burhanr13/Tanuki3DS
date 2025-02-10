@@ -1,9 +1,9 @@
 #include "cpu.h"
 
-#include "3ds.h"
-#include "arm/jit/jit.h"
-#include "svc.h"
-#include "thread.h"
+#include <3ds.h>
+#include <arm/jit/jit.h>
+#include <kernel/svc.h>
+#include <kernel/thread.h>
 
 // #define CPULOG
 // #define BREAK

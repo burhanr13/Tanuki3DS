@@ -1,10 +1,8 @@
 #ifndef SHADERJIT_H
 #define SHADERJIT_H
 
-#include "../../common.h"
-#include "../shader.h"
-
-#define VSH_MAX 16
+#include <common.h>
+#include <pica/shader.h>
 
 typedef struct _GPU GPU;
 

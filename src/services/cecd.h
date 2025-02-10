@@ -1,8 +1,9 @@
 #ifndef CECD_H
 #define CECD_H
 
-#include "../srv.h"
-#include "../thread.h"
+#include <kernel/thread.h>
+
+#include "srv.h"
 
 typedef struct {
     KEvent cecinfo;

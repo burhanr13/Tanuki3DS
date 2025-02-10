@@ -5,8 +5,9 @@
 #include <stdalign.h>
 #include <stdatomic.h>
 
-#include "../common.h"
-#include "../memory.h"
+#include <common.h>
+#include <kernel/memory.h>
+
 #include "gpuregs.h"
 #include "renderer_gl.h"
 #include "shader.h"

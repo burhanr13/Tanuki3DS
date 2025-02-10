@@ -2,9 +2,9 @@
 
 #include <stdio.h>
 
-#include "3ds.h"
-#include "svc.h"
-#include "thread.h"
+#include <3ds.h>
+#include <kernel/svc.h>
+#include <kernel/thread.h>
 
 void run_to_present(Scheduler* sched) {
     u64 end_time = sched->now;

@@ -1,6 +1,6 @@
 #include "kernel.h"
 
-#include "3ds.h"
+#include <3ds.h>
 
 u32 handle_new(E3DS* s) {
     for (int i = 0; i < HANDLE_MAX; i++) {

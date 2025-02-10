@@ -1,6 +1,6 @@
 #include "thread.h"
 
-#include "3ds.h"
+#include <3ds.h>
 
 void e3ds_restore_context(E3DS* s) {
     for (int i = 0; i < 16; i++) {

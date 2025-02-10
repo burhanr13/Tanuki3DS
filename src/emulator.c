@@ -1,13 +1,11 @@
 #include "emulator.h"
 
+#include <confuse.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include <confuse.h>
-
-#include "3ds.h"
-#include "emulator.h"
-#include "services/hid.h"
+#include <3ds.h>
+#include <services/hid.h>
 
 bool g_infologs = false;
 EmulatorState ctremu;

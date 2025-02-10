@@ -1,7 +1,8 @@
 #include "ir.h"
 
-#include "../media.h"
-#include "../vfp.h"
+#include <arm/media.h>
+#include <arm/vfp.h>
+
 #include "jit.h"
 
 bool iropc_hasresult(IROpcode opc) {

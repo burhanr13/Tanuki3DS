@@ -1,7 +1,8 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#include "common.h"
+#include <common.h>
+
 #include "kernel.h"
 
 #define PAGE_SIZE BIT(12)

@@ -1,9 +1,9 @@
 #ifndef CPU_H
 #define CPU_H
 
-#include "3ds.h"
-#include "arm/arm_core.h"
-#include "common.h"
+#include <3ds.h>
+#include <arm/arm_core.h>
+#include <common.h>
 
 extern bool g_cpulog;
 

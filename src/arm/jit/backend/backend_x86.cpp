@@ -4,7 +4,6 @@
 
 #include <capstone/capstone.h>
 #include <xbyak/xbyak.h>
-
 #include <vector>
 
 struct LinkPatch {

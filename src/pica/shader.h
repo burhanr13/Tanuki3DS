@@ -1,7 +1,9 @@
 #ifndef SHADER_H
 #define SHADER_H
 
-#include "../common.h"
+#include <common.h>
+
+#define VSH_MAX 16
 
 #define SHADER_CODE_SIZE 512
 #define SHADER_OPDESC_SIZE 128

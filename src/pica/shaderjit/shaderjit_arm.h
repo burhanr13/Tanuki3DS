@@ -5,7 +5,8 @@
 extern "C" {
 #endif
 
-#include "../shader.h"
+#include <pica/shader.h>
+
 #include "shaderjit.h"
 
 void* shaderjit_arm_init();

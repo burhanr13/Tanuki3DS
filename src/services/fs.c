@@ -5,10 +5,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "../3ds.h"
-#include "../emulator.h"
-#include "../loader.h"
-#include "../srv.h"
+#include <3ds.h>
+#include <emulator.h>
+#include <kernel/loader.h>
 
 enum {
     SYSFILE_MIIDATA = 1,
@@ -17,13 +16,13 @@ enum {
 };
 
 u8 mii_data[] = {
-#embed "../../sys_files/mii.app.romfs"
+#embed "mii.app.romfs"
 };
 u8 badwordlist[] = {
-#embed "../../sys_files/badwords.app.romfs"
+#embed "badwords.app.romfs"
 };
 u8 country_list[] = {
-#embed "../../sys_files/countrylist.app.romfs"
+#embed "countrylist.app.romfs"
 };
 
 char* archive_basepath(u64 archive) {

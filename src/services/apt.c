@@ -1,7 +1,8 @@
 #include "apt.h"
 
-#include "../3ds.h"
-#include "../applets.h"
+#include <3ds.h>
+
+#include "applets.h"
 
 void apt_resume_app(E3DS* s) {
     s->services.apt.nextparam.appid = APPID_HOMEMENU;

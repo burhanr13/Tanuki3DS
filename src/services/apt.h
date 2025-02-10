@@ -1,8 +1,9 @@
 #ifndef APT_H
 #define APT_H
 
-#include "../srv.h"
-#include "../thread.h"
+#include <kernel/thread.h>
+
+#include "srv.h"
 
 #define APT_MAX_PARAMSIZE 4096
 

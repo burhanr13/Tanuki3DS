@@ -2,9 +2,10 @@
 
 #include <string.h>
 
-#include "memory.h"
+#include <kernel/memory.h>
+#include <kernel/svc.h>
+
 #include "services.h"
-#include "svc.h"
 
 struct {
     const char* name;
@@ -22,7 +23,7 @@ struct {
 #define SRVCOUNT (sizeof srvhandlers / sizeof srvhandlers[0])
 
 u8 shared_font[] = {
-#embed "../sys_files/font.bcfnt"
+#embed "font.bcfnt"
 };
 
 void srvobj_init(KObject* hdr, KObjType t) {

@@ -3,8 +3,8 @@
 #include "shaderjit_arm.h"
 
 #include <capstone/capstone.h>
+#include <cmath>
 #include <map>
-#include <math.h>
 #include <vector>
 #include <xbyak_aarch64/xbyak_aarch64.h>
 

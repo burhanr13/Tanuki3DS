@@ -1,6 +1,6 @@
 #include "y2r.h"
 
-#include "../3ds.h"
+#include <3ds.h>
 
 DECL_PORT(y2r) {
     u32* cmdbuf = PTR(cmd_addr);
