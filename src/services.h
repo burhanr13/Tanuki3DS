@@ -8,6 +8,7 @@
 #include "services/fs.h"
 #include "services/gsp.h"
 #include "services/hid.h"
+#include "services/ir.h"
 #include "services/ldr.h"
 #include "services/nwm.h"
 #include "services/y2r.h"
@@ -26,6 +27,7 @@ typedef struct {
     CECDData cecd;
     Y2RData y2r;
     LDRData ldr;
+    IRData ir;
 
 } ServiceData;
 

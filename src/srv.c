@@ -6,6 +6,21 @@
 #include "services.h"
 #include "svc.h"
 
+struct {
+    const char* name;
+    PortRequestHandler handler;
+} srvhandlers[] = {
+#define SRV(portname, name) {portname, port_handle_##name}
+    SRV("APT:U", apt),     SRV("APT:A", apt),        SRV("APT:S", apt),
+    SRV("fs:USER", fs),    SRV("gsp::Gpu", gsp_gpu), SRV("hid:USER", hid),
+    SRV("hid:SPVR", hid),  SRV("dsp::DSP", dsp),     SRV("cfg:u", cfg),
+    SRV("cfg:s", cfg),     SRV("y2r:u", y2r),        SRV("cecd:u", cecd),
+    SRV("ldr:ro", ldr_ro), SRV("nwm:UDS", nwm_uds),  SRV("ir:USER", ir),
+#undef SRV
+};
+
+#define SRVCOUNT (sizeof srvhandlers / sizeof srvhandlers[0])
+
 u8 shared_font[] = {
 #embed "sys_files/font.bcfnt"
 };
@@ -68,6 +83,8 @@ void services_init(E3DS* s) {
 
     srvobj_init(&s->services.y2r.transferend.hdr, KOT_EVENT);
     s->services.y2r.transferend.sticky = true;
+
+    srvobj_init(&s->services.ir.event.hdr, KOT_EVENT);
 }
 
 KSession* session_create(PortRequestHandler f) {
@@ -95,7 +112,6 @@ DECL_PORT_ARG(stub, name) {
 }
 
 DECL_PORT(srv) {
-#define IS(_name) (!strncmp(name, _name, 8))
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x0001: {
@@ -118,49 +134,27 @@ DECL_PORT(srv) {
             char* name = (char*) &cmdbuf[1];
             name[cmdbuf[3]] = '\0';
 
-            PortRequestHandler handler;
-            if (IS("APT:U") || IS("APT:A") || IS("APT:S")) {
-                handler = port_handle_apt;
-            } else if (IS("fs:USER")) {
-                handler = port_handle_fs;
-            } else if (IS("gsp::Gpu")) {
-                handler = port_handle_gsp_gpu;
-            } else if (IS("hid:USER") || IS("hid:SPVR")) {
-                handler = port_handle_hid;
-            } else if (IS("dsp::DSP")) {
-                handler = port_handle_dsp;
-            } else if (IS("cfg:u") || IS("cfg:s")) {
-                handler = port_handle_cfg;
-            } else if (IS("y2r:u")) {
-                handler = port_handle_y2r;
-            } else if (IS("cecd:u")) {
-                handler = port_handle_cecd;
-            } else if (IS("ldr:ro")) {
-                handler = port_handle_ldr_ro;
-            } else if (IS("nwm::UDS")) {
-                handler = port_handle_nwm_uds;
-            } else {
-                lerror("unknown service '%.8s'", name);
-                u32 handle = handle_new(s);
-                KSession* session =
-                    session_create_arg(port_handle_stub, *(u64*) name);
-                HANDLE_SET(handle, session);
-                session->hdr.refcount = 1;
-                cmdbuf[3] = handle;
-                linfo("connected to unknown service '%.8s' with handle %x",
-                      name, handle);
-                cmdbuf[0] = IPCHDR(3, 0);
-                cmdbuf[1] = 0;
-                break;
+            PortRequestHandler handler = nullptr;
+            for (int i = 0; i < SRVCOUNT; i++) {
+                if (!strcmp(name, srvhandlers[i].name)) {
+                    handler = srvhandlers[i].handler;
+                    break;
+                }
             }
             u32 handle = handle_new(s);
-            KSession* session = session_create(handler);
+            KSession* session;
+            if (handler) {
+                session = session_create(handler);
+            } else {
+                lerror("unknown service '%.8s'", name);
+                session = session_create_arg(port_handle_stub, *(u64*) name);
+            }
             HANDLE_SET(handle, session);
             session->hdr.refcount = 1;
+            cmdbuf[0] = IPCHDR(1, 2);
+            cmdbuf[1] = 0;
             cmdbuf[3] = handle;
             linfo("connected to service '%.8s' with handle %x", name, handle);
-            cmdbuf[0] = IPCHDR(3, 0);
-            cmdbuf[1] = 0;
             break;
         }
         case 0x0009:
@@ -181,7 +175,6 @@ DECL_PORT(srv) {
             cmdbuf[1] = 0;
             break;
     }
-#undef IS
 }
 
 DECL_PORT(errf) {
