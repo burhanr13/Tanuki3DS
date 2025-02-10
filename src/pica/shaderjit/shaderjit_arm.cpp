@@ -13,7 +13,7 @@ using namespace Xbyak_aarch64;
 #undef F2I
 #define F2I(i) (std::bit_cast<u32>(i))
 
-#define JIT_DISASM
+// #define JIT_DISASM
 
 struct ShaderCode : Xbyak_aarch64::CodeGenerator {
 

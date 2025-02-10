@@ -9,11 +9,13 @@
 #include "emulator.h"
 #include "pica/renderer_gl.h"
 
-const char usage[] = "ctremu [options] [romfile]\n"
-                     "-h -- print help\n"
-                     "-l -- enable info logging\n"
-                     "-v -- disable vsync\n"
-                     "-sN -- upscale by N\n";
+const char usage[] =
+    R"(ctremu [options] [romfile]
+-h -- print help
+-l -- enable info logging
+-v -- disable vsync
+-sN -- upscale by N
+)";
 
 SDL_Window* g_window;
 
