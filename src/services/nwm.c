@@ -1,6 +1,6 @@
 #include "nwm.h"
 
-#include "../3ds.h"
+#include <3ds.h>
 
 DECL_PORT(nwm_uds) {
     u32* cmdbuf = PTR(cmd_addr);

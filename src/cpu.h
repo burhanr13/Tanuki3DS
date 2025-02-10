@@ -1,16 +1,16 @@
 #ifndef CPU_H
 #define CPU_H
 
-#include "3ds.h"
-#include "arm/arm_core.h"
-#include "common.h"
+#include <3ds.h>
+#include <arm/arm_core.h>
+#include <common.h>
 
 extern bool g_cpulog;
 
 void cpu_init(E3DS* s);
 void cpu_free(E3DS* s);
 
-bool cpu_run(E3DS* s, int cycles);
+s64 cpu_run(E3DS* s, s64 cycles);
 
 u32 cpu_read8(E3DS* s, u32 addr, bool sx);
 u32 cpu_read16(E3DS* s, u32 addr, bool sx);

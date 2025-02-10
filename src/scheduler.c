@@ -2,9 +2,9 @@
 
 #include <stdio.h>
 
-#include "3ds.h"
-#include "svc.h"
-#include "thread.h"
+#include <3ds.h>
+#include <kernel/svc.h>
+#include <kernel/thread.h>
 
 void run_to_present(Scheduler* sched) {
     u64 end_time = sched->now;
@@ -36,9 +36,9 @@ void add_event(Scheduler* sched, SchedEventHandler f, u32 event_arg,
     }
 
     FIFO_push(sched->event_queue,
-              ((SchedulerEvent){.handler = f,
-                                .time = sched->now + reltime,
-                                .arg = event_arg}));
+              ((SchedulerEvent) {.handler = f,
+                                 .time = sched->now + reltime,
+                                 .arg = event_arg}));
 
     u32 i = (sched->event_queue.tail - 1) % EVENT_MAX;
     while (i != sched->event_queue.head &&

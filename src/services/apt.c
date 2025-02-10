@@ -1,6 +1,14 @@
 #include "apt.h"
 
-#include "../3ds.h"
+#include <3ds.h>
+
+#include "applets.h"
+
+void apt_resume_app(E3DS* s) {
+    s->services.apt.nextparam.appid = APPID_HOMEMENU;
+    s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
+    event_signal(s, &s->services.apt.resume_event);
+}
 
 DECL_PORT(apt) {
     u32* cmdbuf = PTR(cmd_addr);
@@ -23,6 +31,9 @@ DECL_PORT(apt) {
                 srvobj_make_handle(s, &s->services.apt.resume_event.hdr);
             linfo("Initialize with notif event %x and resume event %x",
                   cmdbuf[3], cmdbuf[4]);
+            // dont signal this immediately
+            add_event(&s->sched, (SchedEventHandler) apt_resume_app, 0,
+                      CPU_CLK / FPS);
             break;
         case 0x0003:
             linfo("Enable");
@@ -68,7 +79,16 @@ DECL_PORT(apt) {
             break;
         }
         case 0x000d:
-            linfo("ReceiveParameter");
+        case 0x000e: {
+            // these two do the same thing but after you recieve you cant
+            // recieve that parameter again (not implemented)
+            u32 paramsize = cmdbuf[2];
+            if (cmd.command == 0x000d)
+                linfo("RecieveParameter with bufsize=%d", paramsize);
+            else linfo("GlanceParameter with bufsize=%d", paramsize);
+
+            if (paramsize > s->services.apt.nextparam.paramsize)
+                paramsize = APT_MAX_PARAMSIZE;
             cmdbuf[0] = IPCHDR(4, 4);
             cmdbuf[1] = 0;
             cmdbuf[2] = s->services.apt.nextparam.appid;
@@ -79,22 +99,11 @@ DECL_PORT(apt) {
             } else {
                 cmdbuf[6] = 0;
             }
+            cmdbuf[4] = paramsize;
             cmdbuf[8] = cmdbuf[0x41];
+            memcpy(PTR(cmdbuf[8]), s->services.apt.nextparam.param, paramsize);
             break;
-        case 0x000e:
-            linfo("GlanceParameter");
-            cmdbuf[0] = IPCHDR(4, 4);
-            cmdbuf[1] = 0;
-            cmdbuf[2] = s->services.apt.nextparam.appid;
-            cmdbuf[3] = s->services.apt.nextparam.cmd;
-            if (s->services.apt.nextparam.kobj) {
-                cmdbuf[6] =
-                    srvobj_make_handle(s, s->services.apt.nextparam.kobj);
-            } else {
-                cmdbuf[6] = 0;
-            }
-            cmdbuf[8] = cmdbuf[0x41];
-            break;
+        }
         case 0x0016: {
             u32 appid = cmdbuf[1];
             linfo("PreloadLibraryApplet %x", appid);
@@ -106,12 +115,36 @@ DECL_PORT(apt) {
         }
         case 0x001e: {
             u32 appid = cmdbuf[1];
-            linfo("StartLibraryApplet %x", appid);
-
-            s->services.apt.nextparam.appid = appid;
-            s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
-            s->services.apt.nextparam.kobj = nullptr;
-            event_signal(s, &s->services.apt.resume_event);
+            u32 paramsize = cmdbuf[2];
+            u32 handleparam = cmdbuf[4];
+            u32 paramaddr = cmdbuf[6];
+            linfo(
+                "StartLibraryApplet %x with paramsize=%d and handleparam=%08x",
+                appid, paramsize, handleparam);
+            switch (appid) {
+                case APPID_SWKBD: {
+                    KSharedMem* shmem =
+                        HANDLE_GET_TYPED(handleparam, KOT_SHAREDMEM);
+                    if (shmem) {
+                        swkbd_run(s, paramaddr, shmem->mapaddr);
+                    }
+                    break;
+                }
+                case APPID_MIISELECTOR:
+                    // stub
+                    lwarn("mii selector");
+                    s->services.apt.nextparam.appid = APPID_MIISELECTOR;
+                    s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
+                    s->services.apt.nextparam.kobj = nullptr;
+                    s->services.apt.nextparam.paramsize = 1024;
+                    event_signal(s, &s->services.apt.resume_event);
+                    break;
+                case APPID_ERRDISP:
+                    lerror("launching errdisp");
+                    break;
+                default:
+                    lwarn("unknown applet");
+            }
 
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
@@ -156,6 +189,16 @@ DECL_PORT(apt) {
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = s->services.apt.application_cpu_time_limit;
+            break;
+        }
+        case 0x0051: {
+            u32 paramsize = cmdbuf[1];
+            u32 type = cmdbuf[2];
+            u32 paramaddr = cmdbuf[0x41];
+            lwarn("GetStartupArgument type %d", type);
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 1; // exists
             break;
         }
         case 0x0101: {

@@ -4,7 +4,7 @@
 #include <dirent.h>
 #include <stdio.h>
 
-#include "../srv.h"
+#include "srv.h"
 
 #define FS_FILE_MAX 32
 

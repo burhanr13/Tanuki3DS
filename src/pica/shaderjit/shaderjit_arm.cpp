@@ -3,11 +3,15 @@
 #include "shaderjit_arm.h"
 
 #include <capstone/capstone.h>
+#include <cmath>
 #include <map>
 #include <vector>
 #include <xbyak_aarch64/xbyak_aarch64.h>
 
 using namespace Xbyak_aarch64;
+
+#undef F2I
+#define F2I(i) (std::bit_cast<u32>(i))
 
 // #define JIT_DISASM
 
@@ -32,6 +36,10 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
     std::vector<PICAInstr> calls;
     std::map<u32, u32> entrypoints;
 
+    Label ex2func, lg2func;
+    bool usingex2;
+    bool usinglg2;
+
     ShaderCode()
         : Xbyak_aarch64::CodeGenerator(4096, Xbyak_aarch64::AutoGrow) {}
 
@@ -44,9 +52,13 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
         jmplabels.clear();
         jmplabels.resize(SHADER_CODE_SIZE);
         calls.clear();
+        ex2func = Label();
+        lg2func = Label();
         for (auto& e : entrypoints) {
             e.second = compileWithEntry(shu, e.first);
         }
+        if (usingex2) compileEx2();
+        if (usinglg2) compileLg2();
         ready();
     }
 
@@ -276,6 +288,9 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
         fcmeq(v3.s4, src1.s4, 0);
         bic(v1.b16, src2.b16, v3.b16);
     }
+
+    void compileEx2();
+    void compileLg2();
 };
 
 // returns the offset of the function for the given entrypoint
@@ -404,6 +419,26 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 STRDST(1);
                 break;
             }
+            case PICA_EX2: {
+                usingex2 = true;
+                auto src = SRC1(1);
+                auto dst = GETDST(1);
+                mov(s0, src.s[0]);
+                bl(ex2func);
+                dup(dst.s4, v0.s[0]);
+                STRDST(1);
+                break;
+            }
+            case PICA_LG2: {
+                usinglg2 = true;
+                auto src = SRC1(1);
+                auto dst = GETDST(1);
+                mov(s0, src.s[0]);
+                bl(lg2func);
+                dup(dst.s4, v0.s[0]);
+                STRDST(1);
+                break;
+            }
             case PICA_MUL: {
                 auto src1 = SRC1(1);
                 auto src2 = SRC2(1);
@@ -496,7 +531,7 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
             }
             case PICA_MOVA: {
                 auto src = SRC1(1);
-                // this needs to be zs, or won't work   
+                // this needs to be zs, or won't work
                 fcvtzs(v0.s2, src.s2);
                 if (desc.destmask & BIT(3 - 0)) {
                     mov(reg_ax, v0.s[0]);
@@ -662,7 +697,151 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                        instr.opcode);
         }
     }
-};
+}
+
+void ShaderCode::compileEx2() {
+    // takes x in s0 and return in s0
+
+    Label end;
+
+    // constants for getting good input to polynomials (found through testing)
+    const float exthr = 0.535f;
+
+    L(ex2func);
+    // check nan
+    fcmp(s0, s0);
+    bne(end);
+
+    // keep 1 somewhere
+    fmov(s7, 1.f);
+
+    // x = n + r where n in Z, r in [0,1)
+    // 2^x = 2^n * 2^r, 2^r will be in [1,2)
+    // so it ends up just being a float
+    frintm(s1, s0);
+    fcvtms(w11, s0);
+    fsub(s0, s0, s1);
+    // now n in w11 and r in s0
+
+    // translate from [0, 1) -> [exthr-1, exthr)
+    mov(w17, F2I(exthr));
+    fmov(s1, w17);
+    fcmp(s0, s1);
+    fsub(s1, s0, s7);
+    fcsel(s0, s1, s0, HS);
+
+    // make n into float exponent
+    add(w11, w11, 127);
+    cmp(w11, 0);
+    csel(w11, wzr, w11, LT);
+    mov(w12, 0xff);
+    cmp(w11, w12);
+    csel(w11, w12, w11, GT);
+    lsl(w11, w11, 23);
+
+    // 2^r = e^(r * ln2)
+    // e^x ~= ((1/6 * x + 1/2) * x + 1) * x + 1
+    const float c0 = M_LN2 * M_LN2 * M_LN2 / 6;
+    const float c1 = M_LN2 * M_LN2 / 2;
+    const float c2 = M_LN2;
+    // c3 is just 1
+    // now 2^x ~= ((c0 * x + c1) * x + c2) * x + c3
+
+    mov(w17, F2I(c0));
+    fmov(s1, w17);
+    mov(w17, F2I(c1));
+    fmov(s5, w17);
+    mov(w17, F2I(c2));
+    fmov(s6, w17);
+    fmadd(s1, s1, s0, s5);
+    fmadd(s1, s1, s0, s6);
+    fmadd(s1, s1, s0, s7);
+
+    // extract the mantissa and insert into the result
+    fmov(w12, s1);
+    bfi(w11, w12, 0, 23);
+    fmov(s0, w11);
+    L(end);
+    ret();
+}
+
+void ShaderCode::compileLg2() {
+    // takes x in s0 and return in s0
+
+    // constants for getting good input to polynomials (found through testing)
+    const float lgthr = 1.35f;
+
+    Label lnan, lminf;
+
+    L(lg2func);
+    // check nan and 0
+    fcmp(s0, s0);
+    bne(lnan);
+    fcmp(s0, 0);
+    beq(lminf);
+
+    // x = 2^n * r where n in Z and r in [1,2)
+    // log2(x) = n + log2(r)
+    fmov(w11, s0);
+    // check for negative number
+    tbnz(w11, 31, lnan);
+
+    ubfx(w12, w11, 23, 8);
+    sub(w12, w12, 127);
+    ubfx(w11, w11, 0, 23);
+    orr(w11, w11, 0x3f800000);
+    fmov(s0, w11);
+    // now n in w12 and r in s0
+
+    // translate from [1, 2) -> [lgthr/2, lgthr)
+    mov(w17, F2I(lgthr));
+    fmov(s1, w17);
+    fcmp(s0, s1);
+    fmov(s7, 0.5f);
+    fmul(s1, s0, s7);
+    fcsel(s0, s1, s0, HS);
+    cinc(w12, w12, HS);
+
+    // log2(r) = ln(r)/ln2
+    // log polynomial is for x-1
+    fmov(s7, 1.f);
+    fsub(s0, s0, s7);
+
+    // ln(x+1) ~= (((-1/4 * x + 1/3) * x - 1/2) * x + 1) * x
+    const float c0 = -1 / (4 * M_LN2);
+    const float c1 = 1 / (3 * M_LN2);
+    const float c2 = -1 / (2 * M_LN2);
+    const float c3 = 1 / M_LN2;
+    // log2(x+1) ~= (((c0 * x + c1) * x + c2) * x + c3) * x
+
+    mov(w17, F2I(c0));
+    fmov(s1, w17);
+    mov(w17, F2I(c1));
+    fmov(s5, w17);
+    mov(w17, F2I(c2));
+    fmov(s6, w17);
+    mov(w17, F2I(c3));
+    fmov(s7, w17);
+    fmadd(s1, s1, s0, s5);
+    fmadd(s1, s1, s0, s6);
+    fmadd(s1, s1, s0, s7);
+    fmul(s1, s1, s0);
+
+    // res is n + log r
+    scvtf(s0, w12);
+    fadd(s0, s0, s1);
+    ret();
+
+    // degenerate cases
+    L(lnan);
+    mov(w17, F2I(NAN));
+    fmov(s0, w17);
+    ret();
+    L(lminf);
+    mov(w17, F2I(-INFINITY));
+    fmov(s0, w17);
+    ret();
+}
 
 extern "C" {
 

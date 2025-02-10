@@ -4,7 +4,7 @@ ArmInstr thumb_lookup[BIT(16)];
 
 [[gnu::constructor]] void thumb_generate_lookup() {
     for (int i = 0; i < BIT(16); i++) {
-        thumb_lookup[i] = thumb_decode_instr((ThumbInstr){i});
+        thumb_lookup[i] = thumb_decode_instr((ThumbInstr) {i});
     }
 }
 

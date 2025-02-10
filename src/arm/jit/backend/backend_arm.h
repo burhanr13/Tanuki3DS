@@ -5,12 +5,12 @@
 extern "C" {
 #endif
 
-#include "../ir.h"
-#include "../jit.h"
-#include "../register_allocator.h"
-#include "../../arm_core.h"
-#include "../../media.h"
-#include "../../vfp.h"
+#include <arm/arm_core.h>
+#include <arm/jit/ir.h>
+#include <arm/jit/jit.h>
+#include <arm/jit/register_allocator.h>
+#include <arm/media.h>
+#include <arm/vfp.h>
 
 void* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                                 ArmCore* cpu);

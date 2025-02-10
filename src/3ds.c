@@ -4,9 +4,9 @@
 #include <string.h>
 #include <time.h>
 
-#include "cpu.h"
-#include "loader.h"
-#include "svc_types.h"
+#include <cpu.h>
+#include <kernel/loader.h>
+#include <kernel/svc_types.h>
 
 void e3ds_init(E3DS* s, char* romfile) {
     memset(s, 0, sizeof *s);
@@ -113,7 +113,13 @@ void e3ds_run_frame(E3DS* s) {
     while (!s->frame_complete) {
         e3ds_restore_context(s);
         if (!s->cpu.wfe) {
-            cpu_run(s, FIFO_peek(s->sched.event_queue).time - s->sched.now);
+            while (true) {
+                s64 cycles =
+                    FIFO_peek(s->sched.event_queue).time - s->sched.now;
+                if (cycles <= 0) break;
+                s->sched.now += cpu_run(s, cycles);
+                if (s->cpu.wfe) break;
+            }
         }
         e3ds_save_context(s);
         run_next_event(&s->sched);

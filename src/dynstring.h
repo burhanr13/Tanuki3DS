@@ -1,7 +1,7 @@
 #ifndef DYNSTRING_H
 #define DYNSTRING_H
 
-#include "common.h"
+#include <common.h>
 
 typedef struct {
     char* str;

@@ -1,8 +1,8 @@
 #ifndef SHADERGEN_H
 #define SHADERGEN_H
 
-#include "../common.h"
-#include "../dynstring.h"
+#include <common.h>
+
 #include "renderer_gl.h"
 
 #define FSH_MAX 256

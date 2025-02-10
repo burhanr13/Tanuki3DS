@@ -1,7 +1,7 @@
 #ifndef LDR_H
 #define LDR_H
 
-#include "../srv.h"
+#include "srv.h"
 
 typedef struct {
     u32 crs_addr;

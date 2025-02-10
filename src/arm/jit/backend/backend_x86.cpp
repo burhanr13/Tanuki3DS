@@ -3,9 +3,8 @@
 #include "backend_x86.h"
 
 #include <capstone/capstone.h>
-#include <xbyak/xbyak.h>
-
 #include <vector>
+#include <xbyak/xbyak.h>
 
 struct LinkPatch {
     u32 jmp_offset;

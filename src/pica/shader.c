@@ -2,8 +2,8 @@
 
 #include <math.h>
 
-void readsrc(ShaderUnit* shu, fvec src, u32 n, u8 idx, u8 swizzle, bool neg) {
-    fvec* rn;
+void readsrc(ShaderUnit* shu, fvec4 src, u32 n, u8 idx, u8 swizzle, bool neg) {
+    fvec4* rn;
     if (n < 0x10) rn = &shu->v[n];
     else if (n < 0x20) rn = &shu->r[n - 0x10];
     else {
@@ -25,7 +25,7 @@ void readsrc(ShaderUnit* shu, fvec src, u32 n, u8 idx, u8 swizzle, bool neg) {
                 rn = &shu->c[n];
             } else {
                 // out of bounds uniforms read as vec4(1)
-                static fvec dummy = {1, 1, 1, 1};
+                static fvec4 dummy = {1, 1, 1, 1};
                 rn = &dummy;
             }
         } else rn = &shu->c[n];
@@ -37,8 +37,8 @@ void readsrc(ShaderUnit* shu, fvec src, u32 n, u8 idx, u8 swizzle, bool neg) {
     }
 }
 
-void writedest(ShaderUnit* shu, fvec dest, u32 n, u8 mask) {
-    fvec* rn;
+void writedest(ShaderUnit* shu, fvec4 dest, u32 n, u8 mask) {
+    fvec4* rn;
     if (n < 0x10) rn = &shu->o[n];
     else rn = &shu->r[n - 0x10];
     for (int i = 0; i < 4; i++) {
@@ -120,10 +120,10 @@ void shader_run(ShaderUnit* shu) {
         OpDesc desc = shu->opdescs[instr.desc];
         switch (instr.opcode) {
             case PICA_ADD: {
-                fvec a, b;
+                fvec4 a, b;
                 SRC1(a, 1);
                 SRC2(b, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = a[0] + b[0];
                 res[1] = a[1] + b[1];
                 res[2] = a[2] + b[2];
@@ -132,20 +132,20 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_DP3: {
-                fvec a, b;
+                fvec4 a, b;
                 SRC1(a, 1);
                 SRC2(b, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]);
                 res[1] = res[2] = res[3] = res[0];
                 DEST(res, 1);
                 break;
             }
             case PICA_DP4: {
-                fvec a, b;
+                fvec4 a, b;
                 SRC1(a, 1);
                 SRC2(b, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]) +
                          MUL(a[3], b[3]);
                 res[1] = res[2] = res[3] = res[0];
@@ -154,7 +154,7 @@ void shader_run(ShaderUnit* shu) {
             }
             case PICA_DPH:
             case PICA_DPHI: {
-                fvec a, b;
+                fvec4 a, b;
                 if (instr.opcode == PICA_DPH) {
                     SRC1(a, 1);
                     SRC2(b, 1);
@@ -162,7 +162,7 @@ void shader_run(ShaderUnit* shu) {
                     SRC1(a, 1i);
                     SRC2(b, 1i);
                 }
-                fvec res;
+                fvec4 res;
                 res[0] =
                     MUL(a[0], b[0]) + MUL(a[1], b[1]) + MUL(a[2], b[2]) + b[3];
                 res[1] = res[2] = res[3] = res[0];
@@ -171,7 +171,7 @@ void shader_run(ShaderUnit* shu) {
             }
             case PICA_DST:
             case PICA_DSTI: {
-                fvec a, b;
+                fvec4 a, b;
                 if (instr.opcode == PICA_DST) {
                     SRC1(a, 1);
                     SRC2(b, 1);
@@ -179,7 +179,7 @@ void shader_run(ShaderUnit* shu) {
                     SRC1(a, 1i);
                     SRC2(b, 1i);
                 }
-                fvec res;
+                fvec4 res;
                 res[0] = 1;
                 res[1] = MUL(a[1], b[1]);
                 res[2] = a[2];
@@ -188,28 +188,28 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_EX2: {
-                fvec a;
+                fvec4 a;
                 SRC1(a, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = exp2f(a[0]);
                 res[1] = res[2] = res[3] = res[0];
                 DEST(res, 1);
                 break;
             }
             case PICA_LG2: {
-                fvec a;
+                fvec4 a;
                 SRC1(a, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = log2f(a[0]);
                 res[1] = res[2] = res[3] = res[0];
                 DEST(res, 1);
                 break;
             }
             case PICA_MUL: {
-                fvec a, b;
+                fvec4 a, b;
                 SRC1(a, 1);
                 SRC2(b, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = MUL(a[0], b[0]);
                 res[1] = MUL(a[1], b[1]);
                 res[2] = MUL(a[2], b[2]);
@@ -219,7 +219,7 @@ void shader_run(ShaderUnit* shu) {
             }
             case PICA_SGE:
             case PICA_SGEI: {
-                fvec a, b;
+                fvec4 a, b;
                 if (instr.opcode == PICA_SGE) {
                     SRC1(a, 1);
                     SRC2(b, 1);
@@ -227,7 +227,7 @@ void shader_run(ShaderUnit* shu) {
                     SRC1(a, 1i);
                     SRC2(b, 1i);
                 }
-                fvec res;
+                fvec4 res;
                 res[0] = a[0] >= b[0];
                 res[1] = a[1] >= b[1];
                 res[2] = a[2] >= b[2];
@@ -237,7 +237,7 @@ void shader_run(ShaderUnit* shu) {
             }
             case PICA_SLT:
             case PICA_SLTI: {
-                fvec a, b;
+                fvec4 a, b;
                 if (instr.opcode == PICA_SLT) {
                     SRC1(a, 1);
                     SRC2(b, 1);
@@ -245,7 +245,7 @@ void shader_run(ShaderUnit* shu) {
                     SRC1(a, 1i);
                     SRC2(b, 1i);
                 }
-                fvec res;
+                fvec4 res;
                 res[0] = a[0] < b[0];
                 res[1] = a[1] < b[1];
                 res[2] = a[2] < b[2];
@@ -254,9 +254,9 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_FLR: {
-                fvec a;
+                fvec4 a;
                 SRC1(a, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = floorf(a[0]);
                 res[1] = floorf(a[1]);
                 res[2] = floorf(a[2]);
@@ -265,10 +265,10 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_MAX: {
-                fvec a, b;
+                fvec4 a, b;
                 SRC1(a, 1);
                 SRC2(b, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = MAX(a[0], b[0]);
                 res[1] = MAX(a[1], b[1]);
                 res[2] = MAX(a[2], b[2]);
@@ -277,10 +277,10 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_MIN: {
-                fvec a, b;
+                fvec4 a, b;
                 SRC1(a, 1);
                 SRC2(b, 1);
-                fvec res;
+                fvec4 res;
                 res[0] = MIN(a[0], b[0]);
                 res[1] = MIN(a[1], b[1]);
                 res[2] = MIN(a[2], b[2]);
@@ -289,9 +289,9 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_RCP: {
-                fvec a;
+                fvec4 a;
                 SRC1(a, 1);
-                fvec res;
+                fvec4 res;
                 if (a[0] == -0.f) a[0] = 0;
                 res[0] = 1 / a[0];
                 res[1] = res[2] = res[3] = res[0];
@@ -299,9 +299,9 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_RSQ: {
-                fvec a;
+                fvec4 a;
                 SRC1(a, 1);
-                fvec res;
+                fvec4 res;
                 if (a[0] == -0.f) a[0] = 0;
                 res[0] = 1 / sqrtf(a[0]);
                 res[1] = res[2] = res[3] = res[0];
@@ -309,7 +309,7 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_MOVA: {
-                fvec a;
+                fvec4 a;
                 SRC1(a, 1);
                 if (desc.destmask & BIT(3 - 0)) {
                     shu->a[0] = a[0];
@@ -320,7 +320,7 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_MOV: {
-                fvec a;
+                fvec4 a;
                 SRC1(a, 1);
                 DEST(a, 1);
                 break;
@@ -409,7 +409,7 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_CMP ... PICA_CMP + 1: {
-                fvec a, b;
+                fvec4 a, b;
                 SRC1(a, 1c);
                 SRC2(b, 1c);
                 shu->cmp[0] = compare(instr.fmt1c.cmpx, a[0], b[0]);
@@ -418,7 +418,7 @@ void shader_run(ShaderUnit* shu) {
             }
             case PICA_MAD ... PICA_MAD + 0xf: {
                 desc = shu->opdescs[instr.fmt5.desc];
-                fvec a, b, c;
+                fvec4 a, b, c;
                 SRC1(a, 5);
                 if (instr.fmt5.opcode & 1) {
                     SRC2(b, 5);
@@ -428,7 +428,7 @@ void shader_run(ShaderUnit* shu) {
                     SRC3(c, 5i);
                 }
 
-                fvec res;
+                fvec4 res;
                 res[0] = MUL(a[0], b[0]) + c[0];
                 res[1] = MUL(a[1], b[1]) + c[1];
                 res[2] = MUL(a[2], b[2]) + c[2];

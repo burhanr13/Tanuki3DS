@@ -1,7 +1,8 @@
 #ifndef ARM_CORE_H
 #define ARM_CORE_H
 
-#include "../common.h"
+#include <common.h>
+
 #include "arm.h"
 
 typedef enum { B_USER, B_FIQ, B_SVC, B_ABT, B_IRQ, B_UND, B_CT } RegBank;
@@ -66,8 +67,6 @@ typedef struct _ArmCore {
     union {
         float s[32];
         double d[16];
-        u32 is[32];
-        u64 id[16];
     };
 
     union {
@@ -110,7 +109,7 @@ typedef struct _ArmCore {
 
     u32 vector_base;
 
-    long cycles;
+    s64 cycles;
 
     bool wfe;
 

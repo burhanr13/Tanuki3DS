@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
-#include "3ds.h"
+#include <3ds.h>
+
 #include "svc_types.h"
 
 u32 load_elf(E3DS* s, char* filename) {

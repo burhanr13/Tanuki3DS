@@ -2,7 +2,8 @@
 
 #include <xxh3.h>
 
-#include "../gpu.h"
+#include <pica/gpu.h>
+
 #include "shaderjit_backend.h"
 
 ShaderJitFunc shaderjit_get(GPU* gpu, ShaderUnit* shu) {

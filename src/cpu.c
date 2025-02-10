@@ -1,9 +1,9 @@
 #include "cpu.h"
 
-#include "3ds.h"
-#include "arm/jit/jit.h"
-#include "svc.h"
-#include "thread.h"
+#include <3ds.h>
+#include <arm/jit/jit.h>
+#include <kernel/svc.h>
+#include <kernel/thread.h>
 
 // #define CPULOG
 // #define BREAK
@@ -36,30 +36,26 @@ void cpu_free(E3DS* s) {
     jit_free_all(&s->cpu);
 }
 
-bool cpu_run(E3DS* s, int cycles) {
+// returns number of cycles actually ran
+s64 cpu_run(E3DS* s, s64 cycles) {
     s->cpu.cycles = cycles;
-    while (s->cpu.cycles > 0) {
 #ifdef BREAK
-        if (s->cpu.pc == BREAK) {
-            cpu_print_state(&s->cpu);
-        }
+    if (s->cpu.pc == BREAK) {
+        cpu_print_state(&s->cpu);
+    }
 #endif
 #ifdef CPULOG
-        if (g_cpulog) {
-            printf("executing at %08x\n", s->cpu.pc);
-            cpu_print_state(&s->cpu);
-            // cpu_print_vfp_state(&s->cpu);
-        }
+    if (g_cpulog) {
+        printf("executing at %08x\n", s->cpu.pc);
+        cpu_print_state(&s->cpu);
+        // cpu_print_vfp_state(&s->cpu);
+    }
 #endif
 #ifdef PATCHFN
-        if (s->cpu.pc == PATCHFN) s->cpu.pc = s->cpu.lr;
+    if (s->cpu.pc == PATCHFN) s->cpu.pc = s->cpu.lr;
 #endif
-        arm_exec_jit(&s->cpu);
-        if (s->cpu.wfe) {
-            return false;
-        }
-    }
-    return true;
+    arm_exec_jit(&s->cpu);
+    return cycles - s->cpu.cycles;
 }
 
 u32 cpu_read8(E3DS* s, u32 addr, bool sx) {

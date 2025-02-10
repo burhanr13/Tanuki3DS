@@ -1,10 +1,10 @@
 #ifndef HID_H
 #define HID_H
 
-#include "../memory.h"
-#include "../srv.h"
-#include "../svc_types.h"
-#include "../thread.h"
+#include <kernel/memory.h>
+#include <kernel/thread.h>
+
+#include "srv.h"
 
 enum {
     HIDEVENT_PAD0,

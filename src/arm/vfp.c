@@ -155,15 +155,15 @@ void exec_vfp_data_proc(ArmCore* cpu, ArmInstr instr) {
                     if (dp) {
                         vm = vm << 1 | (instr.cp_data_proc.cp & 1);
                         if (op) {
-                            cpu->d[vd] = (s32) cpu->is[vm];
+                            cpu->d[vd] = (s32) F2I(cpu->s[vm]);
                         } else {
-                            cpu->d[vd] = cpu->is[vm];
+                            cpu->d[vd] = F2I(cpu->s[vm]);
                         }
                     } else {
                         if (op) {
-                            cpu->s[vd] = (s32) cpu->is[vm];
+                            cpu->s[vd] = (s32) F2I(cpu->s[vm]);
                         } else {
-                            cpu->s[vd] = cpu->is[vm];
+                            cpu->s[vd] = F2I(cpu->s[vm]);
                         }
                     }
                     break;
@@ -172,15 +172,15 @@ void exec_vfp_data_proc(ArmCore* cpu, ArmInstr instr) {
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
                         if (instr.cp_data_proc.crn & 1) {
-                            cpu->is[vd] = (s32) cpu->d[vm];
+                            cpu->s[vd] = I2F((s32) cpu->d[vm]);
                         } else {
-                            cpu->is[vd] = cpu->d[vm];
+                            cpu->s[vd] = I2F(cpu->d[vm]);
                         }
                     } else {
                         if (instr.cp_data_proc.crn & 1) {
-                            cpu->is[vd] = (s32) cpu->s[vm];
+                            cpu->s[vd] = I2F((s32) cpu->s[vm]);
                         } else {
-                            cpu->is[vd] = cpu->s[vm];
+                            cpu->s[vd] = I2F(cpu->s[vm]);
                         }
                     }
                     break;
@@ -252,7 +252,7 @@ u32 exec_vfp_read(ArmCore* cpu, ArmInstr instr) {
     if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
     else vn |= instr.cp_reg_trans.cp >> 2;
 
-    return cpu->is[vn];
+    return F2I(cpu->s[vn]);
 }
 
 void exec_vfp_write(ArmCore* cpu, ArmInstr instr, u32 data) {
@@ -269,18 +269,18 @@ void exec_vfp_write(ArmCore* cpu, ArmInstr instr, u32 data) {
     if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
     else vn |= instr.cp_reg_trans.cp >> 2;
 
-    cpu->is[vn] = data;
+    cpu->s[vn] = I2F(data);
 }
 
 u64 exec_vfp_read64(ArmCore* cpu, ArmInstr instr) {
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
-        return cpu->id[vm];
+        return BITCAST(double, u64, cpu->d[vm]);
     } else {
         u32 vm = instr.cp_double_reg_trans.crm << 1 |
                  ((instr.cp_double_reg_trans.cp >> 1) & 1);
-        u64 res = cpu->is[vm];
-        if (vm < 31) res |= (u64) cpu->is[vm + 1] << 32;
+        u64 res = F2I(cpu->s[vm]);
+        if (vm < 31) res |= (u64) F2I(cpu->s[vm + 1]) << 32;
         return res;
     }
 }
@@ -288,11 +288,11 @@ u64 exec_vfp_read64(ArmCore* cpu, ArmInstr instr) {
 void exec_vfp_write64(ArmCore* cpu, ArmInstr instr, u64 data) {
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
-        cpu->id[vm] = data;
+        cpu->d[vm] = BITCAST(u64, double, data);
     } else {
         u32 vm = instr.cp_double_reg_trans.crm << 1 |
                  ((instr.cp_double_reg_trans.cp >> 1) & 1);
-        cpu->is[vm] = data;
-        if (vm < 31) cpu->is[vm + 1] = data >> 32;
+        cpu->s[vm] = I2F(data);
+        if (vm < 31) cpu->s[vm + 1] = I2F(data >> 32);
     }
 }

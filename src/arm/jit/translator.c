@@ -1,7 +1,8 @@
 #include "translator.h"
 
-#include "../arm.h"
-#include "../thumb.h"
+#include <arm/arm.h>
+#include <arm/thumb.h>
+
 #include "jit.h"
 
 ArmCompileFunc compile_funcs[ARM_MAX] = {

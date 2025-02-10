@@ -1,7 +1,7 @@
 #ifndef ETC1_H
 #define ETC1_H
 
-#include "../common.h"
+#include <common.h>
 
 typedef union {
     u64 d;

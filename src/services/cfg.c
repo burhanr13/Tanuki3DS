@@ -1,8 +1,6 @@
 #include "cfg.h"
 
-#include <wchar.h>
-
-#include "../3ds.h"
+#include <3ds.h>
 
 DECL_PORT(cfg) {
     u32* cmdbuf = PTR(cmd_addr);
@@ -113,6 +111,12 @@ DECL_PORT(cfg) {
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = 1;
+            break;
+        case 0x0005:
+            linfo("GetSystemModel");
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 0; // old 3ds
             break;
         case 0x0009:
             linfo("GetCountryCode");

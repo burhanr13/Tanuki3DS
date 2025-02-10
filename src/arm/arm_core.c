@@ -189,7 +189,7 @@ void cpu_print_vfp_state(ArmCore* cpu) {
         }
         printf("\n\t");
         for (int j = 0; j < 4; j++) {
-            printf("(0x%08x)\t", cpu->is[4 * i + j]);
+            printf("(0x%08x)\t", F2I(cpu->s[4 * i + j]));
         }
         printf("\n");
     }

@@ -1,9 +1,9 @@
 #include "gsp.h"
 
-#include "../3ds.h"
-#include "../kernel.h"
-#include "../pica/gpu.h"
-#include "../scheduler.h"
+#include <3ds.h>
+#include <kernel/kernel.h>
+#include <pica/gpu.h>
+#include <scheduler.h>
 
 #define GSPMEM ((GSPSharedMem*) PPTR(s->services.gsp.sharedmem.paddr))
 
