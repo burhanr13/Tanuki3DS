@@ -1,8 +1,53 @@
 #include "shaderdec.h"
 
-#include "../dynstring.h"
+#define XXH_INLINE_ALL
+#include <xxh3.h>
+
+#include <dynstring.h>
+
 #include "gpu.h"
 #include "renderer_gl.h"
+
+int shader_dec_get(GPU* gpu) {
+    // we need to hash the shader code, entrypoint, and outmap
+    XXH3_state_t* xxst = XXH3_createState();
+    XXH3_64bits_reset(xxst);
+    XXH3_64bits_update(xxst, gpu->progdata, sizeof gpu->progdata);
+    XXH3_64bits_update(xxst, &gpu->regs.vsh.entrypoint,
+                       sizeof gpu->regs.vsh.entrypoint);
+    XXH3_64bits_update(xxst, gpu->regs.raster.sh_outmap,
+                       sizeof gpu->regs.raster.sh_outmap);
+    u64 hash = XXH3_64bits_digest(xxst);
+    XXH3_freeState(xxst);
+
+    VSHCacheEntry* block = nullptr;
+    for (int i = 0; i < VSH_MAX; i++) {
+        if (gpu->vshaders_hw.d[i].hash == hash ||
+            gpu->vshaders_hw.d[i].hash == 0) {
+            block = &gpu->vshaders_hw.d[i];
+            break;
+        }
+    }
+    if (!block) {
+        block = LRU_eject(gpu->vshaders_hw);
+    }
+    LRU_use(gpu->vshaders_hw, block);
+    if (block->hash != hash) {
+        block->hash = hash;
+        glDeleteShader(block->vs);
+
+        char* source = shader_dec_vs(gpu);
+
+        block->vs = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(block->vs, 1, &(const char*) {source}, nullptr);
+        glCompileShader(block->vs);
+
+        printf(source);
+
+        free(source);
+    }
+    return block->vs;
+}
 
 #define printf(...) ds_printf(&ctx->s, __VA_ARGS__)
 
@@ -19,7 +64,18 @@ void dec_block(DecCTX* ctx, u32 start, u32 num);
 const char vs_header[] = R"(
 #version 410 core
 
-layout (location=0) in vec4 v[16];
+layout (location=0) in vec4 v0;
+layout (location=1) in vec4 v1;
+layout (location=2) in vec4 v2;
+layout (location=3) in vec4 v3;
+layout (location=4) in vec4 v4;
+layout (location=5) in vec4 v5;
+layout (location=6) in vec4 v6;
+layout (location=7) in vec4 v7;
+layout (location=8) in vec4 v8;
+layout (location=9) in vec4 v9;
+layout (location=10) in vec4 v10;
+layout (location=11) in vec4 v11;
 
 out vec4 color;
 out vec2 texcoord0;
@@ -54,12 +110,11 @@ uniform vec4 c[96];
 
 static char coordnames[4] = "xyzw";
 static char* outmapnames[24] = {
-    "gl_Position.x", "gl_Position.y", "gl_Position.z", "gl_Position.w",
-    "normquat.x",    "normquat.y",    "normquat.z",    "normquat.w",
-    "color.r",       "color.g",       "color.b",       "color.a",
-    "texcoord0.x",   "texcoord0.y",   "texcoord1.x",   "texcoord1.y",
-    "texcoordw",     "r[0].x",        "view.x",        "view.y",
-    "view.z",        "r[0].x",        "texcoord2.x",   "texcoord2.y",
+    "pos.x",       "pos.y",      "pos.z",       "pos.w",       "normquat.x",
+    "normquat.y",  "normquat.z", "normquat.w",  "color.r",     "color.g",
+    "color.b",     "color.a",    "texcoord0.x", "texcoord0.y", "texcoord1.x",
+    "texcoord1.y", "texcoordw",  "r[0].x",      "view.x",      "view.y",
+    "view.z",      "r[0].x",     "texcoord2.x", "texcoord2.y",
 };
 
 static char* comparefuncs[6] = {"==", "!=", "<", "<=", ">", ">="};
@@ -83,8 +138,12 @@ void deccondop(DecCTX* ctx, u32 op, bool refx, bool refy) {
 
 void decsrc(DecCTX* ctx, u32 n, u8 idx, u8 swizzle, bool neg) {
     if (neg) printf("-");
-    if (n < 0x10) printf("v[%d]", n);
-    else if (n < 0x20) printf("r[%d]", n - 0x10);
+    if (n < 0x10) {
+        // pica only supports 12 vertex attributes
+        // so we will also only have 12 vertex attributes
+        if (n < 12) printf("v%d", n);
+        else printf("vec4(0)");
+    } else if (n < 0x20) printf("r[%d]", n - 0x10);
     else {
         n -= 0x20;
         if (idx) {
@@ -441,7 +500,7 @@ char* shader_dec_vs(GPU* gpu) {
     ds_init(&ctx.s, 32768);
     ctx.shu.code = (PICAInstr*) gpu->progdata;
     ctx.shu.opdescs = (OpDesc*) gpu->opdescs;
-    ctx.shu.entrypoint = gpu->io.vsh.entrypoint;
+    ctx.shu.entrypoint = gpu->regs.vsh.entrypoint;
 
     ds_printf(&ctx.s, "void proc_main() {\n");
     dec_block(&ctx, ctx.shu.entrypoint, SHADER_CODE_SIZE);
@@ -462,14 +521,16 @@ char* shader_dec_vs(GPU* gpu) {
 
     ds_printf(&final, "proc_main();\n");
 
+    ds_printf(&final, "vec4 pos;\n");
+
     for (int o = 0; o < 7; o++) {
-        u32 all = gpu->io.raster.sh_outmap[o][0] << 24 |
-                  gpu->io.raster.sh_outmap[o][1] << 16 |
-                  gpu->io.raster.sh_outmap[o][2] << 8 |
-                  gpu->io.raster.sh_outmap[o][3];
+        u32 all = gpu->regs.raster.sh_outmap[o][0] << 24 |
+                  gpu->regs.raster.sh_outmap[o][1] << 16 |
+                  gpu->regs.raster.sh_outmap[o][2] << 8 |
+                  gpu->regs.raster.sh_outmap[o][3];
         switch (all) {
             case 0x00'01'02'03:
-                ds_printf(&final, "gl_Position = o[%d];\n", o);
+                ds_printf(&final, "pos = o[%d];\n", o);
                 break;
             case 0x04'05'06'07:
                 ds_printf(&final, "normquat = o[%d];\n", o);
@@ -495,13 +556,17 @@ char* shader_dec_vs(GPU* gpu) {
                 break;
             default:
                 for (int i = 0; i < 4; i++) {
-                    int sem = gpu->io.raster.sh_outmap[o][i];
+                    int sem = gpu->regs.raster.sh_outmap[o][i];
                     if (sem < 0x18)
                         ds_printf(&final, "%s = o[%d].%c;\n", outmapnames[sem],
                                   o, coordnames[i]);
                 }
         }
     }
+
+    // correct z value
+    ds_printf(&final, "pos.z = pos.z * 2 + pos.w;\n");
+    ds_printf(&final, "gl_Position = pos;\n");
 
     ds_printf(&final, "}\n");
 

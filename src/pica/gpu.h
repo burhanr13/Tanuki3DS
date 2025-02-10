@@ -11,6 +11,7 @@
 #include "gpuregs.h"
 #include "renderer_gl.h"
 #include "shader.h"
+#include "shaderdec.h"
 #include "shadergen.h"
 #include "shaderjit/shaderjit.h"
 
@@ -86,7 +87,8 @@ typedef struct _GPU {
 
     LRUCache(TexInfo, TEX_MAX) textures;
 
-    LRUCache(ShaderJitBlock, VSH_MAX) vshaders;
+    LRUCache(ShaderJitBlock, VSH_MAX) vshaders_sw;
+    LRUCache(VSHCacheEntry, VSH_MAX) vshaders_hw;
     LRUCache(FSHCacheEntry, FSH_MAX) fshaders;
 
     struct {
@@ -130,6 +132,7 @@ typedef union {
 } GPUCommand;
 
 void gpu_init(GPU* gpu);
+void gpu_destroy(GPU* gpu);
 
 void gpu_vshrunner_init(GPU* gpu);
 void gpu_vshrunner_destroy(GPU* gpu);

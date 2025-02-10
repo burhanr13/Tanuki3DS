@@ -6,10 +6,19 @@
 typedef struct _GPU GPU;
 
 typedef struct {
-    fvec c[96];
+    fvec4 c[96];
     int i[4][4];
     int b_raw;
 } VertUniforms;
+
+typedef struct _VSHCacheEntry {
+    u64 hash;
+    int vs;
+
+    struct _VSHCacheEntry *next, *prev;
+} VSHCacheEntry;
+
+int shader_dec_get(GPU* gpu);
 
 char* shader_dec_vs(GPU* gpu);
 

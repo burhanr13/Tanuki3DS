@@ -28,20 +28,20 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glShaderSource(mainfs, 1, &(const char*) {mainfragsource}, nullptr);
     glCompileShader(mainvs);
     glCompileShader(mainfs);
-    state->mainprogram = glCreateProgram();
-    glAttachShader(state->mainprogram, mainvs);
-    glAttachShader(state->mainprogram, mainfs);
-    glLinkProgram(state->mainprogram);
+    state->main_program = glCreateProgram();
+    glAttachShader(state->main_program, mainvs);
+    glAttachShader(state->main_program, mainfs);
+    glLinkProgram(state->main_program);
     glDeleteShader(mainvs);
     glDeleteShader(mainfs);
-    glUseProgram(state->mainprogram);
-    glUniform1i(glGetUniformLocation(state->mainprogram, "screen"), 0);
+    glUseProgram(state->main_program);
+    glUniform1i(glGetUniformLocation(state->main_program, "screen"), 0);
 
-    glGenVertexArrays(1, &state->mainvao);
-    glBindVertexArray(state->mainvao);
+    glGenVertexArrays(1, &state->main_vao);
+    glBindVertexArray(state->main_vao);
 
-    glGenBuffers(1, &state->mainvbo);
-    glBindBuffer(GL_ARRAY_BUFFER, state->mainvbo);
+    glGenBuffers(1, &state->main_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, state->main_vbo);
     glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
 
     state->gpu_vs = glCreateShader(GL_VERTEX_SHADER);
@@ -55,43 +55,57 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
 
     LRU_init(state->progcache);
 
+    glGenBuffers(1, &state->vert_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, state->vert_ubo);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, state->vert_ubo);
     glGenBuffers(1, &state->uber_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, state->uber_ubo);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, state->uber_ubo);
-
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, state->uber_ubo);
     glGenBuffers(1, &state->frag_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, state->frag_ubo);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 1, state->frag_ubo);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 2, state->frag_ubo);
 
-    glGenVertexArrays(1, &state->gpuvao);
-    glBindVertexArray(state->gpuvao);
+    glGenVertexArrays(1, &state->gpu_vao);
+    glBindVertexArray(state->gpu_vao);
 
-    glGenBuffers(1, &state->gpuvbo);
-    glBindBuffer(GL_ARRAY_BUFFER, state->gpuvbo);
-    glGenBuffers(1, &state->gpuebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state->gpuebo);
+    glGenBuffers(1, &state->gpu_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, state->gpu_vbo);
+    glGenBuffers(1, &state->gpu_ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state->gpu_ebo);
 
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*) offsetof(Vertex, pos));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*) offsetof(Vertex, color));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*) offsetof(Vertex, texcoord0));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*) offsetof(Vertex, texcoord1));
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*) offsetof(Vertex, texcoord2));
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*) offsetof(Vertex, normquat));
-    glEnableVertexAttribArray(5);
-    glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*) offsetof(Vertex, view));
-    glEnableVertexAttribArray(6);
+    if (ctremu.hwvshaders) {
+        // for now just treat a vertex as fvec4[12]
+        for (int i = 0; i < 12; i++) {
+            glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, 12 * sizeof(fvec4),
+                                  (void*) (i * sizeof(fvec4)));
+            glEnableVertexAttribArray(i);
+        }
+    } else {
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void*) offsetof(Vertex, pos));
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void*) offsetof(Vertex, color));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void*) offsetof(Vertex, texcoord0));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void*) offsetof(Vertex, texcoord1));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void*) offsetof(Vertex, texcoord2));
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void*) offsetof(Vertex, texcoordw));
+        glEnableVertexAttribArray(5);
+        glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void*) offsetof(Vertex, normquat));
+        glEnableVertexAttribArray(6);
+        glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              (void*) offsetof(Vertex, view));
+        glEnableVertexAttribArray(7);
+    }
 
     for (int i = 0; i < 2; i++) {
         glGenTextures(1, &state->screentex[i]);
@@ -123,27 +137,30 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         gpu->textures.d[i].tex = textures[i];
     }
 
-    glBindVertexArray(state->gpuvao);
-    state->curprogram = state->mainprogram;
+    glBindVertexArray(state->gpu_vao);
+    state->curprogram = state->main_program;
 }
 
 void renderer_gl_destroy(GLState* state) {
-    glDeleteProgram(state->mainprogram);
+    glDeleteProgram(state->main_program);
     glDeleteShader(state->gpu_vs);
     glDeleteShader(state->gpu_uberfs);
     for (int i = 0; i < MAX_PROGRAM; i++) {
         glDeleteProgram(state->progcache.d[i].prog);
     }
+    for (int i = 0; i < VSH_MAX; i++) {
+        glDeleteShader(state->gpu->vshaders_hw.d[i].vs);
+    }
     for (int i = 0; i < FSH_MAX; i++) {
         glDeleteShader(state->gpu->fshaders.d[i].fs);
     }
-    glDeleteVertexArrays(1, &state->mainvao);
-    glDeleteVertexArrays(1, &state->gpuvao);
-    glDeleteBuffers(1, &state->mainvbo);
-    glDeleteBuffers(1, &state->gpuvbo);
+    glDeleteVertexArrays(1, &state->main_vao);
+    glDeleteVertexArrays(1, &state->gpu_vao);
+    glDeleteBuffers(1, &state->main_vbo);
+    glDeleteBuffers(1, &state->gpu_vbo);
     glDeleteBuffers(1, &state->uber_ubo);
     glDeleteBuffers(1, &state->frag_ubo);
-    glDeleteBuffers(1, &state->gpuebo);
+    glDeleteBuffers(1, &state->gpu_ebo);
     glDeleteTextures(1, &state->screentex[SCREEN_TOP]);
     glDeleteTextures(1, &state->screentex[SCREEN_BOT]);
     for (int i = 0; i < FB_MAX; i++) {
@@ -157,8 +174,8 @@ void renderer_gl_destroy(GLState* state) {
 }
 
 void render_gl_main(GLState* state, int view_w, int view_h) {
-    glUseProgram(state->mainprogram);
-    glBindVertexArray(state->mainvao);
+    glUseProgram(state->main_program);
+    glBindVertexArray(state->main_vao);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glColorMask(true, true, true, true);
     glDisable(GL_BLEND);
@@ -191,8 +208,8 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 #endif
 
-    glBindVertexArray(state->gpuvao);
-    state->curprogram = state->mainprogram;
+    glBindVertexArray(state->gpu_vao);
+    state->curprogram = state->main_program;
 }
 
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
@@ -221,9 +238,11 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         glUniform1i(glGetUniformLocation(ent->prog, "tex1"), 1);
         glUniform1i(glGetUniformLocation(ent->prog, "tex2"), 2);
         glUniformBlockBinding(
-            ent->prog, glGetUniformBlockIndex(ent->prog, "UberUniforms"), 0);
+            ent->prog, glGetUniformBlockIndex(ent->prog, "VertUniforms"), 0);
         glUniformBlockBinding(
-            ent->prog, glGetUniformBlockIndex(ent->prog, "FragUniforms"), 1);
+            ent->prog, glGetUniformBlockIndex(ent->prog, "UberUniforms"), 1);
+        glUniformBlockBinding(
+            ent->prog, glGetUniformBlockIndex(ent->prog, "FragUniforms"), 2);
     } else {
         if (state->curprogram != ent->prog) glUseProgram(ent->prog);
     }

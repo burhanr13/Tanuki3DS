@@ -104,8 +104,17 @@ bool is_valid_physmem(u32 addr) {
 void gpu_init(GPU* gpu) {
     LRU_init(gpu->fbs);
     LRU_init(gpu->textures);
-    LRU_init(gpu->vshaders);
+    LRU_init(gpu->vshaders_sw);
+    LRU_init(gpu->vshaders_hw);
     LRU_init(gpu->fshaders);
+
+    gpu_vshrunner_init(gpu);
+}
+
+void gpu_destroy(GPU* gpu) {
+    shaderjit_free_all(gpu);
+
+    gpu_vshrunner_destroy(gpu);
 }
 
 void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
@@ -820,16 +829,31 @@ void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
     }
 }
 
+void load_vtx_array(GPU* gpu, void* attrcfg, int base, int count,
+                    fvec4 (*vbuf)[12]) {
+    for (int i = 0; i < count; i++) {
+        load_vtx(gpu, attrcfg, base + i, vbuf[i]);
+    }
+}
+
 void gpu_drawarrays(GPU* gpu) {
     linfo("drawing arrays nverts=%d primmode=%d", gpu->regs.geom.nverts,
           gpu->regs.geom.prim_config.mode);
-    Vertex vbuf[gpu->regs.geom.nverts];
 
     AttrConfig cfg;
     vtx_loader_setup(gpu, cfg);
-    dispatch_vsh(gpu, cfg, gpu->regs.geom.vtx_off, gpu->regs.geom.nverts, vbuf);
+    if (ctremu.hwvshaders) {
+        fvec4 vbuf[gpu->regs.geom.nverts][12];
+        load_vtx_array(gpu, cfg, gpu->regs.geom.vtx_off, gpu->regs.geom.nverts,
+                       vbuf);
+        glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    } else {
+        Vertex vbuf[gpu->regs.geom.nverts];
+        dispatch_vsh(gpu, cfg, gpu->regs.geom.vtx_off, gpu->regs.geom.nverts,
+                     vbuf);
+        glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    }
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawArrays(prim_mode[gpu->regs.geom.prim_config.mode], 0,
                  gpu->regs.geom.nverts);
 }
@@ -856,25 +880,23 @@ void gpu_drawelements(GPU* gpu) {
                  indexbuf, GL_STREAM_DRAW);
 
     int nverts = maxind + 1 - minind;
-    Vertex vbuf[nverts];
 
     AttrConfig cfg;
     vtx_loader_setup(gpu, cfg);
-    dispatch_vsh(gpu, cfg, minind, nverts, vbuf);
+    if (ctremu.hwvshaders) {
+        fvec4 vbuf[nverts][12];
+        load_vtx_array(gpu, cfg, minind, nverts, vbuf);
+        glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    } else {
+        Vertex vbuf[nverts];
+        dispatch_vsh(gpu, cfg, minind, nverts, vbuf);
+        glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    }
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
     glDrawElementsBaseVertex(
         prim_mode[gpu->regs.geom.prim_config.mode], gpu->regs.geom.nverts,
         gpu->regs.geom.indexfmt ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE, 0,
         -minind);
-
-    static bool p = false;
-    if (!p) {
-        char* s = shader_dec_vs(gpu);
-        printf("%s", s);
-        free(s);
-        p = true;
-    }
 }
 
 void gpu_drawimmediate(GPU* gpu) {
@@ -883,13 +905,18 @@ void gpu_drawimmediate(GPU* gpu) {
 
     linfo("drawing immediate mode nverts=%d primmode=%d", nverts,
           gpu->regs.geom.prim_config.mode);
-    Vertex vbuf[nverts];
 
     AttrConfig cfg;
     vtx_loader_imm_setup(gpu, cfg);
-    dispatch_vsh(gpu, cfg, 0, nverts, vbuf);
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    if (ctremu.hwvshaders) {
+        fvec4 vbuf[nverts][12];
+        load_vtx_array(gpu, cfg, 0, nverts, vbuf);
+        glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    } else {
+        Vertex vbuf[nverts];
+        dispatch_vsh(gpu, cfg, 0, nverts, vbuf);
+        glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    }
     glDrawArrays(prim_mode[gpu->regs.geom.prim_config.mode], 0, nverts);
 
     Vec_free(gpu->immattrs);
@@ -1297,6 +1324,25 @@ void gpu_update_gl_state(GPU* gpu) {
     }
     COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
 
+    GLuint vs;
+    if (ctremu.hwvshaders) {
+        // todo: only update uniforms if they were modified
+        VertUniforms vubuf;
+        memcpy(vubuf.c, gpu->floatuniform, sizeof vubuf.c);
+        // expand intuniform from bytes to ints
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                vubuf.i[i][j] = gpu->regs.vsh.intuniform[i][j];
+            }
+        }
+        vubuf.b_raw = gpu->regs.vsh.booluniform;
+        glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.vert_ubo);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof vubuf, &vubuf, GL_STREAM_DRAW);
+        vs = shader_dec_get(gpu);
+    } else {
+        vs = gpu->gl.gpu_vs;
+    }
+
     glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
 
@@ -1309,5 +1355,5 @@ void gpu_update_gl_state(GPU* gpu) {
         fs = shader_gen_get(gpu, &ubuf);
     }
 
-    gpu_gl_load_prog(&gpu->gl, gpu->gl.gpu_vs, fs);
+    gpu_gl_load_prog(&gpu->gl, vs, fs);
 }

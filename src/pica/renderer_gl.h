@@ -25,13 +25,13 @@ typedef struct _ProgCacheEntry {
 typedef struct {
     GPU* gpu;
 
-    GLuint mainvao;
-    GLuint mainvbo;
-    GLuint mainprogram;
+    GLuint main_vao;
+    GLuint main_vbo;
+    GLuint main_program;
 
-    GLuint gpuvao;
-    GLuint gpuvbo;
-    GLuint gpuebo;
+    GLuint gpu_vao;
+    GLuint gpu_vbo;
+    GLuint gpu_ebo;
 
     GLuint gpu_vs;
     GLuint gpu_uberfs;
@@ -41,6 +41,7 @@ typedef struct {
 
     GLuint screentex[2];
 
+    GLuint vert_ubo;
     GLuint uber_ubo;
     GLuint frag_ubo;
 

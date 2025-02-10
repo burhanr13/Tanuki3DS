@@ -16,5 +16,6 @@ typedef struct _ShaderJitBlock {
 } ShaderJitBlock;
 
 ShaderJitFunc shaderjit_get(GPU* gpu, ShaderUnit* shu);
+void shaderjit_free_all(GPU* gpu);
 
 #endif

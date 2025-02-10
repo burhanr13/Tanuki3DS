@@ -17,8 +17,9 @@ typedef struct {
     bool vsync;
     int videoscale;
     bool shaderjit;
-    bool ubershader;
     int vshthreads;
+    bool hwvshaders;
+    bool ubershader;
 
     E3DS system;
 
