@@ -1,6 +1,7 @@
 #include "apt.h"
 
 #include "../3ds.h"
+#include "../applets.h"
 
 void apt_resume_app(E3DS* s) {
     s->services.apt.nextparam.appid = APPID_HOMEMENU;
@@ -35,8 +36,9 @@ DECL_PORT(apt) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             apt_resume_app(s);
-            // home menu needs this to be signaled again after a while for some reason
-            // add_event(&s->sched, (SchedEventHandler) apt_resume_app, 0,
+            // home menu needs this to be signaled again after a while for some
+            // reason add_event(&s->sched, (SchedEventHandler) apt_resume_app,
+            // 0,
             //           CPU_CLK / FPS);
             break;
         case 0x0006: {
@@ -117,15 +119,33 @@ DECL_PORT(apt) {
             u32 paramsize = cmdbuf[2];
             u32 handleparam = cmdbuf[4];
             u32 paramaddr = cmdbuf[6];
-            lwarn(
+            linfo(
                 "StartLibraryApplet %x with paramsize=%d and handleparam=%08x",
                 appid, paramsize, handleparam);
-
-            s->services.apt.nextparam.appid = appid;
-            s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
-            s->services.apt.nextparam.kobj = nullptr;
-            s->services.apt.nextparam.paramsize = 1024;
-            event_signal(s, &s->services.apt.resume_event);
+            switch (appid) {
+                case APPID_SWKBD: {
+                    KSharedMem* shmem =
+                        HANDLE_GET_TYPED(handleparam, KOT_SHAREDMEM);
+                    if (shmem) {
+                        swkbd_run(s, paramaddr, shmem->mapaddr);
+                    }
+                    break;
+                }
+                case APPID_MIISELECTOR:
+                    // stub
+                    lwarn("mii selector");
+                    s->services.apt.nextparam.appid = APPID_MIISELECTOR;
+                    s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
+                    s->services.apt.nextparam.kobj = nullptr;
+                    s->services.apt.nextparam.paramsize = 1024;
+                    event_signal(s, &s->services.apt.resume_event);
+                    break;
+                case APPID_ERRDISP:
+                    lerror("launching errdisp");
+                    break;
+                default:
+                    lwarn("unknown applet");
+            }
 
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
