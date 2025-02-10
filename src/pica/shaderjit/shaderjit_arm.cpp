@@ -13,7 +13,7 @@ using namespace Xbyak_aarch64;
 #undef F2I
 #define F2I(i) (std::bit_cast<u32>(i))
 
-// #define JIT_DISASM
+#define JIT_DISASM
 
 struct ShaderCode : Xbyak_aarch64::CodeGenerator {
 
@@ -37,7 +37,8 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
     std::map<u32, u32> entrypoints;
 
     Label ex2func, lg2func;
-    bool usingex2lg2;
+    bool usingex2;
+    bool usinglg2;
 
     ShaderCode()
         : Xbyak_aarch64::CodeGenerator(4096, Xbyak_aarch64::AutoGrow) {}
@@ -56,7 +57,8 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
         for (auto& e : entrypoints) {
             e.second = compileWithEntry(shu, e.first);
         }
-        if (usingex2lg2) compileEx2Lg2();
+        if (usingex2) compileEx2();
+        if (usinglg2) compileLg2();
         ready();
     }
 
@@ -287,7 +289,8 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
         bic(v1.b16, src2.b16, v3.b16);
     }
 
-    void compileEx2Lg2();
+    void compileEx2();
+    void compileLg2();
 };
 
 // returns the offset of the function for the given entrypoint
@@ -417,7 +420,7 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 break;
             }
             case PICA_EX2: {
-                usingex2lg2 = true;
+                usingex2 = true;
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
                 mov(s0, src.s[0]);
@@ -427,7 +430,7 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
                 break;
             }
             case PICA_LG2: {
-                usingex2lg2 = true;
+                usinglg2 = true;
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
                 mov(s0, src.s[0]);
@@ -696,18 +699,19 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
     }
 }
 
-void ShaderCode::compileEx2Lg2() {
-    // both take x in s0 and return in s0
+void ShaderCode::compileEx2() {
+    // takes x in s0 and return in s0
+
+    Label end;
 
     // constants for getting good input to polynomials (found through testing)
-    Label Cexthr, Clgthr;
-    // various numbers
-    Label Cln2, C1_ln2, C1_6, C1_3, Cnan;
-
-    Label nomodexp, nomodlog;
-    Label nodegenlog;
+    const float exthr = 0.535f;
 
     L(ex2func);
+    // check nan
+    fcmp(s0, s0);
+    bne(end);
+
     // keep 1 somewhere
     fmov(s7, 1.f);
 
@@ -720,11 +724,11 @@ void ShaderCode::compileEx2Lg2() {
     // now n in w11 and r in s0
 
     // translate from [0, 1) -> [exthr-1, exthr)
-    ldr(s1, Cexthr);
+    mov(w17, F2I(exthr));
+    fmov(s1, w17);
     fcmp(s0, s1);
-    blt(nomodexp);
-    fsub(s0, s0, s7);
-    L(nomodexp);
+    fsub(s1, s0, s7);
+    fcsel(s0, s1, s0, HS);
 
     // make n into float exponent
     add(w11, w11, 127);
@@ -736,31 +740,52 @@ void ShaderCode::compileEx2Lg2() {
     lsl(w11, w11, 23);
 
     // 2^r = e^(r * ln2)
-    ldr(s1, Cln2);
-    fmul(s0, s0, s1);
-
     // e^x ~= ((1/6 * x + 1/2) * x + 1) * x + 1
-    ldr(s1, C1_6);
-    fmov(s6, 0.5f);
+    const float c0 = M_LN2 * M_LN2 * M_LN2 / 6;
+    const float c1 = M_LN2 * M_LN2 / 2;
+    const float c2 = M_LN2;
+    // c3 is just 1
+    // now 2^x ~= ((c0 * x + c1) * x + c2) * x + c3
+
+    mov(w17, F2I(c0));
+    fmov(s1, w17);
+    mov(w17, F2I(c1));
+    fmov(s5, w17);
+    mov(w17, F2I(c2));
+    fmov(s6, w17);
+    fmadd(s1, s1, s0, s5);
     fmadd(s1, s1, s0, s6);
-    fmadd(s1, s1, s0, s7);
     fmadd(s1, s1, s0, s7);
 
     // extract the mantissa and insert into the result
     fmov(w12, s1);
     bfi(w11, w12, 0, 23);
     fmov(s0, w11);
+    L(end);
     ret();
+}
+
+void ShaderCode::compileLg2() {
+    // takes x in s0 and return in s0
+
+    // constants for getting good input to polynomials (found through testing)
+    const float lgthr = 1.35f;
+
+    Label lnan, lminf;
 
     L(lg2func);
+    // check nan and 0
+    fcmp(s0, s0);
+    bne(lnan);
+    fcmp(s0, 0);
+    beq(lminf);
+
     // x = 2^n * r where n in Z and r in [1,2)
     // log2(x) = n + log2(r)
     fmov(w11, s0);
     // check for negative number
-    tbz(w11, 31, nodegenlog);
-    ldr(s0, Cnan);
-    ret();
-    L(nodegenlog);
+    tbnz(w11, 31, lnan);
+
     ubfx(w12, w11, 23, 8);
     sub(w12, w12, 127);
     ubfx(w11, w11, 0, 23);
@@ -769,51 +794,53 @@ void ShaderCode::compileEx2Lg2() {
     // now n in w12 and r in s0
 
     // translate from [1, 2) -> [lgthr/2, lgthr)
-    ldr(s1, Clgthr);
+    mov(w17, F2I(lgthr));
+    fmov(s1, w17);
     fcmp(s0, s1);
-    blt(nomodlog);
     fmov(s7, 0.5f);
-    fmul(s0, s0, s7);
-    add(w12, w12, 1);
-    L(nomodlog);
+    fmul(s1, s0, s7);
+    fcsel(s0, s1, s0, HS);
+    cinc(w12, w12, HS);
 
-    // keep 1 here
-    fmov(s7, 1.f);
     // log2(r) = ln(r)/ln2
     // log polynomial is for x-1
+    fmov(s7, 1.f);
     fsub(s0, s0, s7);
 
     // ln(x+1) ~= (((-1/4 * x + 1/3) * x - 1/2) * x + 1) * x
-    fmov(s1, -0.25f);
-    ldr(s6, C1_3);
-    fmadd(s1, s1, s0, s6);
-    fmov(s6, 0.5f);
+    const float c0 = -1 / (4 * M_LN2);
+    const float c1 = 1 / (3 * M_LN2);
+    const float c2 = -1 / (2 * M_LN2);
+    const float c3 = 1 / M_LN2;
+    // log2(x+1) ~= (((c0 * x + c1) * x + c2) * x + c3) * x
+
+    mov(w17, F2I(c0));
+    fmov(s1, w17);
+    mov(w17, F2I(c1));
+    fmov(s5, w17);
+    mov(w17, F2I(c2));
+    fmov(s6, w17);
+    mov(w17, F2I(c3));
+    fmov(s7, w17);
+    fmadd(s1, s1, s0, s5);
     fmadd(s1, s1, s0, s6);
     fmadd(s1, s1, s0, s7);
     fmul(s1, s1, s0);
-
-    ldr(s2, C1_ln2);
-    fmul(s1, s1, s2);
 
     // res is n + log r
     scvtf(s0, w12);
     fadd(s0, s0, s1);
     ret();
 
-    L(Cexthr);
-    dd(F2I(0.535f));
-    L(Clgthr);
-    dd(F2I(1.35f));
-    L(Cln2);
-    dd(F2I((float) M_LN2));
-    L(C1_ln2);
-    dd(F2I((float) (1.f / M_LN2)));
-    L(C1_6);
-    dd(F2I(1.f / 6.f));
-    L(C1_3);
-    dd(F2I(1.f / 3.f));
-    L(Cnan);
-    dd(0x7ff00000);
+    // degenerate cases
+    L(lnan);
+    mov(w17, F2I(NAN));
+    fmov(s0, w17);
+    ret();
+    L(lminf);
+    mov(w17, F2I(-INFINITY));
+    fmov(s0, w17);
+    ret();
 }
 
 extern "C" {
