@@ -30,16 +30,14 @@ DECL_PORT(apt) {
                 srvobj_make_handle(s, &s->services.apt.resume_event.hdr);
             linfo("Initialize with notif event %x and resume event %x",
                   cmdbuf[3], cmdbuf[4]);
+            // dont signal this immediately
+            add_event(&s->sched, (SchedEventHandler) apt_resume_app, 0,
+                      CPU_CLK / FPS);
             break;
         case 0x0003:
             linfo("Enable");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
-            apt_resume_app(s);
-            // home menu needs this to be signaled again after a while for some
-            // reason add_event(&s->sched, (SchedEventHandler) apt_resume_app,
-            // 0,
-            //           CPU_CLK / FPS);
             break;
         case 0x0006: {
             u32 appid = cmdbuf[1];

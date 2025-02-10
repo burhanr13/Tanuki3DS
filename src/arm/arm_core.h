@@ -66,8 +66,6 @@ typedef struct _ArmCore {
     union {
         float s[32];
         double d[16];
-        u32 is[32];
-        u64 id[16];
     };
 
     union {

@@ -134,14 +134,14 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             gpu_drawelements(gpu);
             break;
         case GPUREG(geom.fixattr_data[0])... GPUREG(geom.fixattr_data[2]): {
-            fvec* fattr;
+            fvec4* fattr;
             bool immediatemode = false;
             if (gpu->regs.geom.fixattr_idx == 0xf) {
                 if (gpu->immattrs.size == gpu->immattrs.cap) {
                     gpu->immattrs.cap =
                         gpu->immattrs.cap ? 2 * gpu->immattrs.cap : 8;
-                    gpu->immattrs.d = realloc(gpu->immattrs.d,
-                                              gpu->immattrs.cap * sizeof(fvec));
+                    gpu->immattrs.d = realloc(
+                        gpu->immattrs.d, gpu->immattrs.cap * sizeof(fvec4));
                 }
                 fattr = &gpu->immattrs.d[gpu->immattrs.size];
                 immediatemode = true;
@@ -187,7 +187,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
                 lwarn("writing to out of bound uniform");
                 break;
             }
-            fvec* uniform = &gpu->floatuniform[idx];
+            fvec4* uniform = &gpu->floatuniform[idx];
             if (gpu->regs.vsh.floatuniform_mode) {
                 (*uniform)[3 - gpu->curunifi] = I2F(param);
                 if (++gpu->curunifi == 4) {
@@ -600,7 +600,7 @@ void vtx_loader_imm_setup(GPU* gpu, AttrConfig cfg) {
     u32 nattrs = gpu->regs.geom.vsh_num_attr + 1;
     for (int i = 0; i < nattrs; i++) {
         cfg[i].base = gpu->immattrs.d + i;
-        cfg[i].stride = nattrs * sizeof(fvec);
+        cfg[i].stride = nattrs * sizeof(fvec4);
         cfg[i].fmt = 0b1111;
     }
 }
@@ -640,13 +640,13 @@ void vtx_loader_imm_setup(GPU* gpu, AttrConfig cfg) {
         dst[pa][3] = attr[3];                                                  \
     })
 
-void load_vtx(GPU* gpu, AttrConfig cfg, int i, fvec* dst) {
+void load_vtx(GPU* gpu, AttrConfig cfg, int i, fvec4* dst) {
     u32 nattrs = gpu->regs.geom.vsh_num_attr + 1;
     for (int a = 0; a < nattrs; a++) {
         void* vtx = cfg[a].base + i * cfg[a].stride;
         int pa = (gpu->regs.vsh.permutation >> 4 * a) & 0xf;
         if (cfg[a].fmt == 0b1111) {
-            memcpy(dst[pa], vtx, sizeof(fvec));
+            memcpy(dst[pa], vtx, sizeof(fvec4));
         } else {
             switch (cfg[a].fmt) {
                 case 0b0000:
@@ -699,7 +699,7 @@ void load_vtx(GPU* gpu, AttrConfig cfg, int i, fvec* dst) {
     }
 }
 
-void store_vtx(GPU* gpu, int i, Vertex* vbuf, fvec* src) {
+void store_vtx(GPU* gpu, int i, Vertex* vbuf, fvec4* src) {
     for (int o = 0; o < 7; o++) {
         for (int j = 0; j < 4; j++) {
             u8 sem = gpu->regs.raster.sh_outmap[o][j];

@@ -29,7 +29,7 @@ extern bool g_infologs;
     printf("\e[31m[ERROR](%s) " format "\e[0m\n",                              \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
 
-#define print_fvec(v) printf("[%f,%f,%f,%f] ", (v)[0], (v)[1], (v)[2], (v)[3])
+#define print_vec4(v) printf("[%f,%f,%f,%f] ", (v)[0], (v)[1], (v)[2], (v)[3])
 
 typedef uint8_t u8;
 typedef int8_t s8;
@@ -39,11 +39,22 @@ typedef uint32_t u32;
 typedef int32_t s32;
 typedef uint64_t u64;
 typedef int64_t s64;
+
 #define ubi(n) unsigned _BitInt(n)
 #define sbi(n) signed _BitInt(n)
 
-typedef float fvec[4];
 typedef float fvec2[2];
+typedef float fvec4[4];
+
+#define BITCAST(from, to, x)                                                   \
+    (((union {                                                                 \
+         from _f;                                                              \
+         to _t;                                                                \
+     }) {x})                                                                   \
+         ._t)
+
+#define F2I(f) BITCAST(float, u32, f)
+#define I2F(i) BITCAST(u32, float, i)
 
 #define BIT(n) (1u << (n))
 #define BITL(n) (1ull << (n))

@@ -18,14 +18,14 @@
 typedef union {
     float semantics[24];
     struct {
-        fvec pos;
-        fvec normquat;
-        fvec color;
+        fvec4 pos;
+        fvec4 normquat;
+        fvec4 color;
         fvec2 texcoord0;
         fvec2 texcoord1;
         float texcoordw;
         float _pad;
-        fvec view;
+        fvec4 view;
         fvec2 texcoord2;
     };
 } Vertex;
@@ -71,14 +71,14 @@ typedef struct _GPU {
     u32 sh_idx;
     bool sh_dirty;
 
-    fvec fixattrs[16];
+    fvec4 fixattrs[16];
     u32 curfixattr;
     int curfixi;
-    Vector(fvec) immattrs;
+    Vector(fvec4) immattrs;
 
     u32 curuniform;
     int curunifi;
-    alignas(16) fvec floatuniform[96];
+    alignas(16) fvec4 floatuniform[96];
 
     LRUCache(FBInfo, FB_MAX) fbs;
     FBInfo* cur_fb;
@@ -127,20 +127,6 @@ typedef union {
         u32 incmode : 1;
     };
 } GPUCommand;
-
-#define I2F(i)                                                                 \
-    (((union {                                                                 \
-         u32 _i;                                                               \
-         float _f;                                                             \
-     }) {i})                                                                   \
-         ._f)
-
-#define F2I(f)                                                                 \
-    (((union {                                                                 \
-         float _f;                                                             \
-         u32 _i;                                                               \
-     }) {f})                                                                   \
-         ._i)
 
 void gpu_init(GPU* gpu);
 

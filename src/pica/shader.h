@@ -130,12 +130,12 @@ typedef struct {
     OpDesc* opdescs;
     u32 entrypoint;
 
-    alignas(16) fvec v[16];
-    alignas(16) fvec o[16];
+    alignas(16) fvec4 v[16];
+    alignas(16) fvec4 o[16];
 
-    alignas(16) fvec r[16];
+    alignas(16) fvec4 r[16];
 
-    fvec* c;
+    fvec4* c;
     u8 (*i)[4];
     u16 b;
 

@@ -695,9 +695,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_USAT: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                mov(w0, 0);
-                cmp(src, w0);
-                csel(dst, w0, src, LT);
+                cmp(src, 0);
+                csel(dst, wzr, src, LT);
                 mov(w0, MASK(inst.op1));
                 cmp(src, w0);
                 csel(dst, w0, dst, GT);
@@ -1191,7 +1190,7 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                     }
                     break;
                 case 8:
-                    ldr(w0, CPU(is[vm]));
+                    ldr(w0, CPU(s[vm]));
                     if (dp) {
                         vm = vm << 1 | (instr.cp_data_proc.cp & 1);
                         if (op) {
@@ -1228,7 +1227,7 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                             fcvtzu(w0, s1);
                         }
                     }
-                    str(w0, CPU(is[vd]));
+                    str(w0, CPU(s[vd]));
                     break;
             }
             break;
