@@ -81,6 +81,7 @@ typedef struct _GPU {
     u32 curuniform;
     int curunifi;
     alignas(16) fvec4 floatuniform[96];
+    bool uniform_dirty;
 
     LRUCache(FBInfo, FB_MAX) fbs;
     FBInfo* cur_fb;

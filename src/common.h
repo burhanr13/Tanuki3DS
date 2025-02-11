@@ -162,4 +162,6 @@ typedef float fvec4[4];
         e;                                                                     \
     })
 
+#define LRU_mru(c) ((c).root.next)
+
 #endif

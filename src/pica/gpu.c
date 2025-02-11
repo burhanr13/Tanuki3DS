@@ -194,6 +194,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             break;
         case GPUREG(vsh.floatuniform_data[0])... GPUREG(
             vsh.floatuniform_data[7]): {
+            gpu->uniform_dirty = true;
             u32 idx = gpu->regs.vsh.floatuniform_idx;
             if (idx >= 96) {
                 lwarn("writing to out of bound uniform");
@@ -231,7 +232,13 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             }
             break;
         }
+        case GPUREG(vsh.intuniform[0])... GPUREG(vsh.intuniform[3]):
+        case GPUREG(vsh.booluniform):
+            gpu->uniform_dirty = true;
+            break;
         case GPUREG(vsh.entrypoint):
+        case GPUREG(raster.sh_outmap[0])... GPUREG(raster.sh_outmap[6]):
+            // entrypoint and outmap both affect the decompiled vs
             gpu->sh_dirty = true;
             break;
         case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
@@ -1326,23 +1333,31 @@ void gpu_update_gl_state(GPU* gpu) {
 
     GLuint vs;
     if (ctremu.hwvshaders) {
-        // todo: only update uniforms if they were modified
-        VertUniforms vubuf;
-        memcpy(vubuf.c, gpu->floatuniform, sizeof vubuf.c);
-        // expand intuniform from bytes to ints
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                vubuf.i[i][j] = gpu->regs.vsh.intuniform[i][j];
+        if (gpu->uniform_dirty) {
+            gpu->uniform_dirty = false;
+            VertUniforms vubuf;
+            memcpy(vubuf.c, gpu->floatuniform, sizeof vubuf.c);
+            // expand intuniform from bytes to ints
+            for (int i = 0; i < 4; i++) {
+                for (int j = 0; j < 4; j++) {
+                    vubuf.i[i][j] = gpu->regs.vsh.intuniform[i][j];
+                }
             }
+            vubuf.b_raw = gpu->regs.vsh.booluniform;
+            glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.vert_ubo);
+            glBufferData(GL_UNIFORM_BUFFER, sizeof vubuf, &vubuf,
+                         GL_DYNAMIC_DRAW);
         }
-        vubuf.b_raw = gpu->regs.vsh.booluniform;
-        glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.vert_ubo);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof vubuf, &vubuf, GL_STREAM_DRAW);
-        vs = shader_dec_get(gpu);
+        if (gpu->sh_dirty) {
+            vs = shader_dec_get(gpu);
+        } else {
+            vs = LRU_mru(gpu->vshaders_hw)->vs;
+        }
     } else {
         vs = gpu->gl.gpu_vs;
     }
 
+    // todo: do similar dirty checking for the fs
     glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
 

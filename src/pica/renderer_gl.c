@@ -138,7 +138,6 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     }
 
     glBindVertexArray(state->gpu_vao);
-    state->curprogram = state->main_program;
 }
 
 void renderer_gl_destroy(GLState* state) {
@@ -174,6 +173,7 @@ void renderer_gl_destroy(GLState* state) {
 }
 
 void render_gl_main(GLState* state, int view_w, int view_h) {
+    // reset gl for drawing the main window
     glUseProgram(state->main_program);
     glBindVertexArray(state->main_vao);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -208,11 +208,17 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 #endif
 
+    // switch back to the gpu vao and last program used for the gpu
     glBindVertexArray(state->gpu_vao);
-    state->curprogram = state->main_program;
+    glUseProgram(LRU_mru(state->progcache)->prog);
 }
 
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
+    if (LRU_mru(state->progcache)->vs == vs &&
+        LRU_mru(state->progcache)->fs == fs) {
+        return;
+    }
+
     GLuint prog;
     ProgCacheEntry* ent = nullptr;
     for (int i = 0; i < MAX_PROGRAM; i++) {
@@ -250,6 +256,6 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
 
         linfo("linked new program");
     } else {
-        if (state->curprogram != ent->prog) glUseProgram(ent->prog);
+        glUseProgram(ent->prog);
     }
 }
