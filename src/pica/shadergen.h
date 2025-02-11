@@ -74,7 +74,10 @@ typedef struct {
 } FragUniforms;
 
 typedef struct _FSHCacheEntry {
-    u64 hash;
+    union {
+        u64 hash;
+        u64 key;
+    };
     int fs;
 
     struct _FSHCacheEntry *next, *prev;

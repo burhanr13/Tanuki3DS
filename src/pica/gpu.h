@@ -32,8 +32,14 @@ typedef union {
     };
 } Vertex;
 
+#define FB_MAX 8
+#define TEX_MAX 128
+
 typedef struct _FBInfo {
-    u32 color_paddr;
+    union {
+        u64 color_paddr;
+        u64 key;
+    };
     u32 depth_paddr;
     u32 width, height;
     u32 color_fmt;
@@ -47,7 +53,10 @@ typedef struct _FBInfo {
 } FBInfo;
 
 typedef struct _TexInfo {
-    u32 paddr;
+    union {
+        u64 paddr;
+        u64 key;
+    };
     u32 width, height;
     u32 fmt;
     u32 size;
@@ -56,9 +65,6 @@ typedef struct _TexInfo {
 
     u32 tex;
 } TexInfo;
-
-#define FB_MAX 8
-#define TEX_MAX 128
 
 typedef struct _GPU {
 
@@ -84,10 +90,7 @@ typedef struct _GPU {
     bool uniform_dirty;
 
     LRUCache(FBInfo, FB_MAX) fbs;
-    FBInfo* cur_fb;
-
     LRUCache(TexInfo, TEX_MAX) textures;
-
     LRUCache(ShaderJitBlock, VSH_MAX) vshaders_sw;
     LRUCache(VSHCacheEntry, VSH_MAX) vshaders_hw;
     LRUCache(FSHCacheEntry, FSH_MAX) fshaders;

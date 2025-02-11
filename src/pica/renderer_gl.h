@@ -15,8 +15,13 @@
 typedef struct _GPU GPU;
 
 typedef struct _ProgCacheEntry {
-    GLuint vs;
-    GLuint fs;
+    union {
+        struct {
+            GLuint vs;
+            GLuint fs;
+        };
+        u64 key;
+    };
     GLuint prog;
 
     struct _ProgCacheEntry *next, *prev;

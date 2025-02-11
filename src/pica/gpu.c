@@ -272,8 +272,6 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     })
 
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
-    gpu->cur_fb = nullptr;
-
     paddr &= ~15;
     size &= ~15;
 
@@ -305,27 +303,6 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
     }
 }
 
-// searches the framebuffer cache and creates a new framebuffer if not found
-FBInfo* fbcache_load(GPU* gpu, u32 color_paddr) {
-    FBInfo* newfb = nullptr;
-    for (int i = 0; i < FB_MAX; i++) {
-        if (gpu->fbs.d[i].color_paddr == color_paddr ||
-            gpu->fbs.d[i].color_paddr == 0) {
-            newfb = &gpu->fbs.d[i];
-            break;
-        }
-    }
-    if (!newfb) {
-        newfb = LRU_eject(gpu->fbs);
-        newfb->depth_paddr = 0;
-        newfb->width = 0;
-        newfb->height = 0;
-    }
-    newfb->color_paddr = color_paddr;
-    LRU_use(gpu->fbs, newfb);
-    return newfb;
-}
-
 // searches the framebuffer cache and return nullptr if not found
 FBInfo* fbcache_find(GPU* gpu, u32 color_paddr) {
     FBInfo* newfb = nullptr;
@@ -355,26 +332,6 @@ FBInfo* fbcache_find_within(GPU* gpu, u32 color_paddr) {
     return newfb;
 }
 
-// ensures there is a texture with the given paddr in the cache
-TexInfo* texcache_load(GPU* gpu, u32 paddr) {
-    TexInfo* tex = nullptr;
-    for (int i = 0; i < TEX_MAX; i++) {
-        if (gpu->textures.d[i].paddr == paddr ||
-            gpu->textures.d[i].paddr == 0) {
-            tex = &gpu->textures.d[i];
-            break;
-        }
-    }
-    if (!tex) {
-        tex = LRU_eject(gpu->textures);
-        tex->width = 0;
-        tex->height = 0;
-    }
-    tex->paddr = paddr;
-    LRU_use(gpu->textures, tex);
-    return tex;
-}
-
 TexInfo* texcache_find_within(GPU* gpu, u32 paddr) {
     TexInfo* tex = nullptr;
     for (int i = 0; i < TEX_MAX; i++) {
@@ -388,8 +345,8 @@ TexInfo* texcache_find_within(GPU* gpu, u32 paddr) {
 }
 
 void gpu_update_cur_fb(GPU* gpu) {
-    if (gpu->cur_fb &&
-        gpu->cur_fb->color_paddr == (gpu->regs.fb.colorbuf_loc << 3))
+    // using the same fb
+    if (LRU_mru(gpu->fbs)->color_paddr == (gpu->regs.fb.colorbuf_loc << 3))
         return;
 
     // little hack to make arisoturas sm64 port work
@@ -406,42 +363,42 @@ void gpu_update_cur_fb(GPU* gpu) {
         }
     }
 
-    gpu->cur_fb = fbcache_load(gpu, gpu->regs.fb.colorbuf_loc << 3);
-    gpu->cur_fb->depth_paddr = gpu->regs.fb.depthbuf_loc << 3;
-    gpu->cur_fb->color_fmt = gpu->regs.fb.colorbuf_fmt.fmt;
-    gpu->cur_fb->color_Bpp = gpu->regs.fb.colorbuf_fmt.size + 2;
+    auto curfb = LRU_load(gpu->fbs, gpu->regs.fb.colorbuf_loc << 3);
 
-    linfo("drawing on fb %d at %x with depth buffer at %x",
-          gpu->cur_fb - gpu->fbs.d, gpu->cur_fb->color_paddr,
-          gpu->cur_fb->depth_paddr);
+    curfb->color_paddr = gpu->regs.fb.colorbuf_loc << 3;
+    curfb->depth_paddr = gpu->regs.fb.depthbuf_loc << 3;
+    curfb->color_fmt = gpu->regs.fb.colorbuf_fmt.fmt;
+    curfb->color_Bpp = gpu->regs.fb.colorbuf_fmt.size + 2;
 
-    glBindFramebuffer(GL_FRAMEBUFFER, gpu->cur_fb->fbo);
+    linfo("drawing on fb %d at %x with depth buffer at %x", curfb - gpu->fbs.d,
+          curfb->color_paddr, curfb->depth_paddr);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, curfb->fbo);
 
     u32 w = gpu->regs.fb.dim.width;
     u32 h = gpu->regs.fb.dim.height + 1;
 
-    if (w != gpu->cur_fb->width || h != gpu->cur_fb->height) {
-        gpu->cur_fb->width = w;
-        gpu->cur_fb->height = h;
+    if (w != curfb->width || h != curfb->height) {
+        curfb->width = w;
+        curfb->height = h;
 
-        glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->color_tex);
+        linfo("creating new fb at %08x", curfb->color_paddr);
+
+        glBindTexture(GL_TEXTURE_2D, curfb->color_tex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                     gpu->cur_fb->width * ctremu.videoscale,
-                     gpu->cur_fb->height * ctremu.videoscale, 0, GL_RGBA,
+                     curfb->width * ctremu.videoscale,
+                     curfb->height * ctremu.videoscale, 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, nullptr);
-        glBindTexture(GL_TEXTURE_2D, gpu->cur_fb->depth_tex);
+        glBindTexture(GL_TEXTURE_2D, curfb->depth_tex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8,
-                     gpu->cur_fb->width * ctremu.videoscale,
-                     gpu->cur_fb->height * ctremu.videoscale, 0,
-                     GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
+                     curfb->width * ctremu.videoscale,
+                     curfb->height * ctremu.videoscale, 0, GL_DEPTH_STENCIL,
+                     GL_UNSIGNED_INT_24_8, nullptr);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               GL_TEXTURE_2D, gpu->cur_fb->color_tex, 0);
+                               GL_TEXTURE_2D, curfb->color_tex, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
-                               GL_TEXTURE_2D, gpu->cur_fb->depth_tex, 0);
-
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                               GL_TEXTURE_2D, curfb->depth_tex, 0);
     }
 }
 
@@ -1085,29 +1042,24 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
 }
 
 void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
-    if ((regs->addr << 3) < VRAM_PBASE) {
-        // games setup textures with null sometimes
-        return;
-    }
 
     FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
     glActiveTexture(GL_TEXTURE0 + id);
     if (fb) {
+        // check for simple render to texture cases
         glBindTexture(GL_TEXTURE_2D, fb->color_tex);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     } else {
-        TexInfo* tex = texcache_load(gpu, regs->addr << 3);
-
-        void* rawdata = PTR(tex->paddr);
-
+        auto tex = LRU_load(gpu->textures, regs->addr << 3);
         glBindTexture(GL_TEXTURE_2D, tex->tex);
 
         // this is not completely correct, since games often use different
         // textures with the same attributes
         // TODO: proper cache invalidation
-        if (tex->width != regs->width || tex->height != regs->height ||
-            tex->fmt != fmt) {
+        if (tex->paddr != (regs->addr << 3) || tex->width != regs->width ||
+            tex->height != regs->height || tex->fmt != fmt) {
+            tex->paddr = regs->addr << 3;
             tex->width = regs->width;
             tex->height = regs->height;
             tex->fmt = fmt;
@@ -1130,6 +1082,7 @@ void gpu_load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
 
             // mipmap images are stored adjacent in memory and each image is
             // half the width and height of the previous one
+            void* rawdata = PTR(tex->paddr);
             for (int l = regs->lod.min; l <= regs->lod.max; l++) {
                 load_tex_image(rawdata, tex->width, tex->height, l, fmt);
                 rawdata += TEXSIZE(tex->width, tex->height, fmt, l);

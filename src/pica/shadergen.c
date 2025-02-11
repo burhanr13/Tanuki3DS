@@ -9,17 +9,7 @@
 
 int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
     u64 hash = XXH3_64bits(ubuf, sizeof *ubuf);
-    FSHCacheEntry* block = nullptr;
-    for (int i = 0; i < FSH_MAX; i++) {
-        if (gpu->fshaders.d[i].hash == hash || gpu->fshaders.d[i].hash == 0) {
-            block = &gpu->fshaders.d[i];
-            break;
-        }
-    }
-    if (!block) {
-        block = LRU_eject(gpu->fshaders);
-    }
-    LRU_use(gpu->fshaders, block);
+    auto block = LRU_load(gpu->fshaders, hash);
     if (block->hash != hash) {
         block->hash = hash;
         glDeleteShader(block->fs);

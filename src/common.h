@@ -121,16 +121,19 @@ typedef float fvec4[4];
         }                                                                      \
     })
 #define SVec_remove Vec_remove
-#define Vec_foreach(e, v)                                                      \
-    for (typeof((v).d[0])* e = (v).d; e < (v).d + (v).size; e++)
+#define Vec_foreach(e, v) for (auto* e = (v).d; e < (v).d + (v).size; e++)
 #define SVec_foreach Vec_foreach
 
+// T must have fields: u64 key, T* next, T* prev
+// key=0 is empty
 #define LRUCache(T, N)                                                         \
     struct {                                                                   \
         T d[N];                                                                \
         T root;                                                                \
         size_t size;                                                           \
     }
+
+#define LRU_MAX(c) (sizeof((c).d) / sizeof((c).d[0]))
 
 #define LRU_init(c) ((c).root.next = (c).root.prev = &(c).root, (c).size = 0)
 
@@ -139,6 +142,12 @@ typedef float fvec4[4];
         (n)->next->prev = (n)->prev;                                           \
         (n)->prev->next = (n)->next;                                           \
         (n)->prev = (n)->next = nullptr;                                       \
+    })
+
+#define LRU_remove(c, e)                                                       \
+    ({                                                                         \
+        LL_remove(e);                                                          \
+        (c).size--;                                                            \
     })
 
 #define LRU_use(c, e)                                                          \
@@ -154,7 +163,7 @@ typedef float fvec4[4];
 
 #define LRU_eject(c)                                                           \
     ({                                                                         \
-        typeof(&(c).root) e = (c).root.prev;                                   \
+        auto e = (c).root.prev;                                                \
         (c).root.prev = (c).root.prev->prev;                                   \
         (c).root.prev->next = &(c).root;                                       \
         e->next = e->prev = nullptr;                                           \
@@ -163,5 +172,21 @@ typedef float fvec4[4];
     })
 
 #define LRU_mru(c) ((c).root.next)
+
+#define LRU_load(c, k)                                                         \
+    ({                                                                         \
+        typeof(c.root)* ent = nullptr;                                        \
+        for (int i = 0; i < LRU_MAX(c); i++) {                                 \
+            if ((c).d[i].key == (k) || (c).d[i].key == 0) {                      \
+                ent = &(c).d[i];                                               \
+                break;                                                         \
+            }                                                                  \
+        }                                                                      \
+        if (!ent) {                                                            \
+            ent = LRU_eject(c);                                                \
+        }                                                                      \
+        LRU_use((c), ent);                                                     \
+        ent;                                                                   \
+    })
 
 #endif

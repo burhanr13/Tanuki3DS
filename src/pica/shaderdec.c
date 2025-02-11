@@ -22,18 +22,7 @@ int shader_dec_get(GPU* gpu) {
     u64 hash = XXH3_64bits_digest(xxst);
     XXH3_freeState(xxst);
 
-    VSHCacheEntry* block = nullptr;
-    for (int i = 0; i < VSH_MAX; i++) {
-        if (gpu->vshaders_hw.d[i].hash == hash ||
-            gpu->vshaders_hw.d[i].hash == 0) {
-            block = &gpu->vshaders_hw.d[i];
-            break;
-        }
-    }
-    if (!block) {
-        block = LRU_eject(gpu->vshaders_hw);
-    }
-    LRU_use(gpu->vshaders_hw, block);
+    auto block = LRU_load(gpu->vshaders_hw, hash);
     if (block->hash != hash) {
         block->hash = hash;
         glDeleteShader(block->vs);

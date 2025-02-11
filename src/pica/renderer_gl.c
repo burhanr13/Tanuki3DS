@@ -208,9 +208,10 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 #endif
 
-    // switch back to the gpu vao and last program used for the gpu
+    // switch back to the gpu vao and last program/fbo used for the gpu
     glBindVertexArray(state->gpu_vao);
     glUseProgram(LRU_mru(state->progcache)->prog);
+    glBindFramebuffer(GL_FRAMEBUFFER, LRU_mru(state->gpu->fbs)->fbo);
 }
 
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
@@ -219,18 +220,7 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         return;
     }
 
-    GLuint prog;
-    ProgCacheEntry* ent = nullptr;
-    for (int i = 0; i < MAX_PROGRAM; i++) {
-        ent = &state->progcache.d[i];
-        if ((ent->vs == vs && ent->fs == fs) ||
-            (ent->vs == 0 && ent->fs == 0)) {
-            break;
-        }
-    }
-    if (!ent) ent = LRU_eject(state->progcache);
-    LRU_use(state->progcache, ent);
-
+    auto ent = LRU_load(state->progcache, vs | ((u64) fs << 32));
     if (ent->vs != vs || ent->fs != fs) {
         glDeleteProgram(ent->prog);
         ent->vs = vs;

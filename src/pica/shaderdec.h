@@ -12,7 +12,10 @@ typedef struct {
 } VertUniforms;
 
 typedef struct _VSHCacheEntry {
-    u64 hash;
+    union {
+        u64 hash;
+        u64 key;
+    };
     int vs;
 
     struct _VSHCacheEntry *next, *prev;

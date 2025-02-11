@@ -9,18 +9,7 @@
 
 ShaderJitFunc shaderjit_get(GPU* gpu, ShaderUnit* shu) {
     u64 hash = XXH3_64bits(shu->code, SHADER_CODE_SIZE * sizeof(PICAInstr));
-    ShaderJitBlock* block = nullptr;
-    for (int i = 0; i < VSH_MAX; i++) {
-        if (gpu->vshaders_sw.d[i].hash == hash ||
-            gpu->vshaders_sw.d[i].hash == 0) {
-            block = &gpu->vshaders_sw.d[i];
-            break;
-        }
-    }
-    if (!block) {
-        block = LRU_eject(gpu->vshaders_sw);
-    }
-    LRU_use(gpu->vshaders_sw, block);
+    auto block = LRU_load(gpu->vshaders_sw, hash);
     if (block->hash != hash) {
         block->hash = hash;
         shaderjit_backend_free(block->backend);

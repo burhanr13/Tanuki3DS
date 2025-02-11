@@ -9,7 +9,10 @@ typedef struct _GPU GPU;
 typedef void (*ShaderJitFunc)(ShaderUnit* shu);
 
 typedef struct _ShaderJitBlock {
-    u64 hash;
+    union {
+        u64 hash;
+        u64 key;
+    };
     void* backend;
 
     struct _ShaderJitBlock *next, *prev;

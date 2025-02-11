@@ -277,8 +277,6 @@ int main(int argc, char** argv) {
             } while (ctremu.uncap && elapsed < frame_ticks);
         }
 
-        const float aspect = (float) SCREEN_WIDTH_TOP / (2 * SCREEN_HEIGHT);
-        SDL_SetWindowAspectRatio(g_window, aspect, aspect);
         int w, h;
         SDL_GetWindowSizeInPixels(g_window, &w, &h);
 
@@ -309,6 +307,11 @@ int main(int argc, char** argv) {
                 case SDL_EVENT_DROP_FILE:
                     emulator_set_rom(e.drop.data);
                     g_pending_reset = true;
+                    break;
+                case SDL_EVENT_WINDOW_RESIZED:
+                    const float aspect =
+                        (float) SCREEN_WIDTH_TOP / (2 * SCREEN_HEIGHT);
+                    SDL_SetWindowAspectRatio(g_window, aspect, aspect);
                     break;
             }
         }
