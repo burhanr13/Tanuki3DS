@@ -237,10 +237,14 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         glUniform1i(glGetUniformLocation(ent->prog, "tex0"), 0);
         glUniform1i(glGetUniformLocation(ent->prog, "tex1"), 1);
         glUniform1i(glGetUniformLocation(ent->prog, "tex2"), 2);
-        glUniformBlockBinding(
-            ent->prog, glGetUniformBlockIndex(ent->prog, "VertUniforms"), 0);
-        glUniformBlockBinding(
-            ent->prog, glGetUniformBlockIndex(ent->prog, "UberUniforms"), 1);
+        if (ent->vs != state->gpu_vs)
+            glUniformBlockBinding(
+                ent->prog, glGetUniformBlockIndex(ent->prog, "VertUniforms"),
+                0);
+        if (ent->fs == state->gpu_uberfs)
+            glUniformBlockBinding(
+                ent->prog, glGetUniformBlockIndex(ent->prog, "UberUniforms"),
+                1);
         glUniformBlockBinding(
             ent->prog, glGetUniformBlockIndex(ent->prog, "FragUniforms"), 2);
     } else {

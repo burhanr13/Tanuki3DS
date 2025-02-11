@@ -643,7 +643,16 @@ char* shader_dec_vs(GPU* gpu) {
 
     ds_printf(&final, "proc_main();\n\n");
 
-    ds_printf(&final, "vec4 pos;\n");
+    ds_printf(&final, "vec4 pos = vec4(0);\n");
+    // macos gets mad if you dont write all the outputs
+    // so we do that first
+    ds_printf(&final, "color = vec4(0);\n");
+    ds_printf(&final, "normquat = vec4(0);\n");
+    ds_printf(&final, "view = vec3(0);\n");
+    ds_printf(&final, "texcoord0 = vec2(0);\n");
+    ds_printf(&final, "texcoord1 = vec2(0);\n");
+    ds_printf(&final, "texcoord2 = vec2(0);\n");
+    ds_printf(&final, "texcoordw = 0;\n\n");
 
     for (int o = 0; o < 7; o++) {
         u32 all = gpu->regs.raster.sh_outmap[o][0] << 24 |
