@@ -1192,7 +1192,7 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                 case 8:
                     if (dp) {
                         vm = vm << 1 | (instr.cp_data_proc.cp & 1);
-                        
+
                         ldr(w0, CPU(s[vm]));
                         if (op) {
                             scvtf(d0, w0);
@@ -1215,12 +1215,14 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                     // TODO: deal with rounding mode properly
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+                        
                         LDDM();
                         if (instr.cp_data_proc.crn & 1) {
                             fcvtzs(w0, d1);
                         } else {
                             fcvtzu(w0, d1);
                         }
+                        str(w0, CPU(s[vd]));
                     } else {
                         LDSM();
                         if (instr.cp_data_proc.crn & 1) {
@@ -1228,8 +1230,8 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                         } else {
                             fcvtzu(w0, s1);
                         }
+                        str(w0, CPU(s[vd]));
                     }
-                    str(w0, CPU(s[vd]));
                     break;
             }
             break;
