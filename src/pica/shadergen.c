@@ -29,8 +29,9 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
         block->fs = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(block->fs, 1, &(const char*) {source}, nullptr);
         glCompileShader(block->fs);
-
         free(source);
+
+        linfo("compiled new fragment shader");
     }
     return block->fs;
 }

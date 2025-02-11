@@ -43,6 +43,8 @@ int shader_dec_get(GPU* gpu) {
         glShaderSource(block->vs, 1, &(const char*) {source}, nullptr);
         glCompileShader(block->vs);
         free(source);
+
+        linfo("compiled new vertex shader");
     }
     return block->vs;
 }

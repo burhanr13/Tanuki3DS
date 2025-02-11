@@ -10,7 +10,7 @@
 
 #include <common.h>
 
-#define MAX_PROGRAM 256
+#define MAX_PROGRAM 1024
 
 typedef struct _GPU GPU;
 
