@@ -37,13 +37,12 @@ int shader_dec_get(GPU* gpu) {
         glDeleteShader(block->vs);
 
         char* source = shader_dec_vs(gpu);
-
         block->vs = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(block->vs, 1, &(const char*) {source}, nullptr);
         glCompileShader(block->vs);
-
-        printf(source);
-
+        int res;
+        glGetShaderiv(block->vs, GL_COMPILE_STATUS, &res);
+        if (!res) lerror("failed to compile shader");
         free(source);
     }
     return block->vs;
@@ -117,7 +116,9 @@ static char* outmapnames[24] = {
     "view.z",      "r[0].x",     "texcoord2.x", "texcoord2.y",
 };
 
-static char* comparefuncs[6] = {"==", "!=", "<", "<=", ">", ">="};
+static char* comparefuncs[6] = {"equal",       "notEqual",
+                                "lessThan",    "lessThanEqual",
+                                "greaterThan", "greaterThanEqual"};
 
 void deccondop(DecCTX* ctx, u32 op, bool refx, bool refy) {
     switch (op) {
@@ -272,16 +273,37 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             SRC2(1);
             FIN(1);
             break;
-            // case PICA_SGE:
-            //     DISASMFMT1(sge);
-            // case PICA_SLT:
-            //     DISASMFMT1(slt);
-            // case PICA_SGEI:
-            //     DISASMFMT1I(sge);
-            // case PICA_SLTI:
-            //     DISASMFMT1I(slt);
-            // case PICA_FLR:
-            //     DISASMFMT1U(flr);
+        case PICA_SGE:
+        case PICA_SGEI:
+            DEST(1);
+            printf("vec4(greaterThanEqual(");
+            if (instr.opcode == PICA_SGEI) SRC1(1i);
+            else SRC1(1);
+            printf(", ");
+            if (instr.opcode == PICA_SGEI) SRC2(1i);
+            else SRC2(1);
+            printf("))");
+            FIN(1);
+            break;
+        case PICA_SLT:
+        case PICA_SLTI:
+            DEST(1);
+            printf("vec4(lessThan(");
+            if (instr.opcode == PICA_SLTI) SRC1(1i);
+            else SRC1(1);
+            printf(", ");
+            if (instr.opcode == PICA_SLTI) SRC2(1i);
+            else SRC2(1);
+            printf("))");
+            FIN(1);
+            break;
+        case PICA_FLR:
+            DEST(1);
+            printf("floor(");
+            SRC1(1);
+            printf(")");
+            FIN(1);
+            break;
         case PICA_MAX:
             DEST(1);
             printf("max(");
@@ -309,7 +331,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             break;
         case PICA_RSQ:
             DEST(1);
-            printf("vec4(1 / sqrt(");
+            printf("vec4(inversesqrt(");
             SRC1(1);
             printf(".x))");
             FIN(1);
@@ -340,13 +362,14 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             break;
         case PICA_NOP:
             break;
-        // case PICA_BREAK:
-        //     printf("break");
-        //     break;
-        // case PICA_BREAKC:
-        //     printf("breakc");
-        //     disasmcondop(instr.fmt2.op, instr.fmt2.refx,
-        //     instr.fmt2.refy); break;
+        case PICA_BREAK:
+            printf("break;\n");
+            break;
+        case PICA_BREAKC:
+            printf("if (");
+            deccondop(ctx, instr.fmt2.op, instr.fmt2.refx, instr.fmt2.refy);
+            printf(") break;\n");
+            break;
         case PICA_END:
             printf("return;\n");
             if (ctx->farthestjmp < pc) pc = -1;
@@ -402,17 +425,21 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             pc = instr.fmt2.dest + instr.fmt2.num;
             break;
         }
-        // case PICA_LOOP: {
-        //     printf("loop i%d\n", instr.fmt3.c);
-        //     disasm_block(shu, pc, instr.fmt3.dest + 1 - pc);
-        //     printf("%14s", "");
-        //     for (int i = 0; i < disasm.depth; i++) {
-        //         printf("%4s", "");
-        //     }
-        //     printf("end loop");
-        //     pc = instr.fmt3.dest + 1;
-        //     break;
-        // }
+        case PICA_LOOP: {
+            printf("aL = i[%d].y;\n", instr.fmt3.c);
+            for (int i = 0; i < ctx->depth; i++) {
+                printf("%4s", "");
+            }
+            printf("for (int l = 0; l <= i[%1$d].x; l++, aL += i[%1$d].z) {\n",
+                   instr.fmt3.c);
+            dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
+            for (int i = 0; i < ctx->depth; i++) {
+                printf("%4s", "");
+            }
+            printf("}\n");
+            pc = instr.fmt3.dest + 1;
+            break;
+        }
         // case PICA_JMPC:
         // case PICA_JMPU: {
         //     if (instr.opcode == PICA_JMPU) {
@@ -430,30 +457,45 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         //     break;
         // }
         case PICA_CMP ... PICA_CMP + 1: {
-            printf("cmp.x = ");
-            if (instr.fmt1c.cmpx < 6) {
-                SRC1(1c);
-                printf(".x %s ", comparefuncs[instr.fmt1c.cmpx]);
-                SRC2(1c);
-                printf(".x");
+            if (instr.fmt1c.cmpx == instr.fmt1c.cmpy) {
+                printf("cmp = ");
+                if (instr.fmt1c.cmpx < 6) {
+                    printf("%s(", comparefuncs[instr.fmt1c.cmpx]);
+                    SRC1(1c);
+                    printf(".xy, ");
+                    SRC2(1c);
+                    printf(".xy)");
+                } else {
+                    printf("bvec2(true)");
+                }
+                printf(";\n");
             } else {
-                printf("true");
+                printf("cmp.x = ");
+                if (instr.fmt1c.cmpx < 6) {
+                    printf("%s(", comparefuncs[instr.fmt1c.cmpx]);
+                    SRC1(1c);
+                    printf(".x, ");
+                    SRC2(1c);
+                    printf(".x)");
+                } else {
+                    printf("true");
+                }
+                printf(";\n");
+                for (int i = 0; i < ctx->depth; i++) {
+                    printf("%4s", "");
+                }
+                printf("cmp.y = ");
+                if (instr.fmt1c.cmpy < 6) {
+                    printf("%s(", comparefuncs[instr.fmt1c.cmpy]);
+                    SRC1(1c);
+                    printf(".y, ");
+                    SRC2(1c);
+                    printf(".y)");
+                } else {
+                    printf("true");
+                }
+                printf(";\n");
             }
-            printf(";\n");
-            for (int i = 0; i < ctx->depth; i++) {
-                printf("%4s", "");
-            }
-            printf("cmp.y = ");
-            if (instr.fmt1c.cmpy < 6) {
-                SRC1(1c);
-                printf(".y");
-                printf(" %s ", comparefuncs[instr.fmt1c.cmpy]);
-                SRC2(1c);
-                printf(".y");
-            } else {
-                printf("true");
-            }
-            printf(";\n");
             break;
         }
         case PICA_MAD ... PICA_MAD + 0xf: {
@@ -479,6 +521,8 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
     }
     return pc;
 }
+
+#undef printf
 
 void dec_block(DecCTX* ctx, u32 start, u32 num) {
     ctx->depth++;
@@ -569,6 +613,9 @@ char* shader_dec_vs(GPU* gpu) {
     ds_printf(&final, "gl_Position = pos;\n");
 
     ds_printf(&final, "}\n");
+
+    pica_shader_disasm(&ctx.shu);
+    printf(final.str);
 
     return final.str;
 }
