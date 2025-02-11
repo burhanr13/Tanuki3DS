@@ -1190,9 +1190,10 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                     }
                     break;
                 case 8:
-                    ldr(w0, CPU(s[vm]));
                     if (dp) {
                         vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+                        
+                        ldr(w0, CPU(s[vm]));
                         if (op) {
                             scvtf(d0, w0);
                         } else {
@@ -1200,6 +1201,7 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                         }
                         STDD();
                     } else {
+                        ldr(w0, CPU(s[vm]));
                         if (op) {
                             scvtf(s0, w0);
                         } else {
