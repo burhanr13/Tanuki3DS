@@ -8,6 +8,8 @@
 #include "gpu.h"
 #include "renderer_gl.h"
 
+// #define VSH_DEBUG
+
 int shader_dec_get(GPU* gpu) {
     // we need to hash the shader code, entrypoint, and outmap
     XXH3_state_t* xxst = XXH3_createState();
@@ -40,9 +42,6 @@ int shader_dec_get(GPU* gpu) {
         block->vs = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(block->vs, 1, &(const char*) {source}, nullptr);
         glCompileShader(block->vs);
-        int res;
-        glGetShaderiv(block->vs, GL_COMPILE_STATUS, &res);
-        if (!res) lerror("failed to compile shader");
         free(source);
     }
     return block->vs;
@@ -56,6 +55,10 @@ typedef struct {
     u32 farthestjmp;
     DynString s;
     ShaderUnit shu;
+    u32 curfuncstart;
+    u32 curfuncend;
+    u32 curblockstart;
+    u32 curblockend;
 } DecCTX;
 
 void dec_block(DecCTX* ctx, u32 start, u32 num);
@@ -99,11 +102,6 @@ layout (std140) uniform VertUniforms {
 };
 
 #define b(n) ((b_raw & (1 << n)) != 0)
-
-)";
-
-const char uniforms[] = R"(
-uniform vec4 c[96];
 
 )";
 
@@ -204,14 +202,28 @@ void decdestend(DecCTX* ctx, u8 mask) {
 #define DEST(_fmt) decdest(ctx, instr.fmt##_fmt.dest, desc.destmask)
 #define FIN(_fmt) decdestend(ctx, desc.destmask)
 
+#define INDENT(n)                                                              \
+    ({                                                                         \
+        for (int i = 0; i < (n); i++) {                                        \
+            printf("%4s", "");                                                 \
+        }                                                                      \
+    })
+
+bool contains_jmp_out(DecCTX* ctx, u32 start, u32 end) {
+    for (int pc = start; pc < end; pc++) {
+        PICAInstr instr = ctx->shu.code[pc];
+        if (instr.opcode == PICA_JMPC || instr.opcode == PICA_JMPU) {
+            u32 dst = instr.fmt2.dest;
+            if (dst < start || dst > end) return true;
+        }
+    }
+    return false;
+}
+
 u32 dec_instr(DecCTX* ctx, u32 pc) {
     PICAInstr instr = ctx->shu.code[pc++];
 
-    if (instr.opcode != PICA_NOP) {
-        for (int i = 0; i < ctx->depth; i++) {
-            printf("%4s", "");
-        }
-    }
+    INDENT(ctx->depth);
 
     OpDesc desc = ctx->shu.opdescs[instr.desc];
     switch (instr.opcode) {
@@ -361,6 +373,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             FIN(1);
             break;
         case PICA_NOP:
+            printf("\n");
             break;
         case PICA_BREAK:
             printf("break;\n");
@@ -388,12 +401,13 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
                 printf(") ");
             }
             printf("proc_%03x();\n", instr.fmt2.dest);
+
             bool found = false;
             Vec_foreach(c, ctx->calls) {
                 if (c->fmt2.dest == instr.fmt2.dest) {
                     found = true;
-                    if (c->fmt2.num < instr.fmt2.num)
-                        c->fmt2.num = instr.fmt2.num;
+                    if (c->fmt2.num != instr.fmt2.num)
+                        lerror("calling function with different length");
                 }
             }
             if (!found) {
@@ -412,50 +426,94 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             printf(") {\n");
             dec_block(ctx, pc, instr.fmt2.dest - pc);
             if (instr.fmt2.num) {
-                for (int i = 0; i < ctx->depth; i++) {
-                    printf("%4s", "");
-                }
+                INDENT(ctx->depth);
                 printf("} else {\n");
                 dec_block(ctx, instr.fmt2.dest, instr.fmt2.num);
             }
-            for (int i = 0; i < ctx->depth; i++) {
-                printf("%4s", "");
-            }
+            INDENT(ctx->depth);
             printf("}\n");
             pc = instr.fmt2.dest + instr.fmt2.num;
             break;
         }
         case PICA_LOOP: {
             printf("aL = i[%d].y;\n", instr.fmt3.c);
-            for (int i = 0; i < ctx->depth; i++) {
-                printf("%4s", "");
-            }
+            INDENT(ctx->depth);
             printf("for (int l = 0; l <= i[%1$d].x; l++, aL += i[%1$d].z) {\n",
                    instr.fmt3.c);
             dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
-            for (int i = 0; i < ctx->depth; i++) {
-                printf("%4s", "");
-            }
+            INDENT(ctx->depth);
             printf("}\n");
             pc = instr.fmt3.dest + 1;
             break;
         }
-        // case PICA_JMPC:
-        // case PICA_JMPU: {
-        //     if (instr.opcode == PICA_JMPU) {
-        //         printf("jmpu %s b%d, ", (instr.fmt2.num & 1) ? "not" :
-        //         "",
-        //                instr.fmt3.c);
-        //     } else {
-        //         printf("jmpc ");
-        //         disasmcondop(instr.fmt2.op, instr.fmt2.refx,
-        //         instr.fmt2.refy); printf(", ");
-        //     }
-        //     printf("%03x", instr.fmt2.dest);
-        //     if (instr.fmt2.dest > disasm.farthestjmp)
-        //         disasm.farthestjmp = instr.fmt2.dest;
-        //     break;
-        // }
+        case PICA_JMPC:
+        case PICA_JMPU: {
+            u32 dst = instr.fmt2.dest;
+
+            // jmp to next instr - nop
+            if (dst == pc) {
+                printf("\n");
+                break;
+            }
+            // loop - handle this later
+            if (dst < pc) {
+                lerror("backwards jmp");
+                break;
+            }
+
+            // jumping out of the block
+            // if the block was from control flow, this is not supposed to
+            // happen
+            // if its a block from a prior jmp, then we have ensured already
+            // that this is a function return
+            if (dst > ctx->curblockend) {
+                printf("if (");
+                if (instr.opcode == PICA_JMPC) {
+                    deccondop(ctx, instr.fmt2.op, instr.fmt2.refx,
+                              instr.fmt2.refy);
+                } else {
+                    printf("%sb(%d)", instr.fmt3.num & 1 ? "!" : "",
+                           instr.fmt3.c);
+                }
+                printf(") {\n");
+                dec_block(ctx, dst, ctx->curfuncend - dst);
+                INDENT(ctx->depth + 1);
+                printf("return;\n");
+                INDENT(ctx->depth);
+                printf("}\n");
+            } else {
+                // jmp within the same block
+                // we need to check here if there is a jmp out of the block
+                // right now we only let this happen if we are in the toplevel
+                // block of a function
+                bool jmpout = contains_jmp_out(ctx, pc, dst);
+
+                if (!jmpout ||
+                    (jmpout || ctx->curblockstart == ctx->curfuncstart)) {
+                    // treat the jmp as an if statement
+                    // if condition is inverse of jmp condition
+                    printf("if (!(");
+                    if (instr.opcode == PICA_JMPC) {
+                        deccondop(ctx, instr.fmt2.op, instr.fmt2.refx,
+                                  instr.fmt2.refy);
+                    } else {
+                        printf("%sb(%d)", instr.fmt3.num & 1 ? "!" : "",
+                               instr.fmt3.c);
+                    }
+                    printf(")) {\n");
+                    dec_block(ctx, pc, dst - pc);
+                    INDENT(ctx->depth);
+                    printf("}\n");
+                    pc = dst;
+                } else {
+                    lerror("unhandled control flow");
+                }
+            }
+
+            if (instr.fmt2.dest > ctx->farthestjmp)
+                ctx->farthestjmp = instr.fmt2.dest;
+            break;
+        }
         case PICA_CMP ... PICA_CMP + 1: {
             if (instr.fmt1c.cmpx == instr.fmt1c.cmpy) {
                 printf("cmp = ");
@@ -481,9 +539,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
                     printf("true");
                 }
                 printf(";\n");
-                for (int i = 0; i < ctx->depth; i++) {
-                    printf("%4s", "");
-                }
+                INDENT(ctx->depth);
                 printf("cmp.y = ");
                 if (instr.fmt1c.cmpy < 6) {
                     printf("%s(", comparefuncs[instr.fmt1c.cmpy]);
@@ -525,6 +581,8 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
 #undef printf
 
 void dec_block(DecCTX* ctx, u32 start, u32 num) {
+    ctx->curblockstart = start;
+    ctx->curblockend = start + num;
     ctx->depth++;
     u32 end = SHADER_CODE_SIZE;
     if (start + num < end) end = start + num;
@@ -547,23 +605,27 @@ char* shader_dec_vs(GPU* gpu) {
     ctx.shu.entrypoint = gpu->regs.vsh.entrypoint;
 
     ds_printf(&ctx.s, "void proc_main() {\n");
+    ctx.curfuncstart = ctx.shu.entrypoint;
+    ctx.curfuncend = ctx.curfuncstart + SHADER_CODE_SIZE;
     dec_block(&ctx, ctx.shu.entrypoint, SHADER_CODE_SIZE);
-    ds_printf(&ctx.s, "}\n");
+    ds_printf(&ctx.s, "}\n\n");
     for (int i = 0; i < ctx.calls.size; i++) {
         u32 start = ctx.calls.d[i].fmt3.dest;
         u32 num = ctx.calls.d[i].fmt3.num;
         ds_printf(&final, "void proc_%03x();\n", start);
         ds_printf(&ctx.s, "void proc_%03x() {\n", start);
+        ctx.curfuncstart = start;
+        ctx.curfuncend = start + num;
         dec_block(&ctx, start, num);
-        ds_printf(&ctx.s, "}\n");
+        ds_printf(&ctx.s, "}\n\n");
     }
 
-    ds_printf(&final, "\n%s\n", ctx.s.str);
+    ds_printf(&final, "\n%s", ctx.s.str);
     free(ctx.s.str);
 
     ds_printf(&final, "void main() {\n");
 
-    ds_printf(&final, "proc_main();\n");
+    ds_printf(&final, "proc_main();\n\n");
 
     ds_printf(&final, "vec4 pos;\n");
 
@@ -614,8 +676,10 @@ char* shader_dec_vs(GPU* gpu) {
 
     ds_printf(&final, "}\n");
 
+#ifdef VSH_DEBUG
     pica_shader_disasm(&ctx.shu);
     printf(final.str);
+#endif
 
     return final.str;
 }
