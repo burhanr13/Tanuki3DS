@@ -122,10 +122,26 @@ static char* compareops[6] = {"==", "!=", "<", "<=", ">", ">="};
 void deccondop(DecCTX* ctx, u32 op, bool refx, bool refy) {
     switch (op) {
         case 0:
-            printf("%scmp.x || %scmp.y", refx ? "" : "!", refy ? "" : "!");
+            if (refx == refy) { // special faster cases
+                if (refx) {     // or
+                    printf("any(cmp)");
+                } else { // nand
+                    printf("!all(cmp)");
+                }
+            } else {
+                printf("%scmp.x || %scmp.y", refx ? "" : "!", refy ? "" : "!");
+            }
             break;
         case 1:
-            printf("%scmp.x && %scmp.y", refx ? "" : "!", refy ? "" : "!");
+            if (refx == refy) {
+                if (refx) { // and
+                    printf("all(cmp)");
+                } else { // nor
+                    printf("!any(cmp)");
+                }
+            } else {
+                printf("%scmp.x && %scmp.y", refx ? "" : "!", refy ? "" : "!");
+            }
             break;
         case 2:
             printf("%scmp.x", refx ? "" : "!");
