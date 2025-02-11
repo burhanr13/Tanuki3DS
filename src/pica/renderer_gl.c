@@ -202,13 +202,13 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
 
     glViewport(0, view_h / 2, view_w, view_h / 2);
     glBindTexture(GL_TEXTURE_2D, state->screentex[SCREEN_TOP]);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
 
     glViewport(view_w * (SCREEN_WIDTH_TOP - SCREEN_WIDTH_BOT) /
                    (2 * SCREEN_WIDTH_TOP),
                0, view_w * SCREEN_WIDTH_BOT / SCREEN_WIDTH_TOP, view_h / 2);
     glBindTexture(GL_TEXTURE_2D, state->screentex[SCREEN_BOT]);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
     
 }
 
