@@ -268,6 +268,8 @@ int main(int argc, char** argv) {
         }
 
         if (!ctremu.pause) {
+            render_gl_setup_gpu(&ctremu.system.gpu.gl);
+
             do {
                 e3ds_run_frame(&ctremu.system);
                 frame++;
@@ -280,7 +282,7 @@ int main(int argc, char** argv) {
         int w, h;
         SDL_GetWindowSizeInPixels(g_window, &w, &h);
 
-        if (!ctremu.pause) render_gl_main(&ctremu.system.gpu.gl, w, h);
+        render_gl_main(&ctremu.system.gpu.gl, w, h);
 
         SDL_GL_SwapWindow(g_window);
 

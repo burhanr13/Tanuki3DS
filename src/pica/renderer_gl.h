@@ -54,6 +54,7 @@ typedef struct {
 void renderer_gl_init(GLState* state, GPU* gpu);
 void renderer_gl_destroy(GLState* state);
 
+void render_gl_setup_gpu(GLState* state);
 void render_gl_main(GLState* state, int view_w, int view_h);
 
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs);

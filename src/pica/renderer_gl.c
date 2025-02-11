@@ -172,6 +172,16 @@ void renderer_gl_destroy(GLState* state) {
     }
 }
 
+// call before emulating gpu drawing
+void render_gl_setup_gpu(GLState* state) {
+    glBindVertexArray(state->gpu_vao);
+    glUseProgram(LRU_mru(state->progcache)->prog);
+    glBindFramebuffer(GL_FRAMEBUFFER, LRU_mru(state->gpu->fbs)->fbo);
+}
+
+// call at end of frame
+// leaves framebuffer 0 bound at the end because on mac
+// swap buffers wont work if it is not
 void render_gl_main(GLState* state, int view_w, int view_h) {
     // reset gl for drawing the main window
     glUseProgram(state->main_program);
@@ -184,10 +194,6 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_CULL_FACE);
     glDisable(GL_SCISSOR_TEST);
-
-#ifdef WIREFRAME
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-#endif
 
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -203,15 +209,7 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
                0, view_w * SCREEN_WIDTH_BOT / SCREEN_WIDTH_TOP, view_h / 2);
     glBindTexture(GL_TEXTURE_2D, state->screentex[SCREEN_BOT]);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-#ifdef WIREFRAME
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-#endif
-
-    // switch back to the gpu vao and last program/fbo used for the gpu
-    glBindVertexArray(state->gpu_vao);
-    glUseProgram(LRU_mru(state->progcache)->prog);
-    glBindFramebuffer(GL_FRAMEBUFFER, LRU_mru(state->gpu->fbs)->fbo);
+    
 }
 
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
