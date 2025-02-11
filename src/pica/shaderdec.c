@@ -117,6 +117,7 @@ static char* outmapnames[24] = {
 static char* comparefuncs[6] = {"equal",       "notEqual",
                                 "lessThan",    "lessThanEqual",
                                 "greaterThan", "greaterThanEqual"};
+static char* compareops[6] = {"==", "!=", "<", "<=", ">", ">="};
 
 void deccondop(DecCTX* ctx, u32 op, bool refx, bool refy) {
     switch (op) {
@@ -515,6 +516,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             break;
         }
         case PICA_CMP ... PICA_CMP + 1: {
+            // for vector we need the function but for scalars the operator :/
             if (instr.fmt1c.cmpx == instr.fmt1c.cmpy) {
                 printf("cmp = ");
                 if (instr.fmt1c.cmpx < 6) {
@@ -530,11 +532,10 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             } else {
                 printf("cmp.x = ");
                 if (instr.fmt1c.cmpx < 6) {
-                    printf("%s(", comparefuncs[instr.fmt1c.cmpx]);
                     SRC1(1c);
-                    printf(".x, ");
+                    printf(".x %s ", compareops[instr.fmt1c.cmpx]);
                     SRC2(1c);
-                    printf(".x)");
+                    printf(".x");
                 } else {
                     printf("true");
                 }
@@ -542,11 +543,10 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
                 INDENT(ctx->depth);
                 printf("cmp.y = ");
                 if (instr.fmt1c.cmpy < 6) {
-                    printf("%s(", comparefuncs[instr.fmt1c.cmpy]);
                     SRC1(1c);
-                    printf(".y, ");
+                    printf(".y %s ", compareops[instr.fmt1c.cmpy]);
                     SRC2(1c);
-                    printf(".y)");
+                    printf(".y");
                 } else {
                     printf("true");
                 }
