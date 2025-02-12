@@ -88,7 +88,7 @@ DECL_PORT(apt) {
             else linfo("GlanceParameter with bufsize=%d", paramsize);
 
             if (paramsize > s->services.apt.nextparam.paramsize)
-                paramsize = APT_MAX_PARAMSIZE;
+                paramsize = s->services.apt.nextparam.paramsize;
             cmdbuf[0] = IPCHDR(4, 4);
             cmdbuf[1] = 0;
             cmdbuf[2] = s->services.apt.nextparam.appid;
@@ -136,7 +136,8 @@ DECL_PORT(apt) {
                     s->services.apt.nextparam.appid = APPID_MIISELECTOR;
                     s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
                     s->services.apt.nextparam.kobj = nullptr;
-                    s->services.apt.nextparam.paramsize = 1024;
+                    s->services.apt.nextparam.paramsize = 4;
+                    memset(s->services.apt.nextparam.param, 0, 4);
                     event_signal(s, &s->services.apt.resume_event);
                     break;
                 case APPID_ERRDISP:
