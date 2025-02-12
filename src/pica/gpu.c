@@ -1240,15 +1240,18 @@ static const GLuint attrtypes[] = {
     GL_FLOAT,
 };
 
-void setup_vbos_hw(GPU* gpu, int start, int num) {
-    // use fixed attributes
+void setup_fixattrs_hw(GPU* gpu) {
     for (int i = 0; i < 12; i++) {
         if (gpu->regs.geom.fixed_attr_mask & BIT(i)) {
-            glVertexAttrib4f(i, gpu->fixattrs[i][0], gpu->fixattrs[i][1],
-                             gpu->fixattrs[i][2], gpu->fixattrs[i][3]);
+            int attr = (gpu->regs.vsh.permutation >> 4 * i) & 0xf;
+            glVertexAttrib4fv(attr, gpu->fixattrs[i]);
+            glDisableVertexAttribArray(i);
         }
-        glDisableVertexAttribArray(i);
     }
+}
+
+void setup_vbos_hw(GPU* gpu, int start, int num) {
+    setup_fixattrs_hw(gpu);
 
     for (int vbo = 0; vbo < 12; vbo++) {
         // skip unused vbos
@@ -1356,6 +1359,7 @@ void gpu_drawimmediate(GPU* gpu) {
     update_gl_state(gpu);
 
     if (ctremu.hwvshaders) {
+        setup_fixattrs_hw(gpu);
         // only need to use one vbo
         glBindBuffer(GL_ARRAY_BUFFER, gpu->gl.gpu_vbos[0]);
         for (int i = 0; i < nattrs; i++) {
