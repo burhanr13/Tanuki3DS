@@ -17,6 +17,7 @@ void load_config() {
         CFG_INT("video_scale", 1, 0),
         CFG_BOOL("shaderjit", cfg_true, 0),
         CFG_INT("vsh_threads", 0, 0),
+        CFG_BOOL("hw_vertexshaders", cfg_true, 0),
         CFG_BOOL("ubershader", cfg_false, 0),
         CFG_END(),
     };
@@ -35,6 +36,7 @@ void load_config() {
     if (ctremu.vshthreads > MAX_VSH_THREADS)
         ctremu.vshthreads = MAX_VSH_THREADS;
     cfg_setint(cfg, "vsh_threads", ctremu.vshthreads);
+    ctremu.hwvshaders = cfg_getbool(cfg, "hw_vertexshaders");
     ctremu.ubershader = cfg_getbool(cfg, "ubershader");
 
     FILE* fp = fopen("config.txt", "w");

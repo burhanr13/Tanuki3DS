@@ -1,5 +1,6 @@
 #include "shadergen.h"
 
+#define XXH_INLINE_ALL
 #include <xxh3.h>
 
 #include <dynstring.h>
@@ -8,17 +9,7 @@
 
 int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
     u64 hash = XXH3_64bits(ubuf, sizeof *ubuf);
-    FSHCacheEntry* block = nullptr;
-    for (int i = 0; i < FSH_MAX; i++) {
-        if (gpu->fshaders.d[i].hash == hash || gpu->fshaders.d[i].hash == 0) {
-            block = &gpu->fshaders.d[i];
-            break;
-        }
-    }
-    if (!block) {
-        block = LRU_eject(gpu->fshaders);
-    }
-    LRU_use(gpu->fshaders, block);
+    auto block = LRU_load(gpu->fshaders, hash);
     if (block->hash != hash) {
         block->hash = hash;
         glDeleteShader(block->fs);
@@ -28,8 +19,9 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
         block->fs = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(block->fs, 1, &(const char*) {source}, nullptr);
         glCompileShader(block->fs);
-
         free(source);
+
+        linfo("compiled new fragment shader");
     }
     return block->fs;
 }
@@ -41,6 +33,7 @@ in vec4 color;
 in vec2 texcoord0;
 in vec2 texcoord1;
 in vec2 texcoord2;
+in float texcoordw;
 in vec4 normquat;
 in vec3 view;
 

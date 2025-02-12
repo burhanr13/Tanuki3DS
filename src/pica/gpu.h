@@ -11,6 +11,7 @@
 #include "gpuregs.h"
 #include "renderer_gl.h"
 #include "shader.h"
+#include "shaderdec.h"
 #include "shadergen.h"
 #include "shaderjit/shaderjit.h"
 
@@ -31,8 +32,14 @@ typedef union {
     };
 } Vertex;
 
+#define FB_MAX 8
+#define TEX_MAX 128
+
 typedef struct _FBInfo {
-    u32 color_paddr;
+    union {
+        u64 color_paddr;
+        u64 key;
+    };
     u32 depth_paddr;
     u32 width, height;
     u32 color_fmt;
@@ -46,7 +53,10 @@ typedef struct _FBInfo {
 } FBInfo;
 
 typedef struct _TexInfo {
-    u32 paddr;
+    union {
+        u64 paddr;
+        u64 key;
+    };
     u32 width, height;
     u32 fmt;
     u32 size;
@@ -55,9 +65,6 @@ typedef struct _TexInfo {
 
     u32 tex;
 } TexInfo;
-
-#define FB_MAX 8
-#define TEX_MAX 128
 
 typedef struct _GPU {
 
@@ -80,13 +87,13 @@ typedef struct _GPU {
     u32 curuniform;
     int curunifi;
     alignas(16) fvec4 floatuniform[96];
+    bool uniform_dirty;
 
     LRUCache(FBInfo, FB_MAX) fbs;
-    FBInfo* cur_fb;
-
+    FBInfo* curfb;
     LRUCache(TexInfo, TEX_MAX) textures;
-
-    LRUCache(ShaderJitBlock, VSH_MAX) vshaders;
+    LRUCache(ShaderJitBlock, VSH_MAX) vshaders_sw;
+    LRUCache(VSHCacheEntry, VSH_MAX) vshaders_hw;
     LRUCache(FSHCacheEntry, FSH_MAX) fshaders;
 
     struct {
@@ -130,6 +137,7 @@ typedef union {
 } GPUCommand;
 
 void gpu_init(GPU* gpu);
+void gpu_destroy(GPU* gpu);
 
 void gpu_vshrunner_init(GPU* gpu);
 void gpu_vshrunner_destroy(GPU* gpu);
@@ -144,7 +152,5 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 void gpu_drawarrays(GPU* gpu);
 void gpu_drawelements(GPU* gpu);
 void gpu_drawimmediate(GPU* gpu);
-
-void gpu_update_gl_state(GPU* gpu);
 
 #endif

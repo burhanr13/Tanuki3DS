@@ -781,9 +781,6 @@ u32 disasm_instr(ShaderUnit* shu, u32 pc) {
             }
             break;
         }
-        default:
-            printf("unknown");
-            break;
     }
     return pc;
 }
