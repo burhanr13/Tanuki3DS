@@ -170,7 +170,7 @@ void renderer_gl_destroy(GLState* state) {
 void render_gl_setup_gpu(GLState* state) {
     glBindVertexArray(state->gpu_vao);
     glUseProgram(LRU_mru(state->progcache)->prog);
-    glBindFramebuffer(GL_FRAMEBUFFER, LRU_mru(state->gpu->fbs)->fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, state->gpu->curfb->fbo);
 }
 
 // call at end of frame

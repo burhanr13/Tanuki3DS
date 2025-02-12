@@ -90,6 +90,7 @@ typedef struct _GPU {
     bool uniform_dirty;
 
     LRUCache(FBInfo, FB_MAX) fbs;
+    FBInfo* curfb;
     LRUCache(TexInfo, TEX_MAX) textures;
     LRUCache(ShaderJitBlock, VSH_MAX) vshaders_sw;
     LRUCache(VSHCacheEntry, VSH_MAX) vshaders_hw;

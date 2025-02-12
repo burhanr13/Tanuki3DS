@@ -48,6 +48,8 @@ bool is_valid_physmem(u32 addr) {
 
 void gpu_init(GPU* gpu) {
     LRU_init(gpu->fbs);
+    // ensure this is pointing to something
+    gpu->curfb = &gpu->fbs.root;
     LRU_init(gpu->textures);
     LRU_init(gpu->vshaders_sw);
     LRU_init(gpu->vshaders_hw);
@@ -417,7 +419,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
 
 void update_cur_fb(GPU* gpu) {
     // using the same fb
-    if (LRU_mru(gpu->fbs)->color_paddr == (gpu->regs.fb.colorbuf_loc << 3))
+    if (gpu->curfb->color_paddr == (gpu->regs.fb.colorbuf_loc << 3))
         return;
 
     // little hack to make arisoturas sm64 port work
@@ -471,6 +473,8 @@ void update_cur_fb(GPU* gpu) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
                                GL_TEXTURE_2D, curfb->depth_tex, 0);
     }
+
+    gpu->curfb = curfb;
 }
 
 #define COPYRGBA(dst, src)                                                     \
