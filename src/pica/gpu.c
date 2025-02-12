@@ -1245,7 +1245,7 @@ void setup_fixattrs_hw(GPU* gpu) {
         if (gpu->regs.geom.fixed_attr_mask & BIT(i)) {
             int attr = (gpu->regs.vsh.permutation >> 4 * i) & 0xf;
             glVertexAttrib4fv(attr, gpu->fixattrs[i]);
-            glDisableVertexAttribArray(i);
+            glDisableVertexAttribArray(attr);
         }
     }
 }
