@@ -17,7 +17,7 @@ void load_config() {
         CFG_INT("video_scale", 1, 0),
         CFG_BOOL("shaderjit", cfg_true, 0),
         CFG_INT("vsh_threads", 0, 0),
-        CFG_BOOL("hw_vertexshaders", true, 0),
+        CFG_BOOL("hw_vertexshaders", cfg_true, 0),
         CFG_BOOL("ubershader", cfg_false, 0),
         CFG_END(),
     };
