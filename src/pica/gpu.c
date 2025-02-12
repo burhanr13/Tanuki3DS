@@ -404,6 +404,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
+            gpu->curfb = &gpu->fbs.d[i];
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
             glClearColor((color >> 24) / 255.f, ((color >> 16) & 0xff) / 255.f,
                          ((color >> 8) & 0xff) / 255.f, (color & 0xff) / 255.f);
@@ -414,6 +415,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
         }
         if (gpu->fbs.d[i].depth_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
+            gpu->curfb = &gpu->fbs.d[i];
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
             glClearDepthf((color & MASK(24)) / (float) BIT(24));
             glClearStencil(color >> 24);
