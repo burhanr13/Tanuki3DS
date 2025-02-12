@@ -418,8 +418,11 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
 }
 
 void update_cur_fb(GPU* gpu) {
+    u32 w = gpu->regs.fb.dim.width;
+    u32 h = gpu->regs.fb.dim.height + 1;
     // using the same fb
-    if (gpu->curfb->color_paddr == (gpu->regs.fb.colorbuf_loc << 3))
+    if (gpu->curfb->color_paddr == (gpu->regs.fb.colorbuf_loc << 3) &&
+        gpu->curfb->width == w && gpu->curfb->height == h)
         return;
 
     // little hack to make arisoturas sm64 port work
@@ -447,9 +450,6 @@ void update_cur_fb(GPU* gpu) {
           curfb->color_paddr, curfb->depth_paddr);
 
     glBindFramebuffer(GL_FRAMEBUFFER, curfb->fbo);
-
-    u32 w = gpu->regs.fb.dim.width;
-    u32 h = gpu->regs.fb.dim.height + 1;
 
     if (w != curfb->width || h != curfb->height) {
         curfb->width = w;
