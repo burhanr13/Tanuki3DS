@@ -68,19 +68,14 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glGenVertexArrays(1, &state->gpu_vao);
     glBindVertexArray(state->gpu_vao);
 
-    glGenBuffers(1, &state->gpu_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, state->gpu_vbo);
+    glGenBuffers(12, state->gpu_vbos);
     glGenBuffers(1, &state->gpu_ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state->gpu_ebo);
 
-    if (ctremu.hwvshaders) {
-        // for now just treat a vertex as fvec4[12]
-        for (int i = 0; i < 12; i++) {
-            glVertexAttribPointer(i, 4, GL_FLOAT, GL_FALSE, 12 * sizeof(fvec4),
-                                  (void*) (i * sizeof(fvec4)));
-            glEnableVertexAttribArray(i);
-        }
-    } else {
+    // for hw vshaders attributes are setup at run time
+    if (!ctremu.hwvshaders) {
+        glBindBuffer(GL_ARRAY_BUFFER, state->gpu_vbos[0]);
+
         glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                               (void*) offsetof(Vertex, pos));
         glEnableVertexAttribArray(0);
@@ -107,8 +102,8 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         glEnableVertexAttribArray(7);
     }
 
+    glGenTextures(2, state->screentex);
     for (int i = 0; i < 2; i++) {
-        glGenTextures(1, &state->screentex[i]);
         glBindTexture(GL_TEXTURE_2D, state->screentex[i]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                      SCREEN_HEIGHT * ctremu.videoscale,
@@ -156,12 +151,11 @@ void renderer_gl_destroy(GLState* state) {
     glDeleteVertexArrays(1, &state->main_vao);
     glDeleteVertexArrays(1, &state->gpu_vao);
     glDeleteBuffers(1, &state->main_vbo);
-    glDeleteBuffers(1, &state->gpu_vbo);
+    glDeleteBuffers(12, state->gpu_vbos);
     glDeleteBuffers(1, &state->uber_ubo);
     glDeleteBuffers(1, &state->frag_ubo);
     glDeleteBuffers(1, &state->gpu_ebo);
-    glDeleteTextures(1, &state->screentex[SCREEN_TOP]);
-    glDeleteTextures(1, &state->screentex[SCREEN_BOT]);
+    glDeleteTextures(2, state->screentex);
     for (int i = 0; i < FB_MAX; i++) {
         glDeleteFramebuffers(1, &state->gpu->fbs.d[i].fbo);
         glDeleteTextures(1, &state->gpu->fbs.d[i].color_tex);
@@ -209,7 +203,6 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
                0, view_w * SCREEN_WIDTH_BOT / SCREEN_WIDTH_TOP, view_h / 2);
     glBindTexture(GL_TEXTURE_2D, state->screentex[SCREEN_BOT]);
     glDrawArrays(GL_TRIANGLES, 0, 3);
-    
 }
 
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {

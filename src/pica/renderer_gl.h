@@ -35,7 +35,7 @@ typedef struct {
     GLuint main_program;
 
     GLuint gpu_vao;
-    GLuint gpu_vbo;
+    GLuint gpu_vbos[12];
     GLuint gpu_ebo;
 
     GLuint gpu_vs;

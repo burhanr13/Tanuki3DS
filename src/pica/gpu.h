@@ -152,6 +152,4 @@ void gpu_drawarrays(GPU* gpu);
 void gpu_drawelements(GPU* gpu);
 void gpu_drawimmediate(GPU* gpu);
 
-void gpu_update_gl_state(GPU* gpu);
-
 #endif
