@@ -79,10 +79,10 @@ struct ShaderCode : Xbyak::CodeGenerator {
             } else {
                 switch (idx) {
                     case 1:
-                        movzx(rbx, reg_ax);
+                        movsx(rbx, reg_ax);
                         break;
                     case 2:
-                        movzx(rbx, reg_ay);
+                        movsx(rbx, reg_ay);
                         break;
                     case 3:
                         movzx(rbx, reg_al);

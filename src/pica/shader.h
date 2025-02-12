@@ -141,8 +141,8 @@ typedef struct {
     u8 (*i)[4];
     u16 b;
 
-    u32 a[2];
-    u32 al;
+    s8 a[2];
+    u8 al;
     bool cmp[2];
 
 } ShaderUnit;

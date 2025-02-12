@@ -97,15 +97,16 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
             if (idx == 0) {
                 ldr(QReg(src.getIdx()), ptr(reg_c, 16 * n));
             } else {
+                mov(w11, n);
                 switch (idx) {
                     case 1:
-                        add(w11, reg_ax, n);
+                        add(w11, w11, reg_ax, SXTB);
                         break;
                     case 2:
-                        add(w11, reg_ay, n);
+                        add(w11, w11, reg_ay, SXTB);
                         break;
                     case 3:
-                        add(w11, reg_al, n);
+                        add(w11, w11, reg_al, UXTB);
                         break;
                 }
                 and_(w11, w11, 0x7f);
@@ -531,7 +532,6 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len,
             }
             case PICA_MOVA: {
                 auto src = SRC1(1);
-                // this needs to be zs, or won't work
                 fcvtzs(v0.s2, src.s2);
                 if (desc.destmask & BIT(3 - 0)) {
                     mov(reg_ax, v0.s[0]);
