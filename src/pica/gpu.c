@@ -339,15 +339,22 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
         // need to handle more general cases at some point
 
         if (srcgap == 0 && dstgap == 0) {
-            int yoff = (srcpaddr - srcfb->color_paddr) /
-                       (srcfb->width * srcfb->color_Bpp);
-            int height = size / srcfb->width;
-            // this feels wrong but it works ... :/
+            int yoff = srcpaddr - srcfb->color_paddr;
+            yoff /= (int) (srcfb->width * srcfb->color_Bpp);
+            // this can be larger than dst tex height so don't use it
+            int transferheight = size / srcfb->width;
+
+            linfo("hardware texture copy sh=%d sw=%d yof=%d th=%d dh=%d dw=%d",
+                   srcfb->height, srcfb->width, yoff, transferheight, dsttex->height,
+                   dsttex->width);
+
             glBindFramebuffer(GL_READ_FRAMEBUFFER, srcfb->fbo);
             glBindTexture(GL_TEXTURE_2D, dsttex->tex);
-            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0,
-                             srcfb->width * ctremu.videoscale,
-                             srcfb->height * ctremu.videoscale, 0);
+            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
+                             (srcfb->height - dsttex->height - yoff) *
+                                 ctremu.videoscale,
+                             dsttex->width * ctremu.videoscale,
+                             dsttex->height * ctremu.videoscale, 0);
         }
 
         return;
