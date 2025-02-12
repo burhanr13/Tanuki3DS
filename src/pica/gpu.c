@@ -1247,6 +1247,7 @@ void setup_vbos_hw(GPU* gpu, int start, int num) {
             glVertexAttrib4f(i, gpu->fixattrs[i][0], gpu->fixattrs[i][1],
                              gpu->fixattrs[i][2], gpu->fixattrs[i][3]);
         }
+        glDisableVertexAttribArray(i);
     }
 
     for (int vbo = 0; vbo < 12; vbo++) {
