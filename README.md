@@ -1,6 +1,6 @@
 # Tanuki3DS
 
-[![](https://img.shields.io/github/actions/workflow/status/burhanr13/Tanuki3DS/ci.yml?branch=master)](https://github.com/burhanr13/Tanuki3DS/actions/workflows/ci.yml)
+[![](https://github.com/burhanr13/Tanuki3DS/actions/workflows/ci.yml/badge.svg)](https://github.com/burhanr13/Tanuki3DS/actions/workflows/ci.yml)
 [![](https://dcbadge.limes.pink/api/server/6ya65fvD3g?style=flat)](https://discord.gg/6ya65fvD3g)
 
 <img src=images/logo.png width=100>
