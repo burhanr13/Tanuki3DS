@@ -16,7 +16,7 @@ struct {
     SRV("fs:USER", fs),    SRV("gsp::Gpu", gsp_gpu), SRV("hid:USER", hid),
     SRV("hid:SPVR", hid),  SRV("dsp::DSP", dsp),     SRV("cfg:u", cfg),
     SRV("cfg:s", cfg),     SRV("y2r:u", y2r),        SRV("cecd:u", cecd),
-    SRV("ldr:ro", ldr_ro), SRV("nwm:UDS", nwm_uds),  SRV("ir:USER", ir),
+    SRV("ldr:ro", ldr_ro), SRV("nwm::UDS", nwm_uds),  SRV("ir:USER", ir),
 #undef SRV
 };
 
