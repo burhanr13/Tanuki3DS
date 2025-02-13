@@ -881,7 +881,7 @@ void update_gl_state(GPU* gpu) {
 
     if (gpu->regs.fb.stencil_test.enable) {
         glEnable(GL_STENCIL_TEST);
-        if (gpu->regs.fb.perms.depthbuf.write & BIT(0)) {
+        if (gpu->regs.fb.perms.depthbuf.write) {
             glStencilMask(gpu->regs.fb.stencil_test.bufmask);
         } else {
             glStencilMask(0);
@@ -903,9 +903,9 @@ void update_gl_state(GPU* gpu) {
     } else {
         glColorMask(false, false, false, false);
     }
-    // you can disable writing to the depth buffer with this bit
+    // you can disable writing to the depth buffer with this register
     // instead of using the depth mask
-    if (gpu->regs.fb.perms.depthbuf.write & BIT(1)) {
+    if (gpu->regs.fb.perms.depthbuf.write) {
         glDepthMask(gpu->regs.fb.color_mask.depth);
     } else {
         glDepthMask(false);
