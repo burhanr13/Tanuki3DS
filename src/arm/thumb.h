@@ -111,6 +111,20 @@ typedef union {
         u16 c1 : 4; // 1011
     } push_pop;
     struct {
+        u16 rd : 3;
+        u16 rm : 3;
+        u16 b : 1;
+        u16 u : 1;
+        u16 c1 : 8; // 10110010
+    } extend;
+    struct {
+        u16 rd : 3;
+        u16 rm : 3;
+        u16 h : 1;
+        u16 s : 1;
+        u16 c1 : 8; // 10111010
+    } rev;
+    struct {
         u16 rlist : 8;
         u16 rb : 3;
         u16 l : 1;

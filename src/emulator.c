@@ -77,7 +77,14 @@ void emulator_quit() {
 
 void emulator_set_rom(const char* filename) {
     free(ctremu.romfile);
+    ctremu.romfile = nullptr;
     free(ctremu.romfilenoext);
+    ctremu.romfilenoext = nullptr;
+
+    if (!filename) {
+        ctremu.romfile = nullptr;
+        return;
+    }
 
     ctremu.romfile = strdup(filename);
 
@@ -89,15 +96,20 @@ void emulator_set_rom(const char* filename) {
     if (c) *c = '\0';
 }
 
-void emulator_reset() {
+bool emulator_reset() {
     if (ctremu.initialized) {
         e3ds_destroy(&ctremu.system);
         ctremu.initialized = false;
     }
 
-    if (!ctremu.romfile) return;
+    if (!ctremu.romfile) return true;
 
-    e3ds_init(&ctremu.system, ctremu.romfile);
+    if (!e3ds_init(&ctremu.system, ctremu.romfile)) {
+        emulator_set_rom(nullptr);
+        return false;
+    }
 
     ctremu.initialized = true;
+
+    return true;
 }

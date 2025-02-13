@@ -8,15 +8,14 @@
 #include <kernel/loader.h>
 #include <kernel/svc_types.h>
 
-void e3ds_init(E3DS* s, char* romfile) {
+bool e3ds_init(E3DS* s, char* romfile) {
     memset(s, 0, sizeof *s);
 
     s->sched.master = s;
 
     cpu_init(s);
-
     gpu_init(&s->gpu);
-
+    renderer_gl_init(&s->gpu.gl, &s->gpu);
     memory_init(s);
 
     services_init(s); // start up and allocate memory for services first
@@ -26,7 +25,8 @@ void e3ds_init(E3DS* s, char* romfile) {
     char* ext = strrchr(romfile, '.');
     if (!ext) {
         eprintf("unsupported file format\n");
-        exit(1);
+        e3ds_destroy(s);
+        return false;
     }
     if (!strcmp(ext, ".elf") || !strcmp(ext, ".axf")) {
         entrypoint = load_elf(s, romfile);
@@ -38,11 +38,13 @@ void e3ds_init(E3DS* s, char* romfile) {
         entrypoint = load_ncch(s, romfile, 0);
     } else {
         eprintf("unsupported file format\n");
-        exit(1);
+        e3ds_destroy(s);
+        return false;
     }
     if (entrypoint == -1) {
         eprintf("failed to load rom\n");
-        exit(1);
+        e3ds_destroy(s);
+        return false;
     }
 
     memory_virtmap(s, VRAM_PBASE, VRAM_VBASE, VRAM_SIZE, PERM_RW, MEMST_STATIC);
@@ -68,14 +70,13 @@ void e3ds_init(E3DS* s, char* romfile) {
 
     add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
 
-    renderer_gl_init(&s->gpu.gl, &s->gpu);
+    return true;
 }
 
 void e3ds_destroy(E3DS* s) {
     cpu_free(s);
 
     gpu_destroy(&s->gpu);
-
     renderer_gl_destroy(&s->gpu.gl);
 
     for (int i = 0; i < HANDLE_MAX; i++) {

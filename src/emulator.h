@@ -32,6 +32,6 @@ void emulator_set_rom(const char* filename);
 void emulator_init();
 void emulator_quit();
 
-void emulator_reset();
+bool emulator_reset();
 
 #endif

@@ -98,7 +98,7 @@ void hotkey_press(SDL_Keycode key) {
             ctremu.uncap = !ctremu.uncap;
             break;
         case SDLK_F1:
-            emulator_reset();
+            g_pending_reset = true;
             break;
         case SDLK_F2:
             load_rom_dialog();
@@ -265,8 +265,13 @@ int main(int argc, char** argv) {
 
         if (g_pending_reset) {
             g_pending_reset = false;
-            emulator_reset();
-            ctremu.pause = false;
+            if (emulator_reset()) {
+                ctremu.pause = false;
+            } else {
+                SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
+                                         "ROM loading failed", g_window);
+                ctremu.pause = true;
+            }
             SDL_RaiseWindow(g_window);
         }
 

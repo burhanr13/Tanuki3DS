@@ -10,6 +10,13 @@ u16 dsp_addrs[15] = {
 DECL_PORT(dsp) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
+        case 0x0002:
+            linfo("RecvDataIsReady");
+            // stub
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 1;
+            break;
         case 0x000c: {
             linfo("ConvertProcessAddressFromDspDram");
             cmdbuf[0] = IPCHDR(2, 0);

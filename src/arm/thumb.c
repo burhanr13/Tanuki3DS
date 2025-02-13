@@ -267,6 +267,30 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
                         dec.block_trans.rlist |= BIT(14);
                     }
                 }
+            } else if (instr.extend.c1 == 0b10110010) {
+                dec.pack_sat.c1 = 0b01101;
+                dec.pack_sat.u = instr.extend.u;
+                dec.pack_sat.s = 1;
+                dec.pack_sat.h = !instr.extend.b;
+                dec.pack_sat.rn = 15;
+                dec.pack_sat.rd = instr.extend.rd;
+                dec.pack_sat.shift = 0;
+                dec.pack_sat.x = 1;
+                dec.pack_sat.p = 1;
+                dec.pack_sat.c2 = 1;
+                dec.pack_sat.rm = instr.extend.rm;
+            } else if (instr.rev.c1 == 0b10111010) {
+                dec.pack_sat.c1 = 0b01101;
+                dec.pack_sat.u = instr.rev.s;
+                dec.pack_sat.s = 1;
+                dec.pack_sat.h = 1;
+                dec.pack_sat.rn = 15;
+                dec.pack_sat.rd = instr.rev.rd;
+                dec.pack_sat.shift = instr.rev.h;
+                dec.pack_sat.x = 0;
+                dec.pack_sat.p = 1;
+                dec.pack_sat.c2 = 1;
+                dec.pack_sat.rm = instr.rev.rm;
             }
             break;
         case 12:

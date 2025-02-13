@@ -65,7 +65,7 @@ typedef struct _3DS {
 #define TLS_SIZE 0x200
 #define IPC_CMD_OFF 0x80
 
-void e3ds_init(E3DS* s, char* romfile);
+bool e3ds_init(E3DS* s, char* romfile);
 void e3ds_destroy(E3DS* s);
 
 void e3ds_update_datetime(E3DS* s);
