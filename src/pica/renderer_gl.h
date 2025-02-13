@@ -45,17 +45,24 @@ typedef struct {
 
     GLuint screentex[2];
 
-    GLuint vert_ubo;
-    GLuint uber_ubo;
-    GLuint frag_ubo;
+    union {
+        GLuint ubos[4];
+        struct {
+            GLuint vert_ubo;
+            GLuint uber_ubo;
+            GLuint frag_ubo;
+            GLuint freecam_ubo;
+        };
+    };
 
 } GLState;
 
 void renderer_gl_init(GLState* state, GPU* gpu);
 void renderer_gl_destroy(GLState* state);
 
-void render_gl_setup_gpu(GLState* state);
+void renderer_gl_setup_gpu(GLState* state);
 void render_gl_main(GLState* state, int view_w, int view_h);
+void renderer_gl_update_freecam(GLState* state);
 
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs);
 

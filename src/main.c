@@ -26,6 +26,9 @@ bool g_pending_reset;
 
 char* oldcwd;
 
+#define FREECAM_SPEED 5.0
+#define FREECAM_ROTATE_SPEED 0.02
+
 #ifdef GLDEBUGCTX
 void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
                    GLsizei length, const char* message, const void* userParam) {
@@ -106,6 +109,11 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_F4:
             g_cpulog = !g_cpulog;
             break;
+        case SDLK_F7:
+            ctremu.freecam_enable = !ctremu.freecam_enable;
+            glm_mat4_identity(ctremu.freecam_mtx);
+            renderer_gl_update_freecam(&ctremu.system.gpu.gl);
+            break;
         default:
             break;
     }
@@ -115,21 +123,72 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
     const bool* keys = SDL_GetKeyboardState(nullptr);
 
     PadState btn = {};
-    btn.a = keys[SDL_SCANCODE_L];
-    btn.b = keys[SDL_SCANCODE_K];
-    btn.x = keys[SDL_SCANCODE_O];
-    btn.y = keys[SDL_SCANCODE_I];
-    btn.l = keys[SDL_SCANCODE_Q];
-    btn.r = keys[SDL_SCANCODE_P];
-    btn.start = keys[SDL_SCANCODE_RETURN];
-    btn.select = keys[SDL_SCANCODE_RSHIFT];
-    btn.up = keys[SDL_SCANCODE_UP];
-    btn.down = keys[SDL_SCANCODE_DOWN];
-    btn.left = keys[SDL_SCANCODE_LEFT];
-    btn.right = keys[SDL_SCANCODE_RIGHT];
+    int cx = 0;
+    int cy = 0;
 
-    int cx = (keys[SDL_SCANCODE_D] - keys[SDL_SCANCODE_A]) * INT16_MAX;
-    int cy = (keys[SDL_SCANCODE_W] - keys[SDL_SCANCODE_S]) * INT16_MAX;
+    if (!ctremu.freecam_enable) {
+        btn.a = keys[SDL_SCANCODE_L];
+        btn.b = keys[SDL_SCANCODE_K];
+        btn.x = keys[SDL_SCANCODE_O];
+        btn.y = keys[SDL_SCANCODE_I];
+        btn.l = keys[SDL_SCANCODE_Q];
+        btn.r = keys[SDL_SCANCODE_P];
+        btn.start = keys[SDL_SCANCODE_RETURN];
+        btn.select = keys[SDL_SCANCODE_RSHIFT];
+        btn.up = keys[SDL_SCANCODE_UP];
+        btn.down = keys[SDL_SCANCODE_DOWN];
+        btn.left = keys[SDL_SCANCODE_LEFT];
+        btn.right = keys[SDL_SCANCODE_RIGHT];
+
+        cx = (keys[SDL_SCANCODE_D] - keys[SDL_SCANCODE_A]) * INT16_MAX;
+        cy = (keys[SDL_SCANCODE_W] - keys[SDL_SCANCODE_S]) * INT16_MAX;
+    } else {
+        float speed = FREECAM_SPEED;
+        if (keys[SDL_SCANCODE_LSHIFT]) speed /= 20;
+        if (keys[SDL_SCANCODE_RSHIFT]) speed *= 20;
+
+        mat4 m;
+
+        vec3 t = {};
+        mat4 r = GLM_MAT4_IDENTITY_INIT;
+
+        if (keys[SDL_SCANCODE_E]) {
+            t[1] = -speed;
+        }
+        if (keys[SDL_SCANCODE_Q]) {
+            t[1] = speed;
+        }
+        if (keys[SDL_SCANCODE_DOWN]) {
+            glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_XUP);
+        }
+        if (keys[SDL_SCANCODE_UP]) {
+            glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_XUP);
+        }
+        if (keys[SDL_SCANCODE_A]) {
+            t[0] = speed;
+        }
+        if (keys[SDL_SCANCODE_D]) {
+            t[0] = -speed;
+        }
+        if (keys[SDL_SCANCODE_LEFT]) {
+            glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_YUP);
+        }
+        if (keys[SDL_SCANCODE_RIGHT]) {
+            glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_YUP);
+        }
+        if (keys[SDL_SCANCODE_W]) {
+            t[2] = speed;
+        }
+        if (keys[SDL_SCANCODE_S]) {
+            t[2] = -speed;
+        }
+
+        glm_translate_make(m, t);
+        glm_mat4_mul(m, ctremu.freecam_mtx, ctremu.freecam_mtx);
+        glm_mat4_mul(r, ctremu.freecam_mtx, ctremu.freecam_mtx);
+
+        renderer_gl_update_freecam(&ctremu.system.gpu.gl);
+    }
 
     if (controller) {
         btn.a |= SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_EAST);
@@ -276,7 +335,7 @@ int main(int argc, char** argv) {
         }
 
         if (!ctremu.pause) {
-            render_gl_setup_gpu(&ctremu.system.gpu.gl);
+            renderer_gl_setup_gpu(&ctremu.system.gpu.gl);
 
             do {
                 e3ds_run_frame(&ctremu.system);

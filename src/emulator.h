@@ -1,6 +1,8 @@
 #ifndef EMULATOR_H
 #define EMULATOR_H
 
+#include <cglm/cglm.h>
+
 #include <3ds.h>
 #include <common.h>
 
@@ -20,6 +22,9 @@ typedef struct {
     int vshthreads;
     bool hwvshaders;
     bool ubershader;
+
+    mat4 freecam_mtx;
+    bool freecam_enable;
 
     E3DS system;
 

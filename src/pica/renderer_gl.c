@@ -55,15 +55,14 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
 
     LRU_init(state->progcache);
 
-    glGenBuffers(1, &state->vert_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, state->vert_ubo);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, state->vert_ubo);
-    glGenBuffers(1, &state->uber_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, state->uber_ubo);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 1, state->uber_ubo);
-    glGenBuffers(1, &state->frag_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, state->frag_ubo);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 2, state->frag_ubo);
+    glGenBuffers(4, state->ubos);
+    for (int i = 0; i < 4; i++) {
+        glBindBufferBase(GL_UNIFORM_BUFFER, i, state->ubos[i]);
+    }
+    // freecam buffer contains a matrix and a bool
+    glBindBuffer(GL_UNIFORM_BUFFER, state->freecam_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, 17 * 4, nullptr, GL_STATIC_DRAW);
+    renderer_gl_update_freecam(state);
 
     glGenVertexArrays(1, &state->gpu_vao);
     glBindVertexArray(state->gpu_vao);
@@ -133,6 +132,7 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     }
 
     glBindVertexArray(state->gpu_vao);
+
 }
 
 void renderer_gl_destroy(GLState* state) {
@@ -152,8 +152,7 @@ void renderer_gl_destroy(GLState* state) {
     glDeleteVertexArrays(1, &state->gpu_vao);
     glDeleteBuffers(1, &state->main_vbo);
     glDeleteBuffers(12, state->gpu_vbos);
-    glDeleteBuffers(1, &state->uber_ubo);
-    glDeleteBuffers(1, &state->frag_ubo);
+    glDeleteBuffers(4, state->ubos);
     glDeleteBuffers(1, &state->gpu_ebo);
     glDeleteTextures(2, state->screentex);
     for (int i = 0; i < FB_MAX; i++) {
@@ -167,7 +166,7 @@ void renderer_gl_destroy(GLState* state) {
 }
 
 // call before emulating gpu drawing
-void render_gl_setup_gpu(GLState* state) {
+void renderer_gl_setup_gpu(GLState* state) {
     glBindVertexArray(state->gpu_vao);
     glUseProgram(LRU_mru(state->progcache)->prog);
     glBindFramebuffer(GL_FRAMEBUFFER, state->gpu->curfb->fbo);
@@ -205,6 +204,17 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
     glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
+void renderer_gl_update_freecam(GLState* state) {
+    glBindBuffer(GL_UNIFORM_BUFFER, state->freecam_ubo);
+    if (ctremu.freecam_enable) {
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof ctremu.freecam_mtx,
+                        ctremu.freecam_mtx);
+        glBufferSubData(GL_UNIFORM_BUFFER, 16 * 4, 4, &(int) {1});
+    } else {
+        glBufferSubData(GL_UNIFORM_BUFFER, 16 * 4, 4, &(int) {0});
+    }
+}
+
 void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
     if (LRU_mru(state->progcache)->vs == vs &&
         LRU_mru(state->progcache)->fs == fs) {
@@ -224,10 +234,14 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         glUniform1i(glGetUniformLocation(ent->prog, "tex0"), 0);
         glUniform1i(glGetUniformLocation(ent->prog, "tex1"), 1);
         glUniform1i(glGetUniformLocation(ent->prog, "tex2"), 2);
-        if (ent->vs != state->gpu_vs)
+        if (ent->vs != state->gpu_vs) {
             glUniformBlockBinding(
                 ent->prog, glGetUniformBlockIndex(ent->prog, "VertUniforms"),
                 0);
+            glUniformBlockBinding(
+                ent->prog, glGetUniformBlockIndex(ent->prog, "FreecamUniforms"),
+                3);
+        }
         if (ent->fs == state->gpu_uberfs)
             glUniformBlockBinding(
                 ent->prog, glGetUniformBlockIndex(ent->prog, "UberUniforms"),

@@ -14,7 +14,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install clang-19 libglew-dev libxxhash-dev \
-        libxbyak-dev libcapstone-dev libconfuse-dev
+        libxbyak-dev libcapstone-dev libconfuse-dev libcglm-dev
         # SDL build dependencies
         sudo apt install build-essential git make \
         pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
@@ -52,7 +52,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install clang-19 libglew-dev libxxhash-dev \
-        libcapstone-dev libconfuse-dev
+        libcapstone-dev libconfuse-dev libcglm-dev
         # SDL build dependencies
         sudo apt install build-essential git make \
         pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
@@ -93,7 +93,7 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 glew xxhash xbyak capstone confuse
+        brew install llvm sdl3 glew xxhash xbyak capstone confuse cglm
     - name: build
       run: make USER=1
 
@@ -120,7 +120,7 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 glew xxhash capstone confuse
+        brew install llvm sdl3 glew xxhash capstone confuse cglm
         git clone https://github.com/fujitsu/xbyak_aarch64.git
         cd xbyak_aarch64
         sudo make install

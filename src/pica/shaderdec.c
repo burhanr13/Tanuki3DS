@@ -50,6 +50,7 @@ typedef struct {
     u32 curfuncend;
     u32 curblockstart;
     u32 curblockend;
+    int out_view; // for freecam
 } DecCTX;
 
 void dec_block(DecCTX* ctx, u32 start, u32 num);
@@ -93,6 +94,11 @@ layout (std140) uniform VertUniforms {
 };
 
 #define b(n) ((b_raw & (1 << n)) != 0)
+
+layout (std140) uniform FreecamUniforms {
+    mat4 freecam_mtx;
+    bool freecam_enable;
+};
 
 )";
 
@@ -376,6 +382,15 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             }
             break;
         case PICA_MOV:
+            if (instr.fmt1.dest == ctx->out_view) {
+                u32 rn = instr.fmt1.src1 - 0x10;
+                if (rn < 0x10) {
+                    printf("if (freecam_enable) r[%1$d] = freecam_mtx * "
+                           "r[%1$d];\n",
+                           rn);
+                    INDENT(ctx->depth);
+                }
+            }
             DEST(1);
             SRC1(1);
             FIN(1);
@@ -610,6 +625,16 @@ char* shader_dec_vs(GPU* gpu) {
     ctx.shu.code = (PICAInstr*) gpu->progdata;
     ctx.shu.opdescs = (OpDesc*) gpu->opdescs;
     ctx.shu.entrypoint = gpu->regs.vsh.entrypoint;
+
+    ctx.out_view = -1;
+    for (int o = 0; o < 7; o++) {
+        if (gpu->regs.raster.sh_outmap[o][0] == 0x12 &&
+            gpu->regs.raster.sh_outmap[o][1] == 0x13 &&
+            gpu->regs.raster.sh_outmap[o][2] == 0x14 &&
+            gpu->regs.raster.sh_outmap[o][3] == 0x1f) {
+            ctx.out_view = o;
+        }
+    }
 
     ds_printf(&ctx.s, "void proc_main() {\n");
     ctx.curfuncstart = ctx.shu.entrypoint;
