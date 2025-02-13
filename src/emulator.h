@@ -27,8 +27,6 @@ typedef struct {
 
 extern EmulatorState ctremu;
 
-#define EMUNAME "Tanuki3DS"
-
 void emulator_set_rom(const char* filename);
 
 void emulator_init();

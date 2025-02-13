@@ -114,7 +114,7 @@ void hotkey_press(SDL_Keycode key) {
 void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
     const bool* keys = SDL_GetKeyboardState(nullptr);
 
-    PadState btn;
+    PadState btn = {};
     btn.a = keys[SDL_SCANCODE_L];
     btn.b = keys[SDL_SCANCODE_K];
     btn.x = keys[SDL_SCANCODE_O];
@@ -192,6 +192,8 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
 }
 
 int main(int argc, char** argv) {
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
+
     oldcwd = realpath(".", nullptr);
 
 #ifdef NOPORTABLE
@@ -217,9 +219,10 @@ int main(int argc, char** argv) {
 #ifdef GLDEBUGCTX
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
-    g_window = SDL_CreateWindow(EMUNAME, SCREEN_WIDTH_TOP * ctremu.videoscale,
-                                2 * SCREEN_HEIGHT * ctremu.videoscale,
-                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    g_window =
+        SDL_CreateWindow("Tanuki3DS", SCREEN_WIDTH_TOP * ctremu.videoscale,
+                         2 * SCREEN_HEIGHT * ctremu.videoscale,
+                         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
     SDL_GLContext glcontext = SDL_GL_CreateContext(g_window);
     if (!glcontext) {
@@ -335,7 +338,7 @@ int main(int argc, char** argv) {
                 (double) SDL_NS_PER_SECOND * (frame - prev_fps_frame) / elapsed;
 
             char* wintitle;
-            asprintf(&wintitle, EMUNAME " | %s | %.2lf FPS",
+            asprintf(&wintitle, "Tanuki3DS | %s | %.2lf FPS",
                      ctremu.romfilenodir, fps);
             SDL_SetWindowTitle(g_window, wintitle);
             free(wintitle);
