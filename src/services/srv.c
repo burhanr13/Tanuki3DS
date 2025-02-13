@@ -88,21 +88,6 @@ void services_init(E3DS* s) {
     srvobj_init(&s->services.ir.event.hdr, KOT_EVENT);
 }
 
-KSession* session_create(PortRequestHandler f) {
-    KSession* session = calloc(1, sizeof *session);
-    session->hdr.type = KOT_SESSION;
-    session->handler = (PortRequestHandlerArg) f;
-    return session;
-}
-
-KSession* session_create_arg(PortRequestHandlerArg f, u64 arg) {
-    KSession* session = calloc(1, sizeof *session);
-    session->hdr.type = KOT_SESSION;
-    session->handler = f;
-    session->arg = arg;
-    return session;
-}
-
 DECL_PORT_ARG(stub, name) {
     u32* cmdbuf = PTR(cmd_addr);
     lwarn("stubbed service '%.8s' command 0x%04x (%x,%x,%x,%x,%x)",
