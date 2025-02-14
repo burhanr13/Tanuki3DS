@@ -12,20 +12,20 @@ u32 load_elf(E3DS* s, char* filename) {
     FILE* fp = fopen(filename, "r");
     if (!fp) {
         eprintf("no such file\n");
-        return 0;
+        return -1;
     }
 
     Elf32_Ehdr ehdr;
     if (fread(&ehdr, sizeof ehdr, 1, fp) < 1) {
         fclose(fp);
-        return 0;
+        return -1;
     }
 
     Elf32_Phdr* phdrs = calloc(ehdr.e_phnum, ehdr.e_phentsize);
     fseek(fp, ehdr.e_phoff, SEEK_SET);
     if (fread(phdrs, ehdr.e_phentsize, ehdr.e_phnum, fp) < ehdr.e_phnum) {
         fclose(fp);
-        return 0;
+        return -1;
     }
     for (int i = 0; i < ehdr.e_phnum; i++) {
         if (phdrs[i].p_type != PT_LOAD) continue;
@@ -41,7 +41,7 @@ u32 load_elf(E3DS* s, char* filename) {
         if (fread(segment, 1, phdrs[i].p_filesz, fp) < phdrs[i].p_filesz) {
             fclose(fp);
             free(phdrs);
-            return 0;
+            return -1;
         }
 
         linfo("loaded elf segment at %08x", phdrs[i].p_vaddr);
