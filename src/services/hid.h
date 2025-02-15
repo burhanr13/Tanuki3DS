@@ -1,8 +1,8 @@
 #ifndef HID_H
 #define HID_H
 
-#include <kernel/memory.h>
-#include <kernel/thread.h>
+#include "kernel/memory.h"
+#include "kernel/thread.h"
 
 #include "srv.h"
 

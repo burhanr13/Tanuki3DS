@@ -1,7 +1,7 @@
 #ifndef CECD_H
 #define CECD_H
 
-#include <kernel/thread.h>
+#include "kernel/thread.h"
 
 #include "srv.h"
 

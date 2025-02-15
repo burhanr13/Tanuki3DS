@@ -1,6 +1,6 @@
 #include "dsp.h"
 
-#include <3ds.h>
+#include "3ds.h"
 
 u16 dsp_addrs[15] = {
     0xBFFF, 0x9E92, 0x8680, 0xA792, 0x9430, 0x8400, 0x8540, 0x9492,

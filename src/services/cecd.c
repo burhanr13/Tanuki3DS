@@ -1,6 +1,6 @@
 #include "cecd.h"
 
-#include <3ds.h>
+#include "3ds.h"
 
 DECL_PORT(cecd) {
     u32* cmdbuf = PTR(cmd_addr);

@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#include <common.h>
+#include "common.h"
 
 enum {
     C_EQ,

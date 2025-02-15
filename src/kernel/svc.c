@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <services/srv.h>
+#include "services/srv.h"
 
 #include "svc_types.h"
 #include "thread.h"

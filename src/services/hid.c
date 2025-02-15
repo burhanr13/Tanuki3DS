@@ -1,6 +1,6 @@
 #include "hid.h"
 
-#include <3ds.h>
+#include "3ds.h"
 
 #define HIDMEM ((HIDSharedMem*) PPTR(s->services.hid.sharedmem.paddr))
 

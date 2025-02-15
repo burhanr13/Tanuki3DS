@@ -1,7 +1,7 @@
 #ifndef REGISTER_ALLOCATOR_H
 #define REGISTER_ALLOCATOR_H
 
-#include <common.h>
+#include "common.h"
 
 #include "ir.h"
 

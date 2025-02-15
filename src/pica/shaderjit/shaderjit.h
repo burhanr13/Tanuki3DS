@@ -1,8 +1,8 @@
 #ifndef SHADERJIT_H
 #define SHADERJIT_H
 
-#include <common.h>
-#include <pica/shader.h>
+#include "common.h"
+#include "pica/shader.h"
 
 typedef struct _GPU GPU;
 

@@ -1,7 +1,7 @@
 #ifndef SVC_TYPES_H
 #define SVC_TYPES_H
 
-#include <common.h>
+#include "common.h"
 
 enum {
     MEMOP_FREE = 1,

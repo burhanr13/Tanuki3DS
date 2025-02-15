@@ -2,8 +2,8 @@
 
 #include <string.h>
 
-#include <kernel/memory.h>
-#include <kernel/svc.h>
+#include "kernel/memory.h"
+#include "kernel/svc.h"
 
 #include "services.h"
 

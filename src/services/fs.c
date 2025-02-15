@@ -5,9 +5,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <3ds.h>
-#include <emulator.h>
-#include <kernel/loader.h>
+#include "3ds.h"
+#include "emulator.h"
+#include "kernel/loader.h"
 
 enum {
     SYSFILE_MIIDATA = 1,

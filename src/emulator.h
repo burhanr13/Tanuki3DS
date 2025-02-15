@@ -3,8 +3,8 @@
 
 #include <cglm/cglm.h>
 
-#include <3ds.h>
-#include <common.h>
+#include "3ds.h"
+#include "common.h"
 
 typedef struct {
     char* romfile;

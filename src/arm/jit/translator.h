@@ -1,9 +1,9 @@
 #ifndef RECOMPILER_H
 #define RECOMPILER_H
 
-#include <arm/arm.h>
-#include <arm/arm_core.h>
-#include <common.h>
+#include "arm/arm.h"
+#include "arm/arm_core.h"
+#include "common.h"
 
 #include "ir.h"
 

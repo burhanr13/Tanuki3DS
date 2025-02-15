@@ -1,6 +1,6 @@
 #include "apt.h"
 
-#include <3ds.h>
+#include "3ds.h"
 
 #include "applets.h"
 

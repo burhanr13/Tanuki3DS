@@ -4,9 +4,9 @@
 #include <string.h>
 #include <time.h>
 
-#include <cpu.h>
-#include <kernel/loader.h>
-#include <kernel/svc_types.h>
+#include "cpu.h"
+#include "kernel/loader.h"
+#include "kernel/svc_types.h"
 
 bool e3ds_init(E3DS* s, char* romfile) {
     memset(s, 0, sizeof *s);

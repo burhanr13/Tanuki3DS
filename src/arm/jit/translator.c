@@ -1,7 +1,7 @@
 #include "translator.h"
 
-#include <arm/arm.h>
-#include <arm/thumb.h>
+#include "arm/arm.h"
+#include "arm/thumb.h"
 
 #include "jit.h"
 

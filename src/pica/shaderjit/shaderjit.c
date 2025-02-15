@@ -3,7 +3,7 @@
 #define XXH_INLINE_ALL
 #include <xxh3.h>
 
-#include <pica/gpu.h>
+#include "pica/gpu.h"
 
 #include "shaderjit_backend.h"
 

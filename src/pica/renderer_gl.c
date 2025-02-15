@@ -1,7 +1,7 @@
 #include "renderer_gl.h"
 
-#include <3ds.h>
-#include <emulator.h>
+#include "3ds.h"
+#include "emulator.h"
 
 #include "gpu.h"
 
@@ -132,7 +132,6 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     }
 
     glBindVertexArray(state->gpu_vao);
-
 }
 
 void renderer_gl_destroy(GLState* state) {

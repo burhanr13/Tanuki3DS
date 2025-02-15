@@ -1,8 +1,8 @@
 #ifndef IPC_H
 #define IPC_H
 
-#include <common.h>
-#include <kernel/kernel.h>
+#include "common.h"
+#include "kernel/kernel.h"
 
 typedef struct _3DS E3DS;
 

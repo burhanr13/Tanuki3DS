@@ -1,7 +1,7 @@
 #ifndef SERVICES_H
 #define SERVICES_H
 
-#include <kernel/thread.h>
+#include "kernel/thread.h"
 
 #include "apt.h"
 #include "cecd.h"

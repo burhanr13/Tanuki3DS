@@ -1,17 +1,17 @@
 #ifndef _3DS_H
 #define _3DS_H
 
-#include <arm/arm_core.h>
-#include <common.h>
-#include <kernel/kernel.h>
-#include <kernel/loader.h>
-#include <kernel/memory.h>
-#include <kernel/process.h>
-#include <kernel/thread.h>
-#include <pica/gpu.h>
-#include <scheduler.h>
-#include <services/services.h>
-#include <services/srv.h>
+#include "arm/arm_core.h"
+#include "common.h"
+#include "kernel/kernel.h"
+#include "kernel/loader.h"
+#include "kernel/memory.h"
+#include "kernel/process.h"
+#include "kernel/thread.h"
+#include "pica/gpu.h"
+#include "scheduler.h"
+#include "services/services.h"
+#include "services/srv.h"
 
 #define CPU_CLK 268000000
 #define FPS 60

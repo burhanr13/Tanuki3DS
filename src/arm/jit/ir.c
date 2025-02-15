@@ -1,7 +1,7 @@
 #include "ir.h"
 
-#include <arm/media.h>
-#include <arm/vfp.h>
+#include "arm/media.h"
+#include "arm/vfp.h"
 
 #include "jit.h"
 

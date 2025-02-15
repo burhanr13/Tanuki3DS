@@ -1,7 +1,7 @@
 #ifndef Y2R_H
 #define Y2R_H
 
-#include <kernel/thread.h>
+#include "kernel/thread.h"
 
 #include "srv.h"
 

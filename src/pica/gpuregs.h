@@ -1,7 +1,7 @@
 #ifndef GPUREGS_H
 #define GPUREGS_H
 
-#include <common.h>
+#include "common.h"
 
 #define GPUREG(r) (offsetof(GPURegs, r) >> 2)
 #define GPUREG_MAX 0x300

@@ -2,11 +2,10 @@
 #define GPU_H
 
 #include <pthread.h>
-#include <stdalign.h>
 #include <stdatomic.h>
 
-#include <common.h>
-#include <kernel/memory.h>
+#include "common.h"
+#include "kernel/memory.h"
 
 #include "gpuregs.h"
 #include "renderer_gl.h"

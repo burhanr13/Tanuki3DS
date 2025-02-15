@@ -1,7 +1,7 @@
 #ifndef APT_H
 #define APT_H
 
-#include <kernel/thread.h>
+#include "kernel/thread.h"
 
 #include "srv.h"
 

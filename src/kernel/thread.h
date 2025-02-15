@@ -1,7 +1,7 @@
 #ifndef THREAD_H
 #define THREAD_H
 
-#include <common.h>
+#include "common.h"
 
 #include "kernel.h"
 #include "memory.h"

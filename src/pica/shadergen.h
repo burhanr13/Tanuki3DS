@@ -1,7 +1,7 @@
 #ifndef SHADERGEN_H
 #define SHADERGEN_H
 
-#include <common.h>
+#include "common.h"
 
 #include "renderer_gl.h"
 

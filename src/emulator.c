@@ -4,8 +4,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include <3ds.h>
-#include <services/hid.h>
+#include "3ds.h"
+#include "services/hid.h"
 
 bool g_infologs = false;
 EmulatorState ctremu;

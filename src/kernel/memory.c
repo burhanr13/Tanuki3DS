@@ -7,9 +7,9 @@
 #include <unistd.h>
 #endif
 
-#include <3ds.h>
-#include <common.h>
-#include <emulator.h>
+#include "3ds.h"
+#include "common.h"
+#include "emulator.h"
 
 #include "svc_types.h"
 

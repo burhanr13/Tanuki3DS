@@ -1,8 +1,8 @@
 #ifndef GSP_H
 #define GSP_H
 
-#include <kernel/memory.h>
-#include <kernel/thread.h>
+#include "kernel/memory.h"
+#include "kernel/thread.h"
 
 #include "srv.h"
 

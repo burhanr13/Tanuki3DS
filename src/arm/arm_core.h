@@ -1,7 +1,7 @@
 #ifndef ARM_CORE_H
 #define ARM_CORE_H
 
-#include <common.h>
+#include "common.h"
 
 #include "arm.h"
 

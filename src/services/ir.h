@@ -1,7 +1,7 @@
 #ifndef SRV_IR_H
 #define SRV_IR_H
 
-#include <kernel/thread.h>
+#include "kernel/thread.h"
 
 #include "srv.h"
 

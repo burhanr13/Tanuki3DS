@@ -1,9 +1,9 @@
 #include "ldr.h"
 
-#include <3ds.h>
-#include <arm/jit/jit.h>
-#include <kernel/memory.h>
-#include <kernel/svc_types.h>
+#include "3ds.h"
+#include "arm/jit/jit.h"
+#include "kernel/memory.h"
+#include "kernel/svc_types.h"
 
 DECL_PORT(ldr_ro) {
     u32* cmdbuf = PTR(cmd_addr);

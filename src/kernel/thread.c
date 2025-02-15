@@ -1,6 +1,6 @@
 #include "thread.h"
 
-#include <3ds.h>
+#include "3ds.h"
 
 void e3ds_restore_context(E3DS* s) {
     for (int i = 0; i < 16; i++) {
@@ -94,6 +94,7 @@ void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
 
     if (timeout == 0) {
         // instantly wakup the thread and set the return to timeout
+        // waitsync with timeout=0 is used to poll a sync object
         thread_wakeup_timeout(s, t->id);
         return;
     } else if (timeout > 0) {

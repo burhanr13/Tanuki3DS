@@ -1,7 +1,7 @@
 #ifndef THUMB_H
 #define THUMB_H
 
-#include <common.h>
+#include "common.h"
 
 #include "arm.h"
 

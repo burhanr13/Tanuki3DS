@@ -4,10 +4,10 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <3ds.h>
-#include <cpu.h>
-#include <emulator.h>
-#include <pica/renderer_gl.h>
+#include "3ds.h"
+#include "cpu.h"
+#include "emulator.h"
+#include "pica/renderer_gl.h"
 
 const char usage[] =
     R"(ctremu [options] [romfile]

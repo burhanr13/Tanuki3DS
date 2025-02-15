@@ -1,7 +1,7 @@
 #ifndef JIT_BLOCK_H
 #define JIT_BLOCK_H
 
-#include <arm/arm_core.h>
+#include "arm/arm_core.h"
 
 #include "ir.h"
 
