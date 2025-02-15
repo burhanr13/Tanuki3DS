@@ -130,7 +130,9 @@ void gsp_handle_event(E3DS* s, u32 arg) {
         gsp_handle_event(s, GSPEVENT_VBLANK1);
 
         // dsp stub for now
-        if (s->services.dsp.event) event_signal(s, s->services.dsp.event);
+        // int=2,ch=2 is for when audio is finished being processed
+        if (s->services.dsp.events[2][2])
+            event_signal(s, s->services.dsp.events[2][2]);
 
         linfo("vblank");
 

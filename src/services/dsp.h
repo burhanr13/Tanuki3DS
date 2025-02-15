@@ -6,7 +6,10 @@
 #include "srv.h"
 
 typedef struct {
-    KEvent* event;
+    // there are 3 interrupts and 4 channels to register
+    // events for
+    KEvent* events[3][4];
+
     KEvent semEvent;
 } DSPData;
 

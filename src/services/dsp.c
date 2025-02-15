@@ -10,6 +10,14 @@ u16 dsp_addrs[15] = {
 DECL_PORT(dsp) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
+        case 0x0001: {
+            int reg = cmdbuf[1];
+            linfo("RecvData %d", reg);
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 1;
+            break;
+        }
         case 0x0002:
             linfo("RecvDataIsReady");
             // stub
@@ -25,6 +33,7 @@ DECL_PORT(dsp) {
             break;
         }
         case 0x0010: {
+            u32 chan = cmdbuf[1];
             u32 size = (u16) cmdbuf[3];
             void* buf = PTR(cmdbuf[0x41]);
             cmdbuf[0] = IPCHDR(2, 0);
@@ -48,7 +57,7 @@ DECL_PORT(dsp) {
                 memcpy(buf + 2, dsp_addrs, sizeof dsp_addrs);
             }
 
-            linfo("ReadPipeIfPossible with size 0x%x", size);
+            linfo("ReadPipeIfPossible chan=%d with size 0x%x", chan, size);
             break;
         }
         case 0x0011:
@@ -69,17 +78,33 @@ DECL_PORT(dsp) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
-        case 0x0015:
-            linfo("RegisterInterruptEvents with handle %x", cmdbuf[4]);
-            s->services.dsp.event = HANDLE_GET_TYPED(cmdbuf[4], KOT_EVENT);
-            if (s->services.dsp.event) {
-                s->services.dsp.event->hdr.refcount++;
-                s->services.dsp.event->sticky = true;
-                s->services.dsp.event->signal = true;
+        case 0x0015: {
+            int interrupt = cmdbuf[1];
+            int channel = cmdbuf[2];
+            linfo("RegisterInterruptEvents int=%d,ch=%d with handle %x",
+                  interrupt, channel, cmdbuf[4]);
+            if (interrupt >= 3 || channel >= 4) {
+                lerror("invalid channel");
+                break;
             }
+
+            KEvent** event = &s->services.dsp.events[interrupt][channel];
+
+            // unregister an existing event
+            if (*event) {
+                (*event)->hdr.refcount--;
+                *event = nullptr;
+            }
+
+            *event = HANDLE_GET_TYPED(cmdbuf[4], KOT_EVENT);
+            if (*event) {
+                (*event)->hdr.refcount++;
+            }
+
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        }
         case 0x0016:
             linfo("GetSemaphoreEventHandle");
             cmdbuf[0] = IPCHDR(1, 2);

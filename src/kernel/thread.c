@@ -90,8 +90,12 @@ void thread_reschedule(E3DS* s) {
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
     linfo("sleeping thread %d with timeout %ld", t->id, timeout);
-    if (timeout < 0) {
-        t->state = THRD_SLEEP;
+    t->state = THRD_SLEEP;
+
+    if (timeout == 0) {
+        // instantly wakup the thread and set the return to timeout
+        thread_wakeup_timeout(s, t->id);
+        return;
     } else if (timeout > 0) {
         t->state = THRD_SLEEP;
         s64 timeCycles = timeout * CPU_CLK / 1'000'000'000;
@@ -106,6 +110,7 @@ void thread_wakeup_timeout(E3DS* s, u32 tid) {
 
     linfo("waking up thread %d from timeout", t->id);
     KListNode** cur = &t->waiting_objs;
+    if (*cur) t->ctx.r[0] = TIMEOUT;
     while (*cur) {
         sync_cancel(t, (*cur)->key);
         klist_remove(cur);

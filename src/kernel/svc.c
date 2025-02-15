@@ -387,15 +387,6 @@ DECL_SVC(WaitSynchronization1) {
 
     R(0) = 0;
 
-    // you can do waitsync with timeout=0 and its identical to
-    // sleepthread with timeout 0 (why would you need to do this)
-    if (timeout == 0) {
-        caller->state = THRD_SLEEP;
-        thread_reschedule(s);
-        caller->state = THRD_READY;
-        return;
-    }
-
     if (sync_wait(s, caller, obj)) {
         linfo("waiting on handle %x", handle);
         klist_insert(&caller->waiting_objs, obj);
@@ -415,15 +406,6 @@ DECL_SVC(WaitSynchronizationN) {
     int wokeupi = 0;
 
     R(0) = 0;
-
-    // you can do waitsync with timeout=0 and its identical to
-    // sleepthread with timeout 0 (why would you need to do this)
-    if (timeout == 0) {
-        caller->state = THRD_SLEEP;
-        thread_reschedule(s);
-        caller->state = THRD_READY;
-        return;
-    }
 
     for (int i = 0; i < count; i++) {
         KObject* obj = HANDLE_GET(handles[i]);

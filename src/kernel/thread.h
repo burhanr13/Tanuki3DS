@@ -8,6 +8,8 @@
 
 #define THREAD_MAX 32
 
+#define TIMEOUT 0x09401bfe
+
 typedef struct _3DS E3DS;
 
 enum {
