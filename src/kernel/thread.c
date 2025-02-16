@@ -174,7 +174,7 @@ void event_signal(E3DS* s, KEvent* ev) {
         thread_wakeup(s, (KThread*) (*cur)->key, &ev->hdr);
         klist_remove(cur);
     }
-    if (ev->callback) ev->callback(s, 0);
+    if (ev->callback) ev->callback(s);
     thread_reschedule(s);
     if (ev->sticky) ev->signal = true;
 }
