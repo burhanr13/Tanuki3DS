@@ -1,6 +1,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <fcntl.h>
+#include <sndfile.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -25,6 +26,8 @@ SDL_Gamepad* g_gamepad;
 bool g_pending_reset;
 
 char* oldcwd;
+
+SNDFILE* g_sndfp;
 
 #define FREECAM_SPEED 5.0
 #define FREECAM_ROTATE_SPEED 0.02
@@ -117,6 +120,10 @@ void hotkey_press(SDL_Keycode key) {
         default:
             break;
     }
+}
+
+void audio_cb(s16 samples[2]) {
+    sf_write_short(g_sndfp, samples, 2);
 }
 
 void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
@@ -305,6 +312,12 @@ int main(int argc, char** argv) {
         g_pending_reset = true;
     }
 
+    SF_INFO sfinfo = {.samplerate = 32768,
+                      .channels = 2,
+                      .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16};
+    g_sndfp = sf_open("sound.wav", SFM_WRITE, &sfinfo);
+    ctremu.audio_cb = audio_cb;
+
     if (ctremu.vsync) {
         if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
     } else {
@@ -419,6 +432,8 @@ int main(int argc, char** argv) {
     SDL_Quit();
 
     emulator_quit();
+
+    sf_close(g_sndfp);
 
     free(oldcwd);
 

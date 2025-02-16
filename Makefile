@@ -11,7 +11,7 @@ CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE -I/usr/local/include -Isrc --embed-dir=sys_files
 
-LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone -lconfuse -lteakra_c -lteakra
+LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone -lconfuse -lteakra_c -lteakra -lsndfile
 
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto

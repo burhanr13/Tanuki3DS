@@ -7,7 +7,7 @@
 
 #include "srv.h"
 
-#define DSP_SLICE_CYCLES 16384
+#define DSP_SLICE_CYCLES 32768
 
 #define DSPRAM_DATA_OFF 0x40000
 
@@ -40,6 +40,7 @@ typedef struct {
 typedef struct {
     // there are 3 interrupts and 4 channels to register
     // events for
+    // the only valid ones are [0][0] [1][0] [2][0..3]
     KEvent* events[3][4];
 
     KEvent sem_event; // signalled when there is new audio data

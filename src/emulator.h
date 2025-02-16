@@ -26,6 +26,8 @@ typedef struct {
     mat4 freecam_mtx;
     bool freecam_enable;
 
+    void (*audio_cb)(s16 samples[2]);
+
     E3DS system;
 
 } EmulatorState;

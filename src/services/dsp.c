@@ -1,6 +1,7 @@
 #include "dsp.h"
 
 #include "3ds.h"
+#include "emulator.h"
 
 // lle dsp code is based directly on citra
 
@@ -217,15 +218,19 @@ void recv_data_1_handler(E3DS* s) {
         event_signal(s, s->services.dsp.events[1][0]);
     }
 }
-
+static int bruh = 0;
 void handle_pipe_event(E3DS* s) {
-    linfo("dsp wrote the pipe");
     if (s->services.dsp.data_signaled && s->services.dsp.sem_signaled) {
         s->services.dsp.data_signaled = s->services.dsp.sem_signaled = false;
         u16 slot = Teakra_RecvData(s->services.dsp.teakra, 2);
         u16 dir = slot & 1;
         if (dir == PIPE_TODSP) return;
         u16 pipe = slot >> 1;
+        linfo("dsp wrote pipe %d %d", pipe, bruh++);
+        if (pipe == 0) {
+            lwarn("debug pipe");
+            return;
+        }
         if (pipe < 4 && s->services.dsp.events[2][pipe]) {
             event_signal(s, s->services.dsp.events[2][pipe]);
         }
@@ -249,6 +254,10 @@ void semaphore_handler(E3DS* s) {
     handle_pipe_event(s);
 }
 
+void audio_callback(void*, s16 samples[2]) {
+    ctremu.audio_cb(samples);
+}
+
 void dsp_lle_init(E3DS* s) {
     auto teakra = Teakra_Create();
     Teakra_SetDspMemory(teakra, PPTR(DSPRAM_PBASE));
@@ -266,6 +275,7 @@ void dsp_lle_init(E3DS* s) {
         teakra, 2, (Teakra_InterruptCallback) recv_data_2_handler, s);
     Teakra_SetSemaphoreHandler(teakra,
                                (Teakra_InterruptCallback) semaphore_handler, s);
+    Teakra_SetAudioCallback(teakra, audio_callback, nullptr);
 
     s->services.dsp.teakra = teakra;
 
@@ -287,6 +297,8 @@ void dsp_lle_run_event(E3DS* s, u32) {
 }
 
 void dsp_lle_read_pipe(E3DS* s, u32 index, u8* dst, u32 len) {
+    ldebug("reading pipe %d size %d", index, len);
+
     Pipe* pipes = DSPPTR(s->services.dsp.pipe_addr);
     int slot = index << 1 | PIPE_TOCPU;
     u8* pipedata = DSPPTR(pipes[slot].addr);
@@ -300,6 +312,8 @@ void dsp_lle_read_pipe(E3DS* s, u32 index, u8* dst, u32 len) {
 }
 
 void dsp_lle_write_pipe(E3DS* s, u32 index, u8* src, u32 len) {
+    ldebug("writing pipe %d size %d", index, len);
+
     Pipe* pipes = DSPPTR(s->services.dsp.pipe_addr);
     int slot = index << 1 | PIPE_TODSP;
     u8* pipedata = DSPPTR(pipes[slot].addr);
