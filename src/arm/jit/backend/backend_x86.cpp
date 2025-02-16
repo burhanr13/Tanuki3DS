@@ -5,6 +5,7 @@
 #include <capstone/capstone.h>
 #include <vector>
 #include <xbyak/xbyak.h>
+#include <xbyak/xbyak_util.h>
 
 struct LinkPatch {
     u32 jmp_offset;
@@ -65,6 +66,22 @@ struct Code : Xbyak::CodeGenerator {
 
     const Xbyak::Operand& getOp(int i) {
         return _getOp(regalloc->reg_assn[i]);
+    }
+
+    // older cpus don't support lzcnt
+    // and will silently execute a bsr instead
+    // very annoying
+    void lzcnt_portable(const Xbyak::Reg dst, const Xbyak::Operand& src) {
+        Xbyak::util::Cpu cpu;
+        if (cpu.has(Xbyak::util::Cpu::tLZCNT)) {
+            lzcnt(dst, src);
+        } else {
+            bsr(dst, src);
+            mov(ecx, -1);
+            cmove(dst, ecx);
+            neg(dst);
+            add(dst, 31);
+        }
     }
 };
 
@@ -835,14 +852,14 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 auto& dest = getOp(i);
                 if (inst.imm2) {
                     mov(edx, inst.op2);
-                    lzcnt(edx, edx);
+                    lzcnt_portable(edx, edx);
                     mov(dest, edx);
                 } else {
                     if (dest.isMEM()) {
-                        lzcnt(edx, getOp(inst.op2));
+                        lzcnt_portable(edx, getOp(inst.op2));
                         mov(dest, edx);
                     } else {
-                        lzcnt(dest.getReg(), getOp(inst.op2));
+                        lzcnt_portable(dest.getReg(), getOp(inst.op2));
                     }
                 }
                 break;
