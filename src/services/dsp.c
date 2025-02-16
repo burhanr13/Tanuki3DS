@@ -297,7 +297,7 @@ void dsp_lle_run_event(E3DS* s, u32) {
 }
 
 void dsp_lle_read_pipe(E3DS* s, u32 index, u8* dst, u32 len) {
-    ldebug("reading pipe %d size %d", index, len);
+    linfo("reading pipe %d size %d", index, len);
 
     Pipe* pipes = DSPPTR(s->services.dsp.pipe_addr);
     int slot = index << 1 | PIPE_TOCPU;
@@ -312,7 +312,7 @@ void dsp_lle_read_pipe(E3DS* s, u32 index, u8* dst, u32 len) {
 }
 
 void dsp_lle_write_pipe(E3DS* s, u32 index, u8* src, u32 len) {
-    ldebug("writing pipe %d size %d", index, len);
+    linfo("writing pipe %d size %d", index, len);
 
     Pipe* pipes = DSPPTR(s->services.dsp.pipe_addr);
     int slot = index << 1 | PIPE_TODSP;
