@@ -98,6 +98,12 @@ DECL_PORT(dsp) {
             cmdbuf[4] = cmdbuf[5];
             break;
         }
+        case 0x0012:
+            linfo("UnloadComponent");
+            if (s->services.dsp.teakra) dsp_lle_unload_component(s);
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
         case 0x0013:
             linfo("FlushDataCache");
             cmdbuf[0] = IPCHDR(1, 0);
@@ -172,10 +178,12 @@ enum {
 
 typedef struct {
     u16 addr;
-    u16 size;
-    // these are 16 bit but the actual address is only the bottom 15 bits
-    u16 read_ptr;
-    u16 write_ptr;
+    u16 size; // max size of the pipe
+    // wrap is copied from ptr & size
+    struct {
+        u16 ptr : 15;
+        u16 wrap : 1;
+    } head, tail;
     u8 slot;
     u8 flags;
 } Pipe;
@@ -200,13 +208,15 @@ void dsp_write32(E3DS* s, u32 addr, u32 data) {
 }
 
 void sem_event_handler(E3DS* s) {
-    linfo("sem event signaled");
     auto dsp = &s->services.dsp;
+    linfo("sem event signaled with mask=%04x", dsp->sem_mask);
     Teakra_SetSemaphore(dsp->teakra, dsp->sem_mask);
 }
 
 void recv_data_0_handler(E3DS* s) {
     linfo("recv data on ch0");
+    // ignore until the initialization is complete
+    if (!s->services.dsp.component_loaded) return;
     if (s->services.dsp.events[0][0]) {
         event_signal(s, s->services.dsp.events[0][0]);
     }
@@ -214,11 +224,13 @@ void recv_data_0_handler(E3DS* s) {
 
 void recv_data_1_handler(E3DS* s) {
     linfo("recv data on ch1");
+    // ignore until the initialization is complete
+    if (!s->services.dsp.component_loaded) return;
     if (s->services.dsp.events[1][0]) {
         event_signal(s, s->services.dsp.events[1][0]);
     }
 }
-static int bruh = 0;
+
 void handle_pipe_event(E3DS* s) {
     if (s->services.dsp.data_signaled && s->services.dsp.sem_signaled) {
         s->services.dsp.data_signaled = s->services.dsp.sem_signaled = false;
@@ -226,7 +238,7 @@ void handle_pipe_event(E3DS* s) {
         u16 dir = slot & 1;
         if (dir == PIPE_TODSP) return;
         u16 pipe = slot >> 1;
-        linfo("dsp wrote pipe %d %d", pipe, bruh++);
+        linfo("dsp wrote pipe %d", pipe);
         if (pipe == 0) {
             lwarn("debug pipe");
             return;
@@ -302,11 +314,31 @@ void dsp_lle_read_pipe(E3DS* s, u32 index, u8* dst, u32 len) {
     Pipe* pipes = DSPPTR(s->services.dsp.pipe_addr);
     int slot = index << 1 | PIPE_TOCPU;
     u8* pipedata = DSPPTR(pipes[slot].addr);
-    for (int i = 0; i < len; i++) {
-        dst[i] = pipedata[pipes[slot].read_ptr & ~BIT(15)];
-        pipes[slot].read_ptr++;
+
+    // move wrap bit to size to make our life easier
+    u16 hdptr =
+        pipes[slot].head.ptr | (pipes[slot].size * pipes[slot].head.wrap);
+    u16 tlptr =
+        pipes[slot].tail.ptr | (pipes[slot].size * pipes[slot].tail.wrap);
+
+    // check pipe size
+    u16 cursize = (tlptr - hdptr) & (2 * pipes[slot].size - 1);
+    if (cursize > pipes[slot].size) lerror("pipe is corrupted");
+    if (len > cursize) {
+        lerror("not enough data in the pipe");
     }
-    pipes[slot].size -= len;
+
+    for (int i = 0; i < len; i++) {
+        dst[i] = pipedata[hdptr & ~pipes[slot].size];
+        hdptr++;
+    }
+
+    // restore pointers and wrap bit
+    pipes[slot].head.ptr = hdptr & ~pipes[slot].size;
+    pipes[slot].head.wrap = (hdptr & pipes[slot].size) != 0;
+    pipes[slot].tail.ptr = tlptr & ~pipes[slot].size;
+    pipes[slot].tail.wrap = (tlptr & pipes[slot].size) != 0;
+
     // notify dsp that pipe was read
     Teakra_SendData(s->services.dsp.teakra, 2, slot);
 }
@@ -317,11 +349,31 @@ void dsp_lle_write_pipe(E3DS* s, u32 index, u8* src, u32 len) {
     Pipe* pipes = DSPPTR(s->services.dsp.pipe_addr);
     int slot = index << 1 | PIPE_TODSP;
     u8* pipedata = DSPPTR(pipes[slot].addr);
-    for (int i = 0; i < len; i++) {
-        pipedata[pipes[slot].write_ptr & ~BIT(15)] = src[i];
-        pipes[slot].write_ptr++;
+
+    // move wrap bit to size to make our life easier
+    u16 hdptr =
+        pipes[slot].head.ptr | (pipes[slot].size * pipes[slot].head.wrap);
+    u16 tlptr =
+        pipes[slot].tail.ptr | (pipes[slot].size * pipes[slot].tail.wrap);
+
+    // check pipe size
+    u16 cursize = (tlptr - hdptr) & (2 * pipes[slot].size - 1);
+    if (cursize > pipes[slot].size) lerror("pipe is corrupted");
+    if (cursize + len > pipes[slot].size) {
+        lerror("not enough room in the pipe");
     }
-    pipes[slot].size += len;
+
+    for (int i = 0; i < len; i++) {
+        pipedata[tlptr & ~pipes[slot].size] = src[i];
+        tlptr++;
+    }
+
+    // restore pointers and wrap bit
+    pipes[slot].head.ptr = hdptr & ~pipes[slot].size;
+    pipes[slot].head.wrap = (hdptr & pipes[slot].size) != 0;
+    pipes[slot].tail.ptr = tlptr & ~pipes[slot].size;
+    pipes[slot].tail.wrap = (tlptr & pipes[slot].size) != 0;
+
     // notify dsp that pipe was written
     Teakra_SendData(s->services.dsp.teakra, 2, slot);
 }
@@ -369,4 +421,23 @@ void dsp_lle_load_component(E3DS* s, void* buf) {
     add_event(&s->sched, dsp_lle_run_event, 0, DSP_SLICE_CYCLES);
 
     s->services.dsp.component_loaded = true;
+}
+
+void dsp_lle_unload_component(E3DS* s) {
+    if (!s->services.dsp.component_loaded) {
+        lerror("component not loaded");
+        return;
+    }
+
+    s->services.dsp.component_loaded = false;
+
+    // finalize communication with dsp
+    while (!Teakra_SendDataIsEmpty(s->services.dsp.teakra, 2))
+        dsp_lle_run_slice(s);
+    Teakra_SendData(s->services.dsp.teakra, 2, 0x8000);
+    while (!Teakra_RecvDataIsReady(s->services.dsp.teakra, 2))
+        dsp_lle_run_slice(s);
+    (void) Teakra_RecvData(s->services.dsp.teakra, 2);
+
+    remove_event(&s->sched, dsp_lle_run_event, 0);
 }

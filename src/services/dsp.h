@@ -67,5 +67,6 @@ void dsp_lle_read_pipe(E3DS* s, u32 index, u8* dst, u32 len);
 void dsp_lle_write_pipe(E3DS* s, u32 index, u8* src, u32 len);
 
 void dsp_lle_load_component(E3DS* s, void* buf);
+void dsp_lle_unload_component(E3DS* s);
 
 #endif
