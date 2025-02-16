@@ -33,6 +33,12 @@ DECL_PORT(gsp_gpu) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        case 0x0010: {
+            linfo("SetAxiConfigQoSMode");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
         case 0x0013: {
             cmdbuf[0] = IPCHDR(2, 2);
 
