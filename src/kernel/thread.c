@@ -161,6 +161,24 @@ void thread_kill(E3DS* s, KThread* t) {
     thread_reschedule(s);
 }
 
+KThread* remove_highest_prio(KListNode** l) {
+    int maxprio = THRD_MAX_PRIO;
+    KListNode** cur = l;
+    KListNode** toremove = nullptr;
+    KThread* wakeupthread = nullptr;
+    while (*cur) {
+        KThread* t = (KThread*) (*cur)->key;
+        if (t->priority < maxprio) {
+            maxprio = t->priority;
+            toremove = cur;
+            wakeupthread = t;
+        }
+        cur = &(*cur)->next;
+    }
+    if (toremove) klist_remove(toremove);
+    return wakeupthread;
+}
+
 KEvent* event_create(bool sticky) {
     KEvent* ev = calloc(1, sizeof *ev);
     ev->hdr.type = KOT_EVENT;
@@ -169,14 +187,19 @@ KEvent* event_create(bool sticky) {
 }
 
 void event_signal(E3DS* s, KEvent* ev) {
-    KListNode** cur = &ev->waiting_thrds;
-    while (*cur) {
-        thread_wakeup(s, (KThread*) (*cur)->key, &ev->hdr);
-        klist_remove(cur);
+    if (ev->sticky) {
+        KListNode** cur = &ev->waiting_thrds;
+        while (*cur) {
+            thread_wakeup(s, (KThread*) (*cur)->key, &ev->hdr);
+            klist_remove(cur);
+        }
+        ev->signal = true;
+    } else {
+        KThread* thr = remove_highest_prio(&ev->waiting_thrds);
+        if (thr) thread_wakeup(s, thr, &ev->hdr);
     }
     if (ev->callback) ev->callback(s);
     thread_reschedule(s);
-    if (ev->sticky) ev->signal = true;
 }
 
 KMutex* mutex_create() {
@@ -192,21 +215,8 @@ void mutex_release(E3DS* s, KMutex* mtx) {
     }
     if (!mtx->locker_thrd) return;
 
-    int maxprio = THRD_MAX_PRIO;
-    KListNode** cur = &mtx->waiting_thrds;
-    KListNode** toremove = nullptr;
-    KThread* wakeupthread = nullptr;
-    while (*cur) {
-        KThread* t = (KThread*) (*cur)->key;
-        if (t->priority < maxprio) {
-            maxprio = t->priority;
-            toremove = cur;
-            wakeupthread = t;
-        }
-        cur = &(*cur)->next;
-    }
+    KThread* wakeupthread = remove_highest_prio(&mtx->waiting_thrds);
     thread_wakeup(s, wakeupthread, &mtx->hdr);
-    klist_remove(toremove);
     mtx->locker_thrd = wakeupthread;
 
     thread_reschedule(s);
