@@ -36,7 +36,7 @@ void e3ds_handle_svc(E3DS* s, u32 num) {
 
 DECL_SVC(ControlMemory) {
     u32 memop = R(0) & MEMOP_MASK;
-    u32 memreg = R(0) & MEMOP_REGMASK;
+    u32 memreg [[gnu::unused]] = R(0) & MEMOP_REGMASK;
     bool linear = R(0) & MEMOP_LINEAR;
     u32 addr0 = R(1);
     u32 addr1 = R(2);
@@ -228,7 +228,7 @@ DECL_SVC(CreateMemoryBlock) {
 
     u32 addr = R(1);
     u32 size = R(2);
-    u32 perm = R(3);
+    u32 perm [[gnu::unused]] = R(3);
 
     KSharedMem* shm = calloc(1, sizeof *shm);
     shm->hdr.type = KOT_SHAREDMEM;
@@ -291,7 +291,7 @@ DECL_SVC(ArbitrateAddress) {
     u32 addr = R(1);
     u32 type = R(2);
     s32 value = R(3);
-    s64 time = R(4) | (u64) R(5) << 32;
+    s64 timeout = R(4) | (u64) R(5) << 32;
 
     KArbiter* arbiter = HANDLE_GET_TYPED(h, KOT_ARBITER);
     if (!arbiter) {
@@ -340,14 +340,22 @@ DECL_SVC(ArbitrateAddress) {
             break;
         case ARBITRATE_WAIT:
         case ARBITRATE_DEC_WAIT:
+        case ARBITRATE_WAIT_TIMEOUT:
+        case ARBITRATE_DEC_WAIT_TIMEOUT:
             if (*(s32*) PTR(addr) < value) {
                 klist_insert(&arbiter->waiting_thrds, &caller->hdr);
                 klist_insert(&caller->waiting_objs, &arbiter->hdr);
                 caller->waiting_addr = addr;
                 linfo("waiting on address %08x", addr);
-                thread_sleep(s, caller, -1);
+                if (type == ARBITRATE_WAIT_TIMEOUT ||
+                    type == ARBITRATE_DEC_WAIT_TIMEOUT) {
+                    thread_sleep(s, caller, timeout);
+                } else {
+                    thread_sleep(s, caller, -1);
+                }
             }
-            if (type == ARBITRATE_DEC_WAIT) {
+            if (type == ARBITRATE_DEC_WAIT ||
+                type == ARBITRATE_DEC_WAIT_TIMEOUT) {
                 *(s32*) PTR(addr) -= 1;
             }
             break;
