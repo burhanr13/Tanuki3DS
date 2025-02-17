@@ -168,8 +168,8 @@ DECL_PORT(apt) {
             u32 utility = cmdbuf[1];
             u32 insize = cmdbuf[2];
             u32 outsize = cmdbuf[3];
-            void* input = PTR(cmdbuf[5]);
-            void* output = PTR(cmdbuf[0x41]);
+            void* input [[gnu::unused]] = PTR(cmdbuf[5]);
+            void* output [[gnu::unused]] = PTR(cmdbuf[0x41]);
             linfo("AppletUtility %d in at %08x size %x out at %08x size %x",
                   utility, cmdbuf[5], insize, cmdbuf[0x41], outsize);
             cmdbuf[0] = IPCHDR(2, 0);
@@ -193,9 +193,9 @@ DECL_PORT(apt) {
             break;
         }
         case 0x0051: {
-            u32 paramsize = cmdbuf[1];
+            u32 paramsize [[gnu::unused]] = cmdbuf[1];
             u32 type = cmdbuf[2];
-            u32 paramaddr = cmdbuf[0x41];
+            u32 paramaddr [[gnu::unused]] = cmdbuf[0x41];
             lwarn("GetStartupArgument type %d", type);
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;

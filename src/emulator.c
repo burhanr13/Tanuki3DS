@@ -23,7 +23,7 @@ void load_config() {
     };
     cfg_t* cfg = cfg_init(opts, 0);
 
-    auto res = cfg_parse(cfg, "config.txt");
+    cfg_parse(cfg, "config.txt");
 
     g_infologs = cfg_getbool(cfg, "verbose_log");
     ctremu.vsync = cfg_getbool(cfg, "vsync");
