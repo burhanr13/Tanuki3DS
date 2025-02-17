@@ -86,7 +86,7 @@ DECL_PORT(dsp) {
         }
         case 0x0011: {
             linfo("LoadComponent");
-            u32 size = cmdbuf[1];
+            u32 size [[gnu::unused]] = cmdbuf[1];
             void* buf = PTR(cmdbuf[5]);
 
             if (s->services.dsp.teakra) dsp_lle_load_component(s, buf);
