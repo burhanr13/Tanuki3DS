@@ -20,19 +20,20 @@ DECL_PORT(dsp) {
             linfo("RecvData %d", reg);
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = 1;
+            cmdbuf[2] = Teakra_RecvData(teakra, reg);
             break;
         }
-        case 0x0002:
-            linfo("RecvDataIsReady");
-            // stub
+        case 0x0002: {
+            int reg = cmdbuf[1];
+            linfo("RecvDataIsReady %d", reg);
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = 1;
+            cmdbuf[2] = Teakra_RecvDataIsReady(teakra, reg);
             break;
+        }
         case 0x0007:
             linfo("SetSemaphore %x", cmdbuf[1]);
-            if (teakra) Teakra_SetSemaphore(teakra, cmdbuf[1]);
+            Teakra_SetSemaphore(teakra, cmdbuf[1]);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -48,7 +49,7 @@ DECL_PORT(dsp) {
             u32 size = cmdbuf[2];
             void* buf = PTR(cmdbuf[4]);
             linfo("WriteProcessPipe ch=%d, sz=%d", chan, size);
-            if (teakra) dsp_lle_write_pipe(s, chan, buf, size);
+            dsp_lle_write_pipe(s, chan, buf, size);
             break;
         }
         case 0x0010: {
@@ -60,27 +61,7 @@ DECL_PORT(dsp) {
             cmdbuf[2] = size;
 
             linfo("ReadPipeIfPossible chan=%d with size 0x%x", chan, size);
-
-            if (teakra) {
-                dsp_lle_read_pipe(s, chan, buf, size);
-            } else {
-                // the dsp code first reads 2 bytes containing the number of
-                // entries (15) then it reads 15 shorts (30 bytes) containing
-                // dsp addresses of each dsp firmware memory region
-
-                if (size == 2) {
-                    *(u16*) buf = 15;
-                }
-                if (size == 30) {
-                    memcpy(buf, dsp_addrs, sizeof dsp_addrs);
-                }
-
-                // but you can also read it all at once
-                if (size == 32) {
-                    *(u16*) buf = 15;
-                    memcpy(buf + 2, dsp_addrs, sizeof dsp_addrs);
-                }
-            }
+            dsp_lle_read_pipe(s, chan, buf, size);
 
             break;
         }
@@ -89,7 +70,7 @@ DECL_PORT(dsp) {
             u32 size [[gnu::unused]] = cmdbuf[1];
             void* buf = PTR(cmdbuf[5]);
 
-            if (s->services.dsp.teakra) dsp_lle_load_component(s, buf);
+            dsp_lle_load_component(s, buf);
 
             cmdbuf[0] = IPCHDR(2, 2);
             cmdbuf[1] = 0;
@@ -100,7 +81,7 @@ DECL_PORT(dsp) {
         }
         case 0x0012:
             linfo("UnloadComponent");
-            if (s->services.dsp.teakra) dsp_lle_unload_component(s);
+            dsp_lle_unload_component(s);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
