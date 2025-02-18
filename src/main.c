@@ -84,7 +84,7 @@ void file_callback(void*, char** files, int n) {
 void load_rom_dialog() {
     SDL_DialogFileFilter filetypes = {
         .name = "3DS Executables",
-        .pattern = "3ds;cci;cxi;app;elf",
+        .pattern = "3ds;cci;cxi;app;elf;axf;3dsx",
     };
 
     ctremu.pause = true;

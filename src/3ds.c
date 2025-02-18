@@ -36,6 +36,8 @@ bool e3ds_init(E3DS* s, char* romfile) {
     } else if (!strcmp(ext, ".cxi") || !strcmp(ext, ".app") ||
                !strcmp(ext, ".ncch")) {
         entrypoint = load_ncch(s, romfile, 0);
+    } else if (!strcmp(ext, ".3dsx")) {
+        entrypoint = load_3dsx(s, romfile);
     } else {
         eprintf("unsupported file format\n");
         e3ds_destroy(s);
