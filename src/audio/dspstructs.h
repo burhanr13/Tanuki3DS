@@ -4,15 +4,26 @@
 #include "common.h"
 #include "dsp.h"
 
+enum { DSPFMT_PCM8, DSPFMT_PCM16, DSPFMT_ADPCM };
+
+// u32 are stored in mixed endian
 typedef struct {
-    u8 scale;
+    u16 hi;
+    u16 lo;
+} DSPu32;
+
+#define GETDSPU32(x) ((x).hi << 16 | (x).lo)
+#define SETDSPU32(x, y) ((x).lo = (y), (x).hi = (y) >> 16)
+
+typedef struct {
+    u8 index;
     u8 _pad;
-    s16 y[2];
+    s16 history[2];
 } ADPCMData;
 
 typedef struct {
-    u32 addr;
-    u32 len;
+    DSPu32 addr;
+    DSPu32 len;
     ADPCMData adpcm;
     u8 adpcm_dirty;
     u8 looping;
@@ -27,7 +38,7 @@ typedef u16 DSPFrameCount;
 
 // 2
 typedef struct {
-    u32 dirty;
+    DSPu32 dirty;
     float gain[3][2][2];
     float rate;
     u8 interp_mode;
@@ -40,10 +51,10 @@ typedef struct {
     u32 _156;
     u16 active;
     u16 sync_count;
-    u32 play_pos;
+    DSPu32 play_pos;
     u32 _168;
-    u32 embed_buf_addr;
-    u32 embed_buf_len;
+    DSPu32 buf_addr;
+    DSPu32 buf_len;
     struct {
         u16 num_chan : 2;
         u16 codec : 2;
@@ -51,9 +62,13 @@ typedef struct {
         u16 fade : 1;
         u16 : 10;
     } format;
-    ADPCMData embed_buf_adpcm;
-    u16 flags;
-    u16 embed_buf_id;
+    ADPCMData buf_adpcm;
+    struct {
+        u16 adpcm_dirty : 1;
+        u16 looping : 1;
+        u16 : 14;
+    } flags;
+    u16 buf_id;
 } DSPInputConfig;
 
 // 3
@@ -61,9 +76,9 @@ typedef struct {
     u8 enabled;
     u8 dirty;
     u16 sync_count;
-    u32 pos;
+    DSPu32 pos;
     u16 cur_buf;
-    u16 prev_buf;
+    u16 _10;
 } DSPInputStatus;
 
 // 4

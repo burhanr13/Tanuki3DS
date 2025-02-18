@@ -58,6 +58,6 @@ DSPMemory* get_curr_bank(DSP* dsp) {
 }
 
 void dsp_process_frame(DSP* dsp) {
-    auto m = get_curr_bank(dsp);
+    auto m [[gnu::unused]] = get_curr_bank(dsp);
     // do stuff ?
 }
