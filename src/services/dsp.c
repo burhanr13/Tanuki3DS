@@ -59,7 +59,7 @@ DECL_PORT(dsp) {
             u32 chan = cmdbuf[1];
             u32 size = cmdbuf[2];
             void* buf = PTR(cmdbuf[4]);
-            ldebug("WriteProcessPipe ch=%d, sz=%d", chan, size);
+            linfo("WriteProcessPipe ch=%d, sz=%d", chan, size);
             switch (chan) {
                 case 2:
                     dsp_write_audio_pipe(&s->dsp, buf, size);
@@ -84,7 +84,7 @@ DECL_PORT(dsp) {
             cmdbuf[1] = 0;
             cmdbuf[2] = size;
 
-            ldebug("ReadPipeIfPossible chan=%d with size 0x%x", chan, size);
+            linfo("ReadPipeIfPossible chan=%d with size 0x%x", chan, size);
             switch (chan) {
                 case 2:
                     dsp_read_audio_pipe(&s->dsp, buf, size);
