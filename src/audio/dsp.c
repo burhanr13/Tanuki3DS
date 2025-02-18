@@ -44,6 +44,7 @@ void dsp_read_audio_pipe(DSP* dsp, void* buf, u32 len) {
         lwarn("cannot read from audio pipe");
     }
     memcpy(buf, (void*) audio_pipe + dsp->audio_pipe_pos, len);
+    dsp->audio_pipe_pos += len;
 }
 
 // the binary pipes are used for aac decoding
