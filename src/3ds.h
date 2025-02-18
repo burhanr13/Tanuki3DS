@@ -14,8 +14,8 @@
 #include "services/srv.h"
 #include "video/gpu.h"
 
-#define CPU_CLK 268'000'000ull
-#define FPS 60ull
+#define CPU_CLK 268'111'856ull // exact number from citra
+#define FPS 60
 
 enum {
     SCREEN_TOP,

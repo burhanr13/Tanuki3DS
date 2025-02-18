@@ -4,12 +4,16 @@
 #include "common.h"
 #include "kernel/memory.h"
 
-#define SAMPLE_RATE 32768ull
-#define FRAME_SAMPLES 160ull
+#define SAMPLE_RATE 32768
+#define FRAME_SAMPLES 160
+
+#define DSP_CHANNELS 24
 
 // dsp program is 1ff00000-1ff40000
 // dsp data is 1ff40000-1ff80000
 #define DSPRAM_DATA_OFF 0x40000
+// dsp swaps between the two banks of data
+#define DSPRAM_BANK_OFF 0x20000
 
 typedef struct {
 #ifdef FASTMEM
