@@ -7,7 +7,7 @@
 #include "3ds.h"
 #include "cpu.h"
 #include "emulator.h"
-#include "pica/renderer_gl.h"
+#include "video/renderer_gl.h"
 
 const char usage[] =
     R"(ctremu [options] [romfile]

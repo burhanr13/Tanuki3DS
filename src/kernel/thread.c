@@ -198,7 +198,7 @@ void event_signal(E3DS* s, KEvent* ev) {
         KThread* thr = remove_highest_prio(&ev->waiting_thrds);
         if (thr) thread_wakeup(s, thr, &ev->hdr);
     }
-    if (ev->callback) ev->callback(s, 0);
+    if (ev->callback) ev->callback(s);
     thread_reschedule(s);
 }
 

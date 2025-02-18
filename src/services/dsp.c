@@ -1,35 +1,76 @@
 #include "dsp.h"
 
 #include "3ds.h"
+#include "audio/dsp.h"
 
-u16 dsp_addrs[15] = {
-    0xBFFF, 0x9E92, 0x8680, 0xA792, 0x9430, 0x8400, 0x8540, 0x9492,
-    0x8710, 0x8410, 0xA912, 0xAA12, 0xAAD2, 0xAC52, 0xAC5C,
-};
+// runs when the application signals the dsp semaphore
+// that a new audio frame is ready
+void sem_event_handler(E3DS* s) {
+    ldebug("dsp sem signaled");
+    // we might need to delay this?
+    dsp_process_frame(&s->dsp);
+    if (s->services.dsp.audio_event)
+        event_signal(s, s->services.dsp.audio_event);
+}
 
 DECL_PORT(dsp) {
     u32* cmdbuf = PTR(cmd_addr);
+
     switch (cmd.command) {
         case 0x0001: {
             int reg = cmdbuf[1];
             linfo("RecvData %d", reg);
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = 1;
+            // this is only used directly by the application
+            // to check whether the dsp is on
+            if (reg == 0) {
+                cmdbuf[2] = 1;
+            } else {
+                lwarn("unknown channel for recv data");
+            }
             break;
         }
-        case 0x0002:
-            linfo("RecvDataIsReady");
-            // stub
+        case 0x0002: {
+            int reg = cmdbuf[1];
+            linfo("RecvDataIsReady %d", reg);
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = 1;
+            cmdbuf[2] = 1; // hle dsp is always ready
+            break;
+        }
+        case 0x0007:
+            linfo("SetSemaphore %x", cmdbuf[1]);
+            // not useful in hle
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x000c: {
             linfo("ConvertProcessAddressFromDspDram");
             cmdbuf[0] = IPCHDR(2, 0);
-            cmdbuf[2] = DSPRAM_VBASE + 0x40000 + (cmdbuf[1] << 1);
+            cmdbuf[2] = DSPRAM_VBASE + DSPRAM_DATA_OFF + (cmdbuf[1] << 1);
             cmdbuf[1] = 0;
+            break;
+        }
+        case 0x000d: {
+            u32 chan = cmdbuf[1];
+            u32 size = cmdbuf[2];
+            void* buf = PTR(cmdbuf[4]);
+            ldebug("WriteProcessPipe ch=%d, sz=%d", chan, size);
+            switch (chan) {
+                case 2:
+                    dsp_write_audio_pipe(&s->dsp, buf, size);
+                    if (s->services.dsp.audio_event)
+                        event_signal(s, s->services.dsp.audio_event);
+                    break;
+                case 3:
+                    dsp_write_binary_pipe(&s->dsp, buf, size);
+                    if (s->services.dsp.binary_event)
+                        event_signal(s, s->services.dsp.binary_event);
+                    break;
+                default:
+                    lwarn("unknown audio pipe");
+            }
             break;
         }
         case 0x0010: {
@@ -40,33 +81,37 @@ DECL_PORT(dsp) {
             cmdbuf[1] = 0;
             cmdbuf[2] = size;
 
-            // the dsp code first reads 2 bytes containing the number of entries
-            // (15) then it reads 15 shorts (30 bytes) containing dsp addresses
-            // of each dsp firmware memory region
-
-            if (size == 2) {
-                *(u16*) buf = 15;
+            ldebug("ReadPipeIfPossible chan=%d with size 0x%x", chan, size);
+            switch (chan) {
+                case 2:
+                    dsp_read_audio_pipe(&s->dsp, buf, size);
+                    break;
+                case 3:
+                    dsp_read_binary_pipe(&s->dsp, buf, size);
+                    break;
+                default:
+                    lwarn("unknown audio pipe");
             }
-            if (size == 30) {
-                memcpy(buf, dsp_addrs, sizeof dsp_addrs);
-            }
-
-            // but you can also read it all at once
-            if (size == 32) {
-                *(u16*) buf = 15;
-                memcpy(buf + 2, dsp_addrs, sizeof dsp_addrs);
-            }
-
-            linfo("ReadPipeIfPossible chan=%d with size 0x%x", chan, size);
             break;
         }
-        case 0x0011:
+        case 0x0011: {
             linfo("LoadComponent");
+            u32 size [[gnu::unused]] = cmdbuf[1];
+            void* buf [[gnu::unused]] = PTR(cmdbuf[5]);
+
+            // component is not directly used right now
+
             cmdbuf[0] = IPCHDR(2, 2);
             cmdbuf[1] = 0;
             cmdbuf[2] = true;
-            cmdbuf[3] = 0;
-            cmdbuf[4] = 0;
+            cmdbuf[3] = cmdbuf[4];
+            cmdbuf[4] = cmdbuf[5];
+            break;
+        }
+        case 0x0012:
+            linfo("UnloadComponent");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x0013:
             linfo("FlushDataCache");
@@ -83,12 +128,22 @@ DECL_PORT(dsp) {
             int channel = cmdbuf[2];
             linfo("RegisterInterruptEvents int=%d,ch=%d with handle %x",
                   interrupt, channel, cmdbuf[4]);
-            if (interrupt >= 3 || channel >= 4) {
-                lerror("invalid channel");
-                break;
-            }
 
-            KEvent** event = &s->services.dsp.events[interrupt][channel];
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+
+            KEvent** event;
+            if (interrupt != 2) {
+                lwarn("unknown interrupt event");
+                break;
+            } else {
+                if (channel == 2) event = &s->services.dsp.audio_event;
+                else if (channel == 3) event = &s->services.dsp.binary_event;
+                else {
+                    lwarn("unknown channel for pipe event");
+                    break;
+                }
+            }
 
             // unregister an existing event
             if (*event) {
@@ -100,9 +155,6 @@ DECL_PORT(dsp) {
             if (*event) {
                 (*event)->hdr.refcount++;
             }
-
-            cmdbuf[0] = IPCHDR(1, 0);
-            cmdbuf[1] = 0;
             break;
         }
         case 0x0016:
@@ -110,7 +162,14 @@ DECL_PORT(dsp) {
             cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;
-            cmdbuf[3] = srvobj_make_handle(s, &s->services.dsp.semEvent.hdr);
+            s->services.dsp.sem_event.callback = sem_event_handler;
+            cmdbuf[3] = srvobj_make_handle(s, &s->services.dsp.sem_event.hdr);
+            break;
+        case 0x0017:
+            linfo("SetSemaphoreMask %x", cmdbuf[1]);
+            s->services.dsp.sem_mask = cmdbuf[1];
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
             break;
         case 0x001f:
             linfo("GetHeadphoneStatus");
