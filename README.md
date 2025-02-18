@@ -19,7 +19,14 @@ You can download a stable release from the releases tab, or the latest build bel
 | MacOS | [x86_64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) <br> [arm64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) | 
 
 ## Usage
-Launching the app should give you a prompt to select the game file (currently supports .elf, .3ds/.cci, .cxi/.app files, roms must be decrypted). You can also start a game by dropping its file onto the window.
+Launching the app should give you a prompt to select the game file. You can also start a game by dropping its file onto the window. The supported formats are:
+
+- .cci/.3ds
+- .cxi/.app
+- .elf/.axf
+- .3dsx
+
+All games must be decrypted.
 
 You can modify emulator settings in the generated config file.
 

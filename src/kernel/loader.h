@@ -112,6 +112,31 @@ typedef struct {
     } file[10];
 } ExeFSHeader;
 
+typedef struct {
+    char magic[4]; // 3DSX
+    u16 hdrSz;
+    u16 relHdrSz;
+    u32 version;
+    u32 flags;
+    u32 codeSz;
+    u32 rodataSz;
+    u32 dataBssSz;
+    u32 bssSz;
+    u32 smdhOff;
+    u32 smdhSz;
+    u32 romfsOff;
+} _3DSXHeader;
+
+typedef struct {
+    u32 numAbsolute;
+    u32 numRelative;
+} _3DSXRelHeader;
+
+typedef struct {
+    u16 skip;
+    u16 patch;
+} _3DSXRelocation;
+
 typedef struct _3DS E3DS;
 
 typedef struct {
@@ -122,6 +147,7 @@ typedef struct {
 } RomImage;
 
 u32 load_elf(E3DS* s, char* filename);
+u32 load_3dsx(E3DS* s, char* filename);
 u32 load_ncsd(E3DS* s, char* filename);
 u32 load_ncch(E3DS* s, char* filename, u64 offset);
 

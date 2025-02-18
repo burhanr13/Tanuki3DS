@@ -57,6 +57,71 @@ u32 load_elf(E3DS* s, char* filename) {
     return ehdr.e_entry;
 }
 
+// 3dsx file format info from citra
+u32 load_3dsx(E3DS* s, char* filename) {
+    FILE* fp = fopen(filename, "r");
+    if (!fp) {
+        eprintf("no such file\n");
+        return -1;
+    }
+
+    _3DSXHeader hdr;
+    fread(&hdr, 1, sizeof(_3DSXHeader), fp);
+
+    fseek(fp, hdr.hdrSz, SEEK_SET);
+    _3DSXRelHeader relhdr[3];
+    fread(relhdr, hdr.relHdrSz, 3, fp);
+
+    // the start address here is arbitrary
+    u32 start_addr = 0x10'0000;
+
+    u32 segfilesz[3] = {hdr.codeSz, hdr.rodataSz, hdr.dataBssSz - hdr.bssSz};
+    u32 segmemsz[3] = {
+        (hdr.codeSz + 0xfff) & ~0xfff,
+        (hdr.rodataSz + 0xfff) & ~0xfff,
+        (hdr.dataBssSz + 0xfff) & ~0xfff,
+    };
+    u32 segstarts[3] = {start_addr, start_addr + segmemsz[0],
+                        start_addr + segmemsz[0] + segmemsz[1]};
+
+    memory_virtalloc(s, segstarts[0], segmemsz[0], PERM_RX, MEMST_CODE);
+    memory_virtalloc(s, segstarts[1], segmemsz[1], PERM_R, MEMST_CODE);
+    memory_virtalloc(s, segstarts[2], segmemsz[2], PERM_RW, MEMST_CODE);
+
+    for (int i = 0; i < 3; i++) {
+        fread(PTR(segstarts[i]), 1, segfilesz[i], fp);
+    }
+
+    for (int seg = 0; seg < 3; seg++) {
+        u32* pos = PTR(segstarts[seg]);
+        for (int r = 0; r < relhdr[seg].numAbsolute; r++) {
+            _3DSXRelocation rel;
+            fread(&rel, sizeof rel, 1, fp);
+            pos += rel.skip;
+            for (int p = 0; p < rel.patch; p++) {
+                *pos++ += start_addr;
+            }
+        }
+        pos = PTR(segstarts[seg]);
+        for (int r = 0; r < relhdr[seg].numRelative; r++) {
+            _3DSXRelocation rel;
+            fread(&rel, sizeof rel, 1, fp);
+            pos += rel.skip;
+            for (int p = 0; p < rel.patch; p++) {
+                *pos -= (void*) pos - PTR(segstarts[0]);
+                pos++;
+            }
+        }
+    }
+
+    s->romimage.fp = fp;
+    s->romimage.romfs_off = hdr.romfsOff;
+
+    memory_virtalloc(s, STACK_BASE - BIT(14), BIT(14), PERM_RW, MEMST_PRIVATE);
+
+    return start_addr;
+}
+
 u32 load_ncsd(E3DS* s, char* filename) {
     FILE* fp = fopen(filename, "rb");
     if (!fp) return -1;
