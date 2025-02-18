@@ -3,14 +3,17 @@
 #include "3ds.h"
 #include "audio/dsp.h"
 
+void dsp_event(E3DS* s, u32) {
+    if (s->services.dsp.audio_event)
+        event_signal(s, s->services.dsp.audio_event);
+}
+
 // runs when the application signals the dsp semaphore
 // that a new audio frame is ready
 void sem_event_handler(E3DS* s) {
-    ldebug("dsp sem signaled");
-    // we might need to delay this?
+    linfo("dsp sem signaled");
     dsp_process_frame(&s->dsp);
-    if (s->services.dsp.audio_event)
-        event_signal(s, s->services.dsp.audio_event);
+    add_event(&s->sched, dsp_event, 0, CPU_CLK * FRAME_SAMPLES / SAMPLE_RATE);
 }
 
 DECL_PORT(dsp) {

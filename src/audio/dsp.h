@@ -4,6 +4,9 @@
 #include "common.h"
 #include "kernel/memory.h"
 
+#define SAMPLE_RATE 32768ull
+#define FRAME_SAMPLES 160ull
+
 // dsp program is 1ff00000-1ff40000
 // dsp data is 1ff40000-1ff80000
 #define DSPRAM_DATA_OFF 0x40000

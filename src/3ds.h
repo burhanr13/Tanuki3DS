@@ -14,8 +14,8 @@
 #include "services/srv.h"
 #include "video/gpu.h"
 
-#define CPU_CLK 268000000
-#define FPS 60
+#define CPU_CLK 268'000'000ull
+#define FPS 60ull
 
 enum {
     SCREEN_TOP,
