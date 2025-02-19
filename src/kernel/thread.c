@@ -3,19 +3,15 @@
 #include "3ds.h"
 
 void e3ds_restore_context(E3DS* s) {
-    for (int i = 0; i < 16; i++) {
-        s->cpu.r[i] = CUR_THREAD->ctx.r[i];
-        s->cpu.d[i] = CUR_THREAD->ctx.d[i];
-    }
+    memcpy(s->cpu.r, CUR_THREAD->ctx.r, sizeof s->cpu.r);
+    memcpy(s->cpu.d, CUR_THREAD->ctx.d, sizeof s->cpu.d);
     s->cpu.cpsr.w = CUR_THREAD->ctx.cpsr;
     s->cpu.fpscr.w = CUR_THREAD->ctx.fpscr;
 }
 
 void e3ds_save_context(E3DS* s) {
-    for (int i = 0; i < 16; i++) {
-        CUR_THREAD->ctx.r[i] = s->cpu.r[i];
-        CUR_THREAD->ctx.d[i] = s->cpu.d[i];
-    }
+    memcpy(CUR_THREAD->ctx.r, s->cpu.r, sizeof s->cpu.r);
+    memcpy(CUR_THREAD->ctx.d, s->cpu.d, sizeof s->cpu.d);
     CUR_THREAD->ctx.cpsr = s->cpu.cpsr.w;
     CUR_THREAD->ctx.fpscr = s->cpu.fpscr.w;
 }

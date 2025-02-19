@@ -31,7 +31,7 @@ typedef struct _ArmCore ArmCore;
 typedef struct _JITBlock JITBlock;
 
 typedef struct _ArmCore {
-    union {
+    alignas(16) union {
         u32 r[16];
         struct {
             u32 _r[13];
@@ -65,8 +65,8 @@ typedef struct _ArmCore {
     u32 spsr;
 
     union {
-        float s[32];
-        double d[16];
+        alignas(16) float s[32];
+        alignas(16) double d[16];
     };
 
     union {
