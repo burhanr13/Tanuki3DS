@@ -625,7 +625,10 @@ DECL_ARM_COMPILE(pack_sat) {
             EMITIV(USAT, satamt, vop2);
             EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
         } else if (instr.pack_sat.s) {
-            lwarn("unknown sat %08x at %08x", instr.w, addr);
+            u32 satamt = instr.pack_sat.rn | instr.pack_sat.h << 4;
+            // set q flag
+            EMITIV(SSAT, satamt, vop2);
+            EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
         } else {
             u32 vop1 = EMIT_LOAD_REG(instr.pack_sat.rn);
             if (instr.pack_sat.x) {

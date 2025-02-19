@@ -16,7 +16,14 @@ typedef struct {
 #define SETDSPU32(x, y) ((x).lo = (y), (x).hi = (y) >> 16)
 
 typedef struct {
-    u8 index;
+    union {
+        u8 indexScale;
+        struct {
+            u8 scale : 4;
+            u8 index : 3;
+            u8 : 1;
+        };
+    };
     u8 _pad;
     s16 history[2];
 } ADPCMData;
@@ -78,7 +85,7 @@ typedef struct {
     u16 sync_count;
     DSPu32 pos;
     u16 cur_buf;
-    u16 _10;
+    u16 prev_buf;
 } DSPInputStatus;
 
 // 4

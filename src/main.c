@@ -22,6 +22,8 @@ SDL_Window* g_window;
 SDL_JoystickID g_gamepad_id;
 SDL_Gamepad* g_gamepad;
 
+SDL_AudioStream* g_audio;
+
 bool g_pending_reset;
 
 char* oldcwd;
@@ -113,6 +115,9 @@ void hotkey_press(SDL_Keycode key) {
             ctremu.freecam_enable = !ctremu.freecam_enable;
             glm_mat4_identity(ctremu.freecam_mtx);
             renderer_gl_update_freecam(&ctremu.system.gpu.gl);
+            break;
+        case SDLK_F6:
+            ctremu.mute = !ctremu.mute;
             break;
         default:
             break;
@@ -250,6 +255,11 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
     }
 }
 
+void audio_callback(s16* samples, u32 count) {
+    if (ctremu.uncap || ctremu.mute) return;
+    SDL_PutAudioStreamData(g_audio, samples, count * sizeof(s16));
+}
+
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
@@ -269,7 +279,7 @@ int main(int argc, char** argv) {
 
     read_args(argc, argv);
 
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
@@ -298,6 +308,14 @@ int main(int argc, char** argv) {
     glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
                           GL_TRUE);
 #endif
+
+    SDL_AudioSpec as = {
+        .format = SDL_AUDIO_S16, .channels = 1, .freq = SAMPLE_RATE};
+    g_audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &as,
+                                        nullptr, nullptr);
+
+    SDL_ResumeAudioStreamDevice(g_audio);
+    ctremu.audio_cb = audio_callback;
 
     if (!ctremu.romfile) {
         load_rom_dialog();
@@ -411,6 +429,8 @@ int main(int argc, char** argv) {
         }
         prev_time = cur_time;
     }
+
+    SDL_DestroyAudioStream(g_audio);
 
     SDL_GL_DestroyContext(glcontext);
     SDL_DestroyWindow(g_window);

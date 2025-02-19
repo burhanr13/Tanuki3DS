@@ -6,6 +6,8 @@
 #include "3ds.h"
 #include "common.h"
 
+typedef void (*EmuAudioCallback)(s16* samples, u32 num);
+
 typedef struct {
     char* romfile;
     char* romfilenodir;
@@ -15,6 +17,7 @@ typedef struct {
     bool running;
     bool uncap;
     bool pause;
+    bool mute;
 
     bool vsync;
     int videoscale;
@@ -25,6 +28,8 @@ typedef struct {
 
     mat4 freecam_mtx;
     bool freecam_enable;
+
+    EmuAudioCallback audio_cb;
 
     E3DS system;
 

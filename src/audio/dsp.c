@@ -1,5 +1,7 @@
 #include "dsp.h"
 
+#include "emulator.h"
+
 #include "dspstructs.h"
 
 #undef PTR
@@ -49,7 +51,9 @@ void dsp_read_audio_pipe(DSP* dsp, void* buf, u32 len) {
 
 // the binary pipes are used for aac decoding
 void dsp_write_binary_pipe(DSP* dsp, void* buf, u32 len) {}
-void dsp_read_binary_pipe(DSP* dsp, void* buf, u32 len) {}
+void dsp_read_binary_pipe(DSP* dsp, void* buf, u32 len) {
+    memset(buf, 0, len);
+}
 
 typedef struct {
     u32 paddr;
@@ -70,6 +74,7 @@ void reset_chn(DSPInputStatus* stat) {
     stat->buf_dirty = 0;
     SETDSPU32(stat->pos, 0);
     stat->cur_buf = 0;
+    stat->prev_buf = 0;
 }
 
 bool get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
@@ -98,7 +103,7 @@ bool get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
     }
 }
 
-void dsp_process_chn(DSPMemory* m, int i, s16* out) {
+void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
     auto cfg = &m->input_cfg[i];
     auto stat = &m->input_status[i];
 
@@ -116,6 +121,10 @@ void dsp_process_chn(DSPMemory* m, int i, s16* out) {
 
     if (!cfg->active || !stat->cur_buf) return;
 
+    // todo: handle rate, gain, stereo, and everything else
+    s16 samples[FRAME_SAMPLES] = {};
+    u32 curSample = 0;
+
     u32 rem = FRAME_SAMPLES;
     while (true) {
         BufInfo buf;
@@ -124,31 +133,124 @@ void dsp_process_chn(DSPMemory* m, int i, s16* out) {
             reset_chn(stat);
             break;
         }
-        u32 pos = GETDSPU32(stat->pos);
-        u32 bufRem = buf.len - pos;
+        u32 bufPos = GETDSPU32(stat->pos);
+        u32 bufRem = buf.len - bufPos;
         if (bufRem > rem) bufRem = rem;
 
-        // get bufRem samples from buf
+        if (cfg->format.num_chan == 2) {
+            switch (cfg->format.codec) {
+                case DSPFMT_PCM16:
+                    s16* src = PTR(buf.paddr);
+                    for (int s = 0; s < bufRem; s++) {
+                        samples[curSample + s] = src[2 * (bufPos + s)];
+                    }
+                    break;
+            }
+        } else {
+            switch (cfg->format.codec) {
+                case DSPFMT_PCM16: {
+                    // easy
+                    s16* src = PTR(buf.paddr);
+                    memcpy(&samples[curSample], &src[bufPos],
+                           bufRem * sizeof(s16));
+                    break;
+                }
+                case DSPFMT_PCM8: {
+                    s8* src = PTR(buf.paddr);
+                    for (int s = 0; s < bufRem; s++) {
+                        samples[curSample + s] = src[bufPos + s];
+                    }
+                    break;
+                }
+                case DSPFMT_ADPCM: {
+                    // https://github.com/Thealexbarney/DspTool/blob/master/dsptool/decode.c
 
+                    u8* src = PTR(buf.paddr);
+                    // get back to where we were in the buffer
+                    // i am assuming play pos does not count the index bytes
+                    // as samples
+                    src += (bufPos / 14) * 8;
+                    if (bufPos % 14 > 0) {
+                        src += 1 + (bufPos % 14) / 2;
+                    }
+
+                    s16* coeffs = m->input_adpcm_coeffs[i];
+
+                    for (int s = 0; s < bufRem; s++) {
+                        int srcIdx = bufPos + s;
+                        // every 14 samples there is a new index
+                        if (srcIdx % 14 == 0) {
+                            buf.adpcm->indexScale = *src++;
+                        }
+
+                        int diff = (sbi(4))((bufPos & 1) ? *src++ : *src >> 4);
+                        diff <<= buf.adpcm->scale;
+                        // adpcm coeffs are fixed 1.4.11
+                        // samples are fixed 1.15
+
+                        int sample = coeffs[buf.adpcm->index * 2 + 0] *
+                                         buf.adpcm->history[0] +
+                                     coeffs[buf.adpcm->index * 2 + 1] *
+                                         buf.adpcm->history[1];
+                        // sample is now fixed 1.4.26
+                        sample >>= 11; // make it 1.4.15
+                        sample += diff;
+                        // clamp sample back to -1,1
+                        if (sample > INT16_MAX) sample = INT16_MAX;
+                        if (sample < INT16_MIN) sample = INT16_MIN;
+
+                        // update history
+                        buf.adpcm->history[1] = buf.adpcm->history[0];
+                        buf.adpcm->history[0] = sample;
+
+                        samples[curSample + s] = sample;
+                    }
+                    break;
+                }
+            }
+        }
+
+        curSample += bufRem;
         rem -= bufRem;
 
         if (rem == 0) {
-            SETDSPU32(stat->pos, pos + bufRem);
+            SETDSPU32(stat->pos, bufPos + bufRem);
             break;
         } else SETDSPU32(stat->pos, 0);
 
         if (!buf.looping) {
             linfo("ch%d to buf%d", i, stat->cur_buf);
-            stat->cur_buf++;
+            stat->prev_buf = stat->cur_buf++;
             stat->buf_dirty = 1;
         }
+    }
+
+    // interpolate samples or something
+
+    for (int i = 0; i < FRAME_SAMPLES; i++) {
+        mixer[i] += samples[i];
     }
 }
 
 void dsp_process_frame(DSP* dsp) {
     auto m = get_curr_bank(dsp);
 
-    for (int i = 0; i < DSP_CHANNELS; i++) {
-        dsp_process_chn(m, i, nullptr);
+    // please excuse my sorry excuse of a mixer
+    s32 mixer[FRAME_SAMPLES] = {};
+
+    for (int i = 0; i < 24; i++) {
+        dsp_process_chn(dsp, m, i, mixer);
     }
+
+    // presumably we are supposed to do things here too
+
+    s16 final[FRAME_SAMPLES];
+    for (int s = 0; s < FRAME_SAMPLES; s++) {
+        int sample = mixer[s];
+        if (sample > INT16_MAX) sample = INT16_MAX;
+        if (sample < INT16_MIN) sample = INT16_MIN;
+        final[s] = sample;
+    }
+
+    if (ctremu.audio_cb) ctremu.audio_cb(final, FRAME_SAMPLES);
 }

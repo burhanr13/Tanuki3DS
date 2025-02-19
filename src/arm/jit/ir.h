@@ -110,6 +110,7 @@ typedef enum {
     IR_REV,   // r-v
     IR_REV16, // r-v
     IR_USAT,  // riv
+    IR_SSAT,  // riv
 
     // media instructions (all rvv)
     IR_MEDIA_UADD8,
