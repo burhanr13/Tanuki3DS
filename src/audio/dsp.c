@@ -116,7 +116,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
     auto stat = &m->input_status[i];
 
     // libctru sets this flag when restarting the buffers
-    if ((cfg->dirty_flags & 0x40200010) == 0x40200010) {
+    if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
         linfo("ch%d start", i);
         reset_chn(stat);
         stat->cur_buf = 1;
@@ -238,9 +238,9 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
         } else SETDSPU32(stat->pos, 0);
 
         if (!buf.looping) {
-            linfo("ch%d to buf%d", i, stat->cur_buf);
             stat->prev_buf = stat->cur_buf++;
             stat->buf_dirty = 1;
+            linfo("ch%d to buf%d", i, stat->cur_buf);
         }
     }
 
