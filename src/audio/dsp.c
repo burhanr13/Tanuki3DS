@@ -63,10 +63,18 @@ typedef struct {
 } BufInfo;
 
 DSPMemory* get_curr_bank(DSP* dsp) {
+    // the bank with higher frame count is the input buffer
+    // and lower is output buffer
+    // these are swapped every frame
     auto b0 = DSPMEM(0);
     auto b1 = DSPMEM(1);
-    if (b0->frame_count > b1->frame_count) return b0;
-    else return b1;
+    if (b0->frame_count > b1->frame_count) {
+        memcpy(b1, b0, sizeof *b1);
+        return b1;
+    } else {
+        memcpy(b0, b1, sizeof *b0);
+        return b0;
+    }
 }
 
 void reset_chn(DSPInputStatus* stat) {
@@ -139,12 +147,22 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
 
         if (cfg->format.num_chan == 2) {
             switch (cfg->format.codec) {
-                case DSPFMT_PCM16:
+                case DSPFMT_PCM16: {
                     s16* src = PTR(buf.paddr);
                     for (int s = 0; s < bufRem; s++) {
                         samples[curSample + s] = src[2 * (bufPos + s)];
                     }
                     break;
+                }
+                case DSPFMT_PCM8: {
+                    s8* src = PTR(buf.paddr);
+                    for (int s = 0; s < bufRem; s++) {
+                        samples[curSample + s] = src[2 * (bufPos + s)];
+                    }
+                    break;
+                }
+                case DSPFMT_ADPCM:
+                    lwarn("stereo adpcm?");
             }
         } else {
             switch (cfg->format.codec) {
@@ -183,17 +201,18 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
                             buf.adpcm->indexScale = *src++;
                         }
 
-                        int diff = (sbi(4))((bufPos & 1) ? *src++ : *src >> 4);
+                        int diff =
+                            (sbi(4))(((bufPos + s) & 1) ? *src++ : *src >> 4);
                         diff <<= buf.adpcm->scale;
-                        // adpcm coeffs are fixed 1.4.11
-                        // samples are fixed 1.15
+                        // adpcm coeffs are fixed s5.11
+                        // samples are fixed s1.15
 
                         int sample = coeffs[buf.adpcm->index * 2 + 0] *
                                          buf.adpcm->history[0] +
                                      coeffs[buf.adpcm->index * 2 + 1] *
                                          buf.adpcm->history[1];
-                        // sample is now fixed 1.4.26
-                        sample >>= 11; // make it 1.4.15
+                        // sample is now fixed s6.26
+                        sample >>= 11; // make it s6.15
                         sample += diff;
                         // clamp sample back to -1,1
                         if (sample > INT16_MAX) sample = INT16_MAX;
