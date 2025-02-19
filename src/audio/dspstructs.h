@@ -38,7 +38,7 @@ typedef u16 DSPFrameCount;
 
 // 2
 typedef struct {
-    DSPu32 dirty;
+    u32 dirty_flags;
     float gain[3][2][2];
     float rate;
     u8 interp_mode;
@@ -46,12 +46,12 @@ typedef struct {
     u16 filter;
     s16 simple_filter[2];
     s16 biquad_filter[5];
-    u16 buf_dirty;
+    u16 active_bufs;
     DSPBuffer bufs[4];
     u32 _156;
     u16 active;
     u16 sync_count;
-    DSPu32 play_pos;
+    u32 _164;
     u32 _168;
     DSPu32 buf_addr;
     DSPu32 buf_len;
@@ -73,8 +73,8 @@ typedef struct {
 
 // 3
 typedef struct {
-    u8 enabled;
-    u8 dirty;
+    u8 active;
+    u8 buf_dirty;
     u16 sync_count;
     DSPu32 pos;
     u16 cur_buf;
