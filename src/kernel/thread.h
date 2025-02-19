@@ -23,7 +23,7 @@ typedef struct _KThread {
     KObject hdr;
 
     struct {
-        union {
+        alignas(16) union {
             u32 r[16];
             struct {
                 u32 arg;
@@ -35,7 +35,7 @@ typedef struct _KThread {
         };
         u32 cpsr;
 
-        double d[16];
+        alignas(16) double d[16];
         u32 fpscr;
     } ctx;
 
