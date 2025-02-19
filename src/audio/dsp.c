@@ -130,10 +130,13 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
     if (!cfg->active || !stat->cur_buf) return;
 
     // todo: handle rate, gain, stereo, and everything else
-    s16 samples[FRAME_SAMPLES] = {};
+
+    u32 nSamples = FRAME_SAMPLES * cfg->rate;
+
+    s16 samples[nSamples] = {};
     u32 curSample = 0;
 
-    u32 rem = FRAME_SAMPLES;
+    u32 rem = nSamples;
     while (true) {
         BufInfo buf;
         if (!get_buf(cfg, stat->cur_buf, &buf)) {
@@ -245,9 +248,10 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
     }
 
     // interpolate samples or something
+    // this is the most garbage interpolation ever
 
     for (int i = 0; i < FRAME_SAMPLES; i++) {
-        mixer[i] += samples[i];
+        mixer[i] += samples[i * nSamples / FRAME_SAMPLES];
     }
 }
 
