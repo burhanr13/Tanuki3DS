@@ -124,7 +124,6 @@ void update_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
         old->paddr = new.paddr;
         old->len = new.len;
         old->looping = new.looping;
-        old->adpcm = new.adpcm;
     }
 }
 

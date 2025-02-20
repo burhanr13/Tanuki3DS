@@ -350,6 +350,7 @@ int main(int argc, char** argv) {
                 ctremu.pause = true;
             }
             SDL_RaiseWindow(g_window);
+            SDL_ClearAudioStream(g_audio);
         }
 
         if (!ctremu.pause) {
