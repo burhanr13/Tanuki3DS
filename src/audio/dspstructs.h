@@ -46,14 +46,14 @@ typedef u16 DSPFrameCount;
 // 2
 typedef struct {
     u32 dirty_flags;
-    float gain[3][2][2];
+    float gain[12]; // the first two are l volume and r volume i think?
     float rate;
     u8 interp_mode;
     u8 polyphase;
     u16 filter;
     s16 simple_filter[2];
     s16 biquad_filter[5];
-    u16 active_bufs;
+    u16 bufs_dirty;
     DSPBuffer bufs[4];
     u32 _156;
     u16 active;

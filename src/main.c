@@ -257,7 +257,7 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
 
 void audio_callback(s16* samples, u32 count) {
     if (ctremu.uncap || ctremu.mute) return;
-    SDL_PutAudioStreamData(g_audio, samples, count * sizeof(s16));
+    SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
 }
 
 int main(int argc, char** argv) {
@@ -310,7 +310,7 @@ int main(int argc, char** argv) {
 #endif
 
     SDL_AudioSpec as = {
-        .format = SDL_AUDIO_S16, .channels = 1, .freq = SAMPLE_RATE};
+        .format = SDL_AUDIO_S16, .channels = 2, .freq = SAMPLE_RATE};
     g_audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &as,
                                         nullptr, nullptr);
 

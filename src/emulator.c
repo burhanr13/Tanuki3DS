@@ -19,6 +19,7 @@ void load_config() {
         CFG_INT("vsh_threads", 0, 0),
         CFG_BOOL("hw_vertexshaders", cfg_true, 0),
         CFG_BOOL("ubershader", cfg_false, 0),
+        CFG_BOOL("start_mute", cfg_false, 0),
         CFG_END(),
     };
     cfg_t* cfg = cfg_init(opts, 0);
@@ -38,6 +39,7 @@ void load_config() {
     cfg_setint(cfg, "vsh_threads", ctremu.vshthreads);
     ctremu.hwvshaders = cfg_getbool(cfg, "hw_vertexshaders");
     ctremu.ubershader = cfg_getbool(cfg, "ubershader");
+    ctremu.mute = cfg_getbool(cfg, "start_mute");
 
     FILE* fp = fopen("config.txt", "w");
     if (fp) {

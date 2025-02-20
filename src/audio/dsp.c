@@ -87,12 +87,7 @@ void reset_chn(DSPInputStatus* stat) {
 
 bool get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
     if (bufid == 0) return false;
-    if (bufid == 1) {
-        if (cfg->buf_id == 0) return false;
-        if (cfg->buf_id != 1) {
-            lwarn("?");
-            return false;
-        }
+    if (bufid == cfg->buf_id) {
         out->paddr = GETDSPU32(cfg->buf_addr);
         out->len = GETDSPU32(cfg->buf_len);
         out->adpcm = &cfg->buf_adpcm;
@@ -105,19 +100,20 @@ bool get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
             out->len = GETDSPU32(cfg->bufs[i].len);
             out->adpcm = &cfg->bufs[i].adpcm;
             out->looping = cfg->bufs[i].looping;
+            cfg->bufs_dirty &= ~BIT(i);
             return true;
         }
         return false;
     }
 }
 
-void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
-    auto cfg = &m->input_cfg[i];
-    auto stat = &m->input_status[i];
+void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
+    auto cfg = &m->input_cfg[ch];
+    auto stat = &m->input_status[ch];
 
     // libctru sets this flag when restarting the buffers
     if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
-        linfo("ch%d start", i);
+        linfo("ch%d start", ch);
         reset_chn(stat);
         stat->cur_buf = 1;
     }
@@ -129,18 +125,17 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
 
     if (!cfg->active || !stat->cur_buf) return;
 
-    // todo: handle rate, gain, stereo, and everything else
-
     u32 nSamples = FRAME_SAMPLES * cfg->rate;
 
-    s16 samples[nSamples] = {};
+    s16 lsamples[nSamples] = {};
+    s16 rsamples[nSamples] = {};
     u32 curSample = 0;
 
     u32 rem = nSamples;
-    while (true) {
+    while (rem > 0) {
         BufInfo buf;
         if (!get_buf(cfg, stat->cur_buf, &buf)) {
-            linfo("ch%d end", i);
+            linfo("ch%d end", ch);
             reset_chn(stat);
             break;
         }
@@ -153,14 +148,20 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
                 case DSPFMT_PCM16: {
                     s16* src = PTR(buf.paddr);
                     for (int s = 0; s < bufRem; s++) {
-                        samples[curSample + s] = src[2 * (bufPos + s)];
+                        lsamples[curSample] = src[2 * bufPos + 0];
+                        rsamples[curSample] = src[2 * bufPos + 1];
+                        curSample++;
+                        bufPos++;
                     }
                     break;
                 }
                 case DSPFMT_PCM8: {
                     s8* src = PTR(buf.paddr);
                     for (int s = 0; s < bufRem; s++) {
-                        samples[curSample + s] = src[2 * (bufPos + s)];
+                        lsamples[curSample] = src[2 * bufPos + 0];
+                        rsamples[curSample] = src[2 * bufPos + 1];
+                        curSample++;
+                        bufPos++;
                     }
                     break;
                 }
@@ -172,14 +173,21 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
                 case DSPFMT_PCM16: {
                     // easy
                     s16* src = PTR(buf.paddr);
-                    memcpy(&samples[curSample], &src[bufPos],
+                    memcpy(&lsamples[curSample], &src[bufPos],
                            bufRem * sizeof(s16));
+                    memcpy(&rsamples[curSample], &src[bufPos],
+                           bufRem * sizeof(s16));
+                    curSample += bufRem;
+                    bufPos += bufRem;
                     break;
                 }
                 case DSPFMT_PCM8: {
                     s8* src = PTR(buf.paddr);
                     for (int s = 0; s < bufRem; s++) {
-                        samples[curSample + s] = src[bufPos + s];
+                        lsamples[curSample] = src[bufPos];
+                        rsamples[curSample] = src[bufPos];
+                        curSample++;
+                        bufPos++;
                     }
                     break;
                 }
@@ -195,17 +203,16 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
                         src += 1 + (bufPos % 14) / 2;
                     }
 
-                    s16* coeffs = m->input_adpcm_coeffs[i];
+                    s16* coeffs = m->input_adpcm_coeffs[ch];
 
                     for (int s = 0; s < bufRem; s++) {
-                        int srcIdx = bufPos + s;
                         // every 14 samples there is a new index
-                        if (srcIdx % 14 == 0) {
+                        if (bufPos % 14 == 0) {
                             buf.adpcm->indexScale = *src++;
                         }
 
                         int diff =
-                            (sbi(4))(((bufPos + s) & 1) ? *src++ : *src >> 4);
+                            (sbi(4))((bufPos++ & 1) ? *src++ : *src >> 4);
                         diff <<= buf.adpcm->scale;
                         // adpcm coeffs are fixed s5.11
                         // samples are fixed s1.15
@@ -215,7 +222,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
                                      coeffs[buf.adpcm->index * 2 + 1] *
                                          buf.adpcm->history[1];
                         // sample is now fixed s6.26
-                        sample >>= 11; // make it s6.15
+                        sample += BIT(10); // round instead of floor
+                        sample >>= 11;     // make it s6.15
                         sample += diff;
                         // clamp sample back to -1,1
                         if (sample > INT16_MAX) sample = INT16_MAX;
@@ -225,41 +233,46 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int i, s32* mixer) {
                         buf.adpcm->history[1] = buf.adpcm->history[0];
                         buf.adpcm->history[0] = sample;
 
-                        samples[curSample + s] = sample;
+                        lsamples[curSample] = sample;
+                        rsamples[curSample] = sample;
+                        curSample++;
                     }
                     break;
                 }
             }
         }
 
-        curSample += bufRem;
         rem -= bufRem;
 
-        if (rem == 0) {
-            SETDSPU32(stat->pos, bufPos + bufRem);
-            break;
-        } else SETDSPU32(stat->pos, 0);
-
-        if (!buf.looping) {
-            stat->prev_buf = stat->cur_buf++;
-            stat->buf_dirty = 1;
-            linfo("ch%d to buf%d", i, stat->cur_buf);
+        if (bufPos == buf.len) {
+            SETDSPU32(stat->pos, 0);
+            if (!buf.looping) {
+                stat->prev_buf = stat->cur_buf++;
+                stat->buf_dirty = 1;
+                linfo("ch%d to buf%d", ch, stat->cur_buf);
+            }
+        } else {
+            SETDSPU32(stat->pos, bufPos);
         }
     }
 
     // interpolate samples or something
     // this is the most garbage interpolation ever
+    // i also do not know what gain is
 
-    for (int i = 0; i < FRAME_SAMPLES; i++) {
-        mixer[i] += samples[i * nSamples / FRAME_SAMPLES];
+    for (int s = 0; s < FRAME_SAMPLES; s++) {
+        mixer[2 * s] +=
+            (s32) lsamples[s * nSamples / FRAME_SAMPLES] * cfg->gain[0];
+        mixer[2 * s + 1] +=
+            (s32) rsamples[s * nSamples / FRAME_SAMPLES] * cfg->gain[1];
     }
 }
 
 void dsp_process_frame(DSP* dsp) {
     auto m = get_curr_bank(dsp);
 
-    // please excuse my sorry excuse of a mixer
-    s32 mixer[FRAME_SAMPLES] = {};
+    // interleaved stereo
+    s32 mixer[2 * FRAME_SAMPLES] = {};
 
     for (int i = 0; i < 24; i++) {
         dsp_process_chn(dsp, m, i, mixer);
@@ -267,8 +280,8 @@ void dsp_process_frame(DSP* dsp) {
 
     // presumably we are supposed to do things here too
 
-    s16 final[FRAME_SAMPLES];
-    for (int s = 0; s < FRAME_SAMPLES; s++) {
+    s16 final[2 * FRAME_SAMPLES];
+    for (int s = 0; s < 2 * FRAME_SAMPLES; s++) {
         int sample = mixer[s];
         if (sample > INT16_MAX) sample = INT16_MAX;
         if (sample < INT16_MIN) sample = INT16_MIN;
