@@ -34,7 +34,9 @@ typedef struct {
     u32 pos;
     ADPCMData adpcm;
     bool looping;
+    bool adpcm_dirty;
     u16 id;
+    int queuePos;
 } BufInfo;
 
 typedef struct {

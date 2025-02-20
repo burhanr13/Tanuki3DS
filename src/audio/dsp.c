@@ -86,7 +86,10 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
         out->pos = 0;
         out->adpcm = cfg->buf_adpcm;
         out->looping = cfg->flags.looping;
+        out->adpcm_dirty = cfg->flags.adpcm_dirty;
+        cfg->flags.adpcm_dirty = 0;
         out->id = cfg->buf_id;
+        out->queuePos = -1;
     } else {
         for (int i = 0; i < 4; i++) {
             if (cfg->bufs[i].id != bufid) continue;
@@ -95,7 +98,10 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
             out->pos = 0;
             out->adpcm = cfg->bufs[i].adpcm;
             out->looping = cfg->bufs[i].looping;
+            out->adpcm_dirty = cfg->bufs[i].adpcm_dirty;
+            cfg->bufs[i].adpcm_dirty = 0;
             out->id = cfg->bufs[i].id;
+            out->queuePos = i;
             return;
         }
         out->id = 0;
@@ -119,15 +125,21 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
     // libctru sets this flag when restarting the buffers
     if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
-        ldebug("ch%d start", ch);
+        linfo("ch%d start", ch);
         reset_chn(dsp, ch, stat);
     }
 
-    if (dsp->bufQueues[ch].size &&
-        FIFO_peek(dsp->bufQueues[ch]).id == cfg->buf_id) {
-        auto embeddedBuf = &FIFO_peek(dsp->bufQueues[ch]);
-        if (cfg->flags.adpcm_dirty) embeddedBuf->adpcm = cfg->buf_adpcm;
-        embeddedBuf->looping = cfg->flags.looping;
+    FIFO_foreach(i, dsp->bufQueues[ch]) {
+        auto old = &dsp->bufQueues[ch].d[i];
+        BufInfo new;
+        get_buf(cfg, old->id, &new);
+        if (new.id != old->id ||
+            (new.queuePos >= 0 && !(cfg->bufs_dirty & BIT(new.queuePos))))
+            continue;
+        old->paddr = new.paddr;
+        old->len = new.len;
+        old->looping = new.looping;
+        old->adpcm = new.adpcm;
     }
 
     refill_bufs(dsp, ch, cfg);
@@ -157,7 +169,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
         u32 bufRem = buf->len - buf->pos;
         if (bufRem > rem) bufRem = rem;
 
-        ldebug("ch%d playing %d at pos %d for %d samples", ch, buf->id,
+        linfo("ch%d playing %d at pos %d for %d samples", ch, buf->id,
                buf->pos, bufRem);
 
         if (cfg->format.num_chan == 2) {
@@ -267,7 +279,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
                 BufInfo b [[gnu::unused]];
                 FIFO_pop(dsp->bufQueues[ch], b);
                 stat->cur_buf_dirty = 1;
-                ldebug("ch%d to buf%d", ch, stat->cur_buf);
+                linfo("ch%d to buf%d", ch, stat->cur_buf);
             } else {
                 buf->pos = 0;
             }
@@ -278,7 +290,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
         stat->cur_buf = FIFO_peek(dsp->bufQueues[ch]).id;
         SETDSPU32(stat->pos, FIFO_peek(dsp->bufQueues[ch]).pos);
     } else {
-        ldebug("ch%d ending at %d", ch, stat->prev_buf);
+        linfo("ch%d ending at %d", ch, stat->prev_buf);
         reset_chn(dsp, ch, stat);
     }
 
