@@ -61,7 +61,12 @@ DSPMemory* get_curr_bank(DSP* dsp) {
     // these are swapped every frame
     auto b0 = DSPMEM(0);
     auto b1 = DSPMEM(1);
-    if (b0->frame_count > b1->frame_count) {
+    u32 fc0 = b0->frame_count;
+    u32 fc1 = b1->frame_count;
+    // handle frame count overflow
+    if (fc1 == 0xffff && fc0 != 0xfffe) fc0 += 0x10000;
+    if (fc0 == 0xffff && fc1 != 0xfffe) fc1 += 0x10000;
+    if (fc0 > fc1) {
         memcpy(b1, b0, sizeof *b1);
         return b1;
     } else {
