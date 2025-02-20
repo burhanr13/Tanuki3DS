@@ -60,6 +60,8 @@ typedef struct {
     u32 len;
     ADPCMData* adpcm;
     bool looping;
+    u16 id;
+    int queuePos; // -1 if not from the queue
 } BufInfo;
 
 DSPMemory* get_curr_bank(DSP* dsp) {
@@ -79,7 +81,7 @@ DSPMemory* get_curr_bank(DSP* dsp) {
 
 void reset_chn(DSPInputStatus* stat) {
     stat->active = 0;
-    stat->buf_dirty = 0;
+    stat->bufs_dirty = 0;
     SETDSPU32(stat->pos, 0);
     stat->cur_buf = 0;
     stat->prev_buf = 0;
@@ -92,6 +94,8 @@ bool get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
         out->len = GETDSPU32(cfg->buf_len);
         out->adpcm = &cfg->buf_adpcm;
         out->looping = cfg->flags.looping;
+        out->id = cfg->buf_id;
+        out->queuePos = -1;
         return true;
     } else {
         for (int i = 0; i < 4; i++) {
@@ -100,7 +104,8 @@ bool get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
             out->len = GETDSPU32(cfg->bufs[i].len);
             out->adpcm = &cfg->bufs[i].adpcm;
             out->looping = cfg->bufs[i].looping;
-            cfg->bufs_dirty &= ~BIT(i);
+            out->id = cfg->bufs[i].id;
+            out->queuePos = i;
             return true;
         }
         return false;
@@ -119,6 +124,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     }
 
     cfg->dirty_flags = 0;
+    cfg->bufs_dirty = 0;
 
     stat->active = cfg->active;
     stat->sync_count = cfg->sync_count;
@@ -246,9 +252,11 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
         if (bufPos == buf.len) {
             SETDSPU32(stat->pos, 0);
+            stat->prev_buf = stat->cur_buf;
             if (!buf.looping) {
-                stat->prev_buf = stat->cur_buf++;
-                stat->buf_dirty = 1;
+                stat->cur_buf++;
+                // this flag is important it seems and im handling it wrong
+                if (buf.queuePos == 3) stat->bufs_dirty = 1;
                 linfo("ch%d to buf%d", ch, stat->cur_buf);
             }
         } else {

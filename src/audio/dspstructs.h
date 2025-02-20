@@ -81,7 +81,7 @@ typedef struct {
 // 3
 typedef struct {
     u8 active;
-    u8 buf_dirty;
+    u8 bufs_dirty;
     u16 sync_count;
     DSPu32 pos;
     u16 cur_buf;
