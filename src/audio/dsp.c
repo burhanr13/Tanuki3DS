@@ -143,7 +143,9 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
         linfo("ch%d start", ch);
         reset_chn(dsp, ch, stat);
-    }
+    } else if (!dsp->bufQueues[ch].size) return;
+    // if the buffer queue is empty we do nothing until
+    // the channel gets restarted
 
     update_bufs(dsp, ch, cfg);
     refill_bufs(dsp, ch, cfg);
