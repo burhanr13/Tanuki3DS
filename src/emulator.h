@@ -20,6 +20,7 @@ typedef struct {
     bool mute;
 
     bool vsync;
+    bool audiosync;
     int videoscale;
     bool shaderjit;
     int vshthreads;

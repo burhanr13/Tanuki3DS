@@ -14,6 +14,7 @@ void load_config() {
     cfg_opt_t opts[] = {
         CFG_BOOL("verbose_log", cfg_false, 0),
         CFG_BOOL("vsync", cfg_true, 0),
+        CFG_BOOL("audiosync", cfg_false, 0),
         CFG_INT("video_scale", 1, 0),
         CFG_BOOL("shaderjit", cfg_true, 0),
         CFG_INT("vsh_threads", 0, 0),
@@ -28,6 +29,7 @@ void load_config() {
 
     g_infologs = cfg_getbool(cfg, "verbose_log");
     ctremu.vsync = cfg_getbool(cfg, "vsync");
+    ctremu.audiosync = cfg_getbool(cfg, "audiosync");
     ctremu.videoscale = cfg_getint(cfg, "video_scale");
     if (ctremu.videoscale < 1) ctremu.videoscale = 1;
     cfg_setint(cfg, "video_scale", ctremu.videoscale);
