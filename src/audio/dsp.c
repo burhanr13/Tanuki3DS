@@ -87,7 +87,6 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
         out->adpcm = cfg->buf_adpcm;
         out->looping = cfg->flags.looping;
         out->adpcm_dirty = cfg->flags.adpcm_dirty;
-        cfg->flags.adpcm_dirty = 0;
         out->id = cfg->buf_id;
         out->queuePos = -1;
     } else {
@@ -99,7 +98,6 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
             out->adpcm = cfg->bufs[i].adpcm;
             out->looping = cfg->bufs[i].looping;
             out->adpcm_dirty = cfg->bufs[i].adpcm_dirty;
-            cfg->bufs[i].adpcm_dirty = 0;
             out->id = cfg->bufs[i].id;
             out->queuePos = i;
             return;
@@ -108,6 +106,24 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
     }
 }
 
+// update any internally stored buffers that were modified
+// externally
+void update_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
+    FIFO_foreach(i, dsp->bufQueues[ch]) {
+        auto old = &dsp->bufQueues[ch].d[i];
+        BufInfo new;
+        get_buf(cfg, old->id, &new);
+        if (new.id != old->id ||
+            (new.queuePos >= 0 && !(cfg->bufs_dirty & BIT(new.queuePos))))
+            continue;
+        old->paddr = new.paddr;
+        old->len = new.len;
+        old->looping = new.looping;
+        old->adpcm = new.adpcm;
+    }
+}
+
+// queue new buffers that have been added
 void refill_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
     int curBufid =
         dsp->bufQueues[ch].size ? FIFO_back(dsp->bufQueues[ch]).id + 1 : 1;
@@ -129,19 +145,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
         reset_chn(dsp, ch, stat);
     }
 
-    FIFO_foreach(i, dsp->bufQueues[ch]) {
-        auto old = &dsp->bufQueues[ch].d[i];
-        BufInfo new;
-        get_buf(cfg, old->id, &new);
-        if (new.id != old->id ||
-            (new.queuePos >= 0 && !(cfg->bufs_dirty & BIT(new.queuePos))))
-            continue;
-        old->paddr = new.paddr;
-        old->len = new.len;
-        old->looping = new.looping;
-        old->adpcm = new.adpcm;
-    }
-
+    update_bufs(dsp, ch, cfg);
     refill_bufs(dsp, ch, cfg);
 
     cfg->dirty_flags = 0;
@@ -169,8 +173,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
         u32 bufRem = buf->len - buf->pos;
         if (bufRem > rem) bufRem = rem;
 
-        linfo("ch%d playing %d at pos %d for %d samples", ch, buf->id,
-               buf->pos, bufRem);
+        linfo("ch%d playing %d at pos %d for %d samples", ch, buf->id, buf->pos,
+              bufRem);
 
         if (cfg->format.num_chan == 2) {
             switch (cfg->format.codec) {
