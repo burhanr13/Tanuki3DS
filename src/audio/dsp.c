@@ -81,10 +81,9 @@ DSPMemory* get_curr_bank(DSP* dsp) {
 
 void reset_chn(DSPInputStatus* stat) {
     stat->active = 0;
-    stat->bufs_dirty = 0;
+    stat->cur_buf_dirty = 0;
     SETDSPU32(stat->pos, 0);
     stat->cur_buf = 0;
-    stat->prev_buf = 0;
 }
 
 bool get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
@@ -128,6 +127,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
     stat->active = cfg->active;
     stat->sync_count = cfg->sync_count;
+    stat->cur_buf_dirty = 0;
 
     if (!cfg->active || !stat->cur_buf) return;
 
@@ -255,8 +255,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
             stat->prev_buf = stat->cur_buf;
             if (!buf.looping) {
                 stat->cur_buf++;
-                // this flag is important it seems and im handling it wrong
-                if (buf.queuePos == 3) stat->bufs_dirty = 1;
+                stat->cur_buf_dirty = 1;
                 linfo("ch%d to buf%d", ch, stat->cur_buf);
             }
         } else {
