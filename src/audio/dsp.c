@@ -55,15 +55,6 @@ void dsp_read_binary_pipe(DSP* dsp, void* buf, u32 len) {
     memset(buf, 0, len);
 }
 
-typedef struct {
-    u32 paddr;
-    u32 len;
-    ADPCMData* adpcm;
-    bool looping;
-    u16 id;
-    int queuePos; // -1 if not from the queue
-} BufInfo;
-
 DSPMemory* get_curr_bank(DSP* dsp) {
     // the bank with higher frame count is the input buffer
     // and lower is output buffer
@@ -79,35 +70,46 @@ DSPMemory* get_curr_bank(DSP* dsp) {
     }
 }
 
-void reset_chn(DSPInputStatus* stat) {
+void reset_chn(DSP* dsp, int ch, DSPInputStatus* stat) {
     stat->active = 0;
     stat->cur_buf_dirty = 0;
     SETDSPU32(stat->pos, 0);
     stat->cur_buf = 0;
+    FIFO_clear(dsp->bufQueues[ch]);
 }
 
-bool get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
-    if (bufid == 0) return false;
+void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
+    if (bufid == 0) out->id = 0;
     if (bufid == cfg->buf_id) {
         out->paddr = GETDSPU32(cfg->buf_addr);
         out->len = GETDSPU32(cfg->buf_len);
-        out->adpcm = &cfg->buf_adpcm;
+        out->pos = 0;
+        out->adpcm = cfg->buf_adpcm;
         out->looping = cfg->flags.looping;
         out->id = cfg->buf_id;
-        out->queuePos = -1;
-        return true;
     } else {
         for (int i = 0; i < 4; i++) {
             if (cfg->bufs[i].id != bufid) continue;
             out->paddr = GETDSPU32(cfg->bufs[i].addr);
             out->len = GETDSPU32(cfg->bufs[i].len);
-            out->adpcm = &cfg->bufs[i].adpcm;
+            out->pos = 0;
+            out->adpcm = cfg->bufs[i].adpcm;
             out->looping = cfg->bufs[i].looping;
             out->id = cfg->bufs[i].id;
-            out->queuePos = i;
-            return true;
+            return;
         }
-        return false;
+        out->id = 0;
+    }
+}
+
+void refill_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
+    int curBufid =
+        dsp->bufQueues[ch].size ? FIFO_back(dsp->bufQueues[ch]).id + 1 : 1;
+    while (dsp->bufQueues[ch].size < FIFO_MAX(dsp->bufQueues[ch])) {
+        BufInfo b;
+        get_buf(cfg, curBufid++, &b);
+        if (b.id == 0) break;
+        FIFO_push(dsp->bufQueues[ch], b);
     }
 }
 
@@ -117,10 +119,18 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
     // libctru sets this flag when restarting the buffers
     if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
-        linfo("ch%d start", ch);
-        reset_chn(stat);
-        stat->cur_buf = 1;
+        ldebug("ch%d start", ch);
+        reset_chn(dsp, ch, stat);
     }
+
+    if (dsp->bufQueues[ch].size &&
+        FIFO_peek(dsp->bufQueues[ch]).id == cfg->buf_id) {
+        auto embeddedBuf = &FIFO_peek(dsp->bufQueues[ch]);
+        if (cfg->flags.adpcm_dirty) embeddedBuf->adpcm = cfg->buf_adpcm;
+        embeddedBuf->looping = cfg->flags.looping;
+    }
+
+    refill_bufs(dsp, ch, cfg);
 
     cfg->dirty_flags = 0;
     cfg->bufs_dirty = 0;
@@ -129,7 +139,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     stat->sync_count = cfg->sync_count;
     stat->cur_buf_dirty = 0;
 
-    if (!cfg->active || !stat->cur_buf) return;
+    if (!cfg->active) return;
 
     u32 nSamples = FRAME_SAMPLES * cfg->rate;
 
@@ -139,35 +149,36 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
     u32 rem = nSamples;
     while (rem > 0) {
-        BufInfo buf;
-        if (!get_buf(cfg, stat->cur_buf, &buf)) {
-            linfo("ch%d end", ch);
-            reset_chn(stat);
-            break;
-        }
-        u32 bufPos = GETDSPU32(stat->pos);
-        u32 bufRem = buf.len - bufPos;
+        // no more data right now
+        if (!dsp->bufQueues[ch].size) break;
+
+        BufInfo* buf = &FIFO_peek(dsp->bufQueues[ch]);
+
+        u32 bufRem = buf->len - buf->pos;
         if (bufRem > rem) bufRem = rem;
+
+        ldebug("ch%d playing %d at pos %d for %d samples", ch, buf->id,
+               buf->pos, bufRem);
 
         if (cfg->format.num_chan == 2) {
             switch (cfg->format.codec) {
                 case DSPFMT_PCM16: {
-                    s16* src = PTR(buf.paddr);
+                    s16* src = PTR(buf->paddr);
                     for (int s = 0; s < bufRem; s++) {
-                        lsamples[curSample] = src[2 * bufPos + 0];
-                        rsamples[curSample] = src[2 * bufPos + 1];
+                        lsamples[curSample] = src[2 * buf->pos + 0];
+                        rsamples[curSample] = src[2 * buf->pos + 1];
                         curSample++;
-                        bufPos++;
+                        buf->pos++;
                     }
                     break;
                 }
                 case DSPFMT_PCM8: {
-                    s8* src = PTR(buf.paddr);
+                    s8* src = PTR(buf->paddr);
                     for (int s = 0; s < bufRem; s++) {
-                        lsamples[curSample] = src[2 * bufPos + 0];
-                        rsamples[curSample] = src[2 * bufPos + 1];
+                        lsamples[curSample] = src[2 * buf->pos + 0];
+                        rsamples[curSample] = src[2 * buf->pos + 1];
                         curSample++;
-                        bufPos++;
+                        buf->pos++;
                     }
                     break;
                 }
@@ -178,55 +189,55 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
             switch (cfg->format.codec) {
                 case DSPFMT_PCM16: {
                     // easy
-                    s16* src = PTR(buf.paddr);
-                    memcpy(&lsamples[curSample], &src[bufPos],
+                    s16* src = PTR(buf->paddr);
+                    memcpy(&lsamples[curSample], &src[buf->pos],
                            bufRem * sizeof(s16));
-                    memcpy(&rsamples[curSample], &src[bufPos],
+                    memcpy(&rsamples[curSample], &src[buf->pos],
                            bufRem * sizeof(s16));
                     curSample += bufRem;
-                    bufPos += bufRem;
+                    buf->pos += bufRem;
                     break;
                 }
                 case DSPFMT_PCM8: {
-                    s8* src = PTR(buf.paddr);
+                    s8* src = PTR(buf->paddr);
                     for (int s = 0; s < bufRem; s++) {
-                        lsamples[curSample] = src[bufPos];
-                        rsamples[curSample] = src[bufPos];
+                        lsamples[curSample] = src[buf->pos];
+                        rsamples[curSample] = src[buf->pos];
                         curSample++;
-                        bufPos++;
+                        buf->pos++;
                     }
                     break;
                 }
                 case DSPFMT_ADPCM: {
                     // https://github.com/Thealexbarney/DspTool/blob/master/dsptool/decode.c
 
-                    u8* src = PTR(buf.paddr);
+                    u8* src = PTR(buf->paddr);
                     // get back to where we were in the buffer
                     // i am assuming play pos does not count the index bytes
                     // as samples
-                    src += (bufPos / 14) * 8;
-                    if (bufPos % 14 > 0) {
-                        src += 1 + (bufPos % 14) / 2;
+                    src += (buf->pos / 14) * 8;
+                    if (buf->pos % 14 > 0) {
+                        src += 1 + (buf->pos % 14) / 2;
                     }
 
                     s16* coeffs = m->input_adpcm_coeffs[ch];
 
                     for (int s = 0; s < bufRem; s++) {
                         // every 14 samples there is a new index
-                        if (bufPos % 14 == 0) {
-                            buf.adpcm->indexScale = *src++;
+                        if (buf->pos % 14 == 0) {
+                            buf->adpcm.indexScale = *src++;
                         }
 
                         int diff =
-                            (sbi(4))((bufPos++ & 1) ? *src++ : *src >> 4);
-                        diff <<= buf.adpcm->scale;
+                            (sbi(4))((buf->pos++ & 1) ? *src++ : *src >> 4);
+                        diff <<= buf->adpcm.scale;
                         // adpcm coeffs are fixed s5.11
                         // samples are fixed s1.15
 
-                        int sample = coeffs[buf.adpcm->index * 2 + 0] *
-                                         buf.adpcm->history[0] +
-                                     coeffs[buf.adpcm->index * 2 + 1] *
-                                         buf.adpcm->history[1];
+                        int sample = coeffs[buf->adpcm.index * 2 + 0] *
+                                         buf->adpcm.history[0] +
+                                     coeffs[buf->adpcm.index * 2 + 1] *
+                                         buf->adpcm.history[1];
                         // sample is now fixed s6.26
                         sample += BIT(10); // round instead of floor
                         sample >>= 11;     // make it s6.15
@@ -236,8 +247,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
                         if (sample < INT16_MIN) sample = INT16_MIN;
 
                         // update history
-                        buf.adpcm->history[1] = buf.adpcm->history[0];
-                        buf.adpcm->history[0] = sample;
+                        buf->adpcm.history[1] = buf->adpcm.history[0];
+                        buf->adpcm.history[0] = sample;
 
                         lsamples[curSample] = sample;
                         rsamples[curSample] = sample;
@@ -250,17 +261,25 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
         rem -= bufRem;
 
-        if (bufPos == buf.len) {
-            SETDSPU32(stat->pos, 0);
-            stat->prev_buf = stat->cur_buf;
-            if (!buf.looping) {
-                stat->cur_buf++;
+        if (buf->pos == buf->len) {
+            stat->prev_buf = buf->id;
+            if (!buf->looping) {
+                BufInfo b [[gnu::unused]];
+                FIFO_pop(dsp->bufQueues[ch], b);
                 stat->cur_buf_dirty = 1;
-                linfo("ch%d to buf%d", ch, stat->cur_buf);
+                ldebug("ch%d to buf%d", ch, stat->cur_buf);
+            } else {
+                buf->pos = 0;
             }
-        } else {
-            SETDSPU32(stat->pos, bufPos);
         }
+    }
+
+    if (dsp->bufQueues[ch].size) {
+        stat->cur_buf = FIFO_peek(dsp->bufQueues[ch]).id;
+        SETDSPU32(stat->pos, FIFO_peek(dsp->bufQueues[ch]).pos);
+    } else {
+        ldebug("ch%d ending at %d", ch, stat->prev_buf);
+        reset_chn(dsp, ch, stat);
     }
 
     // interpolate samples or something
@@ -276,6 +295,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 }
 
 void dsp_process_frame(DSP* dsp) {
+
     auto m = get_curr_bank(dsp);
 
     // interleaved stereo

@@ -16,6 +16,28 @@
 #define DSPRAM_BANK_OFF 0x20000
 
 typedef struct {
+    union {
+        u8 indexScale;
+        struct {
+            u8 scale : 4;
+            u8 index : 3;
+            u8 : 1;
+        };
+    };
+    u8 _pad;
+    s16 history[2];
+} ADPCMData;
+
+typedef struct {
+    u32 paddr;
+    u32 len;
+    u32 pos;
+    ADPCMData adpcm;
+    bool looping;
+    u16 id;
+} BufInfo;
+
+typedef struct {
 #ifdef FASTMEM
     u8* mem;
 #else
@@ -23,6 +45,10 @@ typedef struct {
 #endif
 
     u32 audio_pipe_pos;
+
+    // we need to store the whole buffer queue internally
+    // because games overwrite them before they finish playing
+    FIFO(BufInfo, 2) bufQueues[DSP_CHANNELS];
 
 } DSP;
 
