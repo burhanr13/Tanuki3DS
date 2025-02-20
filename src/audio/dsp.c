@@ -266,13 +266,13 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
     // interpolate samples or something
     // this is the most garbage interpolation ever
-    // i also do not know what gain is
+    // dsp does 4-channel mixing instead of just 2
 
     for (int s = 0; s < FRAME_SAMPLES; s++) {
         mixer[2 * s] +=
-            (s32) lsamples[s * nSamples / FRAME_SAMPLES] * cfg->gain[0];
+            (s32) lsamples[s * nSamples / FRAME_SAMPLES] * cfg->mix[0][0];
         mixer[2 * s + 1] +=
-            (s32) rsamples[s * nSamples / FRAME_SAMPLES] * cfg->gain[1];
+            (s32) rsamples[s * nSamples / FRAME_SAMPLES] * cfg->mix[0][1];
     }
 }
 

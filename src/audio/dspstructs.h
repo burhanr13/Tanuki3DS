@@ -46,7 +46,7 @@ typedef u16 DSPFrameCount;
 // 2
 typedef struct {
     u32 dirty_flags;
-    float gain[12]; // the first two are l volume and r volume i think?
+    float mix[3][4]; // 3 busses and 4 channels
     float rate;
     u8 interp_mode;
     u8 polyphase;
