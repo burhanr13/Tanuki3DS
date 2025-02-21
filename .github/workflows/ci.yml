@@ -148,7 +148,8 @@ jobs:
     - name: install dependencies
       run: |
         pacman -Sy
-        pacman --noconfirm -S git make mingw-w64-x86_64-{clang,sdl3,glew,capstone,xxhash,confuse,cglm}
+        pacman --noconfirm -S git make \
+        mingw-w64-x86_64-{clang,lld,sdl3,glew,capstone,xxhash,confuse,cglm}
         git clone https://github.com/herumi/xbyak.git
         cd xbyak
         make install
