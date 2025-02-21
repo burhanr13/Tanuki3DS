@@ -144,7 +144,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     auto stat = &m->input_status[ch];
 
     // libctru sets this flag when restarting the buffers
-    if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
+    if (cfg->dirty_flags & (BIT(30) | BIT(29) | BIT(4))) {
         linfo("ch%d start", ch);
         reset_chn(dsp, ch, stat);
     } else if (!dsp->bufQueues[ch].size) return;
