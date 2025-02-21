@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-#define VSH_MAX 16
+#define VSH_MAX 32
 
 #define SHADER_CODE_SIZE 512
 #define SHADER_OPDESC_SIZE 128
