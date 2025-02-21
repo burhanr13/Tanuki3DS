@@ -50,7 +50,7 @@ typedef struct _KThread {
     u32 state;
 } KThread;
 
-typedef void (*KEventCallback)(E3DS*, u32);
+typedef void (*KEventCallback)(E3DS*);
 
 typedef struct {
     KObject hdr;

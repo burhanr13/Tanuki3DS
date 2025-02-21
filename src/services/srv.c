@@ -68,7 +68,7 @@ void services_init(E3DS* s) {
     s->services.gsp.sharedmem.size = sizeof(GSPSharedMem);
     sharedmem_alloc(s, &s->services.gsp.sharedmem);
 
-    srvobj_init(&s->services.dsp.semEvent.hdr, KOT_EVENT);
+    srvobj_init(&s->services.dsp.sem_event.hdr, KOT_EVENT);
 
     srvobj_init(&s->services.hid.sharedmem.hdr, KOT_SHAREDMEM);
     s->services.hid.sharedmem.size = sizeof(HIDSharedMem);

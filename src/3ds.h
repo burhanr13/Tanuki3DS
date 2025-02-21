@@ -2,18 +2,19 @@
 #define _3DS_H
 
 #include "arm/arm_core.h"
+#include "audio/dsp.h"
 #include "common.h"
 #include "kernel/kernel.h"
 #include "kernel/loader.h"
 #include "kernel/memory.h"
 #include "kernel/process.h"
 #include "kernel/thread.h"
-#include "pica/gpu.h"
 #include "scheduler.h"
 #include "services/services.h"
 #include "services/srv.h"
+#include "video/gpu.h"
 
-#define CPU_CLK 268000000
+#define CPU_CLK 268'111'856ull // exact number from citra
 #define FPS 60
 
 enum {
@@ -29,6 +30,7 @@ typedef struct _3DS {
     ArmCore cpu;
 
     GPU gpu;
+    DSP dsp;
 
     E3DSMemory* mem;
 

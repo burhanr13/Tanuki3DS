@@ -2,7 +2,7 @@
 #define SHADERJIT_H
 
 #include "common.h"
-#include "pica/shader.h"
+#include "video/shader.h"
 
 typedef struct _GPU GPU;
 

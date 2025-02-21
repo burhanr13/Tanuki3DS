@@ -377,6 +377,13 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 v[i] = x;
                 break;
             }
+            case IR_SSAT: {
+                s32 x = OP(2);
+                if (x < ~MASK(OP(1))) x = ~MASK(OP(1));
+                if (x > MASK(OP(1))) x = MASK(OP(1));
+                v[i] = x;
+                break;
+            }
             case IR_MEDIA_UADD8: {
                 v[i] = media_uadd8(cpu, OP(1), OP(2));
                 break;

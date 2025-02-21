@@ -5,7 +5,7 @@
 
 <img src=images/logo.png width=100>
 
-Tanuki3DS is a 3DS emulator for MacOS and Linux written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games at full speed and supports some nice features like controller input, video upscaling, and experimental free camera.
+Tanuki3DS is a 3DS emulator for MacOS and Linux written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games with reasonable graphics and audio at full speed. It also supports some nice features like controller input, fast-forward, video upscaling, and free camera.
 
 <img src=images/oot3d.png width=200><img src=images/mk7.png width=200><img src=images/pokemon.png width=200>
 
@@ -69,9 +69,9 @@ You need the following dependencies installed to build and run:
 - glew
 - capstone
 - xxhash
-- libconfuse
+- confuse
 - cglm
-- xbyak (x86 only)
+- xbyak (x86_64 only)
 - xbyak_aarch64 (arm64 only)
 
 To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23 such as `clang-19` for both linux and MacOS. For MacOS it can be installed via brew. Windows support is planned.
@@ -79,7 +79,7 @@ To build use `make`. You can pass some options to make, `USER=1` to compile a us
 
 ## Compatibility
 
-Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. Also we don't have audio support yet. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed.
+Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed.
 
 ## Acknowledgements
 
