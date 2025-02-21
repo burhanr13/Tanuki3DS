@@ -35,8 +35,7 @@ ifeq ($(OS),Windows_NT)
 	CC := clang
 	CXX := clang++
 	LDFLAGS += -lopengl32 -lglew32
-else
-ifeq ($(shell uname),Darwin)
+else ifeq ($(shell uname),Darwin)
 	CC := $(shell brew --prefix)/opt/llvm/bin/clang
 	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
 	CPPFLAGS += -I$(shell brew --prefix)/include
@@ -44,7 +43,6 @@ ifeq ($(shell uname),Darwin)
 	LDFLAGS += -framework OpenGL -lGLEW
 else
 	LDFLAGS += -lGL -lGLEW
-endif
 endif
 
 BUILD_DIR := build
