@@ -40,7 +40,7 @@ endif
 ifeq ($(OS),Windows_NT)
 	CC := clang
 	CXX := clang++
-	LDFLAGS += -lopengl32 -lglew32
+	LDFLAGS += -lopengl32 -lglew32 -Wl,--stack,8388608
 else ifeq ($(shell uname),Darwin)
 	CC := $(shell brew --prefix)/opt/llvm/bin/clang
 	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
