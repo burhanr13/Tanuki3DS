@@ -702,6 +702,17 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 csel(dst, w0, dst, GT);
                 break;
             }
+            case IR_SSAT: {
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                mov(w0, ~MASK(inst.op1));
+                cmp(src, w0);
+                csel(dst, w0, src, LT);
+                mov(w0, MASK(inst.op1));
+                cmp(src, w0);
+                csel(dst, w0, dst, GT);
+                break;
+            }
             case IR_MEDIA_UADD8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
@@ -1215,7 +1226,7 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                     // TODO: deal with rounding mode properly
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
-                        
+
                         LDDM();
                         if (instr.cp_data_proc.crn & 1) {
                             fcvtzs(w0, d1);

@@ -1,16 +1,18 @@
-#ifndef DSP_H
-#define DSP_H
+#ifndef SRV_DSP_H
+#define SRV_DSP_H
 
 #include "kernel/thread.h"
 
 #include "srv.h"
 
 typedef struct {
-    // there are 3 interrupts and 4 channels to register
-    // events for
-    KEvent* events[3][4];
+    // correspond to interrupt 2, pipes 2 and 3
+    // the other ones aren't used i think
+    KEvent* audio_event;
+    KEvent* binary_event;
 
-    KEvent semEvent;
+    KEvent sem_event; // signalled when there is new audio data
+    u16 sem_mask;
 } DSPData;
 
 DECL_PORT(dsp);

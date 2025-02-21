@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "pica/shader.h"
+#include "video/shader.h"
 
 #include "shaderjit.h"
 
