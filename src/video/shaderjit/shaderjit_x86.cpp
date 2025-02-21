@@ -206,16 +206,26 @@ u32 ShaderCode::compileWithEntry(ShaderUnit* shu, u32 entry) {
     // while compiling previous entry points
     u32 callsStart = calls.size();
 
+#ifdef _WIN32
+    auto arg = rcx;
+#else
+    auto arg = rdi;
+#endif
+
     push(rbp);
     push(rbx);
     push(r12);
+#ifdef _WIN32
+    push(rsi);
+    push(rdi);
+#endif
     sub(rsp, 16 * 16);
     mov(reg_r, rsp);
-    lea(reg_v, ptr[rdi + offsetof(ShaderUnit, v)]);
-    lea(reg_o, ptr[rdi + offsetof(ShaderUnit, o)]);
-    mov(reg_c, qword[rdi + offsetof(ShaderUnit, c)]);
-    mov(reg_i, qword[rdi + offsetof(ShaderUnit, i)]);
-    mov(reg_b, word[rdi + offsetof(ShaderUnit, b)]);
+    lea(reg_v, ptr[arg + offsetof(ShaderUnit, v)]);
+    lea(reg_o, ptr[arg + offsetof(ShaderUnit, o)]);
+    mov(reg_i, qword[arg + offsetof(ShaderUnit, i)]);
+    mov(reg_b, word[arg + offsetof(ShaderUnit, b)]);
+    mov(reg_c, qword[arg + offsetof(ShaderUnit, c)]);
     mov(eax, BIT(31));
     movd(negmask, eax);
     shufps(negmask, negmask, 0);
@@ -227,6 +237,10 @@ u32 ShaderCode::compileWithEntry(ShaderUnit* shu, u32 entry) {
 
     L(endLabel(entry));
     add(rsp, 16 * 16);
+#ifdef _WIN32
+    pop(rdi);
+    pop(rsi);
+#endif
     pop(r12);
     pop(rbx);
     pop(rbp);
