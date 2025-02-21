@@ -268,7 +268,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_VFP_DATA_PROC: {
                 mov(arg1, rbx);
-                mov(esi, inst.op1);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) exec_vfp_data_proc);
                 call(rax);
                 break;
@@ -479,10 +479,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_LOAD_MEM8: {
                 xor_(arg3, arg3);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
                 mov(arg1, rbx);
                 mov(rax, (u64) cpu->read8);
