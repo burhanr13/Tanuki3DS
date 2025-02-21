@@ -5,9 +5,9 @@
 
 <img src=images/logo.png width=100>
 
-Tanuki3DS is a 3DS emulator for MacOS and Linux written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games with reasonable graphics and audio at full speed. It also supports some nice features like controller input, fast-forward, video upscaling, and free camera.
+Tanuki3DS is a 3DS emulator for MacOS, Linux and Windows written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games with reasonable graphics and audio at full speed. It also supports some nice features like controller input, fast-forward, video upscaling, and free camera.
 
-<img src=images/oot3d.png width=200><img src=images/mk7.png width=200><img src=images/pokemon.png width=200>
+<img src=images/oot3d.png width=200><img src=images/mk7.png width=200><img src=images/pokemon.png width=200><img src=images/pmdgti.png width=200>
 
 ## Download
 
@@ -16,7 +16,8 @@ You can download a stable release from the releases tab, or the latest build bel
 | Platform | Download |
 | -------- | -------- |
 | Linux | [Binary](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-binary.zip) <br> [AppImage](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-appimage.zip) |
-| MacOS | [x86_64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) <br> [arm64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) | 
+| MacOS | [x86_64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) <br> [arm64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) |
+| Windows | [Windows Download](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-windows.zip) |
 
 ## Usage
 Launching the app should give you a prompt to select the game file. You can also start a game by dropping its file onto the window. The supported formats are:
@@ -74,7 +75,7 @@ You need the following dependencies installed to build and run:
 - xbyak (x86_64 only)
 - xbyak_aarch64 (arm64 only)
 
-To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23 such as `clang-19` for both linux and MacOS. For MacOS it can be installed via brew. Windows support is planned.
+To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23 such as `clang-19`. To compile on Windows, you need to install Msys2 and mingw-w64 and compile within the mingw64 shell.
 
 
 ## Compatibility
