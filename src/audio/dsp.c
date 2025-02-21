@@ -77,7 +77,6 @@ DSPMemory* get_curr_bank(DSP* dsp) {
 
 void reset_chn(DSP* dsp, int ch, DSPInputStatus* stat) {
     stat->active = 0;
-    stat->cur_buf_dirty = 0;
     SETDSPU32(stat->pos, 0);
     stat->cur_buf = 0;
     FIFO_clear(dsp->bufQueues[ch]);
@@ -146,6 +145,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
     stat->sync_count = cfg->sync_count;
 
+    u16 og_cur_buf = stat->cur_buf;
+
     // these are supposedly reset and "partial reset" flags
     // i dont know what the difference is
     if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
@@ -165,7 +166,10 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     }
     cfg->dirty_flags = 0;
 
-    if (!stat->active) return;
+    if (!stat->active) {
+        if (stat->cur_buf != og_cur_buf) stat->cur_buf_dirty = 1;
+        return;
+    }
 
     update_bufs(dsp, ch, cfg);
     refill_bufs(dsp, ch, cfg);
@@ -311,6 +315,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
         linfo("ch%d ending at %d", ch, stat->prev_buf);
         reset_chn(dsp, ch, stat);
     }
+    if (stat->cur_buf != og_cur_buf) stat->cur_buf_dirty = 1;
 
     // interpolate samples or something
     // this is the most garbage interpolation ever
