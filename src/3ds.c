@@ -103,8 +103,8 @@ void e3ds_update_datetime(E3DS* s) {
     // need time since 1900 in milliseconds
 
     auto timeval = time(nullptr);
-    auto tm = localtime(&timeval);
 #ifndef _WIN32
+    auto tm = localtime(&timeval);
     timeval += tm->tm_gmtoff;
 #endif
 
