@@ -136,3 +136,25 @@ jobs:
       with:
         name: Tanuki3DS-macos-arm64
         path: ./Tanuki3DS-macos-arm64.zip
+
+  windows-build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - uses: msys2/setup-msys2@v2
+    - uses: actions/checkout@v4
+    - name: install dependencies
+      run: |
+        pacman -Sy
+        pacman --noconfirm -S git make mingw-w64-x86_64-{clang,sdl3,glew,capstone,xxhash,confuse,cglm}
+        git clone https://github.com/herumi/xbyak.git
+        cd xbyak
+        make install
+    - name: build
+      run: make USER=1
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Tanuki3DS-windows
+        path: ./ctremu.exe
