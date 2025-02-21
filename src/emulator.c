@@ -22,8 +22,13 @@ void load_config() {
         CFG_INT("video_scale", 1, 0),
         CFG_BOOL("shaderjit", cfg_true, 0),
         CFG_INT("vsh_threads", 0, 0),
+#ifdef _WIN32
+        CFG_BOOL("hw_vertexshaders", cfg_false, 0),
+        CFG_BOOL("ubershader", cfg_true, 0),
+#else
         CFG_BOOL("hw_vertexshaders", cfg_true, 0),
         CFG_BOOL("ubershader", cfg_false, 0),
+#endif
         CFG_BOOL("start_mute", cfg_false, 0),
         CFG_END(),
     };
