@@ -7,6 +7,10 @@
 #include "3ds.h"
 #include "services/hid.h"
 
+#ifdef _WIN32
+#define mkdir(path, ...) mkdir(path)
+#endif
+
 bool g_infologs = false;
 EmulatorState ctremu;
 
@@ -18,8 +22,13 @@ void load_config() {
         CFG_INT("video_scale", 1, 0),
         CFG_BOOL("shaderjit", cfg_true, 0),
         CFG_INT("vsh_threads", 0, 0),
+#ifdef _WIN32
+        CFG_BOOL("hw_vertexshaders", cfg_false, 0),
+        CFG_BOOL("ubershader", cfg_true, 0),
+#else
         CFG_BOOL("hw_vertexshaders", cfg_true, 0),
         CFG_BOOL("ubershader", cfg_false, 0),
+#endif
         CFG_BOOL("start_mute", cfg_false, 0),
         CFG_END(),
     };
@@ -93,6 +102,11 @@ void emulator_set_rom(const char* filename) {
     ctremu.romfile = strdup(filename);
 
     ctremu.romfilenodir = strrchr(ctremu.romfile, '/');
+#ifdef _WIN32
+    if (!ctremu.romfilenodir) {
+        ctremu.romfilenodir = strrchr(ctremu.romfile, '\\');
+    }
+#endif
     if (ctremu.romfilenodir) ctremu.romfilenodir++;
     else ctremu.romfilenodir = ctremu.romfile;
     ctremu.romfilenoext = strdup(ctremu.romfilenodir);

@@ -18,8 +18,27 @@ struct Code : Xbyak::CodeGenerator {
     HostRegAllocation hralloc;
     ArmCore* cpu;
 
-    std::vector<Xbyak::Reg32> tempregs = {esi, edi, r8d, r9d, r10d, r11d};
-    std::vector<Xbyak::Reg32> savedregs = {ebp, r12d, r13d, r14d, r15d};
+#ifdef _WIN32
+    Xbyak::Reg64 arg1 = rcx;
+    Xbyak::Reg32 arg2 = edx;
+    Xbyak::Reg32 arg3 = r8d;
+#else
+    Xbyak::Reg64 arg1 = rdi;
+    Xbyak::Reg32 arg2 = esi;
+    Xbyak::Reg32 arg3 = edx;
+#endif
+    std::vector<Xbyak::Reg32> tempregs =
+#ifdef _WIN32
+        {r9d, r10d, r11d};
+#else
+        {esi, edi, r8d, r9d, r10d, r11d};
+#endif
+    std::vector<Xbyak::Reg32> savedregs =
+#ifdef _WIN32
+        {ebp, edi, esi, r12d, r13d, r14d, r15d};
+#else
+        {ebp, r12d, r13d, r14d, r15d};
+#endif
     std::vector<Xbyak::Address> stackslots;
 
     std::vector<LinkPatch> links;
@@ -248,39 +267,39 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_DATA_PROC: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) exec_vfp_data_proc);
                 call(rax);
                 break;
             }
             case IR_VFP_LOAD_MEM: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) exec_vfp_load_mem);
                 call(rax);
                 break;
             }
             case IR_VFP_STORE_MEM: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) exec_vfp_store_mem);
                 call(rax);
                 break;
             }
             case IR_VFP_READ: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) exec_vfp_read);
                 call(rax);
                 mov(getOp(i), eax);
@@ -288,19 +307,19 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_VFP_WRITE: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) exec_vfp_write);
                 call(rax);
                 break;
             }
             case IR_VFP_READ64L: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) exec_vfp_read64);
                 call(rax);
                 mov(getOp(i), eax);
@@ -313,9 +332,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             case IR_VFP_WRITE64L: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 IRInstr hinst = ir->code.d[i + 1];
                 if (hinst.imm2) {
@@ -324,10 +343,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mov(eax, getOp(hinst.op2));
                 }
                 shl(rax, 32);
-                or_(rdx, rax);
+                or_(arg3.cvt64(), rax);
 
-                mov(esi, inst.op1);
-                mov(rdi, rbx);
+                mov(arg2, inst.op1);
+                mov(arg1, rbx);
                 mov(rax, (u64) exec_vfp_write64);
                 call(rax);
                 i++;
@@ -336,8 +355,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_VFP_WRITE64H:
                 break;
             case IR_CP15_READ: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) cpu->cp15_read);
                 call(rax);
                 mov(getOp(i), eax);
@@ -345,12 +364,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_CP15_WRITE: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) cpu->cp15_write);
                 call(rax);
                 break;
@@ -458,56 +477,56 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
 #else
             case IR_LOAD_MEM8: {
-                xor_(edx, edx);
+                xor_(arg3, arg3);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS8: {
-                mov(edx, 1);
+                mov(arg3, 1);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEM16: {
-                xor_(edx, edx);
+                xor_(arg3, arg3);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS16: {
-                mov(edx, 1);
+                mov(arg3, 1);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
                 mov(getOp(i), eax);
@@ -515,12 +534,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_LOAD_MEM32: {
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read32);
                 call(rax);
                 mov(getOp(i), eax);
@@ -528,51 +547,51 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_STORE_MEM8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->write8);
                 call(rax);
                 break;
             }
             case IR_STORE_MEM16: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->write16);
                 call(rax);
                 break;
             }
             case IR_STORE_MEM32: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->write32);
                 call(rax);
                 break;
@@ -906,16 +925,16 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_UADD8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_uadd8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -923,16 +942,16 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_USUB8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_usub8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -940,16 +959,16 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_UQADD8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_uqadd8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -957,16 +976,16 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_UQSUB8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_uqsub8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -974,16 +993,16 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_UHADD8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_uhadd8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -991,16 +1010,16 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_SSUB8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_ssub8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -1008,16 +1027,16 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_QSUB8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_qsub8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -1025,16 +1044,16 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_SEL: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_sel);
                 call(rax);
                 mov(getOp(i), eax);
@@ -1234,22 +1253,22 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_MODESWITCH: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) cpu_update_mode);
                 call(rax);
                 break;
             }
             case IR_EXCEPTION: {
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 switch (inst.op1) {
                     case E_SWI:
-                        mov(esi, (ArmInstr) {inst.op2}.sw_intr.arg);
+                        mov(arg2, (ArmInstr) {inst.op2}.sw_intr.arg);
                         mov(rax, (u64) cpu->handle_svc);
                         call(rax);
                         break;
                     case E_UND:
-                        mov(esi, inst.op2);
+                        mov(arg2, inst.op2);
                         mov(rax, (u64) cpu_undefined_fail);
                         call(rax);
                         break;

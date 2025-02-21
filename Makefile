@@ -13,8 +13,14 @@ CPPFLAGS := -MP -MMD -D_GNU_SOURCE -I/usr/local/include -Isrc --embed-dir=sys_fi
 
 LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone -lconfuse
 
+ifeq ($(OS),Windows_NT)
+	LTO := -fuse-ld=lld -flto
+else
+	LTO := -flto
+endif
+
 ifeq ($(USER), 1)
-	CFLAGS_RELEASE += -flto
+	CFLAGS_RELEASE += $(LTO)
 	CPPFLAGS += -DNOPORTABLE
 else
 	CFLAGS_RELEASE += -g
@@ -31,7 +37,11 @@ ifeq ($(shell uname -m),aarch64)
 	LDFLAGS += -lxbyak_aarch64
 endif
 
-ifeq ($(shell uname),Darwin)
+ifeq ($(OS),Windows_NT)
+	CC := clang
+	CXX := clang++
+	LDFLAGS += -lopengl32 -lglew32 -Wl,--stack,8388608
+else ifeq ($(shell uname),Darwin)
 	CC := $(shell brew --prefix)/opt/llvm/bin/clang
 	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
 	CPPFLAGS += -I$(shell brew --prefix)/include

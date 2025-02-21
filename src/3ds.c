@@ -103,8 +103,10 @@ void e3ds_update_datetime(E3DS* s) {
     // need time since 1900 in milliseconds
 
     auto timeval = time(nullptr);
+#ifndef _WIN32
     auto tm = localtime(&timeval);
     timeval += tm->tm_gmtoff;
+#endif
 
     datetime->time = (timeval + 2'208'988'800) * 1000;
     datetime->systemtick = s->sched.now;
