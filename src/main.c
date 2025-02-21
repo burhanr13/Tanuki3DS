@@ -2,6 +2,7 @@
 #include <SDL3/SDL_main.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "3ds.h"
