@@ -48,6 +48,7 @@ The keyboard controls are as follows:
 | `Start` | `Return` |
 | `Select` | `RShift` |
 | Pause/Resume | `F5` |
+| Mute/Unmute | `F6` |
 | Toggle fast-forward | `Tab` |
 | Reset | `F1` |
 | Switch game | `F2` |
