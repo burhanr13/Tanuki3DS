@@ -88,7 +88,8 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
     if (bufid == cfg->buf_id) {
         out->paddr = GETDSPU32(cfg->buf_addr);
         out->len = GETDSPU32(cfg->buf_len);
-        out->pos = 0;
+        // embedded buffer start position is specified
+        out->pos = GETDSPU32(cfg->play_pos);
         out->adpcm = cfg->buf_adpcm;
         out->looping = cfg->flags.looping;
         out->adpcm_dirty = cfg->flags.adpcm_dirty;
@@ -143,25 +144,32 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     auto cfg = &m->input_cfg[ch];
     auto stat = &m->input_status[ch];
 
-    // libctru sets this flag when restarting the buffers
-    if (cfg->dirty_flags & (BIT(30) | BIT(29) | BIT(4))) {
-        linfo("ch%d start", ch);
+    stat->sync_count = cfg->sync_count;
+
+    // these are supposedly reset and "partial reset" flags
+    // i dont know what the difference is
+    if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
+        linfo("ch%d reset", ch);
         reset_chn(dsp, ch, stat);
-    } else if (!dsp->bufQueues[ch].size) return;
-    // if the buffer queue is empty we do nothing until
-    // the channel gets restarted
+    }
+
+    stat->active = cfg->active;
+
+    // this bit is the embedded buffer dirty bit
+    // which begins playback of a new embedded buffer
+    // if it is not set and there is nothing in the queue
+    // then the channel is done playing
+    if (!dsp->bufQueues[ch].size && !(cfg->dirty_flags & BIT(30))) {
+        reset_chn(dsp, ch, stat);
+        cfg->dirty_flags = 0;
+    }
+    cfg->dirty_flags = 0;
+
+    if (!stat->active) return;
 
     update_bufs(dsp, ch, cfg);
     refill_bufs(dsp, ch, cfg);
-
-    cfg->dirty_flags = 0;
     cfg->bufs_dirty = 0;
-
-    stat->active = cfg->active;
-    stat->sync_count = cfg->sync_count;
-    stat->cur_buf_dirty = 0;
-
-    if (!cfg->active) return;
 
     u32 nSamples = FRAME_SAMPLES * cfg->rate;
 

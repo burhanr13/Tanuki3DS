@@ -45,7 +45,7 @@ typedef struct {
     u32 _156;
     u16 active;
     u16 sync_count;
-    u32 _164;
+    DSPu32 play_pos;
     u32 _168;
     DSPu32 buf_addr;
     DSPu32 buf_len;
