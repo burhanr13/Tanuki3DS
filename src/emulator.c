@@ -7,6 +7,10 @@
 #include "3ds.h"
 #include "services/hid.h"
 
+#ifdef _WIN32
+#define mkdir(path, ...) mkdir(path)
+#endif
+
 bool g_infologs = false;
 EmulatorState ctremu;
 
@@ -89,6 +93,11 @@ void emulator_set_rom(const char* filename) {
     ctremu.romfile = strdup(filename);
 
     ctremu.romfilenodir = strrchr(ctremu.romfile, '/');
+#ifdef _WIN32
+    if (!ctremu.romfilenodir) {
+        ctremu.romfilenodir = strrchr(ctremu.romfile, '\\');
+    }
+#endif
     if (ctremu.romfilenodir) ctremu.romfilenodir++;
     else ctremu.romfilenodir = ctremu.romfile;
     ctremu.romfilenoext = strdup(ctremu.romfilenodir);

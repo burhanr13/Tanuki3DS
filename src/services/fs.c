@@ -9,6 +9,12 @@
 #include "emulator.h"
 #include "kernel/loader.h"
 
+#ifdef _WIN32
+#define mkdir(path, ...) mkdir(path)
+#define fseek(a, b, c) _fseeki64(a, b, c)
+#define ftell(a) _ftelli64(a)
+#endif
+
 enum {
     SYSFILE_MIIDATA = 1,
     SYSFILE_BADWORDLIST = 2,
@@ -591,7 +597,7 @@ DECL_PORT_ARG(fs_file, fd) {
         case 0x0804: {
             linfo("GetSize");
             fseek(fp, 0, SEEK_END);
-            long len = ftell(fp);
+            s64 len = ftell(fp);
             cmdbuf[0] = IPCHDR(3, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = len;
@@ -675,15 +681,19 @@ DECL_PORT_ARG(fs_dir, fd) {
 
                 ents[i]._21a[0] = 1;
 
-                ents[i].isdir = ent->d_type == DT_DIR;
-                ents[i].isarchive = 0;
-                ents[i].ishidden = ent->d_name[0] == '.';
-
+#ifndef _WIN32
                 struct stat st;
                 fstatat(dirfd(dp), ent->d_name, &st, 0);
-
+                ents[i].isdir = S_ISDIR(st.st_mode);
                 ents[i].isreadonly = (st.st_mode & S_IWUSR) == 0;
                 ents[i].size = st.st_size;
+#else
+                ents[i].isdir = 0;
+                ents[i].isreadonly = 0;
+                ents[i].size = 0;
+#endif
+                ents[i].isarchive = 0;
+                ents[i].ishidden = ent->d_name[0] == '.';
 
                 linfo("entry %s (%s.%s)", ent->d_name, ents[i].shortname,
                       ents[i].shortext);

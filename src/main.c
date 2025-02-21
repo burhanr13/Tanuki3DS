@@ -24,7 +24,7 @@ SDL_Gamepad* g_gamepad;
 
 bool g_pending_reset;
 
-char* oldcwd;
+char oldcwd[4096];
 
 #define FREECAM_SPEED 5.0
 #define FREECAM_ROTATE_SPEED 0.02
@@ -63,7 +63,11 @@ void read_args(int argc, char** argv) {
     argc -= optind;
     argv += optind;
     if (argc >= 1) {
-        if (argv[0][0] == '/') {
+        if (argv[0][0] == '/'
+#ifdef _WIN32
+            || (argv[0][1] == ':' && argv[0][2] == '\\')
+#endif
+        ) {
             emulator_set_rom(argv[0]);
         } else {
             char* path;
@@ -253,7 +257,7 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
-    oldcwd = realpath(".", nullptr);
+    getcwd(oldcwd, sizeof oldcwd);
 
 #ifdef NOPORTABLE
     char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
@@ -419,8 +423,6 @@ int main(int argc, char** argv) {
     SDL_Quit();
 
     emulator_quit();
-
-    free(oldcwd);
 
     return 0;
 }
