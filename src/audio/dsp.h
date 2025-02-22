@@ -48,6 +48,11 @@ typedef struct {
 
     u32 audio_pipe_pos;
 
+    // responses on the aac pipe are always 32 bytes
+    // and are always read in one go
+    u8 binary_pipe[32];
+    void* aac_handle;
+
     // we need to store the whole buffer queue internally
     // because games overwrite them before they finish playing
     FIFO(BufInfo, 2) bufQueues[DSP_CHANNELS];

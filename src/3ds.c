@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "audio/aac.h"
 #include "cpu.h"
 #include "kernel/loader.h"
 #include "kernel/svc_types.h"
@@ -80,6 +81,8 @@ void e3ds_destroy(E3DS* s) {
 
     gpu_destroy(&s->gpu);
     renderer_gl_destroy(&s->gpu.gl);
+
+    aac_shutdown(&s->dsp);
 
     for (int i = 0; i < HANDLE_MAX; i++) {
         if (s->process.handles[i] && !--s->process.handles[i]->refcount)

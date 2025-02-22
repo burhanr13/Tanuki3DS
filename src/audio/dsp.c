@@ -2,14 +2,10 @@
 
 #include "emulator.h"
 
+#include "aac.h"
 #include "dspstructs.h"
 
-#undef PTR
-#ifdef FASTMEM
-#define PTR(addr) ((void*) &dsp->mem[addr])
-#else
-#define PTR(addr) sw_pptr(dsp->mem, addr)
-#endif
+#include "dspptr.inc"
 
 #define DSPMEM(b)                                                              \
     ((DSPMemory*) PTR(DSPRAM_PBASE + DSPRAM_DATA_OFF + b * DSPRAM_BANK_OFF))
@@ -50,9 +46,20 @@ void dsp_read_audio_pipe(DSP* dsp, void* buf, u32 len) {
 }
 
 // the binary pipes are used for aac decoding
-void dsp_write_binary_pipe(DSP* dsp, void* buf, u32 len) {}
+void dsp_write_binary_pipe(DSP* dsp, void* buf, u32 len) {
+    if (len != 32) {
+        lerror("unknown binary pipe write length %d", len);
+        return;
+    }
+    aac_handle_request(dsp, buf, (void*) dsp->binary_pipe);
+}
+
 void dsp_read_binary_pipe(DSP* dsp, void* buf, u32 len) {
-    memset(buf, 0, len);
+    if (len != 32) {
+        lerror("unknown binary pipe read length %d", len);
+        return;
+    }
+    memcpy(buf, dsp->binary_pipe, sizeof dsp->binary_pipe);
 }
 
 DSPMemory* get_curr_bank(DSP* dsp) {
