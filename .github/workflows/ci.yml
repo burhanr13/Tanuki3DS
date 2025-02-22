@@ -93,7 +93,7 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 glew xxhash xbyak capstone confuse cglm
+        brew install llvm sdl3 glew xxhash xbyak capstone confuse cglm || brew link --overwrite python
     - name: build
       run: make USER=1
 
