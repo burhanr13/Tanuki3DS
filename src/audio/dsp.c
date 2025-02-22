@@ -162,8 +162,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     // then the channel is done playing
     if (!dsp->bufQueues[ch].size && !(cfg->dirty_flags & BIT(30))) {
         reset_chn(dsp, ch, stat);
-        cfg->dirty_flags = 0;
     }
+
     cfg->dirty_flags = 0;
 
     if (!stat->active) {
@@ -173,6 +173,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
     update_bufs(dsp, ch, cfg);
     refill_bufs(dsp, ch, cfg);
+    
     cfg->bufs_dirty = 0;
 
     u32 nSamples = FRAME_SAMPLES * cfg->rate;
@@ -297,13 +298,12 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
 
         if (buf->pos == buf->len) {
             stat->prev_buf = buf->id;
-            if (!buf->looping) {
+            if (buf->looping) {
+                buf->pos = 0;
+            } else {
                 BufInfo b [[gnu::unused]];
                 FIFO_pop(dsp->bufQueues[ch], b);
-                stat->cur_buf_dirty = 1;
                 linfo("ch%d to buf%d", ch, stat->cur_buf);
-            } else {
-                buf->pos = 0;
             }
         }
     }
