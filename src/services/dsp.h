@@ -11,6 +11,8 @@ typedef struct {
     KEvent* audio_event;
     KEvent* binary_event;
 
+    bool comp_loaded;
+
     KEvent sem_event; // signalled when there is new audio data
     u16 sem_mask;
 } DSPData;

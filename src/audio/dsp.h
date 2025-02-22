@@ -64,4 +64,6 @@ void dsp_read_binary_pipe(DSP* dsp, void* buf, u32 len);
 
 void dsp_process_frame(DSP* dsp);
 
+void dsp_reset(DSP* dsp);
+
 #endif

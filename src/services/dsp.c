@@ -11,7 +11,8 @@ void dsp_event(E3DS* s, u32) {
 // runs when the application signals the dsp semaphore
 // that a new audio frame is ready
 void sem_event_handler(E3DS* s) {
-    linfo("dsp sem signaled");
+    linfo("dsp sem signaled mask=%04x", s->services.dsp.sem_mask);
+    if (!s->services.dsp.comp_loaded) return;
     dsp_process_frame(&s->dsp);
     add_event(&s->sched, dsp_event, 0, CPU_CLK * FRAME_SAMPLES / SAMPLE_RATE);
 }
@@ -103,6 +104,7 @@ DECL_PORT(dsp) {
             void* buf [[gnu::unused]] = PTR(cmdbuf[5]);
 
             // component is not directly used right now
+            s->services.dsp.comp_loaded = true;
 
             cmdbuf[0] = IPCHDR(2, 2);
             cmdbuf[1] = 0;
@@ -115,6 +117,9 @@ DECL_PORT(dsp) {
             linfo("UnloadComponent");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
+            dsp_reset(&s->dsp);
+            remove_event(&s->sched, dsp_event, 0);
+            s->services.dsp.comp_loaded = false;
             break;
         case 0x0013:
             linfo("FlushDataCache");

@@ -352,3 +352,10 @@ void dsp_process_frame(DSP* dsp) {
 
     if (ctremu.audio_cb) ctremu.audio_cb(final, FRAME_SAMPLES);
 }
+
+void dsp_reset(DSP* dsp) {
+    dsp->audio_pipe_pos = 0;
+    for (int i = 0; i < DSP_CHANNELS; i++) {
+        FIFO_clear(dsp->bufQueues[i]);
+    }
+}
