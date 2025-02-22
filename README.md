@@ -76,6 +76,7 @@ You need the following dependencies installed to build and run:
 - xxhash
 - confuse
 - cglm
+- fdk-aac
 - xbyak (x86_64 only)
 - xbyak_aarch64 (arm64 only)
 

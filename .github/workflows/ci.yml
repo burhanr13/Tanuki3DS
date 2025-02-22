@@ -14,7 +14,8 @@ jobs:
       run: |
         sudo apt update
         sudo apt install clang-19 libglew-dev libxxhash-dev \
-        libxbyak-dev libcapstone-dev libconfuse-dev libcglm-dev
+        libxbyak-dev libcapstone-dev libconfuse-dev libcglm-dev \
+        libfdk-aac-dev
         # SDL build dependencies
         sudo apt install build-essential git make \
         pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
@@ -52,7 +53,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install clang-19 libglew-dev libxxhash-dev \
-        libcapstone-dev libconfuse-dev libcglm-dev
+        libcapstone-dev libconfuse-dev libcglm-dev libfdk-aac-dev
         # SDL build dependencies
         sudo apt install build-essential git make \
         pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
@@ -93,7 +94,8 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 glew xxhash xbyak capstone confuse cglm || brew link --overwrite python
+        brew install llvm sdl3 glew xxhash xbyak capstone confuse cglm fdk-aac \
+         || brew link --overwrite python
     - name: build
       run: make USER=1
 
@@ -117,7 +119,7 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 glew xxhash capstone confuse cglm
+        brew install llvm sdl3 glew xxhash capstone confuse cglm fdk-aac
         git clone https://github.com/fujitsu/xbyak_aarch64.git
         cd xbyak_aarch64
         sudo make install
@@ -149,7 +151,7 @@ jobs:
       run: |
         pacman -Sy
         pacman --noconfirm -S git make \
-        mingw-w64-x86_64-{clang,lld,sdl3,glew,capstone,xxhash,confuse,cglm}
+        mingw-w64-x86_64-{clang,lld,sdl3,glew,capstone,xxhash,confuse,cglm,fdk-aac}
         git clone https://github.com/herumi/xbyak.git
         cd xbyak
         make install

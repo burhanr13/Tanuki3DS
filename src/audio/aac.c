@@ -62,7 +62,7 @@ void aac_handle_request(DSP* dsp, DSPAACMessage* in, DSPAACMessage* out) {
     u32 size = in->decodeRequest.sizeIn;
     u32 bytesValid = size;
 
-    ldebug("aac decoding %d bytes", size);
+    linfo("aac decoding %d bytes", size);
 
     out->decodeResponse.nSamples = 0;
 
@@ -95,6 +95,6 @@ void aac_handle_request(DSP* dsp, DSPAACMessage* in, DSPAACMessage* out) {
 
     out->decodeResponse.rate = rate_to_enum(rate);
 
-    ldebug("decoded %d samples, %d channels at rate %d",
-           out->decodeResponse.nSamples, out->decodeResponse.nChannels, rate);
+    linfo("decoded %d samples, %d channels at rate %d",
+          out->decodeResponse.nSamples, out->decodeResponse.nChannels, rate);
 }
