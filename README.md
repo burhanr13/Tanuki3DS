@@ -1,11 +1,14 @@
 # Tanuki3DS
 
 [![](https://github.com/burhanr13/Tanuki3DS/actions/workflows/ci.yml/badge.svg)](https://github.com/burhanr13/Tanuki3DS/actions/workflows/ci.yml)
-[![](https://dcbadge.limes.pink/api/server/6ya65fvD3g?style=flat)](https://discord.gg/6ya65fvD3g)
 
 <img src=images/logo.png width=100>
 
 Tanuki3DS is a 3DS emulator for MacOS, Linux and Windows written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games with reasonable graphics and audio at full speed. It also supports some nice features like controller input, fast-forward, video upscaling, and free camera.
+
+If you want to ask questions or discuss the emulator, join our discord:
+
+[![](https://discord.com/api/guilds/1309172325203054612/widget.png?style=banner2)](https://discord.gg/6ya65fvD3g)
 
 <img src=images/oot3d.png width=200><img src=images/mk7.png width=200><img src=images/pokemon.png width=200><img src=images/pmdgti.png width=200>
 
