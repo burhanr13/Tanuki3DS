@@ -167,13 +167,13 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     cfg->dirty_flags = 0;
 
     if (!stat->active) {
-        if (stat->cur_buf != og_cur_buf) stat->cur_buf_dirty = 1;
+        stat->cur_buf_dirty = stat->cur_buf != og_cur_buf;
         return;
     }
 
     update_bufs(dsp, ch, cfg);
     refill_bufs(dsp, ch, cfg);
-    
+
     cfg->bufs_dirty = 0;
 
     u32 nSamples = FRAME_SAMPLES * cfg->rate;
@@ -192,8 +192,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
         u32 bufRem = buf->len - buf->pos;
         if (bufRem > rem) bufRem = rem;
 
-        linfo("ch%d playing %d at pos %d for %d samples", ch, buf->id, buf->pos,
-              bufRem);
+        linfo("ch%d playing buf %d at pos %d for %d samples", ch, buf->id,
+              buf->pos, bufRem);
 
         if (cfg->format.num_chan == 2) {
             switch (cfg->format.codec) {
@@ -315,7 +315,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
         linfo("ch%d ending at %d", ch, stat->prev_buf);
         reset_chn(dsp, ch, stat);
     }
-    if (stat->cur_buf != og_cur_buf) stat->cur_buf_dirty = 1;
+
+    stat->cur_buf_dirty = stat->cur_buf != og_cur_buf;
 
     // interpolate samples or something
     // this is the most garbage interpolation ever
