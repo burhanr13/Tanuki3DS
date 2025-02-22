@@ -45,6 +45,8 @@ typedef struct _KThread {
 
     KListNode* waiting_thrds;
 
+    KListNode* owned_mutexes;
+
     u32 id;
     s32 priority;
     u32 state;

@@ -82,7 +82,6 @@ void services_init(E3DS* s) {
     srvobj_init(&s->services.cecd.cecinfo.hdr, KOT_EVENT);
 
     srvobj_init(&s->services.y2r.transferend.hdr, KOT_EVENT);
-    s->services.y2r.transferend.sticky = true;
 
     srvobj_init(&s->services.ir.event.hdr, KOT_EVENT);
 }

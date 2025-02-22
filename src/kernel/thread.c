@@ -140,10 +140,17 @@ void thread_kill(E3DS* s, KThread* t) {
     linfo("killing thread %d", t->id);
 
     t->state = THRD_DEAD;
+
     auto cur = &t->waiting_thrds;
     while (*cur) {
         thread_wakeup(s, (KThread*) (*cur)->key, &t->hdr);
         klist_remove(cur);
+    }
+
+    cur = &t->owned_mutexes;
+    while (*cur) {
+        mutex_release(s, (KMutex*) (*cur)->key);
+        // don't remove the list node since mutex release does that
     }
 
     cur = &t->waiting_objs;
@@ -205,6 +212,10 @@ KMutex* mutex_create() {
 }
 
 void mutex_release(E3DS* s, KMutex* mtx) {
+    if (mtx->locker_thrd) {
+        klist_remove_key(&mtx->locker_thrd->owned_mutexes, &mtx->hdr);
+    }
+
     if (!mtx->waiting_thrds) {
         mtx->locker_thrd = nullptr;
         return;
@@ -239,6 +250,7 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
                 return true;
             }
             mtx->locker_thrd = t;
+            klist_insert(&t->owned_mutexes, &mtx->hdr);
             return false;
         }
         case KOT_SEMAPHORE: {
