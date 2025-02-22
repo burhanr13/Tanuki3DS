@@ -55,7 +55,6 @@ void aac_handle_request(DSP* dsp, DSPAACMessage* in, DSPAACMessage* out) {
     u8* src = PTR(in->decodeRequest.paddrIn);
     s16* dstL = PTR(in->decodeRequest.paddrOutL);
     s16* dstR = nullptr;
-    if (in->decodeRequest.paddrOutR) dstR = PTR(in->decodeRequest.paddrOutR);
 
     out->decodeResponse.size = in->decodeRequest.sizeIn;
 
@@ -63,10 +62,6 @@ void aac_handle_request(DSP* dsp, DSPAACMessage* in, DSPAACMessage* out) {
     u32 bytesValid = size;
 
     linfo("aac decoding %d bytes", size);
-
-    out->decodeResponse.nSamples = 0;
-
-    int rate = 0;
 
     AAC_DECODER_ERROR res;
 
@@ -82,19 +77,19 @@ void aac_handle_request(DSP* dsp, DSPAACMessage* in, DSPAACMessage* out) {
         auto info = aacDecoder_GetStreamInfo(dsp->aac_handle);
 
         out->decodeResponse.nChannels = info->numChannels;
-        out->decodeResponse.nSamples += info->frameSize;
-        rate = info->sampleRate;
+        out->decodeResponse.nSamples = info->frameSize;
+        out->decodeResponse.rate = rate_to_enum(info->sampleRate);
 
         memcpy(dstL, buf, info->frameSize * sizeof(s16));
         dstL += info->frameSize;
         if (info->numChannels == 2) {
+            if (!dstR) dstR = PTR(in->decodeRequest.paddrOutR);
             memcpy(dstR, buf + info->frameSize, info->frameSize * sizeof(s16));
             dstR += info->frameSize;
         }
     }
 
-    out->decodeResponse.rate = rate_to_enum(rate);
-
-    linfo("decoded %d samples, %d channels at rate %d",
-          out->decodeResponse.nSamples, out->decodeResponse.nChannels, rate);
+    linfo("decoded %d samples, %d channels at rate enum %d",
+          out->decodeResponse.nSamples, out->decodeResponse.nChannels,
+          out->decodeResponse.rate);
 }

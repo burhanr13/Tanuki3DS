@@ -146,7 +146,7 @@ void refill_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
     }
 }
 
-void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
+void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     auto cfg = &m->input_cfg[ch];
     auto stat = &m->input_status[ch];
 
@@ -205,20 +205,20 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
         if (cfg->format.num_chan == 2) {
             switch (cfg->format.codec) {
                 case DSPFMT_PCM16: {
-                    s16* src = PTR(buf->paddr);
+                    s16(*src)[2] = PTR(buf->paddr);
                     for (int s = 0; s < bufRem; s++) {
-                        lsamples[curSample] = src[2 * buf->pos + 0];
-                        rsamples[curSample] = src[2 * buf->pos + 1];
+                        lsamples[curSample] = src[buf->pos][0];
+                        rsamples[curSample] = src[buf->pos][1];
                         curSample++;
                         buf->pos++;
                     }
                     break;
                 }
                 case DSPFMT_PCM8: {
-                    s8* src = PTR(buf->paddr);
+                    s8(*src)[2] = PTR(buf->paddr);
                     for (int s = 0; s < bufRem; s++) {
-                        lsamples[curSample] = src[2 * buf->pos + 0];
-                        rsamples[curSample] = src[2 * buf->pos + 1];
+                        lsamples[curSample] = src[buf->pos][0];
+                        rsamples[curSample] = src[buf->pos][1];
                         curSample++;
                         buf->pos++;
                     }
@@ -330,11 +330,17 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32* mixer) {
     // dsp does 4-channel mixing instead of just 2
 
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        mixer[2 * s] +=
+        mixer[s][0] +=
             (s32) lsamples[s * nSamples / FRAME_SAMPLES] * cfg->mix[0][0];
-        mixer[2 * s + 1] +=
+        mixer[s][1] +=
             (s32) rsamples[s * nSamples / FRAME_SAMPLES] * cfg->mix[0][1];
     }
+}
+
+s16 clamp16(s32 in) {
+    if (in > INT16_MAX) return INT16_MAX;
+    if (in < INT16_MIN) return INT16_MIN;
+    return in;
 }
 
 void dsp_process_frame(DSP* dsp) {
@@ -342,7 +348,7 @@ void dsp_process_frame(DSP* dsp) {
     auto m = get_curr_bank(dsp);
 
     // interleaved stereo
-    s32 mixer[2 * FRAME_SAMPLES] = {};
+    s32 mixer[FRAME_SAMPLES][2] = {};
 
     for (int i = 0; i < 24; i++) {
         dsp_process_chn(dsp, m, i, mixer);
@@ -350,12 +356,10 @@ void dsp_process_frame(DSP* dsp) {
 
     // presumably we are supposed to do things here too
 
-    s16 final[2 * FRAME_SAMPLES];
-    for (int s = 0; s < 2 * FRAME_SAMPLES; s++) {
-        int sample = mixer[s];
-        if (sample > INT16_MAX) sample = INT16_MAX;
-        if (sample < INT16_MIN) sample = INT16_MIN;
-        final[s] = sample;
+    s16 final[FRAME_SAMPLES][2];
+    for (int s = 0; s < FRAME_SAMPLES; s++) {
+        final[s][0] = clamp16(mixer[s][0]);
+        final[s][1] = clamp16(mixer[s][1]);
     }
 
     if (ctremu.audio_cb) ctremu.audio_cb(final, FRAME_SAMPLES);

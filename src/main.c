@@ -260,7 +260,7 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
     }
 }
 
-void audio_callback(s16* samples, u32 count) {
+void audio_callback(s16 (*samples)[2], u32 count) {
     if (ctremu.uncap || ctremu.mute) return;
     SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
 }
