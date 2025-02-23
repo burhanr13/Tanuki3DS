@@ -10,13 +10,21 @@
 #include "emulator.h"
 #include "video/renderer_gl.h"
 
+#ifdef _WIN32
+#define realpath(a, b) _fullpath(b, a, 4096)
+#endif
+
 const char usage[] =
     R"(ctremu [options] [romfile]
 -h -- print help
 -l -- enable info logging
--v -- disable vsync
 -sN -- upscale by N
 )";
+
+// we need to read cmdline before initing emu
+bool log_arg;
+int scale_arg;
+char* romfile_arg;
 
 SDL_Window* g_window;
 
@@ -26,8 +34,6 @@ SDL_Gamepad* g_gamepad;
 SDL_AudioStream* g_audio;
 
 bool g_pending_reset;
-
-char oldcwd[4096];
 
 #define FREECAM_SPEED 5.0
 #define FREECAM_ROTATE_SPEED 0.02
@@ -44,16 +50,12 @@ void read_args(int argc, char** argv) {
     while ((c = getopt(argc, argv, "hlvs:")) != (char) -1) {
         switch (c) {
             case 'l':
-                g_infologs = true;
+                log_arg = true;
                 break;
             case 's': {
                 int scale = atoi(optarg);
                 if (scale <= 0) eprintf("invalid scale factor");
-                else ctremu.videoscale = scale;
-                break;
-            }
-            case 'v': {
-                ctremu.vsync = false;
+                else scale_arg = scale;
                 break;
             }
             case '?':
@@ -66,18 +68,7 @@ void read_args(int argc, char** argv) {
     argc -= optind;
     argv += optind;
     if (argc >= 1) {
-        if (argv[0][0] == '/'
-#ifdef _WIN32
-            || (argv[0][1] == ':' && argv[0][2] == '\\')
-#endif
-        ) {
-            emulator_set_rom(argv[0]);
-        } else {
-            char* path;
-            asprintf(&path, "%s/%s", oldcwd, argv[0]);
-            emulator_set_rom(path);
-            free(path);
-        }
+        romfile_arg = realpath(argv[0], nullptr);
     }
 }
 
@@ -268,7 +259,7 @@ void audio_callback(s16 (*samples)[2], u32 count) {
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
-    getcwd(oldcwd, sizeof oldcwd);
+    read_args(argc, argv);
 
 #ifdef NOPORTABLE
     char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
@@ -282,7 +273,12 @@ int main(int argc, char** argv) {
 
     emulator_init();
 
-    read_args(argc, argv);
+    if (log_arg) g_infologs = true;
+    if (scale_arg) ctremu.videoscale = scale_arg;
+    if (romfile_arg) {
+        emulator_set_rom(romfile_arg);
+        free(romfile_arg);
+    }
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
 
