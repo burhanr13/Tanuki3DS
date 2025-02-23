@@ -55,7 +55,7 @@ The keyboard controls are as follows:
 | Toggle fast-forward | `Tab` |
 | Reset | `F1` |
 | Switch game | `F2` |
-| Toggle free cam (Requires HW shaders to be enabled) | `F7` |
+| Toggle freecam | `F7` |
 
 The touch screen can be used with the mouse.
 
@@ -70,6 +70,8 @@ Freecam controls (regular keyboard input is disabled):
 - QE: roll
 - Left Shift (hold): move slower
 - Right Shift (hold): move faster
+
+Note that the freecam only works when hw shaders are enabled.
 
 ## Building
 You need the following dependencies installed to build and run:
