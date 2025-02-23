@@ -2,7 +2,7 @@
 
 #include "3ds.h"
 
-void y2r_event(E3DS* s, u32) {
+void y2r_event(E3DS* s, SchedEventArg) {
     s->services.y2r.busy = false;
     if (s->services.y2r.enableInterrupt) {
         event_signal(s, &s->services.y2r.transferend);
@@ -33,13 +33,13 @@ DECL_PORT(y2r) {
             // todo: actually do the conversion
 
             s->services.y2r.busy = true;
-            add_event(&s->sched, y2r_event, 0, 10000);
+            add_event(&s->sched, y2r_event, SEA_NONE, 10000);
             break;
         case 0x0027:
             linfo("StopConversion");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
-            remove_event(&s->sched, y2r_event, 0);
+            remove_event(&s->sched, y2r_event, SEA_NONE);
             s->services.y2r.busy = false;
             break;
         case 0x0028:

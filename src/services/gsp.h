@@ -3,6 +3,7 @@
 
 #include "kernel/memory.h"
 #include "kernel/thread.h"
+#include "scheduler.h"
 
 #include "srv.h"
 
@@ -83,7 +84,7 @@ typedef struct {
 
 DECL_PORT(gsp_gpu);
 
-void gsp_handle_event(E3DS* s, u32 arg);
+void gsp_handle_event(E3DS* s, SchedEventArg arg);
 void gsp_handle_command(E3DS* s);
 
 #endif

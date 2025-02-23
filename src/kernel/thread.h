@@ -2,6 +2,7 @@
 #define THREAD_H
 
 #include "common.h"
+#include "scheduler.h"
 
 #include "kernel.h"
 #include "memory.h"
@@ -98,7 +99,7 @@ u32 thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority, u32 arg);
 void thread_reschedule(E3DS* s);
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout);
-void thread_wakeup_timeout(E3DS* s, u32 tid);
+void thread_wakeup_timeout(E3DS* s, SchedEventArg arg);
 bool thread_wakeup(E3DS* s, KThread* t, KObject* reason);
 
 void thread_kill(E3DS* s, KThread* t);

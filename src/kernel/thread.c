@@ -91,19 +91,22 @@ void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
     if (timeout == 0) {
         // instantly wakup the thread and set the return to timeout
         // waitsync with timeout=0 is used to poll a sync object
-        thread_wakeup_timeout(s, t->id);
+        thread_wakeup_timeout(s, SEA_PTR(t));
         return;
     } else if (timeout > 0) {
         t->state = THRD_SLEEP;
         s64 timeCycles = timeout * CPU_CLK / 1'000'000'000;
-        add_event(&s->sched, thread_wakeup_timeout, t->id, timeCycles);
+        add_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t), timeCycles);
     }
     thread_reschedule(s);
 }
 
-void thread_wakeup_timeout(E3DS* s, u32 tid) {
-    KThread* t = s->process.threads[tid];
-    if (!t || t->state != THRD_SLEEP) return;
+void thread_wakeup_timeout(E3DS* s, SchedEventArg arg) {
+    KThread* t = arg.p;
+    if (t->state != THRD_SLEEP) {
+        lerror("thread already awake (this should never happen)");
+        return;
+    }
 
     linfo("waking up thread %d from timeout", t->id);
     KListNode** cur = &t->waiting_objs;
@@ -126,7 +129,7 @@ bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
             sync_cancel(t, (*cur)->key);
             klist_remove(cur);
         }
-        remove_event(&s->sched, thread_wakeup_timeout, t->id);
+        remove_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t));
         t->state = THRD_READY;
         thread_reschedule(s);
         return true;
@@ -158,6 +161,8 @@ void thread_kill(E3DS* s, KThread* t) {
         sync_cancel(t, (*cur)->key);
         klist_remove(cur);
     }
+
+    remove_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t));
 
     s->process.threads[t->id] = nullptr;
 

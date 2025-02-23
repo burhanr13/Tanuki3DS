@@ -71,7 +71,8 @@ bool e3ds_init(E3DS* s, char* romfile) {
     s->process.hdr.refcount = 2; // so closing this handle won't cause problems
     s->process.handles[1] = &s->process.hdr;
 
-    add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
+    add_event(&s->sched, gsp_handle_event, SEA_INT(GSPEVENT_VBLANK0),
+              CPU_CLK / FPS);
 
     return true;
 }

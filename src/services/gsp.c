@@ -133,11 +133,12 @@ void update_fbinfos(E3DS* s) {
     }
 }
 
-void gsp_handle_event(E3DS* s, u32 arg) {
-    if (arg == GSPEVENT_VBLANK0) {
-        add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
+void gsp_handle_event(E3DS* s, SchedEventArg arg) {
+    if (arg.i == GSPEVENT_VBLANK0) {
+        add_event(&s->sched, gsp_handle_event, SEA_INT(GSPEVENT_VBLANK0),
+                  CPU_CLK / FPS);
 
-        gsp_handle_event(s, GSPEVENT_VBLANK1);
+        gsp_handle_event(s, SEA_INT(GSPEVENT_VBLANK1));
 
         linfo("vblank");
 
@@ -166,7 +167,7 @@ void gsp_handle_event(E3DS* s, u32 arg) {
     if (interrupts->count < 0x34) {
         u32 idx = interrupts->cur + interrupts->count;
         if (idx >= 0x34) idx -= 0x34;
-        interrupts->queue[idx] = arg;
+        interrupts->queue[idx] = arg.i;
         interrupts->count++;
     }
 
@@ -189,7 +190,7 @@ void gsp_handle_command(E3DS* s) {
             linfo("dma request from %08x to %08x of size 0x%x", src, dest,
                   size);
             memcpy(PTR(dest), PTR(src), size);
-            gsp_handle_event(s, GSPEVENT_DMA);
+            gsp_handle_event(s, SEA_INT(GSPEVENT_DMA));
             break;
         }
         case 0x01: {
@@ -199,7 +200,7 @@ void gsp_handle_command(E3DS* s) {
                   bufsize);
             gpu_run_command_list(&s->gpu, vaddr_to_paddr(bufaddr & ~7),
                                  bufsize);
-            gsp_handle_event(s, GSPEVENT_P3D);
+            gsp_handle_event(s, SEA_INT(GSPEVENT_P3D));
             break;
         }
         case 0x02: {
@@ -218,7 +219,7 @@ void gsp_handle_command(E3DS* s) {
                           cmd->buf[i].end, cmd->buf[i].val);
                     gpu_clear_fb(&s->gpu, vaddr_to_paddr(cmd->buf[i].st),
                                  cmd->buf[i].val);
-                    gsp_handle_event(s, GSPEVENT_PSC0 + i);
+                    gsp_handle_event(s, SEA_INT(GSPEVENT_PSC0 + i));
                 }
             }
             break;
@@ -265,7 +266,7 @@ void gsp_handle_command(E3DS* s) {
                 }
             }
 
-            gsp_handle_event(s, GSPEVENT_PPF);
+            gsp_handle_event(s, SEA_INT(GSPEVENT_PPF));
             break;
         }
         case 0x04: {
@@ -292,7 +293,7 @@ void gsp_handle_command(E3DS* s) {
                              vaddr_to_paddr(addrout), copysize, pitchin, gapin,
                              pitchout, gapout);
 
-            gsp_handle_event(s, GSPEVENT_PPF);
+            gsp_handle_event(s, SEA_INT(GSPEVENT_PPF));
             break;
         }
         case 0x05:

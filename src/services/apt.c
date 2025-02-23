@@ -4,7 +4,7 @@
 
 #include "applets.h"
 
-void apt_resume_app(E3DS* s) {
+void apt_resume_app(E3DS* s, SchedEventArg) {
     s->services.apt.nextparam.appid = APPID_HOMEMENU;
     s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
     event_signal(s, &s->services.apt.resume_event);
@@ -32,8 +32,7 @@ DECL_PORT(apt) {
             linfo("Initialize with notif event %x and resume event %x",
                   cmdbuf[3], cmdbuf[4]);
             // dont signal this immediately
-            add_event(&s->sched, (SchedEventHandler) apt_resume_app, 0,
-                      CPU_CLK / FPS);
+            add_event(&s->sched, apt_resume_app, SEA_NONE, CPU_CLK / FPS);
             break;
         case 0x0003:
             linfo("Enable");
