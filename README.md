@@ -55,7 +55,7 @@ The keyboard controls are as follows:
 | Toggle fast-forward | `Tab` |
 | Reset | `F1` |
 | Switch game | `F2` |
-| Toggle free cam | `F7` |
+| Toggle free cam (Requires HW shaders to be enabled) | `F7` |
 
 The touch screen can be used with the mouse.
 
