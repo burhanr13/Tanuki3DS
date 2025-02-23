@@ -81,6 +81,7 @@ typedef s16 DSPInputADPCMCoeffs[16];
 // 5, this struct is only in libctru for some reason
 // i have no idea what any of these mean
 typedef struct {
+    u32 flags;
     float master_vol;
     float aux_vol[2];
     u16 out_buf_count;
