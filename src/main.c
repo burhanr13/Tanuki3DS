@@ -148,34 +148,18 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
         if (keys[SDL_SCANCODE_LSHIFT]) speed /= 20;
         if (keys[SDL_SCANCODE_RSHIFT]) speed *= 20;
 
-        mat4 m;
-
         vec3 t = {};
-        mat4 r = GLM_MAT4_IDENTITY_INIT;
-
-        if (keys[SDL_SCANCODE_E]) {
-            t[1] = -speed;
-        }
-        if (keys[SDL_SCANCODE_Q]) {
-            t[1] = speed;
-        }
-        if (keys[SDL_SCANCODE_DOWN]) {
-            glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_XUP);
-        }
-        if (keys[SDL_SCANCODE_UP]) {
-            glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_XUP);
-        }
         if (keys[SDL_SCANCODE_A]) {
             t[0] = speed;
         }
         if (keys[SDL_SCANCODE_D]) {
             t[0] = -speed;
         }
-        if (keys[SDL_SCANCODE_LEFT]) {
-            glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_YUP);
+        if (keys[SDL_SCANCODE_F]) {
+            t[1] = speed;
         }
-        if (keys[SDL_SCANCODE_RIGHT]) {
-            glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_YUP);
+        if (keys[SDL_SCANCODE_R]) {
+            t[1] = -speed;
         }
         if (keys[SDL_SCANCODE_W]) {
             t[2] = speed;
@@ -184,6 +168,27 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
             t[2] = -speed;
         }
 
+        mat4 r = GLM_MAT4_IDENTITY_INIT;
+        if (keys[SDL_SCANCODE_DOWN]) {
+            glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_XUP);
+        }
+        if (keys[SDL_SCANCODE_UP]) {
+            glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_XUP);
+        }
+        if (keys[SDL_SCANCODE_LEFT]) {
+            glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_YUP);
+        }
+        if (keys[SDL_SCANCODE_RIGHT]) {
+            glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_YUP);
+        }
+        if (keys[SDL_SCANCODE_Q]) {
+            glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_ZUP);
+        }
+        if (keys[SDL_SCANCODE_E]) {
+            glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_ZUP);
+        }
+
+        mat4 m;
         glm_translate_make(m, t);
         glm_mat4_mul(m, ctremu.freecam_mtx, ctremu.freecam_mtx);
         glm_mat4_mul(r, ctremu.freecam_mtx, ctremu.freecam_mtx);

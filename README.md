@@ -61,12 +61,13 @@ The touch screen can be used with the mouse.
 
 You can also connect a controller to use controller input.
 
-Freecam controls:
+Freecam controls (regular keyboard input is disabled):
 - WASD: move
-- arrow keys: look around
-- QE: move vertically
-- Left Shift: go slower
-- Right Shift: go faster 
+- RF: move vertically
+- arrow keys: look
+- QE: roll
+- Left Shift (hold): move slower
+- Right Shift (hold): move faster
 
 ## Building
 You need the following dependencies installed to build and run:
