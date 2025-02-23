@@ -183,7 +183,7 @@ DECL_PORT(dsp) {
             linfo("GetHeadphoneStatus");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = false;
+            cmdbuf[2] = true;
             break;
         default:
             lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
