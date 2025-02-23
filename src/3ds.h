@@ -17,6 +17,8 @@
 #define CPU_CLK 268'111'856ull // exact number from citra
 #define FPS 60
 
+#define NS_TO_CYCLES(ns) (ns * CPU_CLK / 1'000'000'000)
+
 enum {
     SCREEN_TOP,
     SCREEN_BOT,

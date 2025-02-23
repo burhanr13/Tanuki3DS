@@ -223,6 +223,65 @@ DECL_SVC(ClearEvent) {
     R(0) = 0;
 }
 
+DECL_SVC(CreateTimer) {
+    MAKE_HANDLE(handle);
+
+    KTimer* timer = timer_create(R(1) == RESET_STICKY, R(1) == RESET_PULSE);
+    timer->hdr.refcount = 1;
+    HANDLE_SET(handle, timer);
+
+    linfo("created timer with handle %x, resettype=%d", handle, R(1));
+
+    R(0) = 0;
+    R(1) = handle;
+}
+
+DECL_SVC(SetTimer) {
+    KTimer* t = HANDLE_GET_TYPED(R(0), KOT_TIMER);
+    if (!t) {
+        lerror("not a timer");
+        R(0) = -1;
+        return;
+    }
+
+    s64 delay = (u64) R(2) | (u64) R(3) << 32;
+    s64 interval = (u64) R(1) | (u64) R(4) << 32;
+
+    linfo("scheduling timer %x with delay=%d, interval=%d", R(0), delay,
+          interval);
+
+    t->interval = interval;
+    add_event(&s->sched, timer_signal, SEA_PTR(t), delay);
+
+    R(0) = 0;
+}
+
+DECL_SVC(CancelTimer) {
+    KTimer* t = HANDLE_GET_TYPED(R(0), KOT_TIMER);
+    if (!t) {
+        lerror("not a timer");
+        R(0) = -1;
+        return;
+    }
+
+    remove_event(&s->sched, timer_signal, SEA_PTR(t));
+
+    R(0) = 0;
+}
+
+DECL_SVC(ClearTimer) {
+    KTimer* t = HANDLE_GET_TYPED(R(0), KOT_TIMER);
+    if (!t) {
+        lerror("not a timer");
+        R(0) = -1;
+        return;
+    }
+
+    t->signal = false;
+
+    R(0) = 0;
+}
+
 DECL_SVC(CreateMemoryBlock) {
     MAKE_HANDLE(handle);
 

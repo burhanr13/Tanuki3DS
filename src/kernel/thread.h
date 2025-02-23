@@ -68,6 +68,18 @@ typedef struct {
 
 typedef struct {
     KObject hdr;
+
+    bool signal;
+    bool sticky;
+    bool repeat;
+
+    s64 interval;
+
+    KListNode* waiting_thrds;
+} KTimer;
+
+typedef struct {
+    KObject hdr;
     KListNode* waiting_thrds;
 } KSemaphore;
 
@@ -106,6 +118,9 @@ void thread_kill(E3DS* s, KThread* t);
 
 KEvent* event_create(bool sticky);
 void event_signal(E3DS* s, KEvent* ev);
+
+KTimer* timer_create(bool sticky, bool repeat);
+void timer_signal(E3DS* s, SchedEventArg arg);
 
 KMutex* mutex_create();
 void mutex_release(E3DS* s, KMutex* mtx);

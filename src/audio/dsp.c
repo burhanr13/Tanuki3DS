@@ -348,6 +348,8 @@ void dsp_process_frame(DSP* dsp) {
 
     auto m = get_curr_bank(dsp);
 
+    linfo("frame count=%d", m->frame_count);
+
     // interleaved stereo
     s32 mixer[FRAME_SAMPLES][2] = {};
 

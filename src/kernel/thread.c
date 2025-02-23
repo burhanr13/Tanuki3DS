@@ -95,8 +95,8 @@ void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
         return;
     } else if (timeout > 0) {
         t->state = THRD_SLEEP;
-        s64 timeCycles = timeout * CPU_CLK / 1'000'000'000;
-        add_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t), timeCycles);
+        add_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t),
+                  NS_TO_CYCLES(timeout));
     }
     thread_reschedule(s);
 }
@@ -210,6 +210,35 @@ void event_signal(E3DS* s, KEvent* ev) {
     thread_reschedule(s);
 }
 
+KTimer* timer_create(bool sticky, bool repeat) {
+    KTimer* tmr = calloc(1, sizeof *tmr);
+    tmr->hdr.type = KOT_TIMER;
+    tmr->sticky = sticky;
+    tmr->repeat = repeat;
+    return tmr;
+}
+
+void timer_signal(E3DS* s, SchedEventArg arg) {
+    KTimer* tmr = arg.p;
+    if (tmr->sticky) {
+        KListNode** cur = &tmr->waiting_thrds;
+        while (*cur) {
+            thread_wakeup(s, (KThread*) (*cur)->key, &tmr->hdr);
+            klist_remove(cur);
+        }
+        tmr->signal = true;
+    } else {
+        KThread* thr = remove_highest_prio(&tmr->waiting_thrds);
+        if (thr) thread_wakeup(s, thr, &tmr->hdr);
+    }
+    thread_reschedule(s);
+
+    if (tmr->repeat) {
+        add_event(&s->sched, timer_signal, SEA_PTR(tmr),
+                  NS_TO_CYCLES(tmr->interval));
+    }
+}
+
 KMutex* mutex_create() {
     KMutex* mtx = calloc(1, sizeof *mtx);
     mtx->hdr.type = KOT_MUTEX;
@@ -246,6 +275,12 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
             auto event = (KEvent*) o;
             if (event->signal) return false;
             klist_insert(&event->waiting_thrds, &t->hdr);
+            return true;
+        }
+        case KOT_TIMER: {
+            auto tmr = (KTimer*) o;
+            if (tmr->signal) return false;
+            klist_insert(&tmr->waiting_thrds, &t->hdr);
             return true;
         }
         case KOT_MUTEX: {
