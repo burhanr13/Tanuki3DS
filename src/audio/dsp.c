@@ -308,9 +308,10 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
             if (buf->looping) {
                 buf->pos = 0;
             } else {
-                BufInfo b [[gnu::unused]];
+                BufInfo b;
                 FIFO_pop(dsp->bufQueues[ch], b);
-                linfo("ch%d to buf%d", ch, stat->cur_buf);
+                if (dsp->bufQueues[ch].size)
+                    FIFO_peek(dsp->bufQueues[ch]).adpcm = b.adpcm;
             }
         }
     }
