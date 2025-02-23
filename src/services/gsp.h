@@ -68,11 +68,17 @@ typedef struct {
 } GSPSharedMem;
 
 typedef struct {
+    u32 vaddr;
+    u32 fmt;
+    bool wasDisplayTransferred;
+} LCDFBInfo;
+
+typedef struct {
     KEvent* event;
     KSharedMem sharedmem;
     bool registered;
 
-    FIFO(u32, 2) lcdfbs[2];
+    FIFO(LCDFBInfo, 2) lcdfbs[2];
 } GSPData;
 
 DECL_PORT(gsp_gpu);

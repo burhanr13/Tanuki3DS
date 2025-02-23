@@ -306,7 +306,7 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
           screenid == SCREEN_TOP ? "top" : "bot");
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbs[screenid]);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbo[screenid]);
 
     int srcX0 = 0;
     int srcY0 =
@@ -323,6 +323,39 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                       GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
     // make sure this gets rebound before next draw
+    glBindFramebuffer(GL_FRAMEBUFFER, gpu->curfb->fbo);
+}
+
+void gpu_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid) {
+    linfo("directly rendering lcd fb at %08x to screen %d", paddr, screenid);
+
+    // ngl this whole function is extremely hacky and ignores many things
+
+    void* data = PTR(paddr);
+
+    int colorfmt = fmt & 7;
+    GLuint glfmt = (GLuint[8]) {
+        GL_RGBA, GL_BGR, GL_RGB, GL_RGBA, GL_RGBA, GL_RGBA, GL_RGBA, GL_RGBA,
+    }[colorfmt];
+    GLuint gltype = (GLuint[8]) {
+        GL_UNSIGNED_INT_8_8_8_8,   GL_UNSIGNED_BYTE,
+        GL_UNSIGNED_SHORT_5_6_5,   GL_UNSIGNED_SHORT_5_5_5_1,
+        GL_UNSIGNED_SHORT_4_4_4_4, GL_UNSIGNED_INT_8_8_8_8,
+        GL_UNSIGNED_INT_8_8_8_8,   GL_UNSIGNED_INT_8_8_8_8,
+    }[colorfmt];
+
+    glBindTexture(GL_TEXTURE_2D, gpu->gl.swrendertex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT,
+                 SCREEN_WIDTH(screenid), 0, glfmt, gltype, data);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, gpu->gl.swrenderfbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbo[screenid]);
+
+    glBlitFramebuffer(0, 0, SCREEN_HEIGHT, SCREEN_WIDTH(screenid), 0,
+                      SCREEN_WIDTH(screenid) * ctremu.videoscale,
+                      SCREEN_HEIGHT * ctremu.videoscale, 0, GL_COLOR_BUFFER_BIT,
+                      GL_NEAREST);
+
     glBindFramebuffer(GL_FRAMEBUFFER, gpu->curfb->fbo);
 }
 

@@ -122,8 +122,12 @@ void update_fbinfos(E3DS* s) {
                   fb->fbs[0].left_vaddr, fb->fbs[0].right_vaddr,
                   fb->fbs[1].left_vaddr, fb->fbs[1].right_vaddr);
 
-            FIFO_push(s->services.gsp.lcdfbs[i],
-                      fb->fbs[1 - fb->idx].left_vaddr);
+            auto fbent = &fb->fbs[1 - fb->idx];
+            LCDFBInfo lcdfb = {
+                .vaddr = fbent->left_vaddr,
+                .fmt = fbent->format,
+            };
+            FIFO_push(s->services.gsp.lcdfbs[i], lcdfb);
             fb->newdataflag = 0;
         }
     }
@@ -136,6 +140,19 @@ void gsp_handle_event(E3DS* s, u32 arg) {
         gsp_handle_event(s, GSPEVENT_VBLANK1);
 
         linfo("vblank");
+
+        for (int sc = 0; sc < 2; sc++) {
+            bool isSwRender = true;
+            for (int i = 0; i < 4; i++) {
+                if (s->services.gsp.lcdfbs[sc].d[i].wasDisplayTransferred)
+                    isSwRender = false;
+            }
+            if (!isSwRender) continue;
+            auto lastfb = &FIFO_back(s->services.gsp.lcdfbs[sc]);
+            if (!lastfb->vaddr) continue;
+            gpu_render_lcd_fb(&s->gpu, vaddr_to_paddr(lastfb->vaddr),
+                              lastfb->fmt, sc);
+        }
 
         update_fbinfos(s);
 
@@ -233,12 +250,16 @@ void gsp_handle_command(E3DS* s) {
 
             for (int screen = 0; screen < 2; screen++) {
                 for (int i = 0; i < 4; i++) {
-                    int yoff = addrout - s->services.gsp.lcdfbs[screen].d[i];
+                    int yoff =
+                        addrout - s->services.gsp.lcdfbs[screen].d[i].vaddr;
                     yoff /= wout * fmtBpp[fmtout];
                     if (abs(yoff) < hout / 2) {
                         gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin),
                                              yoff, scalex, scaley, vflip,
                                              screen);
+                        s->services.gsp.lcdfbs[screen]
+                            .d[i]
+                            .wasDisplayTransferred = true;
                         break;
                     }
                 }

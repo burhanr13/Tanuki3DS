@@ -143,6 +143,7 @@ void gpu_vshrunner_destroy(GPU* gpu);
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool vflip, int screenid);
+void gpu_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid);
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
