@@ -22,13 +22,13 @@ const u16 audio_pipe[16] = {
     PUTADDR(master_status),
     PUTADDR(output_samples),
     PUTADDR(intermediate_samples),
-    PUTADDR(dummy),
-    PUTADDR(dummy),
-    PUTADDR(dummy),
-    PUTADDR(dummy),
-    PUTADDR(dummy),
-    PUTADDR(dummy),
-    PUTADDR(dummy),
+    PUTADDR(unk9),
+    PUTADDR(unk10),
+    PUTADDR(unk11),
+    PUTADDR(unk12),
+    PUTADDR(unk13),
+    PUTADDR(unk14),
+    PUTADDR(unk15),
 #undef PUTADDR
 };
 

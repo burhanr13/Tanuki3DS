@@ -111,7 +111,7 @@ typedef s16 DSPOutputSamples[2][FRAME_SAMPLES];
 // 8
 typedef s32 DSPIntermediateSamples[FRAME_SAMPLES][4];
 
-// 9-16 are undocumented
+// 9-15 are undocumented
 
 typedef struct {
     DSPFrameCount frame_count;
@@ -122,7 +122,15 @@ typedef struct {
     DSPStatus master_status;
     DSPOutputSamples output_samples;
     DSPIntermediateSamples intermediate_samples;
-    u32 dummy; // addresses 9-15 will point here
+    // these last structs are not documented
+    // but we need to make sure the sizes are correct
+    u16 unk9[0xd20];
+    u16 unk10[0x130];
+    u16 unk11[0x100];
+    u16 unk12[0xc0];
+    u16 unk13[0x180];
+    u16 unk14[0xa];
+    u16 unk15[0x13a3];
 } DSPMemory;
 
 #endif
