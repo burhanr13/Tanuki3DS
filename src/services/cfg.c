@@ -32,7 +32,7 @@ DECL_PORT(cfg) {
                     break;
                 }
                 case 0x70001:
-                    *(u8*) ptr = 2; // enable stereo/surround audio
+                    *(u8*) ptr = 1; // enable stereo/surround audio
                     break;
                 case 0xa0000: {
                     u8 name[] = "ctremu";
