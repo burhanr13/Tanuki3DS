@@ -226,7 +226,7 @@ DECL_SVC(ClearEvent) {
 DECL_SVC(CreateTimer) {
     MAKE_HANDLE(handle);
 
-    KTimer* timer = timer_create(R(1) == RESET_STICKY, R(1) == RESET_PULSE);
+    KTimer* timer = timer_create_(R(1) == RESET_STICKY, R(1) == RESET_PULSE);
     timer->hdr.refcount = 1;
     HANDLE_SET(handle, timer);
 

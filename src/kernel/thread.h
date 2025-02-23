@@ -119,7 +119,7 @@ void thread_kill(E3DS* s, KThread* t);
 KEvent* event_create(bool sticky);
 void event_signal(E3DS* s, KEvent* ev);
 
-KTimer* timer_create(bool sticky, bool repeat);
+KTimer* timer_create_(bool sticky, bool repeat);
 void timer_signal(E3DS* s, SchedEventArg arg);
 
 KMutex* mutex_create();

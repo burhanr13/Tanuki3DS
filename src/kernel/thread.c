@@ -210,7 +210,7 @@ void event_signal(E3DS* s, KEvent* ev) {
     thread_reschedule(s);
 }
 
-KTimer* timer_create(bool sticky, bool repeat) {
+KTimer* timer_create_(bool sticky, bool repeat) {
     KTimer* tmr = calloc(1, sizeof *tmr);
     tmr->hdr.type = KOT_TIMER;
     tmr->sticky = sticky;
