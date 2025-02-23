@@ -102,6 +102,7 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     }
 
     glGenTextures(2, state->screentex);
+    glGenFramebuffers(2, state->screenfbs);
     for (int i = 0; i < 2; i++) {
         glBindTexture(GL_TEXTURE_2D, state->screentex[i]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
@@ -110,6 +111,9 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
                      GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindFramebuffer(GL_FRAMEBUFFER, state->screenfbs[i]);
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                             state->screentex[i], 0);
     }
 
     GLuint fbos[FB_MAX];
@@ -154,6 +158,7 @@ void renderer_gl_destroy(GLState* state) {
     glDeleteBuffers(4, state->ubos);
     glDeleteBuffers(1, &state->gpu_ebo);
     glDeleteTextures(2, state->screentex);
+    glDeleteFramebuffers(2, state->screenfbs);
     for (int i = 0; i < FB_MAX; i++) {
         glDeleteFramebuffers(1, &state->gpu->fbs.d[i].fbo);
         glDeleteTextures(1, &state->gpu->fbs.d[i].color_tex);

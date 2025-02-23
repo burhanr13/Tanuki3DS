@@ -44,6 +44,7 @@ typedef struct {
     LRUCache(ProgCacheEntry, MAX_PROGRAM) progcache;
 
     GLuint screentex[2];
+    GLuint screenfbs[2];
 
     union {
         GLuint ubos[4];

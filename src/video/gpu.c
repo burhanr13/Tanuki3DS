@@ -284,7 +284,7 @@ TexInfo* texcache_find_within(GPU* gpu, u32 paddr) {
 }
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
-                          bool scaley, int screenid) {
+                          bool scaley, bool vflip, int screenid) {
 
     // the source can be offset into or before an existing framebuffer, so we
     // need to account for this
@@ -305,14 +305,25 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
     linfo("display transfer fb at %x to %s", paddr,
           screenid == SCREEN_TOP ? "top" : "bot");
 
-    glBindTexture(GL_TEXTURE_2D, gpu->gl.screentex[screenid]);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbs[screenid]);
 
-    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
-                     (fb->height - SCREEN_WIDTH(screenid) + yoff + yoffsrc) *
-                         ctremu.videoscale,
-                     (SCREEN_HEIGHT << scalex) * ctremu.videoscale,
-                     (SCREEN_WIDTH(screenid) << scaley) * ctremu.videoscale, 0);
+    int srcX0 = 0;
+    int srcY0 =
+        (fb->height - (SCREEN_WIDTH(screenid) << scaley) + yoff + yoffsrc) *
+        ctremu.videoscale;
+    int srcX1 = (SCREEN_HEIGHT << scalex) * ctremu.videoscale;
+    int srcY1 = (fb->height + yoff + yoffsrc) * ctremu.videoscale;
+    int dstX0 = 0;
+    int dstY0 = vflip ? SCREEN_WIDTH(screenid) * ctremu.videoscale : 0;
+    int dstX1 = SCREEN_HEIGHT * ctremu.videoscale;
+    int dstY1 = vflip ? 0 : SCREEN_WIDTH(screenid) * ctremu.videoscale;
+
+    glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1,
+                      GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+    // make sure this gets rebound before next draw
+    glBindFramebuffer(GL_FRAMEBUFFER, gpu->curfb->fbo);
 }
 
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,

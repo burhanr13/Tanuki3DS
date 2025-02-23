@@ -221,6 +221,7 @@ void gsp_handle_command(E3DS* s) {
             u8 scalemode = (flags >> 24) & 3;
             bool scalex = scalemode >= 1;
             bool scaley = scalemode >= 2;
+            bool vflip = flags & 1; // need to handle yoff differently probably
 
             static int fmtBpp[8] = {4, 3, 2, 2, 2, 4, 4, 4};
 
@@ -236,7 +237,8 @@ void gsp_handle_command(E3DS* s) {
                     yoff /= wout * fmtBpp[fmtout];
                     if (abs(yoff) < hout / 2) {
                         gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin),
-                                             yoff, scalex, scaley, screen);
+                                             yoff, scalex, scaley, vflip,
+                                             screen);
                         break;
                     }
                 }
