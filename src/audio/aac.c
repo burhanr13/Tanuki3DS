@@ -80,12 +80,13 @@ void aac_handle_request(DSP* dsp, DSPAACMessage* in, DSPAACMessage* out) {
         out->decodeResponse.nSamples = info->frameSize;
         out->decodeResponse.rate = rate_to_enum(info->sampleRate);
 
-        memcpy(dstL, buf, info->frameSize * sizeof(s16));
-        dstL += info->frameSize;
         if (info->numChannels == 2) {
             if (!dstR) dstR = PTR(in->decodeRequest.paddrOutR);
-            memcpy(dstR, buf + info->frameSize, info->frameSize * sizeof(s16));
-            dstR += info->frameSize;
+        }
+        auto p = buf;
+        for (int i = 0; i < info->frameSize; i++) {
+            *dstL++ = *p++;
+            if (info->numChannels == 2) *dstR++ = *p++;
         }
     }
 
