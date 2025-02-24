@@ -79,7 +79,7 @@ You need the following dependencies installed to build and run:
 - glew
 - capstone
 - xxhash
-- confuse
+- libconfuse
 - cglm
 - fdk-aac
 - xbyak (x86_64 only)
