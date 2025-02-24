@@ -190,6 +190,7 @@ void gsp_handle_command(E3DS* s) {
             linfo("dma request from %08x to %08x of size 0x%x", src, dest,
                   size);
             memcpy(PTR(dest), PTR(src), size);
+            gpu_invalidate_range(&s->gpu, vaddr_to_paddr(dest), size);
             gsp_handle_event(s, SEA_INT(GSPEVENT_DMA));
             break;
         }
@@ -296,9 +297,23 @@ void gsp_handle_command(E3DS* s) {
             gsp_handle_event(s, SEA_INT(GSPEVENT_PPF));
             break;
         }
-        case 0x05:
+        case 0x05: {
             linfo("flush cache regions");
+            struct {
+                u32 id;
+                struct {
+                    u32 addr;
+                    u32 size;
+                } buf[3];
+                u32 unused;
+            }* cmd = (void*) &cmds->d[cmds->cur];
+            for (int i = 0; i < 3; i++) {
+                if (cmd->buf[i].size == 0) break;
+                gpu_invalidate_range(&s->gpu, vaddr_to_paddr(cmd->buf[i].addr),
+                                     cmd->buf[i].size);
+            }
             break;
+        }
         default:
             lwarn("unknown gsp queue command 0x%02x", cmds->d[cmds->cur].id);
     }

@@ -148,6 +148,7 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
+void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len);
 
 void gpu_drawarrays(GPU* gpu);
 void gpu_drawelements(GPU* gpu);

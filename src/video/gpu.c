@@ -429,6 +429,8 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
             }
         }
     }
+
+    gpu_invalidate_range(gpu, dstpaddr, size);
 }
 
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
@@ -461,6 +463,18 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
             glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
             linfo("cleared depth buffer at %x of fb %d with value %x", paddr, i,
                   color);
+        }
+    }
+}
+// the first wall of defense for texture cache invalidation
+void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len) {
+    ldebug("invalidating cache at %08x-%08x", paddr, paddr + len);
+
+    for (int i = 0; i < TEX_MAX; i++) {
+        auto t = &gpu->textures.d[i];
+        if ((t->paddr <= paddr && paddr < t->paddr + t->size) ||
+            (t->paddr < paddr + len && paddr + len <= t->paddr + t->size)) {
+            LRU_remove(gpu->textures, t);
         }
     }
 }

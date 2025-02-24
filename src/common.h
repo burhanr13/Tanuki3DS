@@ -154,7 +154,6 @@ typedef float fvec4[4];
 
 #define LRU_use(c, e)                                                          \
     ({                                                                         \
-        assert((e)->key);                                                      \
         if (!(e)->prev && !(e)->next) (c).size++;                              \
         if ((e)->prev) (e)->prev->next = (e)->next;                            \
         if ((e)->next) (e)->next->prev = (e)->prev;                            \
@@ -178,6 +177,7 @@ typedef float fvec4[4];
 
 #define LRU_load(c, k)                                                         \
     ({                                                                         \
+        assert(k);                                                             \
         typeof(c.root)* ent = nullptr;                                         \
         for (int i = 0; i < LRU_MAX(c); i++) {                                 \
             if ((c).d[i].key == (k) || (c).d[i].key == 0) {                    \
