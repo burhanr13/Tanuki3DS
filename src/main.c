@@ -413,10 +413,10 @@ int main(int argc, char** argv) {
         if (!ctremu.pause) update_input(&ctremu.system, g_gamepad, w, h);
 
         if (!ctremu.uncap) {
-            if (ctremu.audiosync) {
+            if (ctremu.audiosync && !ctremu.mute) {
                 while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
                     SDL_Delay(1);
-            } else if (!ctremu.vsync) {
+            } else if (!ctremu.vsync || (ctremu.audiosync && ctremu.mute)) {
                 cur_time = SDL_GetTicksNS();
                 elapsed = cur_time - prev_time;
                 Sint64 wait = frame_ticks - elapsed;

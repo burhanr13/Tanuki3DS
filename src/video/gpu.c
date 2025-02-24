@@ -41,6 +41,10 @@ bool is_valid_physmem(u32 addr) {
            (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAM_SIZE);
 }
 
+bool is_vram_addr(u32 addr) {
+    return VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAM_SIZE;
+}
+
 void gpu_init(GPU* gpu) {
     LRU_init(gpu->fbs);
     // ensure this is pointing to something
