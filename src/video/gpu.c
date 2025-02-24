@@ -510,6 +510,9 @@ void update_cur_fb(GPU* gpu) {
                      curfb->width * ctremu.videoscale,
                      curfb->height * ctremu.videoscale, 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, nullptr);
+        // framebuffers have no mipmaps
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
         glBindTexture(GL_TEXTURE_2D, curfb->depth_tex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8,
                      curfb->width * ctremu.videoscale,
@@ -596,6 +599,7 @@ const GLint texswizzle_alpha[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
 const GLint texswizzle_dbg_red[4] = {GL_ONE, GL_ZERO, GL_ZERO, GL_ALPHA};
 const GLint texswizzle_dbg_green[4] = {GL_ZERO, GL_ONE, GL_ZERO, GL_ALPHA};
 const GLint texswizzle_dbg_blue[4] = {GL_ZERO, GL_ZERO, GL_ONE, GL_ALPHA};
+const GLint texswizzle_zero[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_ZERO};
 
 const int texfmtbpp[16] = {
     32, 24, 16, 16, 16, 16, 16, 8, 8, 8, 4, 4, 4, 8, 0, 0,
@@ -730,14 +734,21 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
 }
 
 void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
+    // make sure we are binding to the correct texture
+    glActiveTexture(GL_TEXTURE0 + id);
+
+    // since null is empty for the caches we need to handle
+    // null address before searching any cache
+    if (regs->addr == 0) {
+        linfo("null texture");
+        glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
+        return;
+    }
 
     FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
-    glActiveTexture(GL_TEXTURE0 + id);
     if (fb) {
         // check for simple render to texture cases
         glBindTexture(GL_TEXTURE_2D, fb->color_tex);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     } else {
         auto tex = LRU_load(gpu->textures, regs->addr << 3);
         glBindTexture(GL_TEXTURE_2D, tex->tex);
@@ -756,25 +767,27 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
             if (!is_valid_physmem(tex->paddr) ||
                 !is_valid_physmem(tex->paddr + TEXSIZE(tex->width, tex->height,
                                                        tex->fmt, 0))) {
-                lwarn("invalid texture address");
-                return; // pain
-            }
+                linfo("invalid texture address");
+                glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
+            } else {
 
-            linfo("creating texture from %x with dims %dx%d and fmt=%d",
-                  tex->paddr, tex->width, tex->height, tex->fmt);
+                linfo("creating texture from %x with dims %dx%d and fmt=%d",
+                      tex->paddr, tex->width, tex->height, tex->fmt);
 
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, regs->lod.max);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL,
+                                regs->lod.max);
 
-            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                             texfmtswizzle[fmt]);
+                glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                                 texfmtswizzle[fmt]);
 
-            // mipmap images are stored adjacent in memory and each image is
-            // half the width and height of the previous one
-            void* rawdata = PTR(tex->paddr);
-            for (int l = regs->lod.min; l <= regs->lod.max; l++) {
-                load_tex_image(rawdata, tex->width, tex->height, l, fmt);
-                rawdata += TEXSIZE(tex->width, tex->height, fmt, l);
-                tex->size += TEXSIZE(tex->width, tex->height, fmt, l);
+                // mipmap images are stored adjacent in memory and each image is
+                // half the width and height of the previous one
+                void* rawdata = PTR(tex->paddr);
+                for (int l = regs->lod.min; l <= regs->lod.max; l++) {
+                    load_tex_image(rawdata, tex->width, tex->height, l, fmt);
+                    rawdata += TEXSIZE(tex->width, tex->height, fmt, l);
+                    tex->size += TEXSIZE(tex->width, tex->height, fmt, l);
+                }
             }
         }
     }

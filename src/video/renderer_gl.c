@@ -125,6 +125,21 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                          state->swrendertex, 0);
 
+    // create a blank texture for when games read textures
+    // from invalid memory
+    // the actual behavior is impossible to emulate in a hw renderer
+    // usually its fine to just use a transparent texture instead
+    glGenTextures(1, &state->blanktex);
+    glBindTexture(GL_TEXTURE_2D, state->blanktex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 8, 8, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 nullptr);
+    // blank texture has no mipmaps
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+    // make is always read 0 for all components
+    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                     (GLint[4]) {GL_ZERO, GL_ZERO, GL_ZERO,
+                                 GL_ZERO}); // compound literals are cursed
+
     GLuint fbos[FB_MAX];
     glGenFramebuffers(FB_MAX, fbos);
     GLuint colorbufs[FB_MAX];

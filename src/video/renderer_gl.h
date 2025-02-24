@@ -49,6 +49,8 @@ typedef struct {
     GLuint swrendertex;
     GLuint swrenderfbo;
 
+    GLuint blanktex;
+
     union {
         GLuint ubos[4];
         struct {
