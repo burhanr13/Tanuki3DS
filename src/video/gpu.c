@@ -1,5 +1,7 @@
 #include "gpu.h"
 
+#include <xxh3.h>
+
 #include "3ds.h"
 #include "emulator.h"
 #include "kernel/memory.h"
@@ -205,16 +207,28 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
         switch (c.id) {                                                        \
             case GPUREG(geom.cmdbuf.jmp[0]):                                   \
                 gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[0] << 3,  \
-                                     gpu->regs.geom.cmdbuf.size[0] << 3);      \
+                                     gpu->regs.geom.cmdbuf.size[0] << 3,       \
+                                     true);                                    \
                 return;                                                        \
             case GPUREG(geom.cmdbuf.jmp[1]):                                   \
                 gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[1] << 3,  \
-                                     gpu->regs.geom.cmdbuf.size[1] << 3);      \
+                                     gpu->regs.geom.cmdbuf.size[1] << 3,       \
+                                     true);                                    \
                 return;                                                        \
         }                                                                      \
     })
 
-void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
+void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size, bool nested) {
+    // if this isn't nested, its possible that textures
+    // could have changed since the last draw call
+    // we only rehash textures that are not in vram, since
+    // games usually only access vram through methods we have
+    // already caught
+    for (int i = 0; i < TEX_MAX; i++) {
+        auto t = &gpu->textures.d[i];
+        if (!is_vram_addr(t->paddr)) t->needs_rehash = true;
+    }
+
     paddr &= ~15;
     size &= ~15;
 
@@ -689,6 +703,16 @@ static const GLenum stencil_op[8] = {
 #define TEXSIZE(w, h, fmt, level)                                              \
     ((w >> level) * (h >> level) * texfmtbpp[fmt] / 8)
 
+// including all mip levels
+#define TEXSIZE_TOTAL(w, h, fmt, minl, maxl)                                   \
+    ({                                                                         \
+        u32 size = 0;                                                          \
+        for (int l = minl; l <= maxl; l++) {                                   \
+            size += TEXSIZE(w, h, fmt, l);                                     \
+        }                                                                      \
+        size;                                                                  \
+    })
+
 void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
     w >>= level;
     h >>= level;
@@ -757,6 +781,25 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
     }
 }
 
+void create_texture(GPU* gpu, TexInfo* tex, TexUnitRegs* regs) {
+    linfo("creating texture from %x with dims %dx%d and fmt=%d", tex->paddr,
+          tex->width, tex->height, tex->fmt);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, regs->lod.max);
+
+    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                     texfmtswizzle[tex->fmt]);
+
+    // mipmap images are stored adjacent in memory and each image is
+    // half the width and height of the previous one
+    void* rawdata = PTR(tex->paddr);
+    for (int l = regs->lod.min; l <= regs->lod.max; l++) {
+        load_tex_image(rawdata, tex->width, tex->height, l, tex->fmt);
+        rawdata += TEXSIZE(tex->width, tex->height, tex->fmt, l);
+        tex->size += TEXSIZE(tex->width, tex->height, tex->fmt, l);
+    }
+}
+
 void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     // make sure we are binding to the correct texture
     glActiveTexture(GL_TEXTURE0 + id);
@@ -765,6 +808,15 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     // null address before searching any cache
     if (regs->addr == 0) {
         linfo("null texture");
+        glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
+        return;
+    }
+    // also check for out of bounds textures
+    if (!is_valid_physmem(regs->addr << 3) ||
+        !is_valid_physmem((regs->addr << 3) +
+                          TEXSIZE_TOTAL(regs->width, regs->height, fmt,
+                                        regs->lod.min, regs->lod.max))) {
+        linfo("invalid texture address");
         glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
         return;
     }
@@ -780,38 +832,29 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         // this is not completely correct, since games often use different
         // textures with the same attributes
         // TODO: proper cache invalidation
+        // new: we now have texture hashing but its a pretty big
+        // perf hit :/
         if (tex->paddr != (regs->addr << 3) || tex->width != regs->width ||
             tex->height != regs->height || tex->fmt != fmt) {
             tex->paddr = regs->addr << 3;
             tex->width = regs->width;
             tex->height = regs->height;
             tex->fmt = fmt;
-            tex->size = 0;
+            tex->size = TEXSIZE_TOTAL(tex->width, tex->height, tex->fmt,
+                                      regs->lod.min, regs->lod.max);
 
-            if (!is_valid_physmem(tex->paddr) ||
-                !is_valid_physmem(tex->paddr + TEXSIZE(tex->width, tex->height,
-                                                       tex->fmt, 0))) {
-                linfo("invalid texture address");
-                glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
-            } else {
+            void* data = PTR(tex->paddr);
+            tex->hash = XXH3_64bits(data, tex->size);
+            tex->needs_rehash = false;
 
-                linfo("creating texture from %x with dims %dx%d and fmt=%d",
-                      tex->paddr, tex->width, tex->height, tex->fmt);
-
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL,
-                                regs->lod.max);
-
-                glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                 texfmtswizzle[fmt]);
-
-                // mipmap images are stored adjacent in memory and each image is
-                // half the width and height of the previous one
-                void* rawdata = PTR(tex->paddr);
-                for (int l = regs->lod.min; l <= regs->lod.max; l++) {
-                    load_tex_image(rawdata, tex->width, tex->height, l, fmt);
-                    rawdata += TEXSIZE(tex->width, tex->height, fmt, l);
-                    tex->size += TEXSIZE(tex->width, tex->height, fmt, l);
-                }
+            create_texture(gpu, tex, regs);
+        } else if (tex->needs_rehash) {
+            void* data = PTR(tex->paddr);
+            u64 hash = XXH3_64bits(data, tex->size);
+            tex->needs_rehash = false;
+            if (hash != tex->hash) {
+                tex->hash = hash;
+                create_texture(gpu, tex, regs);
             }
         }
     }

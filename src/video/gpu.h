@@ -60,6 +60,9 @@ typedef struct _TexInfo {
     u32 fmt;
     u32 size;
 
+    u64 hash;
+    bool needs_rehash;
+
     struct _TexInfo *next, *prev;
 
     u32 tex;
@@ -147,7 +150,7 @@ void gpu_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid);
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
-void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
+void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size, bool nested);
 void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len);
 
 void gpu_drawarrays(GPU* gpu);
