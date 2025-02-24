@@ -473,6 +473,12 @@ void update_cur_fb(GPU* gpu) {
         gpu->curfb->width == w && gpu->curfb->height == h)
         return;
 
+    if (gpu->regs.fb.colorbuf_loc == 0) {
+        // uhh (if we ignored this it would corrupt the cache)
+        lwarn("null framebuffer");
+        return;
+    }
+
     // little hack to make arisoturas sm64 port work
     // it clears the depthbuffer by binding it as the colorbuffer
     // and drawing on it

@@ -1,6 +1,7 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -147,11 +148,13 @@ typedef float fvec4[4];
 #define LRU_remove(c, e)                                                       \
     ({                                                                         \
         LL_remove(e);                                                          \
+        (e)->key = 0;                                                          \
         (c).size--;                                                            \
     })
 
 #define LRU_use(c, e)                                                          \
     ({                                                                         \
+        assert((e)->key);                                                      \
         if (!(e)->prev && !(e)->next) (c).size++;                              \
         if ((e)->prev) (e)->prev->next = (e)->next;                            \
         if ((e)->next) (e)->next->prev = (e)->prev;                            \
@@ -175,9 +178,9 @@ typedef float fvec4[4];
 
 #define LRU_load(c, k)                                                         \
     ({                                                                         \
-        typeof(c.root)* ent = nullptr;                                        \
+        typeof(c.root)* ent = nullptr;                                         \
         for (int i = 0; i < LRU_MAX(c); i++) {                                 \
-            if ((c).d[i].key == (k) || (c).d[i].key == 0) {                      \
+            if ((c).d[i].key == (k) || (c).d[i].key == 0) {                    \
                 ent = &(c).d[i];                                               \
                 break;                                                         \
             }                                                                  \
