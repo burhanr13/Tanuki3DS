@@ -17,11 +17,15 @@ u32 vaddr_to_paddr(u32 vaddr) {
 DECL_PORT(gsp_gpu) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
-        case 0x0008:
+        case 0x0008: {
             linfo("FlushDataCache");
+            u32 addr = cmdbuf[1];
+            u32 size = cmdbuf[2];
+            gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addr), size);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        }
         case 0x000b:
             linfo("LCDForceBlank");
             cmdbuf[0] = IPCHDR(1, 0);
@@ -93,11 +97,15 @@ DECL_PORT(gsp_gpu) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
-        case 0x001f:
+        case 0x001f: {
             linfo("StoreDataCache");
+            u32 addr = cmdbuf[1];
+            u32 size = cmdbuf[2];
+            gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addr), size);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        }
         default:
             lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
                   cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);

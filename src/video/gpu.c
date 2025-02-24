@@ -468,7 +468,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
 }
 // the first wall of defense for texture cache invalidation
 void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len) {
-    ldebug("invalidating cache at %08x-%08x", paddr, paddr + len);
+    linfo("invalidating cache at %08x-%08x", paddr, paddr + len);
 
     for (int i = 0; i < TEX_MAX; i++) {
         auto t = &gpu->textures.d[i];
