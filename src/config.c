@@ -49,21 +49,22 @@ void load_config() {
         val = lskip(val);
         rtrim(val);
 
-        const char* matchsect = "";
-
+        if (false) {
 #define SECT(s)                                                                \
-    matchsect = s;                                                             \
-    if (false) {}
+    }                                                                          \
+    else if (!strcmp(section, s)) {                                            \
+        if (false) {}
 #define CMT(s)
-#define MATCH(s, k) else if (!strcmp(section, s) && !strcmp(key, k))
-#define BOOL(s, v) MATCH(matchsect, s) v = !strcmp(val, "true");
-#define INT(s, v) MATCH(matchsect, s) v = atoi(val);
+#define MATCH(s) else if (!strcmp(key, s))
+#define BOOL(s, v) MATCH(s) v = !strcmp(val, "true");
+#define INT(s, v) MATCH(s) v = atoi(val);
 #include "config.inc"
 #undef SECT
 #undef CMT
 #undef MATCH
 #undef BOOL
 #undef INT
+        }
     }
 
     fclose(fp);
