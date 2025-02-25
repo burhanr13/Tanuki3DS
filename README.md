@@ -32,7 +32,7 @@ Launching the app should give you a prompt to select the game file. You can also
 
 All games must be decrypted.
 
-You can modify emulator settings in the generated config file.
+You can modify emulator settings in the generated `ctremu.ini` file.
 
 You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 
@@ -79,7 +79,6 @@ You need the following dependencies installed to build and run:
 - glew
 - capstone
 - xxhash
-- confuse
 - cglm
 - fdk-aac
 - xbyak (x86_64 only)

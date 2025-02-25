@@ -329,7 +329,7 @@ int main(int argc, char** argv) {
         g_pending_reset = true;
     }
 
-    if (ctremu.vsync && !ctremu.audiosync) {
+    if (ctremu.syncmode == SYNC_VIDEO) {
         if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
     } else {
         SDL_GL_SetSwapInterval(0);
@@ -413,10 +413,10 @@ int main(int argc, char** argv) {
         if (!ctremu.pause) update_input(&ctremu.system, g_gamepad, w, h);
 
         if (!ctremu.uncap) {
-            if (ctremu.audiosync && !ctremu.mute) {
+            if (ctremu.syncmode == SYNC_AUDIO && !ctremu.mute) {
                 while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
                     SDL_Delay(1);
-            } else if (!ctremu.vsync || (ctremu.audiosync && ctremu.mute)) {
+            } else if (ctremu.syncmode != SYNC_VIDEO) {
                 cur_time = SDL_GetTicksNS();
                 elapsed = cur_time - prev_time;
                 Sint64 wait = frame_ticks - elapsed;
