@@ -23,7 +23,7 @@ void emulator_init() {
     ctremu.videoscale = 1;
     ctremu.shaderjit = true;
 #ifdef _WIN32
-    ctremu.ubershaders = true;
+    ctremu.ubershader = true;
 #else
     ctremu.hwvshaders = true;
 #endif

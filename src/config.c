@@ -58,9 +58,7 @@ void load_config() {
 #define MATCH(s, k) else if (!strcmp(section, s) && !strcmp(key, k))
 #define BOOL(s, v) MATCH(matchsect, s) v = !strcmp(val, "true");
 #define INT(s, v) MATCH(matchsect, s) v = atoi(val);
-
 #include "config.inc"
-
 #undef SECT
 #undef CMT
 #undef MATCH
@@ -77,13 +75,12 @@ void save_config() {
         lerror("failed to open config");
         return;
     }
+
 #define SECT(s) fprintf(fp, "[" s "]\n");
 #define CMT(s) fprintf(fp, "# " s "\n");
 #define BOOL(s, b) fprintf(fp, s " = %s\n", b ? "true" : "false");
 #define INT(s, i) fprintf(fp, s " = %d\n", i);
-
 #include "config.inc"
-
 #undef SECT
 #undef CMT
 #undef BOOL
