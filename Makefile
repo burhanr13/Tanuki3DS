@@ -11,7 +11,7 @@ CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE -isystem /usr/local/include -Isrc --embed-dir=sys_files
 
-LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone -lconfuse -lfdk-aac
+LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone -lfdk-aac
 
 ifeq ($(OS),Windows_NT)
 	LTO := -fuse-ld=lld -flto

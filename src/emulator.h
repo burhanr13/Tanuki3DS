@@ -7,6 +7,11 @@
 #include "common.h"
 
 typedef void (*EmuAudioCallback)(s16 (*samples)[2], u32 num);
+typedef enum {
+    SYNC_SLEEP,
+    SYNC_VIDEO,
+    SYNC_AUDIO,
+} FrameSyncMode;
 
 typedef struct {
     char* romfile;
@@ -19,8 +24,7 @@ typedef struct {
     bool pause;
     bool mute;
 
-    bool vsync;
-    bool audiosync;
+    FrameSyncMode syncmode;
     int videoscale;
     bool shaderjit;
     int vshthreads;
