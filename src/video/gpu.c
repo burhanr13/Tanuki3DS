@@ -202,6 +202,21 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     }
 }
 
+void gpu_reset_needs_rehesh(GPU* gpu) {
+    // for fully accurate cache invalidation, this
+    // would need to be called on every command list
+    // however that can end up being painfully slow
+    // so we will do it each frame instead which should be
+    // good enough hopefully
+    // we only rehash textures that are not in vram, since
+    // games usually only access vram through methods we have
+    // already caught
+    for (int i = 0; i < TEX_MAX; i++) {
+        auto t = &gpu->textures.d[i];
+        if (!is_vram_addr(t->paddr)) t->needs_rehash = true;
+    }
+}
+
 #define NESTED_CMDLIST()                                                       \
     ({                                                                         \
         switch (c.id) {                                                        \
@@ -219,15 +234,6 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     })
 
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size, bool nested) {
-    // if this isn't nested, its possible that textures
-    // could have changed since the last draw call
-    // we only rehash textures that are not in vram, since
-    // games usually only access vram through methods we have
-    // already caught
-    for (int i = 0; i < TEX_MAX; i++) {
-        auto t = &gpu->textures.d[i];
-        if (!is_vram_addr(t->paddr)) t->needs_rehash = true;
-    }
 
     paddr &= ~15;
     size &= ~15;

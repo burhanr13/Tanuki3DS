@@ -163,6 +163,8 @@ void gsp_handle_event(E3DS* s, SchedEventArg arg) {
                               lastfb->fmt, sc);
         }
 
+        gpu_reset_needs_rehesh(&s->gpu);
+
         update_fbinfos(s);
 
         s->frame_complete = true;

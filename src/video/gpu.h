@@ -144,6 +144,8 @@ void gpu_destroy(GPU* gpu);
 void gpu_vshrunner_init(GPU* gpu);
 void gpu_vshrunner_destroy(GPU* gpu);
 
+void gpu_reset_needs_rehesh(GPU* gpu);
+
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool vflip, int screenid);
 void gpu_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid);
