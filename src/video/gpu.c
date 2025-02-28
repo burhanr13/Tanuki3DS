@@ -841,13 +841,16 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         // new: we now have texture hashing but its a pretty big
         // perf hit :/
         if (tex->paddr != (regs->addr << 3) || tex->width != regs->width ||
-            tex->height != regs->height || tex->fmt != fmt) {
+            tex->height != regs->height || tex->fmt != fmt ||
+            tex->minlod != regs->lod.min || tex->maxlod != regs->lod.max) {
             tex->paddr = regs->addr << 3;
             tex->width = regs->width;
             tex->height = regs->height;
             tex->fmt = fmt;
+            tex->minlod = regs->lod.min;
+            tex->maxlod = regs->lod.max;
             tex->size = TEXSIZE_TOTAL(tex->width, tex->height, tex->fmt,
-                                      regs->lod.min, regs->lod.max);
+                                      tex->minlod, tex->maxlod);
 
             void* data = PTR(tex->paddr);
             tex->hash = XXH3_64bits(data, tex->size);

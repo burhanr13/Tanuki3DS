@@ -56,9 +56,10 @@ typedef struct _TexInfo {
         u64 paddr;
         u64 key;
     };
-    u32 width, height;
-    u32 fmt;
+    u16 width, height;
+    u16 fmt;
     u32 size;
+    u16 minlod, maxlod;
 
     u64 hash;
     bool needs_rehash;
