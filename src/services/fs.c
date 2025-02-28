@@ -924,16 +924,16 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                 return nullptr;
             }
 
-            char* fopenmode = "r";
+            char* fopenmode = "rb";
             switch (flags & 3) {
                 case 0b01:
-                    fopenmode = "r";
+                    fopenmode = "rb";
                     break;
                 case 0b10:
-                    fopenmode = "w";
+                    fopenmode = "wb";
                     break;
                 case 0b11:
-                    fopenmode = "r+";
+                    fopenmode = "rb+";
                     break;
             }
 
