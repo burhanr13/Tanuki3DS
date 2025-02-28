@@ -8,6 +8,8 @@ INT("VideoScale", ctremu.videoscale)
 INT("SwVshNumThreads", ctremu.vshthreads)
 BOOL("ShaderJIT", ctremu.shaderjit)
 BOOL("HwVertexShaders", ctremu.hwvshaders)
+CMT("necessary for a few games to not have graphical issues")
+BOOL("HWShaderSafeMul", ctremu.safeShaderMul)
 BOOL("Ubershader", ctremu.ubershader)
 
 SECT("Audio")

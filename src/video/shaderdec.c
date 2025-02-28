@@ -4,6 +4,7 @@
 #include <xxh3.h>
 
 #include "dynstring.h"
+#include "emulator.h"
 
 #include "gpu.h"
 #include "renderer_gl.h"
@@ -99,6 +100,8 @@ layout (std140) uniform FreecamUniforms {
     mat4 freecam_mtx;
     bool freecam_enable;
 };
+
+#define SAFEMUL(a,b) (a * mix(vec4(0),b,notEqual(a,vec4(0))))
 
 )";
 
@@ -250,32 +253,58 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             break;
         case PICA_DP3:
             DEST(1);
-            printf("vec4(dot(");
-            SRC1(1);
-            printf(".xyz, ");
-            SRC2(1);
-            printf(".xyz))");
+            if (ctremu.safeShaderMul) {
+                printf("vec4(dot(SAFEMUL(");
+                SRC1(1);
+                printf(", ");
+                SRC2(1);
+                printf(").xyz, vec3(1)))");
+            } else {
+                printf("vec4(dot(");
+                SRC1(1);
+                printf(".xyz, ");
+                SRC2(1);
+                printf(".xyz))");
+            }
             FIN(1);
             break;
         case PICA_DP4:
             DEST(1);
-            printf("vec4(dot(");
-            SRC1(1);
-            printf(", ");
-            SRC2(1);
-            printf("))");
+            if (ctremu.safeShaderMul) {
+                printf("vec4(dot(SAFEMUL(");
+                SRC1(1);
+                printf(", ");
+                SRC2(1);
+                printf("), vec4(1)))");
+            } else {
+                printf("vec4(dot(");
+                SRC1(1);
+                printf(", ");
+                SRC2(1);
+                printf("))");
+            }
             FIN(1);
             break;
         case PICA_DPH:
         case PICA_DPHI:
             DEST(1);
-            printf("vec4(dot(vec4(");
-            if (instr.opcode == PICA_DPHI) SRC1(1i);
-            else SRC1(1);
-            printf(".xyz, 1), ");
-            if (instr.opcode == PICA_DPHI) SRC2(1i);
-            else SRC2(1);
-            printf("))");
+            if (ctremu.safeShaderMul) {
+                printf("vec4(dot(SAFEMUL(vec4(");
+                if (instr.opcode == PICA_DPHI) SRC1(1i);
+                else SRC1(1);
+                printf(".xyz, 1), ");
+                if (instr.opcode == PICA_DPHI) SRC2(1i);
+                else SRC2(1);
+                printf("), vec4(1)))");
+            } else {
+                printf("vec4(dot(vec4(");
+                if (instr.opcode == PICA_DPHI) SRC1(1i);
+                else SRC1(1);
+                printf(".xyz, 1), ");
+                if (instr.opcode == PICA_DPHI) SRC2(1i);
+                else SRC2(1);
+                printf("))");
+            }
             FIN(1);
             break;
         case PICA_EX2:
@@ -294,9 +323,17 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             break;
         case PICA_MUL:
             DEST(1);
-            SRC1(1);
-            printf(" * ");
-            SRC2(1);
+            if (ctremu.safeShaderMul) {
+                printf("SAFEMUL(");
+                SRC1(1);
+                printf(", ");
+                SRC2(1);
+                printf(")");
+            } else {
+                SRC1(1);
+                printf(" * ");
+                SRC2(1);
+            }
             FIN(1);
             break;
         case PICA_SGE:
@@ -579,16 +616,31 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_MAD ... PICA_MAD + 0xf: {
             desc = ctx->shu.opdescs[instr.fmt5.desc];
             DEST(5);
-            SRC1(5);
-            printf(" * ");
-            if (instr.fmt5.opcode & 1) {
-                SRC2(5);
-                printf(" + ");
-                SRC3(5);
+            if (ctremu.safeShaderMul) {
+                printf("SAFEMUL(");
+                SRC1(5);
+                printf(", ");
+                if (instr.fmt5.opcode & 1) {
+                    SRC2(5);
+                    printf(") + ");
+                    SRC3(5);
+                } else {
+                    SRC2(5i);
+                    printf(") + ");
+                    SRC3(5i);
+                }
             } else {
-                SRC2(5i);
-                printf(" + ");
-                SRC3(5i);
+                SRC1(5);
+                printf(" * ");
+                if (instr.fmt5.opcode & 1) {
+                    SRC2(5);
+                    printf(" + ");
+                    SRC3(5);
+                } else {
+                    SRC2(5i);
+                    printf(" + ");
+                    SRC3(5i);
+                }
             }
             FIN(5);
             break;

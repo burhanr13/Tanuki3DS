@@ -29,6 +29,7 @@ typedef struct {
     bool shaderjit;
     int vshthreads;
     bool hwvshaders;
+    bool safeShaderMul;
     bool ubershader;
 
     mat4 freecam_mtx;
