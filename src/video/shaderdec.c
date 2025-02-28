@@ -429,9 +429,9 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             if (instr.fmt1.dest == ctx->out_view) {
                 u32 rn = instr.fmt1.src1 - 0x10;
                 if (rn < 0x10) {
-                    printf("if (freecam_enable) r[%1$d] = freecam_mtx * "
-                           "r[%1$d];\n",
-                           rn);
+                    printf("if (freecam_enable) r[%d] = freecam_mtx * "
+                           "r[%d];\n",
+                           rn, rn);
                     INDENT(ctx->depth);
                 }
             }
@@ -505,8 +505,8 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_LOOP: {
             printf("aL = i[%d].y;\n", instr.fmt3.c);
             INDENT(ctx->depth);
-            printf("for (int l = 0; l <= i[%1$d].x; l++, aL += i[%1$d].z) {\n",
-                   instr.fmt3.c);
+            printf("for (int l = 0; l <= i[%d].x; l++, aL += i[%d].z) {\n",
+                   instr.fmt3.c, instr.fmt3.c);
             dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
             INDENT(ctx->depth);
             printf("}\n");

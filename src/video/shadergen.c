@@ -94,12 +94,12 @@ vec3 l, h;
 const char lighting_stub[] = R"(
 {
 float diffuselevel = max(l.z, 0);
-lprimary.rgb += diffuselevel * light[%1$d].diffuse;
+lprimary.rgb += diffuselevel * light[%d].diffuse;
 
 lprimary.rgb = min(lprimary.rgb, 1);
 
 float speclevel = pow(max(h.z, 0), 3);
-lsecondary.rgb += speclevel * light[%1$d].specular0;
+lsecondary.rgb += speclevel * light[%d].specular0;
 
 lsecondary.rgb = min(lsecondary.rgb, 1);
 }
@@ -120,7 +120,7 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
         }
         ds_printf(s, "h = normalize(l + v);\n");
 
-        ds_printf(s, lighting_stub, i);
+        ds_printf(s, lighting_stub, i, i);
     }
 }
 
