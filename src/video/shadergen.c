@@ -21,6 +21,14 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
         glCompileShader(block->fs);
         free(source);
 
+        int res;
+        glGetShaderiv(block->fs, GL_COMPILE_STATUS, &res);
+        if (!res) {
+            char log[512];
+            glGetShaderInfoLog(block->fs, sizeof log, nullptr, log);
+            lerror("failed to compile shader: %s", log);
+        }
+
         linfo("compiled new fragment shader");
     }
     return block->fs;

@@ -10,7 +10,7 @@
 u32 load_elf(E3DS* s, char* filename) {
     FILE* fp = fopen(filename, "r");
     if (!fp) {
-        eprintf("no such file\n");
+        lerror("no such file");
         return -1;
     }
 
@@ -60,7 +60,7 @@ u32 load_elf(E3DS* s, char* filename) {
 u32 load_3dsx(E3DS* s, char* filename) {
     FILE* fp = fopen(filename, "r");
     if (!fp) {
-        eprintf("no such file\n");
+        lerror("no such file");
         return -1;
     }
 

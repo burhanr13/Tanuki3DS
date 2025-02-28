@@ -33,6 +33,13 @@ int shader_dec_get(GPU* gpu) {
         glShaderSource(block->vs, 1, &(const char*) {source}, nullptr);
         glCompileShader(block->vs);
         free(source);
+        int res;
+        glGetShaderiv(block->vs, GL_COMPILE_STATUS, &res);
+        if (!res) {
+            char log[512];
+            glGetShaderInfoLog(block->vs, sizeof log, nullptr, log);
+            lerror("failed to compile shader: %s", log);
+        }
 
         linfo("compiled new vertex shader");
     }
