@@ -89,7 +89,8 @@ To build use `make`. You can pass some options to make, `USER=1` to compile a us
 
 ## Compatibility
 
-Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed.
+Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed. When reporting an issue, please always include the generated `ctremu.log` file which is located
+in the application data folder of your system.
 
 ## Acknowledgements
 
