@@ -62,14 +62,14 @@ typedef float fvec4[4];
 #define MASK(n) (BIT(n) - 1)
 #define MASKL(n) (BITL(n) - 1)
 
-#define INVBIT2(n) ((n) & (MASK(1) << 1) ? 1 : 0)
-#define INVBIT4(n) ((n) & (MASK(2) << 2) ? 2 + INVBIT2(n >> 2) : INVBIT2(n))
-#define INVBIT8(n) ((n) & (MASK(4) << 4) ? 4 + INVBIT4(n >> 4) : INVBIT4(n))
-#define INVBIT16(n) ((n) & (MASK(8) << 8) ? 8 + INVBIT8(n >> 8) : INVBIT8(n))
-#define INVBIT(n)                                                              \
-    ((n) & (MASK(16) << 16) ? 16 + INVBIT16(n >> 16) : INVBIT16(n))
-#define INVBITL(n) ((n) & (MASKL(32) << 32) ? 32 + INVBIT(n >> 32) : INVBIT(n))
+#define INVBIT2(n) ((n) & MASK(1) ? 0 : 1)
+#define INVBIT4(n) ((n) & MASK(2) ? INVBIT2(n) : 2 + INVBIT2(n >> 2))
+#define INVBIT8(n) ((n) & MASK(4) ? INVBIT4(n) : 4 + INVBIT4(n >> 4))
+#define INVBIT16(n) ((n) & MASK(8) ? INVBIT8(n) : 8 + INVBIT8(n >> 8))
+#define INVBIT(n) ((n) & MASK(16) ? INVBIT16(n) : 16 + INVBIT16(n >> 16))
+#define INVBITL(n) ((n) & MASKL(32) ? INVBIT(n) : 32 + INVBIT(n >> 32))
 
+// N must be a power of 2
 #define FIFO(T, N)                                                             \
     struct {                                                                   \
         T d[N];                                                                \
@@ -135,6 +135,7 @@ typedef float fvec4[4];
 
 // T must have fields: u64 key, T* next, T* prev
 // key=0 is empty
+// N hould be a power of 2
 #define LRUCache(T, N)                                                         \
     struct {                                                                   \
         T d[N];                                                                \
