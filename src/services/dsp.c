@@ -310,14 +310,14 @@ void dsp_lle_read_pipe(E3DS* s, u32 index, u8* dst, u32 len) {
     }
 
     for (int i = 0; i < len; i++) {
-        dst[i] = pipedata[hdptr & ~pipes[slot].size];
+        dst[i] = pipedata[hdptr & (pipes[slot].size - 1)];
         hdptr++;
     }
 
     // restore pointers and wrap bit
-    pipes[slot].head.ptr = hdptr & ~pipes[slot].size;
+    pipes[slot].head.ptr = hdptr & (pipes[slot].size - 1);
     pipes[slot].head.wrap = (hdptr & pipes[slot].size) != 0;
-    pipes[slot].tail.ptr = tlptr & ~pipes[slot].size;
+    pipes[slot].tail.ptr = tlptr & (pipes[slot].size - 1);
     pipes[slot].tail.wrap = (tlptr & pipes[slot].size) != 0;
 
     // notify dsp that pipe was read
@@ -345,14 +345,14 @@ void dsp_lle_write_pipe(E3DS* s, u32 index, u8* src, u32 len) {
     }
 
     for (int i = 0; i < len; i++) {
-        pipedata[tlptr & ~pipes[slot].size] = src[i];
+        pipedata[tlptr & (pipes[slot].size - 1)] = src[i];
         tlptr++;
     }
 
     // restore pointers and wrap bit
-    pipes[slot].head.ptr = hdptr & ~pipes[slot].size;
+    pipes[slot].head.ptr = hdptr & (pipes[slot].size - 1);
     pipes[slot].head.wrap = (hdptr & pipes[slot].size) != 0;
-    pipes[slot].tail.ptr = tlptr & ~pipes[slot].size;
+    pipes[slot].tail.ptr = tlptr & (pipes[slot].size - 1);
     pipes[slot].tail.wrap = (tlptr & pipes[slot].size) != 0;
 
     // notify dsp that pipe was written
