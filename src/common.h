@@ -62,11 +62,19 @@ typedef float fvec4[4];
 #define MASK(n) (BIT(n) - 1)
 #define MASKL(n) (BITL(n) - 1)
 
-#define FIFO(T, bits)                                                          \
+#define INVBIT2(n) ((n) & MASK(1) ? 0 : 1)
+#define INVBIT4(n) ((n) & MASK(2) ? INVBIT2(n) : 2 + INVBIT2(n >> 2))
+#define INVBIT8(n) ((n) & MASK(4) ? INVBIT4(n) : 4 + INVBIT4(n >> 4))
+#define INVBIT16(n) ((n) & MASK(8) ? INVBIT8(n) : 8 + INVBIT8(n >> 8))
+#define INVBIT(n) ((n) & MASK(16) ? INVBIT16(n) : 16 + INVBIT16(n >> 16))
+#define INVBITL(n) ((n) & MASKL(32) ? INVBIT(n) : 32 + INVBIT(n >> 32))
+
+// N must be a power of 2
+#define FIFO(T, N)                                                             \
     struct {                                                                   \
-        T d[BIT(bits)];                                                        \
-        ubi(bits) head;                                                        \
-        ubi(bits) tail;                                                        \
+        T d[N];                                                                \
+        ubi(INVBIT(N)) head;                                                   \
+        ubi(INVBIT(N)) tail;                                                   \
         u32 size;                                                              \
     }
 
@@ -127,6 +135,7 @@ typedef float fvec4[4];
 
 // T must have fields: u64 key, T* next, T* prev
 // key=0 is empty
+// N hould be a power of 2
 #define LRUCache(T, N)                                                         \
     struct {                                                                   \
         T d[N];                                                                \
@@ -191,5 +200,49 @@ typedef float fvec4[4];
         LRU_use((c), ent);                                                     \
         ent;                                                                   \
     })
+
+#ifndef __cplusplus
+
+typedef struct {
+    char* str;
+    char* cur;
+    char* end;
+} DynString;
+
+static inline void ds_init(DynString* s, size_t len) {
+    s->str = malloc(len);
+    s->cur = s->str;
+    s->end = s->str + len;
+
+    *s->cur = '\0';
+}
+
+static inline void ds_free(DynString* s) {
+    free(s->str);
+    *s = (DynString) {};
+}
+
+static inline void ds_printf(DynString* s, const char* fmt, ...) {
+    va_list v;
+    while (true) {
+        int rem = s->end - s->cur;
+        va_start(v);
+        int n = vsnprintf(s->cur, rem, fmt, v);
+        va_end(v);
+
+        if (n < rem) {
+            s->cur += n;
+            return;
+        }
+
+        auto curoff = s->cur - s->str;
+        auto curlen = s->end - s->str;
+        s->str = realloc(s->str, 2 * curlen);
+        s->cur = s->str + curoff;
+        s->end = s->str + 2 * curlen;
+    }
+}
+
+#endif
 
 #endif

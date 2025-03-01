@@ -3,8 +3,6 @@
 #define XXH_INLINE_ALL
 #include <xxh3.h>
 
-#include "dynstring.h"
-
 #include "gpu.h"
 
 int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
