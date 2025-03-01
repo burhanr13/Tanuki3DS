@@ -3,6 +3,7 @@
 #include "emulator.h"
 
 #include "aac.h"
+#include "dsp_lle.h"
 #include "dspstructs.h"
 
 #include "dspptr.inc"
@@ -47,19 +48,23 @@ void dsp_read_audio_pipe(DSP* dsp, void* buf, u32 len) {
 
 // the binary pipes are used for aac decoding
 void dsp_write_binary_pipe(DSP* dsp, void* buf, u32 len) {
-    if (len != 32) {
-        lerror("unknown binary pipe write length %d", len);
-        return;
-    }
-    aac_handle_request(dsp, buf, (void*) dsp->binary_pipe);
+    dsp_lle_write_pipe(dsp, 3, buf, len);
+    // if (len != 32) {
+    //     lerror("unknown binary pipe write length %d", len);
+    //     return;
+    // }
+    // aac_handle_request(dsp, buf, (void*) dsp->binary_pipe);
 }
 
 void dsp_read_binary_pipe(DSP* dsp, void* buf, u32 len) {
-    if (len != 32) {
-        lerror("unknown binary pipe read length %d", len);
-        return;
-    }
-    memcpy(buf, dsp->binary_pipe, sizeof dsp->binary_pipe);
+    // if (len != 32) {
+    //     lerror("unknown binary pipe read length %d", len);
+    //     return;
+    // }
+    // memcpy(buf, dsp->binary_pipe, sizeof dsp->binary_pipe);
+    while (!dsp->pipe_written) dsp_lle_run_slice(dsp);
+    dsp->pipe_written = false;
+    dsp_lle_read_pipe(dsp, 3, buf, len);
 }
 
 DSPMemory* get_curr_bank(DSP* dsp) {

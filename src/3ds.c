@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "audio/aac.h"
+#include "audio/dsp_lle.h"
 #include "cpu.h"
 #include "kernel/loader.h"
 #include "kernel/svc_types.h"
@@ -17,6 +18,7 @@ bool e3ds_init(E3DS* s, char* romfile) {
     cpu_init(s);
     gpu_init(&s->gpu);
     renderer_gl_init(&s->gpu.gl, &s->gpu);
+    dsp_lle_init(&s->dsp);
     memory_init(s);
 
     services_init(s); // start up and allocate memory for services first
@@ -84,6 +86,7 @@ void e3ds_destroy(E3DS* s) {
     renderer_gl_destroy(&s->gpu.gl);
 
     aac_shutdown(&s->dsp);
+    dsp_lle_destroy(&s->dsp);
 
     for (int i = 0; i < HANDLE_MAX; i++) {
         if (s->process.handles[i] && !--s->process.handles[i]->refcount)

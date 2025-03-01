@@ -2,6 +2,7 @@
 
 #include "3ds.h"
 #include "audio/dsp.h"
+#include "audio/dsp_lle.h"
 
 void dsp_event(E3DS* s, SchedEventArg) {
     s->lastAudioFrame = s->sched.now;
@@ -109,9 +110,9 @@ DECL_PORT(dsp) {
         case 0x0011: {
             linfo("LoadComponent");
             u32 size [[gnu::unused]] = cmdbuf[1];
-            void* buf [[gnu::unused]] = PTR(cmdbuf[5]);
+            void* buf = PTR(cmdbuf[5]);
 
-            // component is not directly used right now
+            dsp_lle_load_component(&s->dsp, buf);
             s->services.dsp.comp_loaded = true;
 
             cmdbuf[0] = IPCHDR(2, 2);
@@ -127,6 +128,7 @@ DECL_PORT(dsp) {
             cmdbuf[1] = 0;
             dsp_reset(&s->dsp);
             remove_event(&s->sched, dsp_event, SEA_NONE);
+            dsp_lle_unload_component(&s->dsp);
             s->services.dsp.comp_loaded = false;
             break;
         case 0x0013:
