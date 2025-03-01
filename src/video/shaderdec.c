@@ -3,7 +3,6 @@
 #define XXH_INLINE_ALL
 #include <xxh3.h>
 
-#include "dynstring.h"
 #include "emulator.h"
 
 #include "gpu.h"

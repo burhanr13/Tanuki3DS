@@ -79,7 +79,7 @@ typedef struct {
     KSharedMem sharedmem;
     bool registered;
 
-    FIFO(LCDFBInfo, 2) lcdfbs[2];
+    FIFO(LCDFBInfo, 4) lcdfbs[2];
 } GSPData;
 
 DECL_PORT(gsp_gpu);
