@@ -61,6 +61,14 @@ typedef struct {
     // because games overwrite them before they finish playing
     FIFO(BufInfo, 4) bufQueues[DSP_CHANNELS];
 
+    // for lle stuff
+    u16 pipe_addr; // address of the pipes
+    // the pipe event is signaled when both have happened
+    bool sem_signaled;
+    bool data_signaled;
+    bool pipe_written;
+    bool loaded;
+
 } DSP;
 
 // pipe 2
