@@ -1,6 +1,8 @@
 #ifndef DSP_H
 #define DSP_H
 
+#include <teakra/teakra_c.h>
+
 #include "common.h"
 #include "kernel/memory.h"
 
@@ -45,6 +47,8 @@ typedef struct {
 #else
     E3DSMemory* mem;
 #endif
+
+    TeakraContext* teakra;
 
     u32 audio_pipe_pos;
 
