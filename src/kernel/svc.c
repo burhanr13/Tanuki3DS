@@ -75,6 +75,11 @@ DECL_SVC(QueryMemory) {
     R(5) = 0;
 }
 
+DECL_SVC(ExitProcess) {
+    lerror("process exiting");
+    exit(1);
+}
+
 DECL_SVC(CreateThread) {
     s32 priority = R(0);
     u32 entrypoint = R(1);

@@ -1,5 +1,6 @@
 SVC(0x01, ControlMemory)
 SVC(0x02, QueryMemory)
+SVC(0x03, ExitProcess)
 SVC(0x08, CreateThread)
 SVC(0x09, ExitThread)
 SVC(0x0a, SleepThread)
