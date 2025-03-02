@@ -331,6 +331,11 @@ DECL_SVC(MapMemoryBlock) {
     R(0) = 0;
 }
 
+DECL_SVC(UnmapMemoryBlock) {
+    // stub
+    R(0) = 0;
+}
+
 DECL_SVC(CreateAddressArbiter) {
     MAKE_HANDLE(h);
 
