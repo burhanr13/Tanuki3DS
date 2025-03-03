@@ -402,6 +402,8 @@ u32 memory_linearheap_grow(E3DS* s, u32 size, u32 perm) {
 }
 
 VMBlock* memory_virtquery(E3DS* s, u32 addr) {
+    linfo("querying memory at %08x", addr);
+
     addr >>= 12;
     VMBlock* b = s->process.vmblocks.next;
     while (b != &s->process.vmblocks) {
