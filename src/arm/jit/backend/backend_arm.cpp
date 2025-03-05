@@ -88,11 +88,9 @@ struct Code : Xbyak_aarch64::CodeGenerator {
                 return savedBase + hr.index;
             case REG_STACK:
                 return 32 + hr.index;
-            default: // unreachable
-                return 0;
+            default:
+                std::unreachable();
         }
-        // also unreachable
-        return 0;
     }
 
     int getOp(int i) {

@@ -162,8 +162,8 @@ const char* tevsrc_str(int i, u32 tevsrc) {
                     return "tev_color[4]";
                 case 5:
                     return "tev_color[5]";
-                default: // unreachable
-                    return "vec4(0)";
+                default:
+                    unreachable();
             }
         }
         case TEVSRC_PREVIOUS:
