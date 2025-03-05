@@ -62,12 +62,17 @@ typedef float fvec4[4];
 #define MASK(n) (BIT(n) - 1)
 #define MASKL(n) (BITL(n) - 1)
 
-#define INVBIT2(n) ((n) & MASK(1) ? 0 : 1)
-#define INVBIT4(n) ((n) & MASK(2) ? INVBIT2(n) : 2 + INVBIT2(n >> 2))
-#define INVBIT8(n) ((n) & MASK(4) ? INVBIT4(n) : 4 + INVBIT4(n >> 4))
-#define INVBIT16(n) ((n) & MASK(8) ? INVBIT8(n) : 8 + INVBIT8(n >> 8))
-#define INVBIT(n) ((n) & MASK(16) ? INVBIT16(n) : 16 + INVBIT16(n >> 16))
-#define INVBITL(n) ((n) & MASKL(32) ? INVBIT(n) : 32 + INVBIT(n >> 32))
+// by not including the closing parenthesis in this first macro
+// we can delay the expansion and allow recursion
+#define _INVBIT(w, n)                                                          \
+    ((n) & MASK(w) ? 0 : w) + _INVBIT##w((n) & MASK(w) ? (n) : (n) >> w
+#define _INVBIT1(n) 0
+#define _INVBIT2(n) _INVBIT(1, n))
+#define _INVBIT4(n) _INVBIT(2, n))
+#define _INVBIT8(n) _INVBIT(4, n))
+#define _INVBIT16(n) _INVBIT(8, n))
+#define _INVBIT32(n) _INVBIT(16, n))
+#define INVBIT(n) _INVBIT32(n)
 
 // N must be a power of 2
 #define FIFO(T, N)                                                             \
