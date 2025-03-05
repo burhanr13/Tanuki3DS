@@ -1,5 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef COMMON_H
+#define COMMON_H
 
 #include <assert.h>
 #include <stdarg.h>
@@ -74,6 +74,8 @@ typedef float fvec4[4];
 #define _INVBIT32(n) _INVBIT(16, n))
 #define INVBIT(n) _INVBIT32(n)
 
+#define lengthof(a) (sizeof a / sizeof *a)
+
 // N must be a power of 2
 #define FIFO(T, N)                                                             \
     struct {                                                                   \
@@ -83,11 +85,11 @@ typedef float fvec4[4];
         u32 size;                                                              \
     }
 
-#define FIFO_MAX(f) (sizeof((f).d) / sizeof((f).d[0]))
+#define FIFO_MAX(f) lengthof((f).d)
 #define FIFO_push(f, v) ((f).d[(f).tail++] = v, (f).size++)
 #define FIFO_pop(f, v) (v = (f).d[(f).head++], (f).size--)
 #define FIFO_peek(f) ((f).d[(f).head])
-#define FIFO_back(f) ((f).d[(f).tail - (typeof((f).tail)) 1])
+#define FIFO_back(f) ((f).d[(f).tail - 1uwb])
 #define FIFO_foreach(i, f)                                                     \
     for (u32 _i = 0, i = (f).head; _i < (f).size;                              \
          _i++, i = (typeof((f).head)) ((f).head + _i))
@@ -99,7 +101,7 @@ typedef float fvec4[4];
         size_t size;                                                           \
     }
 
-#define SVec_MAX(v) (sizeof((v).d) / sizeof((v).d[0]))
+#define SVec_MAX(v) lengthof((v).d)
 #define SVec_push(v, e)                                                        \
     ({                                                                         \
         (v).d[(v).size++] = (e);                                               \
@@ -114,7 +116,7 @@ typedef float fvec4[4];
         size_t cap;                                                            \
     }
 
-#define Vec_init(v) ((v).d = nullptr, (v).size = 0, (v).cap = 0)
+#define Vec_init(v) ((v).d = nullptr, (v).size = (v).cap = 0)
 #define Vec_assn(v1, v2)                                                       \
     ((v1).d = (v2).d, (v1).size = (v2).size, (v1).cap = (v2).cap)
 #define Vec_free(v) (free((v).d), Vec_init(v))
@@ -148,7 +150,7 @@ typedef float fvec4[4];
         size_t size;                                                           \
     }
 
-#define LRU_MAX(c) (sizeof((c).d) / sizeof((c).d[0]))
+#define LRU_MAX(c) lengthof((c).d)
 
 #define LRU_init(c) ((c).root.next = (c).root.prev = &(c).root, (c).size = 0)
 
