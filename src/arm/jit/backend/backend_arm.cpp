@@ -2,7 +2,10 @@
 
 #include "backend_arm.h"
 
+#ifndef NOCAPSTONE
 #include <capstone/capstone.h>
+#endif
+#include <utility>
 #include <vector>
 #include <xbyak_aarch64/xbyak_aarch64.h>
 
@@ -1433,6 +1436,7 @@ void backend_arm_free(void* backend) {
     delete ((Code*) backend);
 }
 
+#ifndef NOCAPSTONE
 void backend_arm_disassemble(void* backend) {
     Code* code = (Code*) backend;
     code->print_hostregs();
@@ -1449,6 +1453,7 @@ void backend_arm_disassemble(void* backend) {
     cs_free(insn, count);
     cs_close(&handle);
 }
+#endif
 }
 
 #endif

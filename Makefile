@@ -1,7 +1,18 @@
 TARGET_EXEC := ctremu
 
+ifeq ($(OS),Windows_NT)
+CC := clang
+CXX := clang++
+else ifeq ($(shell uname),Darwin)
+CC := $(shell brew --prefix)/opt/llvm/bin/clang
+CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
+else ifeq ($(shell uname),Linux)
 CC := clang-19
 CXX := clang++-19
+else
+CC := clang
+CXX := clang++
+endif
 
 CSTD := -std=gnu23
 CXXSTD := -std=gnu++23
@@ -11,7 +22,7 @@ CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE -isystem /usr/local/include -Isrc --embed-dir=sys_files
 
-LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lcapstone -lfdk-aac
+LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lfdk-aac
 
 ifeq ($(OS),Windows_NT)
 	LTO := -fuse-ld=lld -flto
@@ -21,9 +32,10 @@ endif
 
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += $(LTO)
-	CPPFLAGS += -DNOPORTABLE
+	CPPFLAGS += -DNOPORTABLE -DNOCAPSTONE
 else
 	CFLAGS_RELEASE += -g
+	LDFLAGS += -lcapstone
 endif
 
 ifeq ($(shell getconf PAGESIZE),4096)
@@ -38,12 +50,8 @@ ifeq ($(shell uname -m),aarch64)
 endif
 
 ifeq ($(OS),Windows_NT)
-	CC := clang
-	CXX := clang++
 	LDFLAGS += -lopengl32 -lglew32 -Wl,--stack,8388608
 else ifeq ($(shell uname),Darwin)
-	CC := $(shell brew --prefix)/opt/llvm/bin/clang
-	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
 	CPPFLAGS += -isystem $(shell brew --prefix)/include
 	LDFLAGS := -L$(shell brew --prefix)/lib $(LDFLAGS)
 	LDFLAGS += -framework OpenGL -lGLEW

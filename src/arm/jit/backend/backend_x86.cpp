@@ -2,7 +2,10 @@
 
 #include "backend_x86.h"
 
+#ifndef NOCAPSTONE
 #include <capstone/capstone.h>
+#endif
+#include <utility>
 #include <vector>
 #include <xbyak/xbyak.h>
 #include <xbyak/xbyak_util.h>
@@ -78,9 +81,8 @@ struct Code : Xbyak::CodeGenerator {
             case REG_STACK:
                 return stackslots[hr.index];
             default:
-                break;
+                std::unreachable();
         }
-        return rdx;
     }
 
     const Xbyak::Operand& getOp(int i) {
@@ -1363,6 +1365,7 @@ void backend_x86_free(void* backend) {
     delete ((Code*) backend);
 }
 
+#ifndef NOCAPSTONE
 void backend_x86_disassemble(void* backend) {
     Code* code = (Code*) backend;
     code->print_hostregs();
@@ -1378,6 +1381,7 @@ void backend_x86_disassemble(void* backend) {
     }
     cs_free(insn, count);
 }
+#endif
 }
 
 #endif
