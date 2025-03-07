@@ -50,7 +50,7 @@ ifeq ($(shell uname -m),aarch64)
 endif
 
 ifeq ($(OS),Windows_NT)
-	LDFLAGS := -static $(LDFLAGS)
+	LDFLAGS := -static-libgcc -static-libstdc++ $(LDFLAGS)
 	LDFLAGS += -Wl,--stack,8388608
 else ifeq ($(shell uname),Darwin)
 	CPPFLAGS += -isystem $(shell brew --prefix)/include
