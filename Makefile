@@ -35,6 +35,7 @@ ifeq ($(shell uname),Darwin)
 	LIBDIRS := $(shell brew --prefix)/lib $(LIBDIRS)
 else ifeq ($(OS),Windows_NT)
 	LIBDIRS += /mingw32/lib /mingw64/lib
+	STATIC_LIBS += -lwinpthread
 endif
 
 ifeq ($(USER), 1)
