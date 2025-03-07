@@ -4,17 +4,17 @@ BUILD_DIR := build
 SRC_DIR := src
 
 ifeq ($(OS),Windows_NT)
-CC := clang
-CXX := clang++
+	CC := clang
+	CXX := clang++
 else ifeq ($(shell uname),Darwin)
-CC := $(shell brew --prefix)/opt/llvm/bin/clang
-CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
+	CC := $(shell brew --prefix)/opt/llvm/bin/clang
+	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
 else ifeq ($(shell uname),Linux)
-CC := clang-19
-CXX := clang++-19
+	CC := clang-19
+	CXX := clang++-19
 else
-CC := clang
-CXX := clang++
+	CC := clang
+	CXX := clang++
 endif
 
 CSTD := -std=gnu23
@@ -35,6 +35,7 @@ ifeq ($(shell uname),Darwin)
 	LIBDIRS := $(shell brew --prefix)/lib $(LIBDIRS)
 else ifeq ($(OS),Windows_NT)
 	LIBDIRS += /mingw32/lib /mingw64/lib
+	LIBS += -lwindowsapp -lole32
 endif
 
 ifeq ($(USER), 1)
@@ -61,7 +62,7 @@ vpath %.a $(LIBDIRS)
 .LIBPATTERNS := lib%.a
 
 ifeq ($(OS),Windows_NT)
-	LDFLAGS += -lwindowsapp -static -Wl,--stack,8388608 -fuse-ld=lld
+	LDFLAGS += -static -Wl,--stack,8388608 -fuse-ld=lld
 endif
 
 SRCS := $(shell find $(SRC_DIR) -name '*.c') 
