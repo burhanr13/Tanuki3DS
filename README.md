@@ -71,10 +71,8 @@ Freecam controls (regular keyboard input is disabled):
 - Left Shift (hold): move slower
 - Right Shift (hold): move faster
 
-Note that the freecam only works when hw shaders are enabled.
-
 ## Building
-You need the following dependencies installed to build and run:
+You need the following dependencies installed to build:
 - sdl3
 - xxhash
 - cglm

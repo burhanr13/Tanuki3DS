@@ -56,6 +56,7 @@ endif
 
 LDFLAGS := $(LIBDIRS:%=-L%) $(LIBS)
 vpath %.a $(LIBDIRS)
+LIBPATTERNS := lib%.a
 
 ifeq ($(OS),Windows_NT)
 	LDFLAGS += -static-libgcc -static-libstdc++ -Wl,--stack,8388608 -fuse-ld=lld
