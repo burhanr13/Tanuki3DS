@@ -35,7 +35,7 @@ ifeq ($(shell uname),Darwin)
 	LIBDIRS := $(shell brew --prefix)/lib $(LIBDIRS)
 else ifeq ($(OS),Windows_NT)
 	LIBDIRS += /mingw32/lib /mingw64/lib
-	LIBS += -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32
+	LIBS +=
 endif
 
 ifeq ($(USER), 1)
@@ -62,7 +62,7 @@ vpath %.a $(LIBDIRS)
 .LIBPATTERNS := lib%.a
 
 ifeq ($(OS),Windows_NT)
-	LDFLAGS += -static -Wl,--stack,8388608 -fuse-ld=lld
+	LDFLAGS += -Wl,--stack,8388608 -fuse-ld=lld
 endif
 
 SRCS := $(shell find $(SRC_DIR) -name '*.c') 
