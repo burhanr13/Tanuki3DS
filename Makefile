@@ -51,7 +51,7 @@ endif
 
 ifeq ($(OS),Windows_NT)
 	LDFLAGS := -static $(LDFLAGS)
-	LDFLAGS += -luser32 -Wl,--stack,8388608
+	LDFLAGS += -lole32 -Wl,--stack,8388608
 else ifeq ($(shell uname),Darwin)
 	CPPFLAGS += -isystem $(shell brew --prefix)/include
 	LDFLAGS := -L$(shell brew --prefix)/lib $(LDFLAGS)
