@@ -61,7 +61,7 @@ vpath %.a $(LIBDIRS)
 .LIBPATTERNS := lib%.a
 
 ifeq ($(OS),Windows_NT)
-	LDFLAGS += -static -Wl,--stack,8388608 -fuse-ld=lld
+	LDFLAGS += -lwindowsapp -static -Wl,--stack,8388608 -fuse-ld=lld
 endif
 
 SRCS := $(shell find $(SRC_DIR) -name '*.c') 
