@@ -76,11 +76,10 @@ Note that the freecam only works when hw shaders are enabled.
 ## Building
 You need the following dependencies installed to build and run:
 - sdl3
-- glew
-- capstone
 - xxhash
 - cglm
 - fdk-aac
+- capstone
 - xbyak (x86_64 only)
 - xbyak_aarch64 (arm64 only)
 
