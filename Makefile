@@ -33,6 +33,8 @@ STATIC_LIBS := -lfdk-aac
 ifeq ($(shell uname),Darwin)
 	CPPFLAGS += -isystem $(shell brew --prefix)/include
 	LIBDIRS := $(shell brew --prefix)/lib $(LIBDIRS)
+else ifeq ($(OS),Windows_NT)
+	LIBDIRS += /mingw32/lib /mingw64/lib
 endif
 
 ifeq ($(USER), 1)
