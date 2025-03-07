@@ -22,7 +22,7 @@ CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE -isystem /usr/local/include -Isrc --embed-dir=sys_files
 
-LDFLAGS := -L/usr/local/lib -lm -lSDL3 -lfdk-aac
+LDFLAGS := -L/usr/local/lib -lm -lfdk-aac
 
 ifeq ($(OS),Windows_NT)
 	LTO := -fuse-ld=lld -flto
@@ -50,9 +50,13 @@ ifeq ($(shell uname -m),aarch64)
 endif
 
 ifeq ($(OS),Windows_NT)
-	LDFLAGS := -static $(LDFLAGS)
-	LDFLAGS += -lole32 -Wl,--stack,8388608
-else ifeq ($(shell uname),Darwin)
+	LDFLAGS := -Wl,-Bstatic -lgcc -lstdc++ -lpthread $(LDFLAGS) -Wl,-Bdynamic -lSDL3
+	LDFLAGS += -Wl,--stack,8388608
+else 
+	LDFLAGS += -lSDL3
+endif
+
+ifeq ($(shell uname),Darwin)
 	CPPFLAGS += -isystem $(shell brew --prefix)/include
 	LDFLAGS := -L$(shell brew --prefix)/lib $(LDFLAGS)
 endif
