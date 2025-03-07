@@ -35,7 +35,7 @@ ifeq ($(shell uname),Darwin)
 	LIBDIRS := $(shell brew --prefix)/lib $(LIBDIRS)
 else ifeq ($(OS),Windows_NT)
 	LIBDIRS += /mingw32/lib /mingw64/lib
-	LIBS += -lntdll -lkernel32 -lmsvcrt -ladvapi32 -lbcrypt -lrpcrt4 -lgdi32 -lucrtbase -luser32 -limm32 -lole32 -loleaut32 -lsetupapi -lshell32 -lversion -lwinmm -lcfgmgr32 -lcryptbase -lbcryptprimitives
+	LIBS += -lntdll -lkernel32 -lmsvcrt -ladvapi32 -lbcrypt -lrpcrt4 -lgdi32 -lucrtbase -luser32 -limm32 -lole32 -loleaut32 -lsetupapi -lshell32 -lversion -lwinmm -lcfgmgr32 -lcryptbase -lbcryptprimitives -luuid
 endif
 
 ifeq ($(USER), 1)
