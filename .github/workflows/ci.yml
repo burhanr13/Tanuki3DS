@@ -155,9 +155,7 @@ jobs:
         make install
     - name: build
       run: make USER=1
-    - name: package libs
-      run: ./.github/windows-libs.sh
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-windows
-        path: Tanuki3DS
+        path: ./ctremu.exe
