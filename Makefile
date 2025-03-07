@@ -50,13 +50,10 @@ ifeq ($(shell uname -m),aarch64)
 endif
 
 ifeq ($(OS),Windows_NT)
-	LDFLAGS += -lopengl32 -lglew32 -Wl,--stack,8388608
+	LDFLAGS += -Wl,--stack,8388608
 else ifeq ($(shell uname),Darwin)
 	CPPFLAGS += -isystem $(shell brew --prefix)/include
 	LDFLAGS := -L$(shell brew --prefix)/lib $(LDFLAGS)
-	LDFLAGS += -framework OpenGL -lGLEW
-else
-	LDFLAGS += -lGL -lGLEW
 endif
 
 BUILD_DIR := build

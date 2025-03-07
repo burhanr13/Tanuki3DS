@@ -305,7 +305,8 @@ int main(int argc, char** argv) {
         lerror("could not create gl context");
         return 1;
     }
-    glewInit();
+    
+    gladLoadGLLoader((void*) SDL_GL_GetProcAddress);
 
 #ifdef GLDEBUGCTX
     glEnable(GL_DEBUG_OUTPUT);
