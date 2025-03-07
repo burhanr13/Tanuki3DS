@@ -35,7 +35,6 @@ ifeq ($(shell uname),Darwin)
 	LIBDIRS := $(shell brew --prefix)/lib $(LIBDIRS)
 else ifeq ($(OS),Windows_NT)
 	LIBDIRS += /mingw32/lib /mingw64/lib
-	STATIC_LIBS += -lwinpthread
 endif
 
 ifeq ($(USER), 1)
@@ -62,7 +61,7 @@ vpath %.a $(LIBDIRS)
 .LIBPATTERNS := lib%.a
 
 ifeq ($(OS),Windows_NT)
-	LDFLAGS += -static-libgcc -static-libstdc++ -Wl,--stack,8388608 -fuse-ld=lld
+	LDFLAGS += -static -Wl,--stack,8388608 -fuse-ld=lld
 endif
 
 SRCS := $(shell find $(SRC_DIR) -name '*.c') 
