@@ -41,6 +41,8 @@ u32 srvobj_make_handle(E3DS* s, KObject* o) {
 
 void services_init(E3DS* s) {
     srvobj_init(&s->services.notif_sem.hdr, KOT_SEMAPHORE);
+    s->services.notif_sem.count = 0;
+    s->services.notif_sem.max = 1;
 
     srvobj_init(&s->services.apt.lock.hdr, KOT_MUTEX);
     srvobj_init(&s->services.apt.notif_event.hdr, KOT_EVENT);

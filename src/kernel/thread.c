@@ -263,6 +263,26 @@ void mutex_release(E3DS* s, KMutex* mtx) {
     thread_reschedule(s);
 }
 
+KSemaphore* semaphore_create(s32 init, s32 max) {
+    KSemaphore* sem = calloc(1, sizeof *sem);
+    sem->hdr.type = KOT_SEMAPHORE;
+    sem->count = init;
+    sem->max = max;
+    return sem;
+}
+
+void semaphore_release(E3DS* s, KSemaphore* sem) {
+    if (!sem->waiting_thrds) {
+        if (sem->count < sem->max) sem->count++;
+        return;
+    }
+
+    KThread* wakeupthread = remove_highest_prio(&sem->waiting_thrds);
+    thread_wakeup(s, wakeupthread, &sem->hdr);
+
+    thread_reschedule(s);
+}
+
 bool sync_wait(E3DS* s, KThread* t, KObject* o) {
     switch (o->type) {
         case KOT_THREAD: {
@@ -295,6 +315,10 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
         }
         case KOT_SEMAPHORE: {
             auto sem = (KSemaphore*) o;
+            if (sem->count > 0) {
+                sem->count--;
+                return false;
+            }
             klist_insert(&sem->waiting_thrds, &t->hdr);
             return true;
         }

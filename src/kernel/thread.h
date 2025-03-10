@@ -81,6 +81,8 @@ typedef struct {
 typedef struct {
     KObject hdr;
     KListNode* waiting_thrds;
+    s32 count;
+    s32 max;
 } KSemaphore;
 
 typedef struct {
@@ -124,6 +126,9 @@ void timer_signal(E3DS* s, SchedEventArg arg);
 
 KMutex* mutex_create();
 void mutex_release(E3DS* s, KMutex* mtx);
+
+KSemaphore* semaphore_create(s32 init, s32 max);
+void semaphore_release(E3DS* s, KSemaphore* sem);
 
 bool sync_wait(E3DS* s, KThread* t, KObject* o);
 void sync_cancel(KThread* t, KObject* o);

@@ -189,6 +189,34 @@ DECL_SVC(ReleaseMutex) {
     R(0) = 0;
 }
 
+DECL_SVC(CreateSemaphore) {
+    MAKE_HANDLE(handle);
+
+    KSemaphore* sem = semaphore_create(R(1), R(2));
+    sem->hdr.refcount = 1;
+    HANDLE_SET(handle, sem);
+
+    linfo("created semaphore with handle %x, init=%d, max=%d", handle, R(1),
+          R(2));
+
+    R(0) = 0;
+    R(1) = handle;
+}
+
+DECL_SVC(ReleaseSemaphore) {
+    KSemaphore* sem = HANDLE_GET_TYPED(R(0), KOT_SEMAPHORE);
+    if (!sem) {
+        lerror("not a semaphore");
+        R(0) = -1;
+        return;
+    }
+
+    linfo("releasing semaphore %x", R(0));
+    semaphore_release(s, sem);
+
+    R(0) = 0;
+}
+
 DECL_SVC(CreateEvent) {
     MAKE_HANDLE(handle);
 
