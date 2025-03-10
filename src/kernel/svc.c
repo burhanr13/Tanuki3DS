@@ -204,17 +204,19 @@ DECL_SVC(CreateSemaphore) {
 }
 
 DECL_SVC(ReleaseSemaphore) {
-    KSemaphore* sem = HANDLE_GET_TYPED(R(0), KOT_SEMAPHORE);
+    KSemaphore* sem = HANDLE_GET_TYPED(R(1), KOT_SEMAPHORE);
     if (!sem) {
         lerror("not a semaphore");
         R(0) = -1;
         return;
     }
 
-    linfo("releasing semaphore %x", R(0));
-    semaphore_release(s, sem);
-
     R(0) = 0;
+    R(1) = sem->count;
+
+    linfo("releasing semaphore %x with count %d", R(0), R(2));
+    semaphore_release(s, sem, R(2));
+
 }
 
 DECL_SVC(CreateEvent) {

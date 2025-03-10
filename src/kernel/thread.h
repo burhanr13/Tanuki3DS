@@ -128,7 +128,7 @@ KMutex* mutex_create();
 void mutex_release(E3DS* s, KMutex* mtx);
 
 KSemaphore* semaphore_create(s32 init, s32 max);
-void semaphore_release(E3DS* s, KSemaphore* sem);
+void semaphore_release(E3DS* s, KSemaphore* sem, s32 count);
 
 bool sync_wait(E3DS* s, KThread* t, KObject* o);
 void sync_cancel(KThread* t, KObject* o);

@@ -207,7 +207,6 @@ void event_signal(E3DS* s, KEvent* ev) {
         if (thr) thread_wakeup(s, thr, &ev->hdr);
     }
     if (ev->callback) ev->callback(s);
-    thread_reschedule(s);
 }
 
 KTimer* timer_create_(bool sticky, bool repeat) {
@@ -231,7 +230,6 @@ void timer_signal(E3DS* s, SchedEventArg arg) {
         KThread* thr = remove_highest_prio(&tmr->waiting_thrds);
         if (thr) thread_wakeup(s, thr, &tmr->hdr);
     }
-    thread_reschedule(s);
 
     if (tmr->repeat) {
         add_event(&s->sched, timer_signal, SEA_PTR(tmr),
@@ -259,8 +257,6 @@ void mutex_release(E3DS* s, KMutex* mtx) {
     KThread* wakeupthread = remove_highest_prio(&mtx->waiting_thrds);
     thread_wakeup(s, wakeupthread, &mtx->hdr);
     mtx->locker_thrd = wakeupthread;
-
-    thread_reschedule(s);
 }
 
 KSemaphore* semaphore_create(s32 init, s32 max) {
@@ -271,16 +267,15 @@ KSemaphore* semaphore_create(s32 init, s32 max) {
     return sem;
 }
 
-void semaphore_release(E3DS* s, KSemaphore* sem) {
-    if (!sem->waiting_thrds) {
-        if (sem->count < sem->max) sem->count++;
-        return;
+void semaphore_release(E3DS* s, KSemaphore* sem, s32 count) {
+    sem->count += count;
+    if (sem->count > sem->max) sem->count = sem->max;
+
+    while (sem->count > 0 && sem->waiting_thrds) {
+        sem->count--;
+        KThread* wakeupthread = remove_highest_prio(&sem->waiting_thrds);
+        thread_wakeup(s, wakeupthread, &sem->hdr);
     }
-
-    KThread* wakeupthread = remove_highest_prio(&sem->waiting_thrds);
-    thread_wakeup(s, wakeupthread, &sem->hdr);
-
-    thread_reschedule(s);
 }
 
 bool sync_wait(E3DS* s, KThread* t, KObject* o) {
