@@ -71,6 +71,8 @@ SRCSCPP := $(shell find $(SRC_DIR) -name '*.cpp')
 SRCS := $(SRCS:$(SRC_DIR)/%=%)
 SRCSCPP := $(SRCSCPP:$(SRC_DIR)/%=%)
 
+# need to save this for clean
+BUILD_ROOT := $(BUILD_DIR)
 ifeq ($(DEBUG), 1)
 	BUILD_DIR := $(BUILD_DIR)/debug
 	TARGET_EXEC := $(TARGET_EXEC)d
@@ -102,6 +104,6 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 .PHONY: clean
 clean:
 	@echo clean...
-	@rm -rf $(BUILD_DIR) $(TARGET_EXEC) $(TARGET_EXEC)d
+	@rm -rf $(BUILD_ROOT) $(TARGET_EXEC) $(TARGET_EXEC)d
 
 -include $(DEPS)
