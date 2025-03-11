@@ -1,6 +1,6 @@
-#ifdef __aarch64__
+#if 0
 
-#include "backend_arm.h"
+#include "backend_arm_old.h"
 
 #ifndef NOCAPSTONE
 #include <capstone/capstone.h>
@@ -952,20 +952,20 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 }
                 ldp(x29, x30, post_ptr(sp, 0x10));
 
-                if (inst.opcode == IR_END_LINK) {
-                    Label nolink, linkaddr;
-                    cmp(x0, 0);
-                    ble(nolink);
-                    ldr(x16, linkaddr);
-                    br(x16);
-                    align(8);
-                    L(linkaddr);
-                    links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
-                                                 inst.op1, inst.op2});
-                    dd(0);
-                    dd(0);
-                    L(nolink);
-                }
+                // if (inst.opcode == IR_END_LINK) {
+                //     Label nolink, linkaddr;
+                //     cmp(x0, 0);
+                //     ble(nolink);
+                //     ldr(x16, linkaddr);
+                //     br(x16);
+                //     align(8);
+                //     L(linkaddr);
+                //     links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
+                //                                  inst.op1, inst.op2});
+                //     dd(0);
+                //     dd(0);
+                //     L(nolink);
+                // }
 
                 ret();
                 break;
