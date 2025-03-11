@@ -935,7 +935,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 lastflags = 0;
 
                 ldr(x0, CPU(cycles));
-                sub(x0, x0, ir->numinstr);
+                sub(x0, x0, inst.cycles);
                 str(x0, CPU(cycles));
 
                 if (inst.opcode == IR_END_LOOP) {
