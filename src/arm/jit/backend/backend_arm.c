@@ -909,7 +909,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 lastflags = 0;
 
                 ldrx(r0, CPU(cycles));
-                subx(r0, r0, ir->numinstr);
+                subx(r0, r0, inst.cycles);
                 strx(r0, CPU(cycles));
 
                 if (inst.opcode == IR_END_LOOP) {
