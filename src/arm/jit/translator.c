@@ -36,7 +36,8 @@ ArmCompileFunc compile_funcs[ARM_MAX] = {
                                      .imm1 = _imm1,                            \
                                      .imm2 = _imm2,                            \
                                      .op1 = _op1,                              \
-                                     .op2 = _op2}))
+                                     .op2 = _op2,                              \
+                                     .cycles = block->numinstr + 1}))
 
 #define EMITVX(opc, op1, op2, imm) EMITXX(opc, op1, op2, 0, imm)
 #define EMITVV(opc, op1, op2) EMITVX(opc, op1, op2, 0)

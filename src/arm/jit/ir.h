@@ -145,6 +145,7 @@ typedef struct {
     };
     u32 op1;
     u32 op2;
+    u32 cycles; // cycle count up to this instruction
 } IRInstr;
 
 typedef struct {
