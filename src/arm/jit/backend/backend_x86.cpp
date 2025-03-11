@@ -1297,7 +1297,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_END_LINK:
             case IR_END_LOOP: {
 
-                sub(qword[CPU(cycles)], ir->numinstr);
+                sub(qword[CPU(cycles)], inst.cycles);
 
                 if (inst.opcode == IR_END_LOOP) {
                     cmp(qword[CPU(cycles)], 0);
