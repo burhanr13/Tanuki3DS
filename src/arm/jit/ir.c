@@ -476,7 +476,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
             case IR_END_LINK:
             case IR_END_LOOP:
             case IR_END_RET:
-                cpu->cycles -= block->numinstr;
+                cpu->cycles -= block->code.d[i].cycles;
                 return;
         }
 #ifdef IR_TRACE

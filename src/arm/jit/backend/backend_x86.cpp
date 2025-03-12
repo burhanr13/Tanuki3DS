@@ -1297,10 +1297,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_END_LINK:
             case IR_END_LOOP: {
 
-                sub(qword[CPU(cycles)], inst.cycles);
+                mov(rax, qword[CPU(cycles)]);
+                sub(rax, inst.cycles);
+                mov(qword[CPU(cycles)], rax);
 
                 if (inst.opcode == IR_END_LOOP) {
-                    cmp(qword[CPU(cycles)], 0);
+                    cmp(rax, 0);
                     jg("loopblock");
                 }
 
@@ -1309,12 +1311,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 for (int i = hralloc.count[REG_SAVED] - 1; i >= 0; i--) {
                     pop(savedregs[i].cvt64());
                 }
+                pop(rbx);
 
                 if (inst.opcode == IR_END_LINK) {
                     inLocalLabel();
-                    cmp(qword[CPU(cycles)], 0);
+                    cmp(rax, 0);
                     jle(".nolink");
-                    pop(rbx);
                     links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
                                                  inst.op1, inst.op2});
                     nop(10);
@@ -1322,8 +1324,6 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     L(".nolink");
                     outLocalLabel();
                 }
-
-                pop(rbx);
                 ret();
                 break;
             }
