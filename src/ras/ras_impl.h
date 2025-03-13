@@ -11,11 +11,20 @@
 
 #include <sys/mman.h>
 
+typedef int8_t s8;
+typedef uint8_t u8;
+typedef int16_t s16;
+typedef uint16_t u16;
+typedef int32_t s32;
+typedef uint32_t u32;
+typedef int64_t s64;
+typedef uint64_t u64;
+
 #define BIT(b) (1ull << (b))
 #define MASK(b) (BIT(b) - 1)
-#define ISNBITSU(n, b) ((u32) (n) >> (b) == 0)
-#define ISNBITSS(n, b)                                                         \
-    ((s32) (n) >> ((b) - 1) == 0 || (s32) (n) >> ((b) - 1) == -1)
+#define ISNBITSU64(n, b) ((u64) (n) >> (b) == 0)
+#define ISNBITSS64(n, b)                                                       \
+    ((s64) (n) >> ((b) - 1) == 0 || (s64) (n) >> ((b) - 1) == -1)
 #define ISLOWBITS0(n, b) (((n) & MASK(b)) == 0)
 
 typedef enum {
@@ -215,7 +224,7 @@ void rasApplyPatch(rasBlock* ctx, rasPatch p) {
         case RAS_PATCH_REL26: {
             rasAssert(ISLOWBITS0(reladdr, 2), RAS_ERR_BAD_LABEL);
             reladdr >>= 2;
-            rasAssert(ISNBITSS(reladdr, 26), RAS_ERR_BAD_LABEL);
+            rasAssert(ISNBITSS64(reladdr, 26), RAS_ERR_BAD_LABEL);
             reladdr &= MASK(26);
             *patchinst |= reladdr;
             break;
@@ -231,7 +240,7 @@ void rasApplyPatch(rasBlock* ctx, rasPatch p) {
                 *patchinst |= (reladdr & MASK(2)) << 29;
             }
             reladdr >>= 2;
-            rasAssert(ISNBITSS(reladdr, 19), RAS_ERR_BAD_LABEL);
+            rasAssert(ISNBITSS64(reladdr, 19), RAS_ERR_BAD_LABEL);
             reladdr &= MASK(19);
             *patchinst |= reladdr << 5;
             break;
@@ -310,9 +319,22 @@ void rasEmitWord(rasBlock* ctx, u32 w) {
 }
 
 void rasEmitDword(rasBlock* ctx, u64 d) {
-    if ((ctx->curr - ctx->code) & 1) rasEmitWord(ctx, 0);
-    rasEmitWord(ctx, d);
-    rasEmitWord(ctx, d >> 32);
+    word(d);
+    word(d >> 32);
+}
+
+void rasAlign(rasBlock* ctx, size_t alignment) {
+    if (alignment & 3) return;
+    alignment >>= 2;
+    for (int i = 0; i < 64; i++) {
+        if (alignment & BIT(i)) {
+            if (alignment != BIT(i)) return;
+            break;
+        }
+    }
+    size_t cur = ctx->curr - ctx->code;
+    size_t aligned = (cur + (alignment - 1)) & ~(alignment - 1);
+    for (int i = 0; i < aligned - cur; i++) word(0);
 }
 
 int rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n) {
@@ -380,16 +402,17 @@ int rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n) {
 
 void rasEmitPseudoAddSubImm(rasBlock* ctx, u32 sf, u32 op, u32 s, rasReg rd,
                             rasReg rn, u64 imm, rasReg rtmp) {
-    if (ISNBITSU(imm, 12)) {
+    if (!sf) imm = (s32) imm;
+    if (ISNBITSU64(imm, 12)) {
         addsub(sf, op, s, rd, rn, imm);
-    } else if (ISNBITSU(imm, 24) && ISLOWBITS0(imm, 12)) {
-        addsub(sf, op, s, rd, rn, imm >> 12, _lsl(12));
+    } else if (ISNBITSU64(imm, 24) && ISLOWBITS0(imm, 12)) {
+        addsub(sf, op, s, rd, rn, imm >> 12, lsl(12));
     } else {
         imm = -imm;
-        if (ISNBITSU(imm, 12)) {
+        if (ISNBITSU64(imm, 12)) {
             addsub(sf, !op, s, rd, rn, imm);
-        } else if (ISNBITSU(imm, 24) && ISLOWBITS0(imm, 12)) {
-            addsub(sf, !op, s, rd, rn, imm >> 12, _lsl(12));
+        } else if (ISNBITSU64(imm, 24) && ISLOWBITS0(imm, 12)) {
+            addsub(sf, !op, s, rd, rn, imm >> 12, lsl(12));
         } else {
             imm = -imm;
             if (sf) {
@@ -476,7 +499,7 @@ void rasEmitPseudoMovImm(rasBlock* ctx, u32 sf, rasReg rd, u64 imm) {
             } else {
                 opc = 3;
             }
-            movewide(sf, opc, rd, hw, _lsl(16 * i));
+            movewide(sf, opc, rd, hw, lsl(16 * i));
         }
     }
 }
