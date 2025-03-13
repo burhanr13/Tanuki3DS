@@ -68,6 +68,18 @@ int getOp(ArmCodeBackend* backend, int i) {
     else return getOpForReg(&backend->hralloc, assn);
 }
 
+void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr);
+void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
+                       rasLabel lldf32, rasLabel lldf64);
+void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
+                        rasLabel lstf32, rasLabel lstf64);
+void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasReg dst);
+void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr, rasReg src);
+void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr, rasReg dst,
+                      bool h);
+void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr, rasReg src,
+                       bool h);
+
 #define GETOP(i) getOp(backend, i)
 
 #define CPU(m, ...) (r29, offsetof(ArmCore, m) __VA_OPT__(+) __VA_ARGS__)
@@ -128,14 +140,18 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
 
     u32 jmptarget = -1;
 
-    Label(lcp15r, cpu->cp15_read);
-    Label(lcp15w, cpu->cp15_write);
-    Label(lld8, cpu->read8);
-    Label(lld16, cpu->read16);
-    Label(lld32, cpu->read32);
-    Label(lst8, cpu->write8);
-    Label(lst16, cpu->write16);
-    Label(lst32, cpu->write32);
+    Label(lcp15r);
+    Label(lcp15w);
+    Label(lld8);
+    Label(lld16);
+    Label(lld32);
+    Label(lst8);
+    Label(lst16);
+    Label(lst32);
+    Label(lldf32);
+    Label(lldf64);
+    Label(lstf32);
+    Label(lstf64);
 
     Label(looplabel);
 
@@ -247,71 +263,57 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 str(r0, CPU(cpsr));
                 break;
             }
+            case IR_VFP_DATA_PROC: {
+                compileVFPDataProc(backend, (ArmInstr) {inst.op1});
+                break;
+            }
             case IR_VFP_LOAD_MEM: {
-                movx(r0, r29);
-                mov(r1, inst.op1);
-                MOVOP2(r2);
-                adrl(ip0, Lnew(exec_vfp_load_mem));
-                blr(ip0);
+                auto addr = LOADOP2();
+                compileVFPLoadMem(backend, (ArmInstr) {inst.op1}, addr, lldf32,
+                                  lldf64);
                 break;
             }
             case IR_VFP_STORE_MEM: {
-                movx(r0, r29);
-                mov(r1, inst.op1);
-                MOVOP2(r2);
-                adrl(ip0, Lnew(exec_vfp_store_mem));
-                blr(ip0);
+                auto addr = LOADOP2();
+                compileVFPStoreMem(backend, (ArmInstr) {inst.op1}, addr, lstf32,
+                                   lstf64);
                 break;
             }
-            // case IR_VFP_DATA_PROC: {
-            //     compileVFPDataProc(ArmInstr(inst.op1));
-            //     break;
-            // }
-            // case IR_VFP_LOAD_MEM: {
-            //     auto addr = LOADOP2();
-            //     compileVFPLoadMem(ArmInstr(inst.op1), addr);
-            //     break;
-            // }
-            // case IR_VFP_STORE_MEM: {
-            //     auto addr = LOADOP2();
-            //     compileVFPStoreMem(ArmInstr(inst.op1), addr);
-            //     break;
-            // }
-            // case IR_VFP_READ: {
-            //     auto dst = DSTREG();
-            //     compileVFPRead(ArmInstr(inst.op1), dst);
-            //     break;
-            // }
-            // case IR_VFP_WRITE: {
-            //     auto src = LOADOP2();
-            //     compileVFPWrite(ArmInstr(inst.op1), src);
-            //     break;
-            // }
-            // case IR_VFP_READ64L: {
-            //     auto dst = DSTREG();
-            //     compileVFPRead64(ArmInstr(inst.op1), dst, false);
-            //     break;
-            // }
-            // case IR_VFP_READ64H: {
-            //     auto dst = DSTREG();
-            //     compileVFPRead64(ArmInstr(inst.op1), dst, true);
-            //     break;
-            // }
-            // case IR_VFP_WRITE64L: {
-            //     auto src = LOADOP2();
-            //     compileVFPWrite64(ArmInstr(inst.op1), src, false);
-            //     break;
-            // }
-            // case IR_VFP_WRITE64H: {
-            //     auto src = LOADOP2();
-            //     compileVFPWrite64(ArmInstr(inst.op1), src, true);
-            //     break;
-            // }
+            case IR_VFP_READ: {
+                auto dst = DSTREG();
+                compileVFPRead(backend, (ArmInstr) {inst.op1}, dst);
+                break;
+            }
+            case IR_VFP_WRITE: {
+                auto src = LOADOP2();
+                compileVFPWrite(backend, (ArmInstr) {inst.op1}, src);
+                break;
+            }
+            case IR_VFP_READ64L: {
+                auto dst = DSTREG();
+                compileVFPRead64(backend, (ArmInstr) {inst.op1}, dst, false);
+                break;
+            }
+            case IR_VFP_READ64H: {
+                auto dst = DSTREG();
+                compileVFPRead64(backend, (ArmInstr) {inst.op1}, dst, true);
+                break;
+            }
+            case IR_VFP_WRITE64L: {
+                auto src = LOADOP2();
+                compileVFPWrite64(backend, (ArmInstr) {inst.op1}, src, false);
+                break;
+            }
+            case IR_VFP_WRITE64H: {
+                auto src = LOADOP2();
+                compileVFPWrite64(backend, (ArmInstr) {inst.op1}, src, true);
+                break;
+            }
             case IR_CP15_READ: {
                 auto dst = DSTREG();
                 movx(r0, r29);
                 mov(r1, inst.op1);
-                adrl(ip0, lcp15r);
+                ldrlx(ip0, lcp15r);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -321,7 +323,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, inst.op1);
                 mov(r2, src);
-                adrl(ip0, lcp15w);
+                ldrlx(ip0, lcp15w);
                 blr(ip0);
                 break;
             }
@@ -330,7 +332,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 MOVOP1(r1);
                 mov(r2, 0);
-                adrl(ip0, lld8);
+                ldrlx(ip0, lld8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -340,7 +342,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 MOVOP1(r1);
                 mov(r2, 1);
-                adrl(ip0, lld8);
+                ldrlx(ip0, lld8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -350,7 +352,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 MOVOP1(r1);
                 mov(r2, 0);
-                adrl(ip0, lld16);
+                ldrlx(ip0, lld16);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -360,7 +362,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 MOVOP1(r1);
                 mov(r2, 1);
-                adrl(ip0, lld16);
+                ldrlx(ip0, lld16);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -369,7 +371,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto dst = DSTREG();
                 movx(r0, r29);
                 MOVOP1(r1);
-                adrl(ip0, lld32);
+                ldrlx(ip0, lld32);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -378,7 +380,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 MOVOP1(r1);
                 MOVOP2(r2);
-                adrl(ip0, lst8);
+                ldrlx(ip0, lst8);
                 blr(ip0);
                 break;
             }
@@ -386,7 +388,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 MOVOP1(r1);
                 MOVOP2(r2);
-                adrl(ip0, lst16);
+                ldrlx(ip0, lst16);
                 blr(ip0);
                 break;
             }
@@ -394,7 +396,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 MOVOP1(r1);
                 MOVOP2(r2);
-                adrl(ip0, lst32);
+                ldrlx(ip0, lst32);
                 blr(ip0);
                 break;
             }
@@ -697,7 +699,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, src1);
                 mov(r2, src2);
-                adrl(ip0, Lnew(media_uadd8));
+                movx(ip0, (size_t) media_uadd8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -709,7 +711,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, src1);
                 mov(r2, src2);
-                adrl(ip0, Lnew(media_usub8));
+                movx(ip0, (size_t) media_usub8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -751,7 +753,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, src1);
                 mov(r2, src2);
-                adrl(ip0, Lnew(media_ssub8));
+                movx(ip0, (size_t) media_ssub8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -773,7 +775,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, src1);
                 mov(r2, src2);
-                adrl(ip0, Lnew(media_sel));
+                movx(ip0, (size_t) media_sel);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -863,7 +865,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
             case IR_MODESWITCH: {
                 movx(r0, r29);
                 mov(r1, inst.op1);
-                adrl(ip0, Lnew(cpu_update_mode));
+                movx(ip0, (size_t) cpu_update_mode);
                 blr(ip0);
                 break;
             }
@@ -872,13 +874,13 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     case E_SWI:
                         movx(r0, r29);
                         mov(r1, (ArmInstr) {inst.op2}.sw_intr.arg);
-                        adrl(ip0, Lnew(cpu->handle_svc));
+                        movx(ip0, (size_t) cpu->handle_svc);
                         blr(ip0);
                         break;
                     case E_UND:
                         movx(r0, r29);
                         mov(r1, inst.op2);
-                        adrl(ip0, Lnew(cpu_undefined_fail));
+                        movx(ip0, (size_t) cpu_undefined_fail);
                         blr(ip0);
                         break;
                 }
@@ -896,9 +898,9 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     push(Reg(SAVEDREGS_BASE + i), Reg(SAVEDREGS_BASE + i + 1));
                 }
                 int spdisp = SPDISP();
-                if (spdisp) sub(sp, sp, spdisp);
+                if (spdisp) subx(sp, sp, spdisp);
 
-                adrl(r29, Lnew(cpu));
+                movx(r29, (size_t) cpu);
                 L(looplabel);
 
                 break;
@@ -918,7 +920,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 }
 
                 int spdisp = SPDISP();
-                if (spdisp) add(sp, sp, spdisp);
+                if (spdisp) addx(sp, sp, spdisp);
                 for (int i = (backend->hralloc.count[REG_SAVED] - 1) & ~1;
                      i >= 0; i -= 2) {
                     pop(Reg(SAVEDREGS_BASE + i), Reg(SAVEDREGS_BASE + i + 1));
@@ -950,7 +952,324 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
         STOREDST();
     }
 
+    align(8);
+    L(lcp15r);
+    dword(Lnew(cpu->cp15_read));
+    L(lcp15w);
+    dword(Lnew(cpu->cp15_write));
+    L(lld8);
+    dword(Lnew(cpu->read8));
+    L(lld16);
+    dword(Lnew(cpu->read16));
+    L(lld32);
+    dword(Lnew(cpu->read32));
+    L(lst8);
+    dword(Lnew(cpu->write8));
+    L(lst16);
+    dword(Lnew(cpu->write16));
+    L(lst32);
+    dword(Lnew(cpu->write32));
+    L(lldf32);
+    dword(Lnew(cpu->readf32));
+    L(lldf64);
+    dword(Lnew(cpu->readf64));
+    L(lstf32);
+    dword(Lnew(cpu->writef32));
+    L(lstf64);
+    dword(Lnew(cpu->writef64));
+
     return backend;
+}
+
+void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
+    bool dp = instr.cp_data_proc.cpnum & 1;
+    u32 vd = instr.cp_data_proc.crd;
+    u32 vn = instr.cp_data_proc.crn;
+    u32 vm = instr.cp_data_proc.crm;
+    if (!dp) {
+        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+        vn = vn << 1 | (instr.cp_data_proc.cp >> 2);
+        vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+    }
+
+    u32 cpopc = instr.cp_data_proc.cpopc & 0b1011;
+    bool op = instr.cp_data_proc.cp & 2;
+
+    switch (cpopc) {
+        case 0:
+        case 1:
+            if (dp) {
+                ldrd(v0, CPU(d[vd]));
+                ldrd(v1, CPU(d[vn]));
+                ldrd(v2, CPU(d[vm]));
+            } else {
+                ldrs(v0, CPU(s[vd]));
+                ldrs(v1, CPU(s[vn]));
+                ldrs(v2, CPU(s[vm]));
+            }
+            fpdataproc3source(dp, 0, 0, cpopc, cpopc ^ op, v0, v1, v2, v0);
+            if (dp) {
+                strd(v0, CPU(d[vd]));
+            } else {
+                strs(v0, CPU(s[vd]));
+            }
+            break;
+        case 2:
+        case 3:
+        case 8: {
+            if (dp) {
+                ldrd(v1, CPU(d[vn]));
+                ldrd(v2, CPU(d[vm]));
+            } else {
+                ldrs(v1, CPU(s[vn]));
+                ldrs(v2, CPU(s[vm]));
+            }
+            u32 opcode = cpopc == 8 ? 1 : cpopc == 2 ? op * 8 : 2 + op;
+            fpdataproc2source(dp, 0, 0, opcode, v0, v1, v2);
+            if (dp) {
+                strd(v0, CPU(d[vd]));
+            } else {
+                strs(v0, CPU(s[vd]));
+            }
+            break;
+        }
+        case 11: {
+            op = instr.cp_data_proc.cp & 4;
+            u32 crn = instr.cp_data_proc.crn;
+            switch (crn) {
+                case 0:
+                case 1:
+                    if (dp) {
+                        ldrd(v2, CPU(d[vm]));
+                    } else {
+                        ldrs(v2, CPU(s[vm]));
+                    }
+                    fpdataproc1source(dp, 0, 0, crn << 1 | op, v0, v2);
+                    if (dp) {
+                        strd(v0, CPU(d[vd]));
+                    } else {
+                        strs(v0, CPU(s[vd]));
+                    }
+                    break;
+                case 4:
+                case 5:
+                    if (dp) {
+                        ldrd(v0, CPU(d[vd]));
+                        ldrd(v2, CPU(d[vm]));
+                    } else {
+                        ldrs(v0, CPU(s[vd]));
+                        ldrs(v2, CPU(s[vm]));
+                    }
+                    fpcompare(dp, 0, 0, 0, (crn & 1) * 8, v0, v2);
+                    mrs(r0, nzcv);
+                    ldr(r1, CPU(fpscr));
+                    ubfx(r0, r0, 28, 4);
+                    bfi(r1, r0, 28, 4);
+                    str(r1, CPU(fpscr));
+                    break;
+                case 7:
+                    if (dp) {
+                        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+                        ldrd(v0, CPU(d[vm]));
+                        fcvtsd(v0, v0);
+                        strs(v0, CPU(s[vd]));
+                    } else {
+                        vd = vd >> 1;
+                        ldrs(v0, CPU(s[vm]));
+                        fcvtds(v0, v0);
+                        strd(v0, CPU(d[vd]));
+                    }
+                    break;
+                case 8:
+                    if (dp) vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+                    ldr(r0, CPU(s[vm]));
+                    fpconvertintvr(0, dp, 0, 0, 2 + !op, v0, r0);
+                    if (dp) {
+                        strd(v0, CPU(d[vd]));
+                    } else {
+                        strs(v0, CPU(s[vd]));
+                    }
+                    break;
+                case 12:
+                case 13:
+                    if (dp) {
+                        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+                        ldrd(v0, CPU(d[vm]));
+                    } else {
+                        ldrs(v0, CPU(s[vm]));
+                    }
+                    fpconvertintrv(0, dp, 0, 3, !(crn & 1), r0, v0);
+                    str(r0, CPU(s[vd]));
+                    break;
+            }
+            break;
+        }
+    }
+}
+
+void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
+                       rasLabel lldf32, rasLabel lldf64) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    if (rcount > 1) {
+        push(r19, zr);
+        mov(r19, addr);
+        addr = r19;
+    }
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+            movx(r0, r29);
+            mov(r1, addr);
+            ldrlx(ip0, lldf64);
+            blr(ip0);
+            strd(v0, CPU(d[(vd + i) & 15]));
+            if (i < rcount - 1) add(addr, addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+            movx(r0, r29);
+            mov(r1, addr);
+            ldrlx(ip0, lldf32);
+            blr(ip0);
+            strs(v0, CPU(s[(vd + i) & 31]));
+            if (i < rcount - 1) add(addr, addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        pop(r19, zr);
+    }
+}
+
+void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
+                        rasLabel lstf32, rasLabel lstf64) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    if (rcount > 1) {
+        push(r19, zr);
+        mov(r19, addr);
+        addr = r19;
+    }
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+            movx(r0, r29);
+            mov(r1, addr);
+            ldrd(v0, CPU(d[(vd + i) & 15]));
+            ldrlx(ip0, lstf64);
+            blr(ip0);
+            if (i < rcount - 1) add(addr, addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+            movx(r0, r29);
+            mov(r1, addr);
+            ldrs(v0, CPU(s[(vd + i) & 31]));
+            ldrlx(ip0, lstf32);
+            blr(ip0);
+            if (i < rcount - 1) add(addr, addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        pop(r19, zr);
+    }
+}
+
+void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasReg dst) {
+    if (instr.cp_reg_trans.cpopc == 7) {
+        if (instr.cp_reg_trans.crn == 1) {
+            ldr(dst, CPU(fpscr));
+        } else {
+            lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
+            mov(dst, 0);
+        }
+        return;
+    }
+
+    u32 vn = instr.cp_reg_trans.crn << 1;
+    if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
+    else vn |= instr.cp_reg_trans.cp >> 2;
+
+    ldr(dst, CPU(s[vn]));
+}
+
+void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr, rasReg src) {
+    if (instr.cp_reg_trans.cpopc == 7) {
+        if (instr.cp_reg_trans.crn == 1) {
+            str(src, CPU(fpscr));
+        } else {
+            lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
+        }
+        return;
+    }
+
+    u32 vn = instr.cp_reg_trans.crn << 1;
+    if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
+    else vn |= instr.cp_reg_trans.cp >> 2;
+
+    str(src, CPU(s[vn]));
+}
+
+void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr, rasReg dst,
+                      bool h) {
+    if (instr.cp_double_reg_trans.cpnum & 1) {
+        u32 vm = instr.cp_double_reg_trans.crm;
+        if (h) {
+            ldr(dst, CPU(d[vm], 4));
+        } else {
+            ldr(dst, CPU(d[vm]));
+        }
+    } else {
+        u32 vm = instr.cp_double_reg_trans.crm << 1 |
+                 ((instr.cp_double_reg_trans.cp >> 1) & 1);
+        if (h) {
+            ldr(dst, CPU(s[vm + 1]));
+        } else {
+            ldr(dst, CPU(s[vm]));
+        }
+    }
+}
+
+void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr, rasReg src,
+                       bool h) {
+    if (instr.cp_double_reg_trans.cpnum & 1) {
+        u32 vm = instr.cp_double_reg_trans.crm;
+        if (h) {
+            str(src, CPU(d[vm], 4));
+        } else {
+            str(src, CPU(d[vm]));
+        }
+    } else {
+        u32 vm = instr.cp_double_reg_trans.crm << 1 |
+                 ((instr.cp_double_reg_trans.cp >> 1) & 1);
+        if (h) {
+            if (vm < 31) str(src, CPU(s[vm + 1]));
+        } else {
+            str(src, CPU(s[vm]));
+        }
+    }
 }
 
 void backend_arm_free(ArmCodeBackend* backend) {

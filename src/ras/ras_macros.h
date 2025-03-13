@@ -21,9 +21,16 @@
 // https://www.chiark.greenend.org.uk/~sgtatham/quasiblog/c11-generic/#coercion
 extern void* _ras_invalid_argument_type;
 #define __FORCE_INT(op)                                                        \
-    _Generic(op, rasReg: *(int*) _ras_invalid_argument_type, default: op)
+    _Generic(op,                                                               \
+        rasReg: *(int*) _ras_invalid_argument_type,                            \
+        rasLabel: *(int*) _ras_invalid_argument_type,                          \
+        default: op)
+#define __FORCE_FLT(op)                                                        \
+    _Generic(op, rasVReg: *(int*) _ras_invalid_argument_type, default: op)
 #define __FORCE(type, val)                                                     \
     _Generic(val, type: val, default: *(type*) _ras_invalid_argument_type)
+
+#define align(a) rasAlign(RAS_CTX_VAR, a)
 
 #define word(w) __EMIT(Word, w)
 #define dword(d)                                                               \
@@ -32,7 +39,7 @@ extern void* _ras_invalid_argument_type;
         default: __EMIT(Dword, __FORCE_INT(d)))
 
 #define addsub(sf, op, s, rd, rn, op2, ...)                                    \
-    _addsub(sf, op, s, rd, rn, op2, __VA_DFL(_lsl(0), __VA_ARGS__))
+    _addsub(sf, op, s, rd, rn, op2, __VA_DFL(lsl(0), __VA_ARGS__))
 #define _addsub(sf, op, s, rd, rn, op2, mod)                                   \
     _Generic(op2,                                                              \
         rasReg: _Generic(mod,                                                  \
@@ -76,7 +83,7 @@ extern void* _ras_invalid_argument_type;
 #define __CINV(n, v) ((n) ? ~(v) : (v))
 
 #define logical(sf, opc, n, rd, rn, op2, ...)                                  \
-    _logical(sf, opc, n, rd, rn, op2, __VA_DFL(_lsl(0), __VA_ARGS__))
+    _logical(sf, opc, n, rd, rn, op2, __VA_DFL(lsl(0), __VA_ARGS__))
 #define _logical(sf, opc, n, rd, rn, op2, mod)                                 \
     _Generic(op2,                                                              \
         rasReg: __EMIT(LogicalReg, sf, opc, n, __FORCE(rasShift, mod),         \
@@ -118,11 +125,10 @@ extern void* _ras_invalid_argument_type;
 #define clsw(rd, rn) dataproc1source(0, 0, 0, 5, rd, rn)
 #define rbitx(rd, rn) dataproc1source(1, 0, 0, 0, rd, rn)
 #define rev16x(rd, rn) dataproc1source(1, 0, 0, 1, rd, rn)
-#define rev32x(rd, rn) dataproc1source(1, 0, 0, 2, rd, rn)
+#define rev32(rd, rn) dataproc1source(1, 0, 0, 2, rd, rn)
 #define revx(rd, rn) dataproc1source(1, 0, 0, 3, rd, rn)
 #define clzx(rd, rn) dataproc1source(1, 0, 0, 4, rd, rn)
 #define clsx(rd, rn) dataproc1source(1, 0, 0, 5, rd, rn)
-#define rev32(rd, rn) rev32x(rd, rn)
 
 #define dataproc2source(sf, s, opcode, rd, rn, rm)                             \
     __EMIT(DataProc2Source, sf, s, rm, opcode, rn, rd)
@@ -225,31 +231,39 @@ extern void* _ras_invalid_argument_type;
 #define asrx(rd, rn, op2) shift(1, 2, rd, rn, op2)
 #define rorx(rd, rn, op2) shift(1, 3, rd, rn, op2)
 
-#define uxtb(rd, rn) ubfxw(rd, rn, 0, 8)
-#define uxth(rd, rn) ubfxw(rd, rn, 0, 16)
+#define _shift(t, name, op, ...)                                               \
+    __VA_IF(__shift(name, op, __VA_DFL(0, __VA_ARGS__)), ((rasShift) {op, t}), \
+            __VA_ARGS__)
+#define __shift(name, op, op1) ___shift(name, op, op1)
+#define ___shift(name, op, op1, ...) name(op, op1, __VA_ARGS__)
+
+#define lsl(op, ...) _shift(0, lsl_, op __VA_OPT__(, ) __VA_ARGS__)
+#define lsr(op, ...) _shift(1, lsr_, op __VA_OPT__(, ) __VA_ARGS__)
+#define asr(op, ...) _shift(2, asr_, op __VA_OPT__(, ) __VA_ARGS__)
+
+#define uxtb_(rd, rn) ubfxw(rd, rn, 0, 8)
+#define uxth_(rd, rn) ubfxw(rd, rn, 0, 16)
+#define uxtw_(rd, rn) ubfxx(rd, rn, 0, 32)
 #define sxtbw(rd, rn) sbfxw(rd, rn, 0, 8)
 #define sxtbx(rd, rn) sbfxx(rd, rn, 0, 8)
 #define sxthw(rd, rn) sbfxw(rd, rn, 0, 16)
 #define sxthx(rd, rn) sbfxx(rd, rn, 0, 16)
-#define sxtw(rd, rn) sbfxx(rd, rn, 0, 32)
-#define sxtwx(rd, rn) sxtw(rd, rn)
+#define sxtw_(rd, rn) sbfxx(rd, rn, 0, 32)
 
-#define shiftmod(t, amt) ((rasShift) {amt, t})
+#define _extend(t, name, ...) __extend(t, name, __VA_DFL(0, __VA_ARGS__))
+#define __extend(t, name, op) ___extend(t, name, op)
+#define ___extend(t, name, op, ...)                                            \
+    __VA_IF(name(op, __VA_DFL(0, __VA_ARGS__)), ((rasExtend) {op, t}),         \
+            __VA_ARGS__)
 
-#define _lsl(amt) shiftmod(0, amt)
-#define _lsr(amt) shiftmod(1, amt)
-#define _asr(amt) shiftmod(2, amt)
-
-#define extendmod(type, ...) ((rasExtend) {__VA_DFL(0, __VA_ARGS__), type})
-
-#define _uxtb(...) extendmod(0, __VA_ARGS__)
-#define _uxth(...) extendmod(1, __VA_ARGS__)
-#define _uxtw(...) extendmod(2, __VA_ARGS__)
-#define _uxtx(...) extendmod(3, __VA_ARGS__)
-#define _sxtb(...) extendmod(4, __VA_ARGS__)
-#define _sxth(...) extendmod(5, __VA_ARGS__)
-#define _sxtw(...) extendmod(6, __VA_ARGS__)
-#define _sxtx(...) extendmod(7, __VA_ARGS__)
+#define uxtb(...) _extend(0, uxtb_, __VA_ARGS__)
+#define uxth(...) _extend(1, uxth_, __VA_ARGS__)
+#define uxtw(...) _extend(2, uxtw_, __VA_ARGS__)
+#define uxtx(...) _extend(3, movx, __VA_ARGS__)
+#define sxtb(...) _extend(4, sxtb_, __VA_ARGS__)
+#define sxth(...) _extend(5, sxth_, __VA_ARGS__)
+#define sxtw(...) _extend(6, sxtw_, __VA_ARGS__)
+#define sxtx(...) _extend(7, movx, __VA_ARGS__)
 
 #define pcreladdr(op, rd, l) __EMIT(PCRelAddr, op, l, rd)
 
@@ -258,7 +272,7 @@ extern void* _ras_invalid_argument_type;
 #define adrl(rd, l) __EMIT(PseudoPCRelAddrLong, rd, l)
 
 #define movewide(sf, opc, rd, imm, ...)                                        \
-    __EMIT(MoveWide, sf, opc, __VA_DFL(_lsl(0), __VA_ARGS__), imm, rd)
+    __EMIT(MoveWide, sf, opc, __VA_DFL(lsl(0), __VA_ARGS__), imm, rd)
 
 #define movnw(rd, imm, ...) movewide(0, 0, rd, imm, __VA_ARGS__)
 #define movzw(rd, imm, ...) movewide(0, 2, rd, imm, __VA_ARGS__)
@@ -288,55 +302,76 @@ extern void* _ras_invalid_argument_type;
         default: *(rasExtend*) _ras_invalid_argument_type)
 #define __EXT_OF_SHIFT(s) ((rasExtend) {s.amt, 3, s.type != 0 || s.amt > 4})
 
-#define loadstore(size, opc, rt, amod)                                         \
-    _loadstore(size, opc, rt, __EXPAND_AMOD(amod))
-#define _loadstore(size, opc, rt, amod) __loadstore(size, opc, rt, amod)
-#define __loadstore(size, opc, rt, rn, off, ...)                               \
+#define __V2R(vn) _Generic(vn, rasVReg: Reg((vn).idx))
+
+#define loadstore(vr, size, opc, rt, amod)                                     \
+    _loadstore(vr, size, opc, rt, __EXPAND_AMOD(amod))
+#define _loadstore(vr, size, opc, rt, amod) __loadstore(vr, size, opc, rt, amod)
+#define __loadstore(vr, size, opc, rt, rn, off, ...)                           \
     _Generic(off,                                                              \
         rasReg: rasEmitLoadStoreRegOff,                                        \
         default: rasEmitLoadStoreImmOff)(                                      \
-        RAS_CTX_VAR, size, opc, off,                                           \
+        RAS_CTX_VAR, size, vr, opc, off,                                       \
         _Generic(off,                                                          \
-            rasReg: __MAKE_EXT(__VA_DFL(_uxtx(), __VA_ARGS__)),                \
+            rasReg: __MAKE_EXT(__VA_DFL(uxtx(), __VA_ARGS__)),                 \
             default: __VA_DFL(0, __VA_ARGS__)),                                \
         rn, rt)
 
-#define strb(rt, amod) loadstore(0, 0, rt, amod)
-#define ldrb(rt, amod) loadstore(0, 1, rt, amod)
-#define ldrsbx(rt, amod) loadstore(0, 2, rt, amod)
-#define ldrsbw(rt, amod) loadstore(0, 3, rt, amod)
-#define strh(rt, amod) loadstore(1, 0, rt, amod)
-#define ldrh(rt, amod) loadstore(1, 1, rt, amod)
-#define ldrshx(rt, amod) loadstore(1, 2, rt, amod)
-#define ldrshw(rt, amod) loadstore(1, 3, rt, amod)
-#define strw(rt, amod) loadstore(2, 0, rt, amod)
-#define ldrw(rt, amod) loadstore(2, 1, rt, amod)
-#define ldrswx(rt, amod) loadstore(2, 2, rt, amod)
-#define strx(rt, amod) loadstore(3, 0, rt, amod)
-#define ldrx(rt, amod) loadstore(3, 1, rt, amod)
-#define ldrsw(rt, amod) ldrswx(rt, amod)
+#define strb(rt, amod) loadstore(0, 0, 0, rt, amod)
+#define ldrb(rt, amod) loadstore(0, 0, 1, rt, amod)
+#define ldrsbx(rt, amod) loadstore(0, 0, 2, rt, amod)
+#define ldrsbw(rt, amod) loadstore(0, 0, 3, rt, amod)
+#define strh(rt, amod) loadstore(0, 1, 0, rt, amod)
+#define ldrh(rt, amod) loadstore(0, 1, 1, rt, amod)
+#define ldrshx(rt, amod) loadstore(0, 1, 2, rt, amod)
+#define ldrshw(rt, amod) loadstore(0, 1, 3, rt, amod)
+#define strw(rt, amod) loadstore(0, 2, 0, rt, amod)
+#define ldrw(rt, amod) loadstore(0, 2, 1, rt, amod)
+#define ldrsw(rt, amod) loadstore(0, 2, 2, rt, amod)
+#define strx(rt, amod) loadstore(0, 3, 0, rt, amod)
+#define ldrx(rt, amod) loadstore(0, 3, 1, rt, amod)
 
-#define loadliteral(opc, rt, l) __EMIT(LoadLiteral, opc, l, rt)
+#define strs(vt, amod) loadstore(1, 2, 0, __V2R(vt), amod)
+#define ldrs(vt, amod) loadstore(1, 2, 1, __V2R(vt), amod)
+#define strd(vt, amod) loadstore(1, 3, 0, __V2R(vt), amod)
+#define ldrd(vt, amod) loadstore(1, 3, 1, __V2R(vt), amod)
+#define strq(vt, amod) loadstore(1, 0, 2, __V2R(vt), amod)
+#define ldrq(vt, amod) loadstore(1, 0, 3, __V2R(vt), amod)
+#define pushv(vt) strq(vt, (sp, -0x10, pre))
+#define popv(vt) ldrq(vt, (sp, 0x10, post))
 
-#define ldrlw(rt, l) loadliteral(0, rt, l)
-#define ldrlx(rt, l) loadliteral(1, rt, l)
-#define ldrlswx(rt, l) loadliteral(2, rt, l)
-#define ldrlsw(rt, l) ldrlswx(rt, l)
+#define loadliteral(vr, opc, rt, l) __EMIT(LoadLiteral, opc, vr, l, rt)
 
-#define loadstorepair(opc, l, rt, rt2, amod)                                   \
-    _loadstorepair(opc, l, rt, rt2, __EXPAND_AMOD(amod))
-#define _loadstorepair(opc, l, rt, rt2, amod)                                  \
-    __loadstorepair(opc, l, rt, rt2, amod)
-#define __loadstorepair(opc, l, rt, rt2, rn, off, ...)                         \
-    __EMIT(LoadStorePair, opc, __VA_DFL(2, __VA_ARGS__), l, off, rt2, rn, rt)
+#define ldrlw(rt, l) loadliteral(0, 0, rt, l)
+#define ldrlx(rt, l) loadliteral(0, 1, rt, l)
+#define ldrlsw(rt, l) loadliteral(0, 2, rt, l)
 
-#define stpw(rt, rt2, amod) loadstorepair(0, 0, rt, rt2, amod)
-#define ldpw(rt, rt2, amod) loadstorepair(0, 1, rt, rt2, amod)
-#define ldpswx(rt, rt2, amod) loadstorepair(1, 1, rt, rt2, amod)
-#define stpx(rt, rt2, amod) loadstorepair(2, 0, rt, rt2, amod)
-#define ldpx(rt, rt2, amod) loadstorepair(2, 1, rt, rt2, amod)
+#define ldrls(vt, l) loadliteral(1, 0, __V2R(vt), l)
+#define ldrld(vt, l) loadliteral(1, 1, __V2R(vt), l)
+#define ldrlq(vt, l) loadliteral(1, 2, __V2R(vt), l)
+
+#define loadstorepair(vr, opc, l, rt, rt2, amod)                               \
+    _loadstorepair(vr, opc, l, rt, rt2, __EXPAND_AMOD(amod))
+#define _loadstorepair(vr, opc, l, rt, rt2, amod)                              \
+    __loadstorepair(vr, opc, l, rt, rt2, amod)
+#define __loadstorepair(vr, opc, l, rt, rt2, rn, off, ...)                     \
+    __EMIT(LoadStorePair, opc, vr, __VA_DFL(2, __VA_ARGS__), l, off, rt2, rn,  \
+           rt)
+
+#define stpw(rt, rt2, amod) loadstorepair(0, 0, 0, rt, rt2, amod)
+#define ldpw(rt, rt2, amod) loadstorepair(0, 0, 1, rt, rt2, amod)
+#define ldpsw(rt, rt2, amod) loadstorepair(0, 1, 1, rt, rt2, amod)
+#define stpx(rt, rt2, amod) loadstorepair(0, 2, 0, rt, rt2, amod)
+#define ldpx(rt, rt2, amod) loadstorepair(0, 2, 1, rt, rt2, amod)
 #define push(rt, rt2) stpx(rt, rt2, (sp, -0x10, pre))
 #define pop(rt, rt2) ldpx(rt, rt2, (sp, 0x10, post))
+
+#define stps(vt, vt2, amod) loadstorepair(1, 0, 0, __V2R(vt), __V2R(vt2), amod)
+#define ldps(vt, vt2, amod) loadstorepair(1, 0, 1, __V2R(vt), __V2R(vt2), amod)
+#define stpd(vt, vt2, amod) loadstorepair(1, 1, 0, __V2R(vt), __V2R(vt2), amod)
+#define ldpd(vt, vt2, amod) loadstorepair(1, 1, 1, __V2R(vt), __V2R(vt2), amod)
+#define stpq(vt, vt2, amod) loadstorepair(1, 2, 0, __V2R(vt), __V2R(vt2), amod)
+#define ldpq(vt, vt2, amod) loadstorepair(1, 2, 1, __V2R(vt), __V2R(vt2), amod)
 
 #define post 1
 #define pre 3
@@ -401,8 +436,13 @@ extern void* _ras_invalid_argument_type;
 #define bhs(l) b(hs, l)
 #define blo(l) b(lo, l)
 
-#define hint(crm, op2) __EMIT(Hint, crm, op2)
-#define nop() hint(0, 0)
+#define hint(opc) __EMIT(Hint, opc)
+#define nop() hint(0)
+
+#define systemregmove(l, rt, opc) __EMIT(SystemRegMove, l, opc, rt)
+
+#define msr(opc, rt) systemregmove(0, rt, opc)
+#define mrs(rt, opc) systemregmove(1, rt, opc)
 
 #define Label(l, ...) rasLabel l = Lnew(__VA_ARGS__)
 #define Lnew(...) __VA_IF(_Lnewext(__VA_ARGS__), _Lnew(), __VA_ARGS__)
@@ -410,6 +450,107 @@ extern void* _ras_invalid_argument_type;
 #define _Lnewext(addr) rasDefineLabelExternal(_Lnew(), addr)
 #define L(l) rasDefineLabel(RAS_CTX_VAR, l)
 #define Lext(l, addr) rasDefineLabelExternal(l, addr)
+
+#define fpmovimm(ftype, m, s, rd, fimm, imm5)                                  \
+    __EMIT(FPMovImm, m, s, ftype, fimm, imm5, rd)
+
+#define fpdataproc1source(ftype, m, s, opcode, rd, rn)                         \
+    __EMIT(FPDataProc1Source, m, s, ftype, opcode, rn, rd)
+
+#define fmovs(rd, op2)                                                         \
+    _Generic(op2,                                                              \
+        rasVReg: fpdataproc1source(0, 0, 0, 0, rd, __FORCE(rasVReg, op2)),     \
+        default: fpmovimm(0, 0, 0, rd, __FORCE_FLT(op2), 0))
+#define fmovd(rd, op2)                                                         \
+    _Generic(op2,                                                              \
+        rasVReg: fpdataproc1source(1, 0, 0, 0, rd, __FORCE(rasVReg, op2)),     \
+        default: fpmovimm(1, 0, 0, rd, __FORCE_FLT(op2), 0))
+
+#define fabss(rd, rn) fpdataproc1source(0, 0, 0, 1, rd, rn)
+#define fnegs(rd, rn) fpdataproc1source(0, 0, 0, 2, rd, rn)
+#define fsqrts(rd, rn) fpdataproc1source(0, 0, 0, 3, rd, rn)
+#define fcvtds(rd, rn) fpdataproc1source(0, 0, 0, 5, rd, rn)
+#define fabsd(rd, rn) fpdataproc1source(1, 0, 0, 1, rd, rn)
+#define fnegd(rd, rn) fpdataproc1source(1, 0, 0, 2, rd, rn)
+#define fsqrtd(rd, rn) fpdataproc1source(1, 0, 0, 3, rd, rn)
+#define fcvtsd(rd, rn) fpdataproc1source(1, 0, 0, 4, rd, rn)
+
+#define fpcompare(ftype, m, s, op, opcode2, rn, rm)                            \
+    __EMIT(FPCompare, m, s, ftype, rm, op, rn, opcode2)
+
+#define fcmps(rn, rm) fpcompare(0, 0, 0, 0, 0, rn, rm)
+#define fcmpzs(rn) fpcompare(0, 0, 0, 0, 8, rn, v0)
+#define fcmpd(rn, rm) fpcompare(1, 0, 0, 0, 0, rn, rm)
+#define fcmpzd(rn) fpcompare(1, 0, 0, 0, 8, rn, v0)
+
+#define fpdataproc2source(ftype, m, s, opcode, rd, rn, rm)                     \
+    __EMIT(FPDataProc2Source, m, s, ftype, rm, opcode, rn, rd)
+
+#define fmuls(rd, rn, rm) fpdataproc2source(0, 0, 0, 0, rd, rn, rm)
+#define fdivs(rd, rn, rm) fpdataproc2source(0, 0, 0, 1, rd, rn, rm)
+#define fadds(rd, rn, rm) fpdataproc2source(0, 0, 0, 2, rd, rn, rm)
+#define fsubs(rd, rn, rm) fpdataproc2source(0, 0, 0, 3, rd, rn, rm)
+#define fmaxs(rd, rn, rm) fpdataproc2source(0, 0, 0, 4, rd, rn, rm)
+#define fmins(rd, rn, rm) fpdataproc2source(0, 0, 0, 5, rd, rn, rm)
+#define fmaxnms(rd, rn, rm) fpdataproc2source(0, 0, 0, 6, rd, rn, rm)
+#define fminnms(rd, rn, rm) fpdataproc2source(0, 0, 0, 7, rd, rn, rm)
+#define fnmuls(rd, rn, rm) fpdataproc2source(0, 0, 0, 8, rd, rn, rm)
+#define fmuld(rd, rn, rm) fpdataproc2source(1, 0, 0, 0, rd, rn, rm)
+#define fdivd(rd, rn, rm) fpdataproc2source(1, 0, 0, 1, rd, rn, rm)
+#define faddd(rd, rn, rm) fpdataproc2source(1, 0, 0, 2, rd, rn, rm)
+#define fsubd(rd, rn, rm) fpdataproc2source(1, 0, 0, 3, rd, rn, rm)
+#define fmaxd(rd, rn, rm) fpdataproc2source(1, 0, 0, 4, rd, rn, rm)
+#define fmind(rd, rn, rm) fpdataproc2source(1, 0, 0, 5, rd, rn, rm)
+#define fmaxnmd(rd, rn, rm) fpdataproc2source(1, 0, 0, 6, rd, rn, rm)
+#define fminnmd(rd, rn, rm) fpdataproc2source(1, 0, 0, 7, rd, rn, rm)
+#define fnmuld(rd, rn, rm) fpdataproc2source(1, 0, 0, 8, rd, rn, rm)
+
+#define fpdataproc3source(ftype, m, s, o1, o0, rd, rn, rm, ra)                 \
+    __EMIT(FPDataProc3Source, m, s, ftype, o1, rm, o0, ra, rn, rd)
+
+#define fmadds(rd, rn, rm, ra) fpdataproc3source(0, 0, 0, 0, 0, rd, rn, rm, ra)
+#define fmsubs(rd, rn, rm, ra) fpdataproc3source(0, 0, 0, 0, 1, rd, rn, rm, ra)
+#define fnmadds(rd, rn, rm, ra) fpdataproc3source(0, 0, 0, 1, 0, rd, rn, rm, ra)
+#define fnmsubs(rd, rn, rm, ra) fpdataproc3source(0, 0, 0, 1, 1, rd, rn, rm, ra)
+#define fmaddd(rd, rn, rm, ra) fpdataproc3source(1, 0, 0, 0, 0, rd, rn, rm, ra)
+#define fmsubd(rd, rn, rm, ra) fpdataproc3source(1, 0, 0, 0, 1, rd, rn, rm, ra)
+#define fnmaddd(rd, rn, rm, ra) fpdataproc3source(1, 0, 0, 1, 0, rd, rn, rm, ra)
+#define fnmsubd(rd, rn, rm, ra) fpdataproc3source(1, 0, 0, 1, 1, rd, rn, rm, ra)
+
+#define __R2V(vn)                                                              \
+    _Generic(vn,                                                               \
+        rasReg: VReg((vn).idx),                                                \
+        default: *(rasVReg*) _ras_invalid_argument_type)
+
+#define fpconvertintrv(sf, ftype, s, rmode, opcode, rd, rn)                    \
+    __EMIT(FPConvertInt, sf, s, ftype, rmode, opcode, rn, __R2V(rd))
+#define fpconvertintvr(sf, ftype, s, rmode, opcode, rd, rn)                    \
+    __EMIT(FPConvertInt, sf, s, ftype, rmode, opcode, __R2V(rn), rd)
+
+#define fpmovegpr(sf, rd, rn)                                                  \
+    _Generic(rd,                                                               \
+        rasReg: fpconvertintrv(sf, sf, 0, 0, 6, rd, __FORCE(rasVReg, rn)),     \
+        rasVReg: fpconvertintvr(sf, sf, 0, 0, 7, __FORCE(rasVReg, rd), rn))
+#define fmovw(rd, rn) fpmovegpr(0, rd, rn)
+#define fmovx(rd, rn) fpmovegpr(1, rd, rn)
+
+#define scvtfsw(rd, rn) fpconvertintvr(0, 0, 0, 0, 2, rd, rn)
+#define ucvtfsw(rd, rn) fpconvertintvr(0, 0, 0, 0, 3, rd, rn)
+#define scvtfdw(rd, rn) fpconvertintvr(0, 1, 0, 0, 2, rd, rn)
+#define ucvtfdw(rd, rn) fpconvertintvr(0, 1, 0, 0, 3, rd, rn)
+#define scvtfsx(rd, rn) fpconvertintvr(1, 0, 0, 0, 2, rd, rn)
+#define ucvtfsx(rd, rn) fpconvertintvr(1, 0, 0, 0, 3, rd, rn)
+#define scvtfdx(rd, rn) fpconvertintvr(1, 1, 0, 0, 2, rd, rn)
+#define ucvtfdx(rd, rn) fpconvertintvr(1, 1, 0, 0, 3, rd, rn)
+
+#define fcvtzsws(rd, rn) fpconvertintrv(0, 0, 0, 3, 0, rd, rn)
+#define fcvtzuws(rd, rn) fpconvertintrv(0, 0, 0, 3, 1, rd, rn)
+#define fcvtzswd(rd, rn) fpconvertintrv(0, 1, 0, 3, 0, rd, rn)
+#define fcvtzuwd(rd, rn) fpconvertintrv(0, 1, 0, 3, 1, rd, rn)
+#define fcvtzsxs(rd, rn) fpconvertintrv(1, 0, 0, 3, 0, rd, rn)
+#define fcvtzuxs(rd, rn) fpconvertintrv(1, 0, 0, 3, 1, rd, rn)
+#define fcvtzsxd(rd, rn) fpconvertintrv(1, 1, 0, 3, 0, rd, rn)
+#define fcvtzuxd(rd, rn) fpconvertintrv(1, 1, 0, 3, 1, rd, rn)
 
 #define Reg(n) ((rasReg) {n})
 
@@ -450,6 +591,43 @@ extern void* _ras_invalid_argument_type;
 #define lr r30
 #define zr ((rasReg) {31, 0})
 #define sp ((rasReg) {31, 1})
+
+#define VReg(n) ((rasVReg) {n})
+
+#define v0 VReg(0)
+#define v1 VReg(1)
+#define v2 VReg(2)
+#define v3 VReg(3)
+#define v4 VReg(4)
+#define v5 VReg(5)
+#define v6 VReg(6)
+#define v7 VReg(7)
+#define v8 VReg(8)
+#define v9 VReg(9)
+#define v10 VReg(10)
+#define v11 VReg(11)
+#define v12 VReg(12)
+#define v13 VReg(13)
+#define v14 VReg(14)
+#define v15 VReg(15)
+#define v16 VReg(16)
+#define v17 VReg(17)
+#define v18 VReg(18)
+#define v19 VReg(19)
+#define v20 VReg(20)
+#define v21 VReg(21)
+#define v22 VReg(22)
+#define v23 VReg(23)
+#define v24 VReg(24)
+#define v25 VReg(25)
+#define v26 VReg(26)
+#define v27 VReg(27)
+#define v28 VReg(28)
+#define v29 VReg(29)
+#define v30 VReg(30)
+#define v31 VReg(31)
+
+#define nzcv 0xda10
 
 #ifdef RAS_DEFAULT_SUFFIX
 #define __CAT(x, y) ___CAT(x, y)
@@ -512,12 +690,12 @@ extern void* _ras_invalid_argument_type;
 #define ubfiz _(ubfiz)
 #define ubfx _(ubfx)
 #define extr _(extr)
-#define lsl _(lsl)
-#define lsr _(lsr)
-#define asr _(asr)
+#define lsl_ _(lsl)
+#define lsr_ _(lsr)
+#define asr_ _(asr)
 #define ror _(ror)
-#define sxtb _(sxtb)
-#define sxth _(sxth)
+#define sxtb_ _(sxtb)
+#define sxth_ _(sxth)
 #define movn _(movn)
 #define movz _(movz)
 #define movk _(movk)
