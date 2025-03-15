@@ -32,7 +32,7 @@ Launching the app should give you a prompt to select the game file. You can also
 
 All games must be decrypted.
 
-You can modify emulator settings in the generated `ctremu.ini` file.
+You can modify emulator settings in the generated `ctremu.ini` file. The settings and save data are stored by default in the application data path of your OS, but you can optionally create a file called `portable.txt` in the same directory as the executable to have them be created there.
 
 You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 
