@@ -31,14 +31,15 @@ int shader_dec_get(GPU* gpu) {
         block->vs = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(block->vs, 1, &(const char*) {source}, nullptr);
         glCompileShader(block->vs);
-        free(source);
         int res;
         glGetShaderiv(block->vs, GL_COMPILE_STATUS, &res);
         if (!res) {
             char log[512];
             glGetShaderInfoLog(block->vs, sizeof log, nullptr, log);
             lerror("failed to compile shader: %s", log);
+            printf("%s",source);
         }
+        free(source);
 
         linfo("compiled new vertex shader");
     }
@@ -96,11 +97,11 @@ bvec2 cmp;
 
 layout (std140) uniform VertUniforms {
     vec4 c[96];
-    ivec4 i[4];
-    int b_raw;
+    uvec4 i[4];
+    uint b_raw;
 };
 
-#define b(n) ((b_raw & (1 << n)) != 0)
+#define b(n) ((b_raw & (1u << n)) != 0u)
 
 layout (std140) uniform FreecamUniforms {
     mat4 freecam_mtx;
@@ -504,7 +505,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_LOOP: {
             printf("aL = i[%d].y;\n", instr.fmt3.c);
             INDENT(ctx->depth);
-            printf("for (int l = 0; l <= i[%d].x; l++, aL += i[%d].z) {\n",
+            printf("for (uint l = 0u; l <= i[%d].x; l++, aL += i[%d].z) {\n",
                    instr.fmt3.c, instr.fmt3.c);
             dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
             INDENT(ctx->depth);
