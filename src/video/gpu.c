@@ -464,7 +464,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             gpu->curfb = &gpu->fbs.d[i];
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearDepthf((color & MASK(24)) / (float) BIT(24));
+            glClearDepth((color & MASK(24)) / (float) BIT(24));
             glClearStencil(color >> 24);
             glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
             linfo("cleared depth buffer at %x of fb %d with value %x", paddr, i,
@@ -506,7 +506,7 @@ void update_cur_fb(GPU* gpu) {
         if (gpu->fbs.d[i].depth_paddr == gpu->regs.fb.colorbuf_loc << 3) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearDepthf(0);
+            glClearDepth(0);
             glDepthMask(true);
             glClear(GL_DEPTH_BUFFER_BIT);
             linfo("lmao");
@@ -903,10 +903,10 @@ void update_gl_state(GPU* gpu) {
         float offset = cvtf24(gpu->regs.raster.depthmap_offset);
         float scale = cvtf24(gpu->regs.raster.depthmap_scale);
         // pica near plane is -1 and farplane is 0
-        glDepthRangef(offset - scale, offset);
+        glDepthRange(offset - scale, offset);
     } else {
         // default depth range maps -1 -> 1 and 0 -> 0
-        glDepthRangef(1, 0);
+        glDepthRange(1, 0);
     }
 
     ubuf.tex2coord = gpu->regs.tex.config.tex2coord;
