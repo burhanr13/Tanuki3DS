@@ -398,6 +398,8 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                                  ctremu.videoscale,
                              dsttex->width * ctremu.videoscale,
                              dsttex->height * ctremu.videoscale, 0);
+        } else {
+            lwarn("unhandled texture copy case");
         }
 
         return;

@@ -33,7 +33,7 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
 }
 
 const char fs_header[] = R"(
-#version 410 core
+#version 330 core
 
 in vec4 color;
 in vec2 texcoord0;
