@@ -74,17 +74,6 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     gpu->regs.w[id] &= ~mask;
     gpu->regs.w[id] |= param & mask;
     switch (id) {
-        // this is a slow way to ensure texture cache coherency
-        // case GPUREG(tex.config):
-        //     if (gpu->regs.tex.config.clearcache) {
-        //         while (gpu->textures.size) {
-        //             TexInfo* t = LRU_eject(gpu->textures);
-        //             t->paddr = 0;
-        //             t->width = 0;
-        //             t->height = 0;
-        //         }
-        //     }
-        //     break;
         case GPUREG(geom.drawarrays):
             gpu_drawarrays(gpu);
             break;
@@ -748,17 +737,16 @@ static const GLenum stencil_op[8] = {
 };
 
 #define TEXSIZE(w, h, fmt, level)                                              \
-    ((w >> level) * (h >> level) * texfmtbpp[fmt] / 8)
+    (((w) >> (level)) * ((h) >> (level)) * texfmtbpp[fmt] / 8)
 
 // including all mip levels
-#define TEXSIZE_TOTAL(w, h, fmt, minl, maxl)                                   \
-    ({                                                                         \
-        u32 size = 0;                                                          \
-        for (int l = minl; l <= maxl; l++) {                                   \
-            size += TEXSIZE(w, h, fmt, l);                                     \
-        }                                                                      \
-        size;                                                                  \
-    })
+static inline u32 texsize_total(TexUnitRegs* regs, u32 fmt) {
+    u32 size = 0;
+    for (int i = regs->lod.min; i <= regs->lod.max; i++) {
+        size += TEXSIZE(regs->width, regs->height, fmt, i);
+    }
+    return size;
+}
 
 void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
     w >>= level;
@@ -843,8 +831,13 @@ void create_texture(GPU* gpu, TexInfo* tex, TexUnitRegs* regs) {
     for (int l = regs->lod.min; l <= regs->lod.max; l++) {
         load_tex_image(rawdata, tex->width, tex->height, l, tex->fmt);
         rawdata += TEXSIZE(tex->width, tex->height, tex->fmt, l);
-        tex->size += TEXSIZE(tex->width, tex->height, tex->fmt, l);
     }
+}
+
+u64 get_texture_hash(void* tex, u32 size) {
+    if (!ctremu.hashTextures) return 0;
+    // maybe we might want to do something different later but rn this is fine
+    return XXH3_64bits(tex, size);
 }
 
 void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
@@ -858,11 +851,12 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
         return;
     }
+
+    u32 texsize = texsize_total(regs, fmt);
+
     // also check for out of bounds textures
     if (!is_valid_physmem(regs->addr << 3) ||
-        !is_valid_physmem((regs->addr << 3) +
-                          TEXSIZE_TOTAL(regs->width, regs->height, fmt,
-                                        regs->lod.min, regs->lod.max))) {
+        !is_valid_physmem((regs->addr << 3) + texsize)) {
         linfo("invalid texture address");
         glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
         return;
@@ -890,17 +884,16 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
             tex->fmt = fmt;
             tex->minlod = regs->lod.min;
             tex->maxlod = regs->lod.max;
-            tex->size = TEXSIZE_TOTAL(tex->width, tex->height, tex->fmt,
-                                      tex->minlod, tex->maxlod);
+            tex->size = texsize;
 
             void* data = PTR(tex->paddr);
-            tex->hash = XXH3_64bits(data, tex->size);
+            tex->hash = get_texture_hash(data, tex->size);
             tex->needs_rehash = false;
 
             create_texture(gpu, tex, regs);
         } else if (tex->needs_rehash) {
             void* data = PTR(tex->paddr);
-            u64 hash = XXH3_64bits(data, tex->size);
+            u64 hash = get_texture_hash(data, tex->size);
             tex->needs_rehash = false;
             if (hash != tex->hash) {
                 tex->hash = hash;

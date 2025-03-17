@@ -19,9 +19,9 @@ DECL_PORT(gsp_gpu) {
     switch (cmd.command) {
         case 0x0008: {
             linfo("FlushDataCache");
-            // u32 addr = cmdbuf[1];
-            // u32 size = cmdbuf[2];
-            // gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addr), size);
+            u32 addr = cmdbuf[1];
+            u32 size = cmdbuf[2];
+            gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addr), size);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -99,9 +99,9 @@ DECL_PORT(gsp_gpu) {
             break;
         case 0x001f: {
             linfo("StoreDataCache");
-            // u32 addr = cmdbuf[1];
-            // u32 size = cmdbuf[2];
-            // gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addr), size);
+            u32 addr = cmdbuf[1];
+            u32 size = cmdbuf[2];
+            gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addr), size);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -163,7 +163,7 @@ void gsp_handle_event(E3DS* s, SchedEventArg arg) {
                               lastfb->fmt, sc);
         }
 
-        //gpu_reset_needs_rehesh(&s->gpu);
+        gpu_reset_needs_rehesh(&s->gpu);
 
         update_fbinfos(s);
 
