@@ -163,6 +163,8 @@ void gsp_handle_event(E3DS* s, SchedEventArg arg) {
                               lastfb->fmt, sc);
         }
 
+        gpu_reset_needs_rehesh(&s->gpu);
+
         update_fbinfos(s);
 
         s->frame_complete = true;
@@ -207,8 +209,8 @@ void gsp_handle_command(E3DS* s) {
             u32 bufsize = cmds->d[cmds->cur].args[1];
             linfo("sending command list at %08x with size 0x%x", bufaddr,
                   bufsize);
-            gpu_run_command_list(&s->gpu, vaddr_to_paddr(bufaddr & ~7),
-                                 bufsize);
+            gpu_run_command_list(&s->gpu, vaddr_to_paddr(bufaddr & ~7), bufsize,
+                                 false);
             gsp_handle_event(s, SEA_INT(GSPEVENT_P3D));
             break;
         }

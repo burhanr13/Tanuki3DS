@@ -23,9 +23,13 @@ void emulator_init() {
     ctremu.videoscale = 1;
     ctremu.shaderjit = true;
     ctremu.hwvshaders = true;
+    ctremu.safeShaderMul = true;
+    ctremu.hashTextures = true;
 
     load_config();
 
+    if (ctremu.syncmode < SYNC_SLEEP || ctremu.syncmode > SYNC_AUDIO)
+        ctremu.syncmode = SYNC_VIDEO;
     if (ctremu.videoscale < 1) ctremu.videoscale = 1;
     if (ctremu.vshthreads > MAX_VSH_THREADS)
         ctremu.vshthreads = MAX_VSH_THREADS;
