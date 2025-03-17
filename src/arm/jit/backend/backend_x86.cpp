@@ -104,6 +104,14 @@ struct Code : Xbyak::CodeGenerator {
             add(dst, 31);
         }
     }
+
+    void compileVFPDataProc(ArmInstr instr);
+    void compileVFPLoadMem(ArmInstr instr, const Xbyak::Operand& addr);
+    void compileVFPStoreMem(ArmInstr instr, const Xbyak::Operand& addr);
+    void compileVFPRead(ArmInstr instr, const Xbyak::Operand& dst);
+    void compileVFPWrite(ArmInstr instr, const Xbyak::Operand& src);
+    void compileVFPRead64(ArmInstr instr, const Xbyak::Operand& dst, bool hi);
+    void compileVFPWrite64(ArmInstr instr, const Xbyak::Operand& src, bool hi);
 };
 
 #define CPU(m) (rbx + offsetof(ArmCore, m))
@@ -277,84 +285,61 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_VFP_LOAD_MEM: {
                 if (inst.imm2) {
-                    mov(arg3, inst.op2);
+                    mov(edx, inst.op2);
+                    compileVFPLoadMem(ArmInstr(inst.op1), edx);
                 } else {
-                    mov(arg3, getOp(inst.op2));
+                    compileVFPLoadMem(ArmInstr(inst.op1), getOp(inst.op2));
                 }
-                mov(arg1, rbx);
-                mov(arg2, inst.op1);
-                mov(rax, (u64) exec_vfp_load_mem);
-                call(rax);
                 break;
             }
             case IR_VFP_STORE_MEM: {
                 if (inst.imm2) {
-                    mov(arg3, inst.op2);
+                    mov(edx, inst.op2);
+                    compileVFPStoreMem(ArmInstr(inst.op1), edx);
                 } else {
-                    mov(arg3, getOp(inst.op2));
+                    compileVFPStoreMem(ArmInstr(inst.op1), getOp(inst.op2));
                 }
-                mov(arg1, rbx);
-                mov(arg2, inst.op1);
-                mov(rax, (u64) exec_vfp_store_mem);
-                call(rax);
                 break;
             }
             case IR_VFP_READ: {
-                mov(arg1, rbx);
-                mov(arg2, inst.op1);
-                mov(rax, (u64) exec_vfp_read);
-                call(rax);
-                mov(getOp(i), eax);
+                compileVFPRead(ArmInstr(inst.op1), getOp(i));
                 break;
             }
             case IR_VFP_WRITE: {
                 if (inst.imm2) {
-                    mov(arg3, inst.op2);
+                    mov(edx, inst.op2);
+                    compileVFPWrite(ArmInstr(inst.op1), edx);
                 } else {
-                    mov(arg3, getOp(inst.op2));
+                    compileVFPWrite(ArmInstr(inst.op1), getOp(inst.op2));
                 }
-                mov(arg1, rbx);
-                mov(arg2, inst.op1);
-                mov(rax, (u64) exec_vfp_write);
-                call(rax);
                 break;
             }
             case IR_VFP_READ64L: {
-                mov(arg1, rbx);
-                mov(arg2, inst.op1);
-                mov(rax, (u64) exec_vfp_read64);
-                call(rax);
-                mov(getOp(i), eax);
-                shr(rax, 32);
-                mov(getOp(i + 1), eax);
-                i++;
+                compileVFPRead64(ArmInstr(inst.op1), getOp(i), false);
                 break;
             }
             case IR_VFP_READ64H:
+                compileVFPRead64(ArmInstr(inst.op1), getOp(i), true);
                 break;
             case IR_VFP_WRITE64L: {
                 if (inst.imm2) {
-                    mov(arg3, inst.op2);
+                    mov(edx, inst.op2);
+                    compileVFPWrite64(ArmInstr(inst.op1), edx, false);
                 } else {
-                    mov(arg3, getOp(inst.op2));
+                    compileVFPWrite64(ArmInstr(inst.op1), getOp(inst.op2),
+                                      false);
                 }
-                IRInstr hinst = ir->code.d[i + 1];
-                if (hinst.imm2) {
-                    mov(eax, hinst.op2);
-                } else {
-                    mov(eax, getOp(hinst.op2));
-                }
-                shl(rax, 32);
-                or_(arg3.cvt64(), rax);
-
-                mov(arg2, inst.op1);
-                mov(arg1, rbx);
-                mov(rax, (u64) exec_vfp_write64);
-                call(rax);
-                i++;
                 break;
             }
             case IR_VFP_WRITE64H:
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                    compileVFPWrite64(ArmInstr(inst.op1), edx, true);
+                } else {
+                    compileVFPWrite64(ArmInstr(inst.op1), getOp(inst.op2),
+                                      true);
+                }
+                break;
                 break;
             case IR_CP15_READ: {
                 mov(arg1, rbx);
@@ -925,6 +910,21 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(getOp(i), edx);
                 break;
             }
+            case IR_SSAT: {
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                mov(ecx, ~MASK(inst.op1));
+                cmp(edx, ecx);
+                cmovl(edx, ecx);
+                mov(ecx, MASK(inst.op1));
+                cmp(edx, ecx);
+                cmovg(edx, ecx);
+                mov(getOp(i), edx);
+                break;
+            }
             case IR_MEDIA_UADD8: {
                 if (inst.imm2) {
                     mov(arg3, inst.op2);
@@ -960,36 +960,38 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_MEDIA_UQADD8: {
-                if (inst.imm2) {
-                    mov(arg3, inst.op2);
-                } else {
-                    mov(arg3, getOp(inst.op2));
-                }
                 if (inst.imm1) {
-                    mov(arg2, inst.op1);
+                    mov(edx, inst.op1);
                 } else {
-                    mov(arg2, getOp(inst.op1));
+                    mov(edx, getOp(inst.op1));
                 }
-                mov(arg1, rbx);
-                mov(rax, (u64) media_uqadd8);
-                call(rax);
+                movd(xmm0, edx);
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                movd(xmm1, edx);
+                paddusb(xmm0, xmm1);
+                movd(eax, xmm0);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_MEDIA_UQSUB8: {
-                if (inst.imm2) {
-                    mov(arg3, inst.op2);
-                } else {
-                    mov(arg3, getOp(inst.op2));
-                }
                 if (inst.imm1) {
-                    mov(arg2, inst.op1);
+                    mov(edx, inst.op1);
                 } else {
-                    mov(arg2, getOp(inst.op1));
+                    mov(edx, getOp(inst.op1));
                 }
-                mov(arg1, rbx);
-                mov(rax, (u64) media_uqsub8);
-                call(rax);
+                movd(xmm0, edx);
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                movd(xmm1, edx);
+                psubusb(xmm0, xmm1);
+                movd(eax, xmm0);
                 mov(getOp(i), eax);
                 break;
             }
@@ -1028,19 +1030,20 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_MEDIA_QSUB8: {
-                if (inst.imm2) {
-                    mov(arg3, inst.op2);
-                } else {
-                    mov(arg3, getOp(inst.op2));
-                }
                 if (inst.imm1) {
-                    mov(arg2, inst.op1);
+                    mov(edx, inst.op1);
                 } else {
-                    mov(arg2, getOp(inst.op1));
+                    mov(edx, getOp(inst.op1));
                 }
-                mov(arg1, rbx);
-                mov(rax, (u64) media_qsub8);
-                call(rax);
+                movd(xmm0, edx);
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                } else {
+                    mov(edx, getOp(inst.op2));
+                }
+                movd(xmm1, edx);
+                psubsb(xmm0, xmm1);
+                movd(eax, xmm0);
                 mov(getOp(i), eax);
                 break;
             }
@@ -1199,22 +1202,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mov(getOp(i), inst.op1 ? ~1 : ~3);
                 } else {
                     auto& op1 = getOp(inst.op1);
-                    if (op1.isMEM()) {
-                        cmp(op1, 0);
-                    } else {
-                        test(op1.getReg(), op1.getReg());
-                    }
                     auto& dest = getOp(i);
-                    if (dest.isMEM()) {
-                        mov(ecx, ~3);
-                        mov(edx, ~1);
-                        cmovne(ecx, edx);
-                        mov(dest, ecx);
-                    } else {
-                        mov(dest, ~3);
-                        mov(edx, ~1);
-                        cmovne(dest.getReg(), edx);
-                    }
+                    OP(mov, dest, op1);
+                    shl(dest, 1);
+                    sub(dest, 4);
                 }
                 break;
             }
@@ -1333,6 +1324,203 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
     }
 
     ready();
+}
+
+void Code::compileVFPRead(ArmInstr instr, const Xbyak::Operand& dst) {
+    if (instr.cp_reg_trans.cpopc == 7) {
+        if (instr.cp_reg_trans.crn == 1) {
+            OP(mov, dst, ptr[CPU(fpscr)]);
+        } else {
+            lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
+            mov(dst, 0);
+        }
+        return;
+    }
+
+    u32 vn = instr.cp_reg_trans.crn << 1;
+    if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
+    else vn |= instr.cp_reg_trans.cp >> 2;
+
+    OP(mov, dst, ptr[CPU(s[vn])]);
+}
+
+void Code::compileVFPWrite(ArmInstr instr, const Xbyak::Operand& src) {
+    if (instr.cp_reg_trans.cpopc == 7) {
+        if (instr.cp_reg_trans.crn == 1) {
+            OP(mov, ptr[CPU(fpscr)], src);
+        } else {
+            lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
+        }
+        return;
+    }
+
+    u32 vn = instr.cp_reg_trans.crn << 1;
+    if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
+    else vn |= instr.cp_reg_trans.cp >> 2;
+
+    OP(mov, ptr[CPU(s[vn])], src);
+}
+
+void Code::compileVFPRead64(ArmInstr instr, const Xbyak::Operand& dst,
+                            bool hi) {
+    if (instr.cp_double_reg_trans.cpnum & 1) {
+        u32 vm = instr.cp_double_reg_trans.crm;
+        if (hi) {
+            OP(mov, dst, ptr[CPU(d[vm]) + 4]);
+        } else {
+            OP(mov, dst, ptr[CPU(d[vm])]);
+        }
+    } else {
+        u32 vm = instr.cp_double_reg_trans.crm << 1 |
+                 ((instr.cp_double_reg_trans.cp >> 1) & 1);
+        if (hi) {
+            OP(mov, dst, ptr[CPU(s[vm + 1])]);
+        } else {
+            OP(mov, dst, ptr[CPU(s[vm])]);
+        }
+    }
+}
+
+void Code::compileVFPWrite64(ArmInstr instr, const Xbyak::Operand& src,
+                             bool hi) {
+    if (instr.cp_double_reg_trans.cpnum & 1) {
+        u32 vm = instr.cp_double_reg_trans.crm;
+        if (hi) {
+            OP(mov, ptr[CPU(d[vm]) + 4], src);
+        } else {
+            OP(mov, ptr[CPU(d[vm])], src);
+        }
+    } else {
+        u32 vm = instr.cp_double_reg_trans.crm << 1 |
+                 ((instr.cp_double_reg_trans.cp >> 1) & 1);
+        if (hi) {
+            if (vm < 31) OP(mov, ptr[CPU(s[vm + 1])], src);
+        } else {
+            OP(mov, ptr[CPU(s[vm])], src);
+        }
+    }
+}
+
+void Code::compileVFPLoadMem(ArmInstr instr, const Xbyak::Operand& _addr) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    const Xbyak::Operand* addr_ = &_addr;
+    if (rcount > 1) {
+        // need to set ebp with addr before modifying rsp
+        mov(ptr[rsp - 8], rbp);
+        mov(ebp, _addr);
+        sub(rsp, 16);
+        addr_ = &ebp;
+    }
+    auto& addr = *addr_;
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+#ifdef JIT_FASTMEM
+            mov(rax, (u64) cpu->fastmem);
+            if (addr != edx) mov(edx, addr);
+            movsd(xmm0, ptr[rax + rdx]);
+#else
+            mov(arg2, addr);
+            mov(arg1, rbx);
+            mov(rax, (u64) cpu->readf64);
+            call(rax);
+#endif
+            movsd(ptr[CPU(d[(vd + i) & 15])], xmm0);
+            if (i < rcount - 1) add(addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+#ifdef JIT_FASTMEM
+            mov(rax, (u64) cpu->fastmem);
+            if (addr != edx) mov(edx, addr);
+            movss(xmm0, ptr[rax + rdx]);
+#else
+            mov(arg2, addr);
+            mov(arg1, rbx);
+            mov(rax, (u64) cpu->readf32);
+            call(rax);
+#endif
+            movss(ptr[CPU(s[(vd + i) & 31])], xmm0);
+            if (i < rcount - 1) add(addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        add(rsp, 8);
+        pop(rbp);
+    }
+}
+
+void Code::compileVFPStoreMem(ArmInstr instr, const Xbyak::Operand& _addr) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    const Xbyak::Operand* addr_ = &_addr;
+    if (rcount > 1) {
+        // need to set ebp with addr before modifying rsp
+        mov(ptr[rsp - 8], rbp);
+        mov(ebp, _addr);
+        sub(rsp, 16);
+        addr_ = &ebp;
+    }
+    auto& addr = *addr_;
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+            movsd(xmm0, ptr[CPU(d[(vd + i) & 15])]);
+#ifdef JIT_FASTMEM
+            mov(rax, (u64) cpu->fastmem);
+            if (addr != edx) mov(edx, addr);
+            movsd(ptr[rax + rdx], xmm0);
+#else
+            mov(arg2, addr);
+            mov(arg1, rbx);
+            mov(rax, (u64) cpu->writef64);
+            call(rax);
+#endif
+            if (i < rcount - 1) add(addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+            movss(xmm0, ptr[CPU(s[(vd + i) & 31])]);
+#ifdef JIT_FASTMEM
+            mov(rax, (u64) cpu->fastmem);
+            if (addr != edx) mov(edx, addr);
+            movss(ptr[rax + rdx], xmm0);
+#else
+            mov(arg2, addr);
+            mov(arg1, rbx);
+            mov(rax, (u64) cpu->writef32);
+            call(rax);
+#endif
+            if (i < rcount - 1) add(addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        add(rsp, 8);
+        pop(rbp);
+    }
 }
 
 extern "C" {
