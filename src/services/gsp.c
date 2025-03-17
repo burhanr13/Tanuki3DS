@@ -223,13 +223,13 @@ void gsp_handle_command(E3DS* s) {
                 u16 ctl[2];
             }* cmd = (void*) &cmds->d[cmds->cur];
             for (int i = 0; i < 2; i++) {
-                if (cmd->buf[i].st) {
-                    linfo("memory fill at fb %08x-%08x with %x", cmd->buf[i].st,
-                          cmd->buf[i].end, cmd->buf[i].val);
-                    gpu_clear_fb(&s->gpu, vaddr_to_paddr(cmd->buf[i].st),
-                                 cmd->buf[i].val);
-                    gsp_handle_event(s, SEA_INT(GSPEVENT_PSC0 + i));
-                }
+                if (!cmd->buf[i].st) continue;
+                linfo("memory fill at fb %08x-%08x with %x", cmd->buf[i].st,
+                      cmd->buf[i].end, cmd->buf[i].val);
+                gpu_clear_fb(&s->gpu, vaddr_to_paddr(cmd->buf[i].st),
+                             vaddr_to_paddr(cmd->buf[i].end), cmd->buf[i].val,
+                             cmd->ctl[i] >> 8);
+                gsp_handle_event(s, SEA_INT(GSPEVENT_PSC0 + i));
             }
             break;
         }

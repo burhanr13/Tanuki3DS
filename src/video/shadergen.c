@@ -27,7 +27,7 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
             lerror("failed to compile shader: %s", log);
         }
 
-        linfo("compiled new fragment shader");
+        ldebug("compiled new fragment shader with hash %llx", hash);
     }
     return block->fs;
 }

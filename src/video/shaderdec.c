@@ -37,11 +37,11 @@ int shader_dec_get(GPU* gpu) {
             char log[512];
             glGetShaderInfoLog(block->vs, sizeof log, nullptr, log);
             lerror("failed to compile shader: %s", log);
-            printf("%s",source);
+            printf("%s", source);
         }
         free(source);
 
-        linfo("compiled new vertex shader");
+        ldebug("compiled new vertex shader with hash %llx", hash);
     }
     return block->vs;
 }
