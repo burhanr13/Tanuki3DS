@@ -836,7 +836,7 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                 glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
             } else {
 
-                ldebug("creating texture from %x with dims %dx%d and fmt=%d",
+                linfo("creating texture from %x with dims %dx%d and fmt=%d",
                       tex->paddr, tex->width, tex->height, tex->fmt);
 
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL,

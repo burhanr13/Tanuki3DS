@@ -41,7 +41,7 @@ int shader_dec_get(GPU* gpu) {
         }
         free(source);
 
-        ldebug("compiled new vertex shader with hash %llx", hash);
+        linfo("compiled new vertex shader with hash %llx", hash);
     }
     return block->vs;
 }
