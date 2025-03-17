@@ -2,7 +2,9 @@
 
 #include "shaderjit_x86.h"
 
+#ifndef NOCAPSTONE
 #include <capstone/capstone.h>
+#endif
 #include <map>
 #include <vector>
 #include <xbyak/xbyak.h>
@@ -557,6 +559,7 @@ void shaderjit_x86_free(void* backend) {
     delete ((ShaderCode*) backend);
 }
 
+#ifndef NOCAPSTONE
 void shaderjit_x86_disassemble(void* backend) {
     auto code = (ShaderCode*) backend;
     csh handle;
@@ -572,6 +575,7 @@ void shaderjit_x86_disassemble(void* backend) {
     }
     cs_free(insn, count);
 }
+#endif
 }
 
 #endif

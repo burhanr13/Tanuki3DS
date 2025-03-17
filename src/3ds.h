@@ -50,6 +50,7 @@ typedef struct _3DS {
 
     RomImage romimage;
 
+    u64 lastAudioFrame;
     bool frame_complete;
 
     Scheduler sched;

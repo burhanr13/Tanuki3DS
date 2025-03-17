@@ -55,7 +55,7 @@ typedef struct {
 
     // we need to store the whole buffer queue internally
     // because games overwrite them before they finish playing
-    FIFO(BufInfo, 2) bufQueues[DSP_CHANNELS];
+    FIFO(BufInfo, 4) bufQueues[DSP_CHANNELS];
 
 } DSP;
 

@@ -3,8 +3,6 @@
 #define XXH_INLINE_ALL
 #include <xxh3.h>
 
-#include "dynstring.h"
-
 #include "gpu.h"
 
 int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
@@ -21,13 +19,21 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
         glCompileShader(block->fs);
         free(source);
 
-        linfo("compiled new fragment shader");
+        int res;
+        glGetShaderiv(block->fs, GL_COMPILE_STATUS, &res);
+        if (!res) {
+            char log[512];
+            glGetShaderInfoLog(block->fs, sizeof log, nullptr, log);
+            lerror("failed to compile shader: %s", log);
+        }
+
+        ldebug("compiled new fragment shader with hash %llx", hash);
     }
     return block->fs;
 }
 
 const char fs_header[] = R"(
-#version 410 core
+#version 330 core
 
 in vec4 color;
 in vec2 texcoord0;
@@ -86,12 +92,12 @@ vec3 l, h;
 const char lighting_stub[] = R"(
 {
 float diffuselevel = max(l.z, 0);
-lprimary.rgb += diffuselevel * light[%1$d].diffuse;
+lprimary.rgb += diffuselevel * light[%d].diffuse;
 
 lprimary.rgb = min(lprimary.rgb, 1);
 
 float speclevel = pow(max(h.z, 0), 3);
-lsecondary.rgb += speclevel * light[%1$d].specular0;
+lsecondary.rgb += speclevel * light[%d].specular0;
 
 lsecondary.rgb = min(lsecondary.rgb, 1);
 }
@@ -112,7 +118,7 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
         }
         ds_printf(s, "h = normalize(l + v);\n");
 
-        ds_printf(s, lighting_stub, i);
+        ds_printf(s, lighting_stub, i, i);
     }
 }
 
@@ -156,8 +162,8 @@ const char* tevsrc_str(int i, u32 tevsrc) {
                     return "tev_color[4]";
                 case 5:
                     return "tev_color[5]";
-                default: // unreachable
-                    return "vec4(0)";
+                default:
+                    unreachable();
             }
         }
         case TEVSRC_PREVIOUS:

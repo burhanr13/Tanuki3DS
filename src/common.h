@@ -1,5 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef COMMON_H
+#define COMMON_H
 
 #include <assert.h>
 #include <stdarg.h>
@@ -62,19 +62,34 @@ typedef float fvec4[4];
 #define MASK(n) (BIT(n) - 1)
 #define MASKL(n) (BITL(n) - 1)
 
-#define FIFO(T, bits)                                                          \
+// by not including the closing parenthesis in this first macro
+// we can delay the expansion and allow recursion
+#define _INVBIT(w, n)                                                          \
+    ((n) & MASK(w) ? 0 : w) + _INVBIT##w((n) & MASK(w) ? (n) : (n) >> w
+#define _INVBIT1(n) 0
+#define _INVBIT2(n) _INVBIT(1, n))
+#define _INVBIT4(n) _INVBIT(2, n))
+#define _INVBIT8(n) _INVBIT(4, n))
+#define _INVBIT16(n) _INVBIT(8, n))
+#define _INVBIT32(n) _INVBIT(16, n))
+#define INVBIT(n) _INVBIT32(n)
+
+#define lengthof(a) (sizeof a / sizeof *a)
+
+// N must be a power of 2
+#define FIFO(T, N)                                                             \
     struct {                                                                   \
-        T d[BIT(bits)];                                                        \
-        ubi(bits) head;                                                        \
-        ubi(bits) tail;                                                        \
+        T d[N];                                                                \
+        ubi(INVBIT(N)) head;                                                   \
+        ubi(INVBIT(N)) tail;                                                   \
         u32 size;                                                              \
     }
 
-#define FIFO_MAX(f) (sizeof((f).d) / sizeof((f).d[0]))
+#define FIFO_MAX(f) lengthof((f).d)
 #define FIFO_push(f, v) ((f).d[(f).tail++] = v, (f).size++)
 #define FIFO_pop(f, v) (v = (f).d[(f).head++], (f).size--)
 #define FIFO_peek(f) ((f).d[(f).head])
-#define FIFO_back(f) ((f).d[(f).tail - (typeof((f).tail)) 1])
+#define FIFO_back(f) ((f).d[(f).tail - 1uwb])
 #define FIFO_foreach(i, f)                                                     \
     for (u32 _i = 0, i = (f).head; _i < (f).size;                              \
          _i++, i = (typeof((f).head)) ((f).head + _i))
@@ -86,7 +101,7 @@ typedef float fvec4[4];
         size_t size;                                                           \
     }
 
-#define SVec_MAX(v) (sizeof((v).d) / sizeof((v).d[0]))
+#define SVec_MAX(v) lengthof((v).d)
 #define SVec_push(v, e)                                                        \
     ({                                                                         \
         (v).d[(v).size++] = (e);                                               \
@@ -101,7 +116,7 @@ typedef float fvec4[4];
         size_t cap;                                                            \
     }
 
-#define Vec_init(v) ((v).d = nullptr, (v).size = 0, (v).cap = 0)
+#define Vec_init(v) ((v).d = nullptr, (v).size = (v).cap = 0)
 #define Vec_assn(v1, v2)                                                       \
     ((v1).d = (v2).d, (v1).size = (v2).size, (v1).cap = (v2).cap)
 #define Vec_free(v) (free((v).d), Vec_init(v))
@@ -127,6 +142,7 @@ typedef float fvec4[4];
 
 // T must have fields: u64 key, T* next, T* prev
 // key=0 is empty
+// N hould be a power of 2
 #define LRUCache(T, N)                                                         \
     struct {                                                                   \
         T d[N];                                                                \
@@ -134,7 +150,7 @@ typedef float fvec4[4];
         size_t size;                                                           \
     }
 
-#define LRU_MAX(c) (sizeof((c).d) / sizeof((c).d[0]))
+#define LRU_MAX(c) lengthof((c).d)
 
 #define LRU_init(c) ((c).root.next = (c).root.prev = &(c).root, (c).size = 0)
 
@@ -191,5 +207,49 @@ typedef float fvec4[4];
         LRU_use((c), ent);                                                     \
         ent;                                                                   \
     })
+
+#ifndef __cplusplus
+
+typedef struct {
+    char* str;
+    char* cur;
+    char* end;
+} DynString;
+
+static inline void ds_init(DynString* s, size_t len) {
+    s->str = malloc(len);
+    s->cur = s->str;
+    s->end = s->str + len;
+
+    *s->cur = '\0';
+}
+
+static inline void ds_free(DynString* s) {
+    free(s->str);
+    *s = (DynString) {};
+}
+
+static inline void ds_printf(DynString* s, const char* fmt, ...) {
+    va_list v;
+    while (true) {
+        int rem = s->end - s->cur;
+        va_start(v);
+        int n = vsnprintf(s->cur, rem, fmt, v);
+        va_end(v);
+
+        if (n < rem) {
+            s->cur += n;
+            return;
+        }
+
+        auto curoff = s->cur - s->str;
+        auto curlen = s->end - s->str;
+        s->str = realloc(s->str, 2 * curlen);
+        s->cur = s->str + curoff;
+        s->end = s->str + 2 * curlen;
+    }
+}
+
+#endif
 
 #endif

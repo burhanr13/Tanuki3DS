@@ -260,6 +260,15 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         glAttachShader(ent->prog, ent->vs);
         glAttachShader(ent->prog, ent->fs);
         glLinkProgram(ent->prog);
+
+        int res;
+        glGetProgramiv(ent->prog, GL_LINK_STATUS, &res);
+        if (!res) {
+            char log[512];
+            glGetProgramInfoLog(ent->prog, sizeof log, nullptr, log);
+            lerror("failed to link program: %s", log);
+        }
+
         glUseProgram(ent->prog);
         glUniform1i(glGetUniformLocation(ent->prog, "tex0"), 0);
         glUniform1i(glGetUniformLocation(ent->prog, "tex1"), 1);
@@ -279,7 +288,7 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         glUniformBlockBinding(
             ent->prog, glGetUniformBlockIndex(ent->prog, "FragUniforms"), 2);
 
-        linfo("linked new program");
+        ldebug("linked new program from vs %d and fs %d", ent->vs, ent->fs);
     } else {
         glUseProgram(ent->prog);
     }

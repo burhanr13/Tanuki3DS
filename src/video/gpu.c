@@ -418,6 +418,8 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                                  ctremu.videoscale,
                              dsttex->width * ctremu.videoscale,
                              dsttex->height * ctremu.videoscale, 0);
+        } else {
+            linfo("unhandled texture copy case");
         }
 
         return;
@@ -457,7 +459,7 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
     gpu_invalidate_range(gpu, dstpaddr, size);
 }
 
-void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
+void gpu_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
     // some of the current gl state can affect gl clear
     // so we need to reset it
     glDisable(GL_SCISSOR_TEST);
@@ -466,34 +468,73 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
     glStencilMask(0xff);
     // right now we assume clear color is rgba8888 and d24s8 format, this should
     // be changed
+    bool foundDb = false;
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             gpu->curfb = &gpu->fbs.d[i];
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearColor((color >> 24) / 255.f, ((color >> 16) & 0xff) / 255.f,
-                         ((color >> 8) & 0xff) / 255.f, (color & 0xff) / 255.f);
+            glClearColor((value >> 24) / 255.f, ((value >> 16) & 0xff) / 255.f,
+                         ((value >> 8) & 0xff) / 255.f, (value & 0xff) / 255.f);
             glClear(GL_COLOR_BUFFER_BIT);
             linfo("cleared color buffer at %x of fb %d with value %x", paddr, i,
-                  color);
+                  value);
             return;
         }
         if (gpu->fbs.d[i].depth_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             gpu->curfb = &gpu->fbs.d[i];
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearDepthf((color & MASK(24)) / (float) BIT(24));
-            glClearStencil(color >> 24);
+            glClearDepth((value & MASK(24)) / (float) BIT(24));
+            glClearStencil(value >> 24);
             glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
             linfo("cleared depth buffer at %x of fb %d with value %x", paddr, i,
-                  color);
+                  value);
+            // dont return size multiple fbs can have the same db
+            foundDb = true;
         }
     }
+
+    if (foundDb) return;
+
+    // fallback to sw memfill if no fbs were filled
+
+    linfo("sw memfill at %x to %x value %x datasz %d", paddr, endPaddr, value,
+          datasz);
+
+    void* cur = PTR(paddr);
+    void* end = PTR(endPaddr);
+    switch (datasz) {
+        case 0:
+            while (cur < end) {
+                *(u16*) cur = value;
+                cur += 2;
+            }
+            break;
+        case 1:
+        case 3:
+            while (cur < end) {
+                *(u16*) cur = value;
+                *(u8*) (cur + 2) = value >> 16;
+                cur += 3;
+            }
+            break;
+        case 2:
+            while (cur < end) {
+                *(u32*) cur = value;
+                cur += 4;
+            }
+            break;
+    }
+
+    gpu_invalidate_range(gpu, paddr, endPaddr - paddr);
 }
+
 // the first wall of defense for texture cache invalidation
 void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len) {
     linfo("invalidating cache at %08x-%08x", paddr, paddr + len);
 
+    // probably should optimize this at some point to not be linear
     for (int i = 0; i < TEX_MAX; i++) {
         auto t = &gpu->textures.d[i];
         if ((t->paddr <= paddr && paddr < t->paddr + t->size) ||
@@ -524,7 +565,7 @@ void update_cur_fb(GPU* gpu) {
         if (gpu->fbs.d[i].depth_paddr == gpu->regs.fb.colorbuf_loc << 3) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearDepthf(0);
+            glClearDepth(0);
             glDepthMask(true);
             glClear(GL_DEPTH_BUFFER_BIT);
             linfo("lmao");
@@ -953,10 +994,10 @@ void update_gl_state(GPU* gpu) {
         float offset = cvtf24(gpu->regs.raster.depthmap_offset);
         float scale = cvtf24(gpu->regs.raster.depthmap_scale);
         // pica near plane is -1 and farplane is 0
-        glDepthRangef(offset - scale, offset);
+        glDepthRange(offset - scale, offset);
     } else {
         // default depth range maps -1 -> 1 and 0 -> 0
-        glDepthRangef(1, 0);
+        glDepthRange(1, 0);
     }
 
     ubuf.tex2coord = gpu->regs.tex.config.tex2coord;

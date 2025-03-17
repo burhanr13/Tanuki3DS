@@ -20,7 +20,7 @@ You can download a stable release from the releases tab, or the latest build bel
 | -------- | -------- |
 | Linux | [Binary](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-binary.zip) <br> [AppImage](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-appimage.zip) |
 | MacOS | [x86_64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) <br> [arm64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) |
-| Windows | [Windows Download](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-windows.zip) |
+| Windows | [Executable](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-windows.zip) |
 
 ## Usage
 Launching the app should give you a prompt to select the game file. You can also start a game by dropping its file onto the window. The supported formats are:
@@ -32,7 +32,7 @@ Launching the app should give you a prompt to select the game file. You can also
 
 All games must be decrypted.
 
-You can modify emulator settings in the generated `ctremu.ini` file.
+You can modify emulator settings in the generated `ctremu.ini` file. The settings and save data are stored by default in the application data path of your OS, but you can optionally create a file called `portable.txt` in the same directory as the executable to have them be created there.
 
 You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 
@@ -71,16 +71,13 @@ Freecam controls (regular keyboard input is disabled):
 - Left Shift (hold): move slower
 - Right Shift (hold): move faster
 
-Note that the freecam only works when hw shaders are enabled.
-
 ## Building
-You need the following dependencies installed to build and run:
+You need the following dependencies installed to build:
 - sdl3
-- glew
-- capstone
 - xxhash
 - cglm
 - fdk-aac
+- capstone
 - xbyak (x86_64 only)
 - xbyak_aarch64 (arm64 only)
 
@@ -89,7 +86,8 @@ To build use `make`. You can pass some options to make, `USER=1` to compile a us
 
 ## Compatibility
 
-Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed.
+Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed. When reporting an issue, please always include the generated `ctremu.log` file which is located
+in the application data folder of your system.
 
 ## Acknowledgements
 

@@ -75,6 +75,11 @@ DECL_SVC(QueryMemory) {
     R(5) = 0;
 }
 
+DECL_SVC(ExitProcess) {
+    lerror("process exiting");
+    exit(1);
+}
+
 DECL_SVC(CreateThread) {
     s32 priority = R(0);
     u32 entrypoint = R(1);
@@ -182,6 +187,36 @@ DECL_SVC(ReleaseMutex) {
     mutex_release(s, m);
 
     R(0) = 0;
+}
+
+DECL_SVC(CreateSemaphore) {
+    MAKE_HANDLE(handle);
+
+    KSemaphore* sem = semaphore_create(R(1), R(2));
+    sem->hdr.refcount = 1;
+    HANDLE_SET(handle, sem);
+
+    linfo("created semaphore with handle %x, init=%d, max=%d", handle, R(1),
+          R(2));
+
+    R(0) = 0;
+    R(1) = handle;
+}
+
+DECL_SVC(ReleaseSemaphore) {
+    KSemaphore* sem = HANDLE_GET_TYPED(R(1), KOT_SEMAPHORE);
+    if (!sem) {
+        lerror("not a semaphore");
+        R(0) = -1;
+        return;
+    }
+
+    R(0) = 0;
+    R(1) = sem->count;
+
+    linfo("releasing semaphore %x with count %d", R(0), R(2));
+    semaphore_release(s, sem, R(2));
+
 }
 
 DECL_SVC(CreateEvent) {
@@ -328,6 +363,11 @@ DECL_SVC(MapMemoryBlock) {
 
     memory_virtmap(s, shmem->paddr, addr, shmem->size, perm, MEMST_SHARED);
 
+    R(0) = 0;
+}
+
+DECL_SVC(UnmapMemoryBlock) {
+    // stub
     R(0) = 0;
 }
 

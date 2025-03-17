@@ -4,6 +4,7 @@
 #include "audio/dsp.h"
 
 void dsp_event(E3DS* s, SchedEventArg) {
+    s->lastAudioFrame = s->sched.now;
     if (s->services.dsp.audio_event)
         event_signal(s, s->services.dsp.audio_event);
 }
@@ -14,8 +15,14 @@ void sem_event_handler(E3DS* s) {
     linfo("dsp sem signaled mask=%04x", s->services.dsp.sem_mask);
     if (!s->services.dsp.comp_loaded) return;
     dsp_process_frame(&s->dsp);
+
+    // make sure audio frames are being sent at a consistent rate
+    s64 timeSinceLastFrame = s->sched.now - s->lastAudioFrame;
+    u64 audioFrameCycles = CPU_CLK * FRAME_SAMPLES / SAMPLE_RATE;
+    if (timeSinceLastFrame >= audioFrameCycles) timeSinceLastFrame = 0;
+
     add_event(&s->sched, dsp_event, SEA_NONE,
-              CPU_CLK * FRAME_SAMPLES / SAMPLE_RATE);
+              audioFrameCycles - timeSinceLastFrame);
 }
 
 DECL_PORT(dsp) {

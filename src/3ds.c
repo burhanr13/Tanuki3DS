@@ -25,7 +25,7 @@ bool e3ds_init(E3DS* s, char* romfile) {
 
     char* ext = strrchr(romfile, '.');
     if (!ext) {
-        eprintf("unsupported file format\n");
+        lerror("unsupported file format");
         e3ds_destroy(s);
         return false;
     }
@@ -40,12 +40,12 @@ bool e3ds_init(E3DS* s, char* romfile) {
     } else if (!strcmp(ext, ".3dsx")) {
         entrypoint = load_3dsx(s, romfile);
     } else {
-        eprintf("unsupported file format\n");
+        lerror("unsupported file format");
         e3ds_destroy(s);
         return false;
     }
     if (entrypoint == -1) {
-        eprintf("failed to load rom\n");
+        lerror("failed to load rom");
         e3ds_destroy(s);
         return false;
     }

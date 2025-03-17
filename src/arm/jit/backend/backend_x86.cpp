@@ -2,7 +2,10 @@
 
 #include "backend_x86.h"
 
+#ifndef NOCAPSTONE
 #include <capstone/capstone.h>
+#endif
+#include <utility>
 #include <vector>
 #include <xbyak/xbyak.h>
 #include <xbyak/xbyak_util.h>
@@ -78,9 +81,8 @@ struct Code : Xbyak::CodeGenerator {
             case REG_STACK:
                 return stackslots[hr.index];
             default:
-                break;
+                std::unreachable();
         }
-        return rdx;
     }
 
     const Xbyak::Operand& getOp(int i) {
@@ -1295,10 +1297,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_END_LINK:
             case IR_END_LOOP: {
 
-                sub(qword[CPU(cycles)], ir->numinstr);
+                mov(rax, qword[CPU(cycles)]);
+                sub(rax, inst.cycles);
+                mov(qword[CPU(cycles)], rax);
 
                 if (inst.opcode == IR_END_LOOP) {
-                    cmp(qword[CPU(cycles)], 0);
+                    cmp(rax, 0);
                     jg("loopblock");
                 }
 
@@ -1307,12 +1311,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 for (int i = hralloc.count[REG_SAVED] - 1; i >= 0; i--) {
                     pop(savedregs[i].cvt64());
                 }
+                pop(rbx);
 
                 if (inst.opcode == IR_END_LINK) {
                     inLocalLabel();
-                    cmp(qword[CPU(cycles)], 0);
+                    cmp(rax, 0);
                     jle(".nolink");
-                    pop(rbx);
                     links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
                                                  inst.op1, inst.op2});
                     nop(10);
@@ -1320,8 +1324,6 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     L(".nolink");
                     outLocalLabel();
                 }
-
-                pop(rbx);
                 ret();
                 break;
             }
@@ -1363,6 +1365,7 @@ void backend_x86_free(void* backend) {
     delete ((Code*) backend);
 }
 
+#ifndef NOCAPSTONE
 void backend_x86_disassemble(void* backend) {
     Code* code = (Code*) backend;
     code->print_hostregs();
@@ -1378,6 +1381,7 @@ void backend_x86_disassemble(void* backend) {
     }
     cs_free(insn, count);
 }
+#endif
 }
 
 #endif

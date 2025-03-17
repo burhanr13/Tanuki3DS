@@ -2,7 +2,10 @@
 
 #include "backend_arm.h"
 
+#ifndef NOCAPSTONE
 #include <capstone/capstone.h>
+#endif
+#include <utility>
 #include <vector>
 #include <xbyak_aarch64/xbyak_aarch64.h>
 
@@ -88,11 +91,9 @@ struct Code : Xbyak_aarch64::CodeGenerator {
                 return savedBase + hr.index;
             case REG_STACK:
                 return 32 + hr.index;
-            default: // unreachable
-                return 0;
+            default:
+                std::unreachable();
         }
-        // also unreachable
-        return 0;
     }
 
     int getOp(int i) {
@@ -934,7 +935,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 lastflags = 0;
 
                 ldr(x0, CPU(cycles));
-                sub(x0, x0, ir->numinstr);
+                sub(x0, x0, inst.cycles);
                 str(x0, CPU(cycles));
 
                 if (inst.opcode == IR_END_LOOP) {
@@ -1435,6 +1436,7 @@ void backend_arm_free(void* backend) {
     delete ((Code*) backend);
 }
 
+#ifndef NOCAPSTONE
 void backend_arm_disassemble(void* backend) {
     Code* code = (Code*) backend;
     code->print_hostregs();
@@ -1451,6 +1453,7 @@ void backend_arm_disassemble(void* backend) {
     cs_free(insn, count);
     cs_close(&handle);
 }
+#endif
 }
 
 #endif

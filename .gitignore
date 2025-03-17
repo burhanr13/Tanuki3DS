@@ -14,6 +14,8 @@ log*
 !logo.*
 *.fs
 *.toml
+*.ini
+portable.txt
 
 ctremu*
 *.app

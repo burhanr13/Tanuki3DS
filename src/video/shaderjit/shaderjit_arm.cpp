@@ -2,7 +2,9 @@
 
 #include "shaderjit_arm.h"
 
+#ifndef NOCAPSTONE
 #include <capstone/capstone.h>
+#endif
 #include <cmath>
 #include <map>
 #include <vector>
@@ -857,6 +859,7 @@ void shaderjit_arm_free(void* backend) {
     delete ((ShaderCode*) backend);
 }
 
+#ifndef NOCAPSTONE
 void shaderjit_arm_disassemble(void* backend) {
     auto code = (ShaderCode*) backend;
     csh handle;
@@ -873,6 +876,7 @@ void shaderjit_arm_disassemble(void* backend) {
     cs_free(insn, count);
     cs_close(&handle);
 }
+#endif
 }
 
 #endif

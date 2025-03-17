@@ -13,9 +13,8 @@ jobs:
     - name: install dependencies
       run: |
         sudo apt update
-        sudo apt install clang-19 libglew-dev libxxhash-dev \
-        libxbyak-dev libcapstone-dev libcglm-dev \
-        libfdk-aac-dev
+        sudo apt install clang-19 libxxhash-dev libxbyak-dev \
+        libcglm-dev libfdk-aac-dev
         # SDL build dependencies
         sudo apt install build-essential git make \
         pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
@@ -52,8 +51,7 @@ jobs:
     - name: install dependencies
       run: |
         sudo apt update
-        sudo apt install clang-19 libglew-dev libxxhash-dev \
-        libcapstone-dev libcglm-dev libfdk-aac-dev
+        sudo apt install clang-19 libxxhash-dev libcglm-dev libfdk-aac-dev
         # SDL build dependencies
         sudo apt install build-essential git make \
         pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
@@ -94,15 +92,14 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 glew xxhash xbyak capstone cglm fdk-aac \
-         || brew link --overwrite python
+        brew install llvm sdl3 xxhash xbyak cglm fdk-aac
     - name: build
       run: make USER=1
 
     # taken from panda3ds
     - name: create app bundle
       run: |
-        brew install dylibbundler imagemagick || brew link --overwrite python
+        brew install dylibbundler imagemagick
         ./.github/mac-bundle.sh
         codesign --force -s - -vvvv Tanuki3DS.app
         zip -r Tanuki3DS-macos-x86_64 Tanuki3DS.app
@@ -119,7 +116,7 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 glew xxhash capstone cglm fdk-aac
+        brew install llvm sdl3 xxhash cglm fdk-aac
         git clone https://github.com/fujitsu/xbyak_aarch64.git
         cd xbyak_aarch64
         sudo make install
@@ -151,15 +148,13 @@ jobs:
       run: |
         pacman -Sy
         pacman --noconfirm -S git make \
-        mingw-w64-x86_64-{clang,lld,sdl3,glew,capstone,xxhash,cglm,fdk-aac}
+        mingw-w64-x86_64-{clang,lld,sdl3,xxhash,cglm,fdk-aac}
         git clone https://github.com/herumi/xbyak.git
         cd xbyak
         make install
     - name: build
       run: make USER=1
-    - name: package libs
-      run: ./.github/windows-libs.sh
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-windows
-        path: Tanuki3DS
+        path: ./ctremu.exe
