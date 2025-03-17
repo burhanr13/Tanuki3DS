@@ -140,8 +140,6 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
 
     u32 jmptarget = -1;
 
-    Label(lcp15r);
-    Label(lcp15w);
     Label(lld8);
     Label(lld16);
     Label(lld32);
@@ -313,7 +311,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto dst = DSTREG();
                 movx(r0, r29);
                 mov(r1, inst.op1);
-                ldrlx(ip0, lcp15r);
+                movx(ip0, (size_t) cpu->cp15_read);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -323,7 +321,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, inst.op1);
                 mov(r2, src);
-                ldrlx(ip0, lcp15w);
+                movx(ip0, (size_t) cpu->cp15_write);
                 blr(ip0);
                 break;
             }
@@ -953,10 +951,6 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
     }
 
     align(8);
-    L(lcp15r);
-    dword(Lnew(cpu->cp15_read));
-    L(lcp15w);
-    dword(Lnew(cpu->cp15_write));
     L(lld8);
     dword(Lnew(cpu->read8));
     L(lld16);
