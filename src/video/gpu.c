@@ -870,11 +870,11 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         auto tex = LRU_load(gpu->textures, regs->addr << 3);
         glBindTexture(GL_TEXTURE_2D, tex->tex);
 
-        // this is not completely correct, since games often use different
-        // textures with the same attributes
-        // TODO: proper cache invalidation
-        // new: we now have texture hashing but its a pretty big
-        // perf hit :/
+        // if the attributes are different we obviously need to recreate the
+        // texture
+        // if they are the same we check if the hash needs to be updated
+        // and if it does we get the hash and check if that is equal and
+        // recreate when it is not
         if (tex->paddr != (regs->addr << 3) || tex->width != regs->width ||
             tex->height != regs->height || tex->fmt != fmt ||
             tex->minlod != regs->lod.min || tex->maxlod != regs->lod.max) {
