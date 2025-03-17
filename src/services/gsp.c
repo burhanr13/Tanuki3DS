@@ -319,9 +319,8 @@ void gsp_handle_command(E3DS* s) {
             }* cmd = (void*) &cmds->d[cmds->cur];
             for (int i = 0; i < 3; i++) {
                 if (cmd->buf[i].size == 0) break;
-                // gpu_invalidate_range(&s->gpu,
-                // vaddr_to_paddr(cmd->buf[i].addr),
-                //                      cmd->buf[i].size);
+                gpu_invalidate_range(&s->gpu, vaddr_to_paddr(cmd->buf[i].addr),
+                                     cmd->buf[i].size);
             }
             break;
         }
