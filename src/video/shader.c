@@ -393,6 +393,43 @@ void shader_run(ShaderUnit* shu) {
                 TOP.max = shu->i[instr.fmt3.c & 3][0];
                 break;
             }
+            case PICA_EMIT: {
+                memcpy(shu->gsh.curvtx[shu->gsh.emit_vtxid], shu->o,
+                       sizeof shu->o);
+                if (shu->gsh.emit_vtxid == 3) lwarn("gsh quads?");
+                if (shu->gsh.emit_prim) {
+                    // right now we only emit tris, supposedly you can emit
+                    // quads but not known how to tell
+                    if (shu->gsh.emit_inv) {
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[2], sizeof shu->gsh.curvtx[2]);
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[1], sizeof shu->gsh.curvtx[1]);
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[0], sizeof shu->gsh.curvtx[0]);
+                    } else {
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[0], sizeof shu->gsh.curvtx[0]);
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[1], sizeof shu->gsh.curvtx[1]);
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[2], sizeof shu->gsh.curvtx[2]);
+                    }
+                }
+                break;
+            }
+            case PICA_SETEMIT: {
+                shu->gsh.emit_vtxid = instr.fmt4.vtxid;
+                shu->gsh.emit_inv = instr.fmt4.inv;
+                shu->gsh.emit_prim = instr.fmt4.prim;
+                break;
+            }
             case PICA_JMPC:
             case PICA_JMPU: {
                 bool cond;

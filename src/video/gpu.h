@@ -77,20 +77,23 @@ typedef struct _GPU {
     E3DSMemory* mem;
 #endif
 
-    u32 progdata[SHADER_CODE_SIZE];
-    u32 opdescs[SHADER_OPDESC_SIZE];
-    u32 sh_idx;
-    bool sh_dirty;
+    struct {
+        u32 progdata[SHADER_CODE_SIZE];
+        u32 opdescs[SHADER_OPDESC_SIZE];
+        u32 code_idx;
+        bool code_dirty;
+
+        u32 curuniform;
+        int curunifi;
+        alignas(16) fvec4 floatuniform[96];
+    } gsh, vsh;
+
+    bool vsh_uniform_dirty; // for hw vertex shaders
 
     fvec4 fixattrs[16];
     u32 curfixattr;
     int curfixi;
     Vector(fvec4) immattrs;
-
-    u32 curuniform;
-    int curunifi;
-    alignas(16) fvec4 floatuniform[96];
-    bool uniform_dirty;
 
     LRUCache(FBInfo, FB_MAX) fbs;
     FBInfo* curfb;

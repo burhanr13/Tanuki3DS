@@ -14,7 +14,7 @@ int shader_dec_get(GPU* gpu) {
     // we need to hash the shader code, entrypoint, and outmap
     XXH3_state_t* xxst = XXH3_createState();
     XXH3_64bits_reset(xxst);
-    XXH3_64bits_update(xxst, gpu->progdata, sizeof gpu->progdata);
+    XXH3_64bits_update(xxst, gpu->vsh.progdata, sizeof gpu->vsh.progdata);
     XXH3_64bits_update(xxst, &gpu->regs.vsh.entrypoint,
                        sizeof gpu->regs.vsh.entrypoint);
     XXH3_64bits_update(xxst, gpu->regs.raster.sh_outmap,
@@ -681,8 +681,8 @@ char* shader_dec_vs(GPU* gpu) {
 
     DecCTX ctx = {};
     ds_init(&ctx.s, 32768);
-    ctx.shu.code = (PICAInstr*) gpu->progdata;
-    ctx.shu.opdescs = (OpDesc*) gpu->opdescs;
+    ctx.shu.code = (PICAInstr*) gpu->vsh.progdata;
+    ctx.shu.opdescs = (OpDesc*) gpu->vsh.opdescs;
     ctx.shu.entrypoint = gpu->regs.vsh.entrypoint;
 
     ctx.out_view = -1;

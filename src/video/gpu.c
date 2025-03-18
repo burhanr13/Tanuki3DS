@@ -92,12 +92,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             fvec4* fattr;
             bool immediatemode = false;
             if (gpu->regs.geom.fixattr_idx == 0xf) {
-                if (gpu->immattrs.size == gpu->immattrs.cap) {
-                    gpu->immattrs.cap =
-                        gpu->immattrs.cap ? 2 * gpu->immattrs.cap : 8;
-                    gpu->immattrs.d = realloc(
-                        gpu->immattrs.d, gpu->immattrs.cap * sizeof(fvec4));
-                }
+                Vec_grow(gpu->immattrs);
                 fattr = &gpu->immattrs.d[gpu->immattrs.size];
                 immediatemode = true;
             } else {
@@ -134,39 +129,82 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
                 gpu_drawimmediate(gpu);
             }
             break;
+        case GPUREG(gsh.floatuniform_data[0])... GPUREG(
+            gsh.floatuniform_data[7]): {
+            u32 idx = gpu->regs.gsh.floatuniform_idx;
+            if (idx >= 96) {
+                lwarn("writing to out of bound uniform");
+                break;
+            }
+            fvec4* uniform = &gpu->gsh.floatuniform[idx];
+            if (gpu->regs.gsh.floatuniform_mode) {
+                (*uniform)[3 - gpu->gsh.curunifi] = I2F(param);
+                if (++gpu->gsh.curunifi == 4) {
+                    gpu->gsh.curunifi = 0;
+                    gpu->regs.gsh.floatuniform_idx++;
+                }
+            } else {
+                switch (gpu->gsh.curunifi) {
+                    case 0: {
+                        (*uniform)[3] = cvtf24(param >> 8);
+                        gpu->gsh.curuniform = (param & 0xff) << 16;
+                        gpu->gsh.curunifi = 1;
+                        break;
+                    }
+                    case 1: {
+                        (*uniform)[2] =
+                            cvtf24(param >> 16 | gpu->gsh.curuniform);
+                        gpu->gsh.curuniform = (param & MASK(16)) << 8;
+                        gpu->gsh.curunifi = 2;
+                        break;
+                    }
+                    case 2: {
+                        (*uniform)[1] =
+                            cvtf24(param >> 24 | gpu->gsh.curuniform);
+                        (*uniform)[0] = cvtf24(param & MASK(24));
+                        gpu->gsh.curunifi = 0;
+                        gpu->regs.gsh.floatuniform_idx++;
+                        break;
+                    }
+                }
+            }
+            break;
+        }
         case GPUREG(vsh.floatuniform_data[0])... GPUREG(
             vsh.floatuniform_data[7]): {
-            gpu->uniform_dirty = true;
+            gpu->vsh_uniform_dirty = true;
             u32 idx = gpu->regs.vsh.floatuniform_idx;
             if (idx >= 96) {
                 lwarn("writing to out of bound uniform");
                 break;
             }
-            fvec4* uniform = &gpu->floatuniform[idx];
+            fvec4* uniform = &gpu->vsh.floatuniform[idx];
             if (gpu->regs.vsh.floatuniform_mode) {
-                (*uniform)[3 - gpu->curunifi] = I2F(param);
-                if (++gpu->curunifi == 4) {
-                    gpu->curunifi = 0;
+                (*uniform)[3 - gpu->vsh.curunifi] = I2F(param);
+                if (++gpu->vsh.curunifi == 4) {
+                    gpu->vsh.curunifi = 0;
                     gpu->regs.vsh.floatuniform_idx++;
                 }
             } else {
-                switch (gpu->curunifi) {
+                switch (gpu->vsh.curunifi) {
                     case 0: {
                         (*uniform)[3] = cvtf24(param >> 8);
-                        gpu->curuniform = (param & 0xff) << 16;
-                        gpu->curunifi = 1;
+                        gpu->vsh.curuniform = (param & 0xff) << 16;
+                        gpu->vsh.curunifi = 1;
                         break;
                     }
                     case 1: {
-                        (*uniform)[2] = cvtf24(param >> 16 | gpu->curuniform);
-                        gpu->curuniform = (param & MASK(16)) << 8;
-                        gpu->curunifi = 2;
+                        (*uniform)[2] =
+                            cvtf24(param >> 16 | gpu->vsh.curuniform);
+                        gpu->vsh.curuniform = (param & MASK(16)) << 8;
+                        gpu->vsh.curunifi = 2;
                         break;
                     }
                     case 2: {
-                        (*uniform)[1] = cvtf24(param >> 24 | gpu->curuniform);
+                        (*uniform)[1] =
+                            cvtf24(param >> 24 | gpu->vsh.curuniform);
                         (*uniform)[0] = cvtf24(param & MASK(24));
-                        gpu->curunifi = 0;
+                        gpu->vsh.curunifi = 0;
                         gpu->regs.vsh.floatuniform_idx++;
                         break;
                     }
@@ -176,25 +214,37 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
         }
         case GPUREG(vsh.intuniform[0])... GPUREG(vsh.intuniform[3]):
         case GPUREG(vsh.booluniform):
-            gpu->uniform_dirty = true;
+            gpu->vsh_uniform_dirty = true;
+            break;
+        case GPUREG(gsh.entrypoint):
+            gpu->gsh.code_dirty = true;
+            break;
+        case GPUREG(gsh.codetrans_data[0])... GPUREG(gsh.codetrans_data[8]):
+            gpu->gsh.code_dirty = true;
+            gpu->gsh
+                .progdata[gpu->regs.gsh.codetrans_idx++ % SHADER_CODE_SIZE] =
+                param;
+            break;
+        case GPUREG(gsh.opdescs_data[0])... GPUREG(gsh.opdescs_data[8]):
+            gpu->gsh.code_dirty = true;
+            gpu->gsh.opdescs[gpu->regs.gsh.opdescs_idx++ % SHADER_OPDESC_SIZE] =
+                param;
             break;
         case GPUREG(vsh.entrypoint):
         case GPUREG(raster.sh_outmap[0])... GPUREG(raster.sh_outmap[6]):
             // entrypoint and outmap both affect the decompiled vs
-            gpu->sh_dirty = true;
+            gpu->vsh.code_dirty = true;
             break;
         case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
-            gpu->sh_dirty = true;
-            gpu->progdata[gpu->regs.vsh.codetrans_idx++ % SHADER_CODE_SIZE] =
+            gpu->vsh.code_dirty = true;
+            gpu->vsh
+                .progdata[gpu->regs.vsh.codetrans_idx++ % SHADER_CODE_SIZE] =
                 param;
             break;
         case GPUREG(vsh.opdescs_data[0])... GPUREG(vsh.opdescs_data[8]):
-            gpu->sh_dirty = true;
-            gpu->opdescs[gpu->regs.vsh.opdescs_idx++ % SHADER_OPDESC_SIZE] =
+            gpu->vsh.code_dirty = true;
+            gpu->vsh.opdescs[gpu->regs.vsh.opdescs_idx++ % SHADER_OPDESC_SIZE] =
                 param;
-            break;
-        case GPUREG(geom.restart_primitive):
-            Vec_free(gpu->immattrs);
             break;
     }
 }
@@ -1116,10 +1166,10 @@ void update_gl_state(GPU* gpu) {
 
     GLuint vs;
     if (ctremu.hwvshaders) {
-        if (gpu->uniform_dirty) {
-            gpu->uniform_dirty = false;
+        if (gpu->vsh_uniform_dirty) {
+            gpu->vsh_uniform_dirty = false;
             VertUniforms vubuf;
-            memcpy(vubuf.c, gpu->floatuniform, sizeof vubuf.c);
+            memcpy(vubuf.c, gpu->vsh.floatuniform, sizeof vubuf.c);
             // expand intuniform from bytes to ints
             for (int i = 0; i < 4; i++) {
                 for (int j = 0; j < 4; j++) {
@@ -1131,7 +1181,7 @@ void update_gl_state(GPU* gpu) {
             glBufferData(GL_UNIFORM_BUFFER, sizeof vubuf, &vubuf,
                          GL_DYNAMIC_DRAW);
         }
-        if (gpu->sh_dirty) {
+        if (gpu->vsh.code_dirty) {
             vs = shader_dec_get(gpu);
         } else {
             vs = LRU_mru(gpu->vshaders_hw)->vs;
@@ -1310,22 +1360,32 @@ void store_vtx(GPU* gpu, int i, Vertex* vbuf, fvec4* src) {
 }
 
 void init_vsh(GPU* gpu, ShaderUnit* shu) {
-    shu->code = (PICAInstr*) gpu->progdata;
-    shu->opdescs = (OpDesc*) gpu->opdescs;
+    shu->code = (PICAInstr*) gpu->vsh.progdata;
+    shu->opdescs = (OpDesc*) gpu->vsh.opdescs;
     shu->entrypoint = gpu->regs.vsh.entrypoint;
-    shu->c = gpu->floatuniform;
+    shu->c = gpu->vsh.floatuniform;
     shu->i = gpu->regs.vsh.intuniform;
     shu->b = gpu->regs.vsh.booluniform;
 }
 
+void init_gsh(GPU* gpu, ShaderUnit* shu) {
+    shu->code = (PICAInstr*) gpu->gsh.progdata;
+    shu->opdescs = (OpDesc*) gpu->gsh.opdescs;
+    shu->entrypoint = gpu->regs.gsh.entrypoint;
+    shu->c = gpu->gsh.floatuniform;
+    shu->i = gpu->regs.gsh.intuniform;
+    shu->b = gpu->regs.gsh.booluniform;
+    Vec_init(shu->gsh.outvtx);
+}
+
 void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
-                   Vertex* vbuf) {
+                   fvec4 (*vbuf)[16]) {
     ShaderUnit vsh;
     init_vsh(gpu, &vsh);
     for (int i = 0; i < count; i++) {
         load_vtx(gpu, cfg, srcoff + i, vsh.v);
         gpu->vsh_runner.shaderfunc(&vsh);
-        store_vtx(gpu, dstoff + i, vbuf, vsh.o);
+        memcpy(vbuf[dstoff + i], vsh.o, sizeof vsh.o);
     }
 }
 
@@ -1383,11 +1443,11 @@ void gpu_vshrunner_destroy(GPU* gpu) {
 
 void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
     if (ctremu.shaderjit) {
-        if (gpu->sh_dirty) {
+        if (gpu->vsh.code_dirty) {
             ShaderUnit shu;
             init_vsh(gpu, &shu);
             gpu->vsh_runner.shaderfunc = shaderjit_get(gpu, &shu);
-            gpu->sh_dirty = false;
+            gpu->vsh.code_dirty = false;
         }
     } else {
         gpu->vsh_runner.shaderfunc = pica_shader_exec;
@@ -1418,12 +1478,10 @@ void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
     }
 }
 
-void setup_vbos_sw(GPU* gpu, int start, int num) {
+void run_vsh(GPU* gpu, int start, int num, fvec4 (*out)[16]) {
     AttrConfig cfg;
     vtx_loader_setup(gpu, cfg);
-    Vertex vbuf[num];
-    dispatch_vsh(gpu, cfg, start, num, vbuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    dispatch_vsh(gpu, cfg, start, num, out);
 }
 
 static const GLuint attrtypes[] = {
@@ -1483,6 +1541,15 @@ void setup_vbos_hw(GPU* gpu, int start, int num) {
     }
 }
 
+void draw_gsh_out(GPU* gpu, ShaderUnit* gsh) {
+    Vertex vbuf[gsh->gsh.outvtx.size];
+    for (int i = 0; i < gsh->gsh.outvtx.size; i++) {
+        store_vtx(gpu, i, vbuf, gsh->gsh.outvtx.d[i]);
+    }
+    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, gsh->gsh.outvtx.size);
+}
+
 static const GLenum prim_mode[4] = {
     GL_TRIANGLES,
     GL_TRIANGLE_STRIP,
@@ -1496,10 +1563,45 @@ void gpu_drawarrays(GPU* gpu) {
 
     update_gl_state(gpu);
 
-    if (ctremu.hwvshaders) {
+    u32 nverts = gpu->regs.geom.nverts;
+
+    // gsh must be emulated in sw
+    if (ctremu.hwvshaders && !gpu->regs.geom.config.use_gsh) {
         setup_vbos_hw(gpu, gpu->regs.geom.vtx_off, gpu->regs.geom.nverts);
     } else {
-        setup_vbos_sw(gpu, gpu->regs.geom.vtx_off, gpu->regs.geom.nverts);
+        fvec4 vshout[nverts][16];
+        run_vsh(gpu, gpu->regs.geom.vtx_off, nverts, vshout);
+        if (gpu->regs.geom.config.use_gsh) {
+            ShaderUnit gsh;
+            init_gsh(gpu, &gsh);
+
+            // there are 3 geom shader modes, rn we only care about the normal
+            // mode
+
+            if (gpu->regs.geom.gsh_misc0.mode != 0)
+                lwarn("unknown geoshader mode");
+
+            int vshoutct = gpu->regs.geom.vsh_outmap_total1 + 1;
+            int gshinct = gpu->regs.gsh.inconfig.inattrs + 1;
+            int stride = gshinct / vshoutct;
+
+            for (int p = 0; p < nverts; p += stride) {
+                for (int v = 0; v < stride; v++) {
+                    memcpy(gsh.v + v * vshoutct, vshout[p],
+                           vshoutct * sizeof(fvec4));
+                }
+                pica_shader_exec(&gsh);
+            }
+
+            draw_gsh_out(gpu, &gsh);
+            return;
+        } else {
+            Vertex vbuf[nverts];
+            for (int i = 0; i < nverts; i++) {
+                store_vtx(gpu, i, vbuf, vshout[i]);
+            }
+            glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+        }
     }
 
     glDrawArrays(prim_mode[gpu->regs.geom.prim_config.mode], 0,
@@ -1531,14 +1633,30 @@ void gpu_drawelements(GPU* gpu) {
                  gpu->regs.geom.nverts * BIT(gpu->regs.geom.indexfmt), indexbuf,
                  GL_STREAM_DRAW);
 
-    if (ctremu.hwvshaders) {
-        setup_vbos_hw(gpu, minind, maxind + 1 - minind);
+    u32 nverts = gpu->regs.geom.nverts;
+    u32 nbufverts = maxind + 1 - minind;
+
+    if (ctremu.hwvshaders && !gpu->regs.geom.config.use_gsh) {
+        setup_vbos_hw(gpu, minind, nbufverts);
     } else {
-        setup_vbos_sw(gpu, minind, maxind + 1 - minind);
+        fvec4 vshout[nbufverts][16];
+        run_vsh(gpu, minind, nbufverts, vshout);
+        if (gpu->regs.geom.config.use_gsh) {
+            ShaderUnit gsh;
+            init_gsh(gpu, &gsh);
+            // do things
+            draw_gsh_out(gpu, &gsh);
+            return;
+        } else {
+            Vertex vbuf[nbufverts];
+            for (int i = 0; i < nbufverts; i++) {
+                store_vtx(gpu, i, vbuf, vshout[i]);
+            }
+            glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+        }
     }
 
-    glDrawElementsBaseVertex(prim_mode[gpu->regs.geom.prim_config.mode],
-                             gpu->regs.geom.nverts,
+    glDrawElementsBaseVertex(prim_mode[gpu->regs.geom.prim_config.mode], nverts,
                              indextypes[gpu->regs.geom.indexfmt], 0, -minind);
 }
 
@@ -1551,7 +1669,7 @@ void gpu_drawimmediate(GPU* gpu) {
 
     update_gl_state(gpu);
 
-    if (ctremu.hwvshaders) {
+    if (ctremu.hwvshaders && !gpu->regs.geom.config.use_gsh) {
         setup_fixattrs_hw(gpu);
         // only need to use one vbo
         glBindBuffer(GL_ARRAY_BUFFER, gpu->gl.gpu_vbos[0]);
@@ -1567,9 +1685,21 @@ void gpu_drawimmediate(GPU* gpu) {
     } else {
         AttrConfig cfg;
         vtx_loader_imm_setup(gpu, cfg);
-        Vertex vbuf[nverts];
-        dispatch_vsh(gpu, cfg, 0, nverts, vbuf);
-        glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+        fvec4 vshout[nverts][16];
+        dispatch_vsh(gpu, cfg, 0, nverts, vshout);
+        if (gpu->regs.geom.config.use_gsh) {
+            ShaderUnit gsh;
+            init_gsh(gpu, &gsh);
+            // do things
+            draw_gsh_out(gpu, &gsh);
+            return;
+        } else {
+            Vertex vbuf[nverts];
+            for (int i = 0; i < nverts; i++) {
+                store_vtx(gpu, i, vbuf, vshout[i]);
+            }
+            glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+        }
     }
 
     glDrawArrays(prim_mode[gpu->regs.geom.prim_config.mode], 0, nverts);

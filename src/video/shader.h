@@ -40,6 +40,8 @@ enum {
     PICA_IFU = 0x27,
     PICA_IFC = 0x28,
     PICA_LOOP = 0x29,
+    PICA_EMIT = 0x2a,
+    PICA_SETEMIT = 0x2b,
     PICA_JMPC = 0x2c,
     PICA_JMPU = 0x2d,
     PICA_CMP = 0x2e,
@@ -50,7 +52,7 @@ typedef union {
     u32 w;
     struct {
         u32 desc : 7;
-        u32 ops : 19;
+        u32 : 19;
         u32 opcode : 6;
     };
     struct {
@@ -80,7 +82,7 @@ typedef union {
     } fmt1c;
     struct {
         u32 num : 8;
-        u32 pad1 : 2;
+        u32 : 2;
         u32 dest : 12;
         u32 op : 2;
         u32 refy : 1;
@@ -89,11 +91,18 @@ typedef union {
     } fmt2;
     struct {
         u32 num : 8;
-        u32 pad1 : 2;
+        u32 : 2;
         u32 dest : 12;
         u32 c : 4;
         u32 opcode : 6;
     } fmt3;
+    struct {
+        u32 : 22;
+        u32 inv : 1;
+        u32 prim : 1;
+        u32 vtxid : 2;
+        u32 opcode : 6;
+    } fmt4;
     struct {
         u32 desc : 5;
         u32 src3 : 5;
@@ -144,6 +153,16 @@ typedef struct {
     s8 a[2];
     u8 al;
     bool cmp[2];
+
+    struct {
+        int emit_vtxid;
+        bool emit_prim;
+        bool emit_inv;
+
+        fvec4 curvtx[4][16];
+
+        Vector(fvec4[16]) outvtx;
+    } gsh;
 
 } ShaderUnit;
 
