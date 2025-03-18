@@ -277,10 +277,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_DATA_PROC: {
-                mov(arg1, rbx);
-                mov(arg2, inst.op1);
-                mov(rax, (u64) exec_vfp_data_proc);
-                call(rax);
+                compileVFPDataProc(ArmInstr(inst.op1));
                 break;
             }
             case IR_VFP_LOAD_MEM: {
@@ -1322,8 +1319,311 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
         }
     }
+}
 
-    ready();
+void Code::compileVFPDataProc(ArmInstr instr) {
+    bool dp = instr.cp_data_proc.cpnum & 1;
+    u32 vd = instr.cp_data_proc.crd;
+    u32 vn = instr.cp_data_proc.crn;
+    u32 vm = instr.cp_data_proc.crm;
+    if (!dp) {
+        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+        vn = vn << 1 | (instr.cp_data_proc.cp >> 2);
+        vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+    }
+    bool op = instr.cp_data_proc.cp & 2;
+
+    switch (instr.cp_data_proc.cpopc & 0b1011) {
+        case 0:
+            if (op) {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vd])]);
+                    movsd(xmm1, ptr[CPU(d[vn])]);
+                    mulsd(xmm1, ptr[CPU(d[vm])]);
+                    subsd(xmm0, xmm1);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vd])]);
+                    movss(xmm1, ptr[CPU(s[vn])]);
+                    mulss(xmm1, ptr[CPU(s[vm])]);
+                    subss(xmm0, xmm1);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            } else {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    mulsd(xmm0, ptr[CPU(d[vm])]);
+                    addsd(xmm0, ptr[CPU(d[vd])]);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    mulss(xmm0, ptr[CPU(s[vm])]);
+                    addss(xmm0, ptr[CPU(s[vd])]);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            }
+            break;
+        case 1:
+            if (op) {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    mulsd(xmm0, ptr[CPU(d[vm])]);
+                    addsd(xmm0, ptr[CPU(d[vd])]);
+                    xorpd(xmm1, xmm1);
+                    subsd(xmm1, xmm0);
+                    movsd(ptr[CPU(d[vd])], xmm1);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    mulss(xmm0, ptr[CPU(s[vm])]);
+                    addss(xmm0, ptr[CPU(s[vd])]);
+                    xorps(xmm1, xmm1);
+                    subss(xmm1, xmm0);
+                    movss(ptr[CPU(s[vd])], xmm1);
+                }
+            } else {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    mulsd(xmm0, ptr[CPU(d[vm])]);
+                    subsd(xmm0, ptr[CPU(d[vd])]);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    mulss(xmm0, ptr[CPU(s[vm])]);
+                    subss(xmm0, ptr[CPU(s[vd])]);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            }
+            break;
+        case 2:
+            if (dp) {
+                movsd(xmm0, ptr[CPU(d[vn])]);
+                mulsd(xmm0, ptr[CPU(d[vm])]);
+                if (op) {
+                    xorpd(xmm1, xmm1);
+                    subsd(xmm1, xmm0);
+                    movsd(ptr[CPU(d[vd])], xmm1);
+                } else {
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                }
+            } else {
+                movss(xmm0, ptr[CPU(s[vn])]);
+                mulss(xmm0, ptr[CPU(s[vm])]);
+                if (op) {
+                    xorps(xmm1, xmm1);
+                    subss(xmm1, xmm0);
+                    movss(ptr[CPU(s[vd])], xmm1);
+                } else {
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            }
+            break;
+        case 3:
+            if (op) {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    subsd(xmm0, ptr[CPU(d[vm])]);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    subss(xmm0, ptr[CPU(s[vm])]);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            } else {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    addsd(xmm0, ptr[CPU(d[vm])]);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    addss(xmm0, ptr[CPU(s[vm])]);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            }
+            break;
+        case 8:
+            if (dp) {
+                movsd(xmm0, ptr[CPU(d[vn])]);
+                divsd(xmm0, ptr[CPU(d[vm])]);
+                movsd(ptr[CPU(d[vd])], xmm0);
+            } else {
+                movss(xmm0, ptr[CPU(s[vn])]);
+                divss(xmm0, ptr[CPU(s[vm])]);
+                movss(ptr[CPU(s[vd])], xmm0);
+            }
+            break;
+        case 11: {
+            op = instr.cp_data_proc.cp & 4;
+            switch (instr.cp_data_proc.crn) {
+                case 0:
+                    if (op) {
+                        if (dp) {
+                            mov(rdx, MASKL(63));
+                            and_(rdx, ptr[CPU(d[vm])]);
+                            mov(ptr[CPU(d[vd])], rdx);
+                        } else {
+                            mov(edx, ptr[CPU(s[vm])]);
+                            and_(edx, MASK(31));
+                            mov(ptr[CPU(s[vd])], edx);
+                        }
+                    } else {
+                        if (dp) {
+                            movsd(xmm0, ptr[CPU(d[vm])]);
+                            movsd(ptr[CPU(d[vd])], xmm0);
+                        } else {
+                            movss(xmm0, ptr[CPU(s[vm])]);
+                            movss(ptr[CPU(s[vd])], xmm0);
+                        }
+                    }
+                    break;
+                case 1:
+                    if (op) {
+                        if (dp) {
+                            sqrtsd(xmm0, ptr[CPU(d[vm])]);
+                            movsd(ptr[CPU(d[vd])], xmm0);
+                        } else {
+                            sqrtss(xmm0, ptr[CPU(s[vm])]);
+                            movss(ptr[CPU(s[vd])], xmm0);
+                        }
+                    } else {
+                        if (dp) {
+                            mov(rdx, BITL(63));
+                            xor_(rdx, ptr[CPU(d[vm])]);
+                            mov(ptr[CPU(d[vd])], rdx);
+                        } else {
+                            mov(edx, ptr[CPU(s[vm])]);
+                            xor_(edx, BIT(31));
+                            mov(ptr[CPU(s[vd])], edx);
+                        }
+                    }
+                    break;
+                case 4:
+                case 5:
+                    if (dp) {
+                        movsd(xmm0, ptr[CPU(d[vd])]);
+                        if (instr.cp_data_proc.crn & 1) {
+                            xorpd(xmm1, xmm1);
+                            comisd(xmm0, xmm1);
+                        } else {
+                            comisd(xmm0, ptr[CPU(d[vm])]);
+                        }
+                    } else {
+                        movss(xmm0, ptr[CPU(s[vd])]);
+                        if (instr.cp_data_proc.crn & 1) {
+                            xorps(xmm1, xmm1);
+                            comiss(xmm0, xmm1);
+                        } else {
+                            comiss(xmm0, ptr[CPU(s[vm])]);
+                        }
+                    }
+                    // x86 flags to arm flags
+                    // 00 -> 0010 (gt)
+                    // 01 -> 1000 (lt)
+                    // 10 -> 0110 (eq)
+                    // 11 -> 0011 (uo)
+                    inLocalLabel();
+                    lahf();
+                    and_(dword[CPU(fpscr)], 0x0fff'ffff);
+                    and_(ah, 0x41);
+                    jz(".l0");
+                    cmp(ah, 0x01);
+                    jz(".l1");
+                    cmp(ah, 0x40);
+                    jz(".l2");
+                    or_(dword[CPU(fpscr)], 3 << 28);
+                    jmp(".end");
+                    L(".l2");
+                    or_(dword[CPU(fpscr)], 6 << 28);
+                    jmp(".end");
+                    L(".l1");
+                    or_(dword[CPU(fpscr)], 8 << 28);
+                    jmp(".end");
+                    L(".l0");
+                    or_(dword[CPU(fpscr)], 2 << 28);
+                    L(".end");
+                    outLocalLabel();
+                    break;
+                case 7:
+                    if (dp) {
+                        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+
+                        cvtsd2ss(xmm0, ptr[CPU(d[vm])]);
+                        movss(ptr[CPU(s[vd])], xmm0);
+                    } else {
+                        vd = vd >> 1;
+
+                        cvtss2sd(xmm0, ptr[CPU(s[vm])]);
+                        movsd(ptr[CPU(d[vd])], xmm0);
+                    }
+                    break;
+                case 8:
+                    if (dp) {
+                        vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+
+                        if (op) {
+                            cvtsi2sd(xmm0, ptr[CPU(s[vm])]);
+                            movsd(ptr[CPU(d[vd])], xmm0);
+                        } else {
+                            mov(edx, ptr[CPU(s[vm])]);
+                            cvtsi2sd(xmm0, rdx);
+                            movsd(ptr[CPU(d[vd])], xmm0);
+                        }
+                    } else {
+                        if (op) {
+                            cvtsi2ss(xmm0, ptr[CPU(s[vm])]);
+                            movss(ptr[CPU(s[vd])], xmm0);
+                        } else {
+                            mov(edx, ptr[CPU(s[vm])]);
+                            cvtsi2ss(xmm0, rdx);
+                            movss(ptr[CPU(s[vd])], xmm0);
+                        }
+                    }
+                    break;
+                case 12:
+                case 13:
+                    inLocalLabel();
+                    if (dp) {
+                        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+
+                        if (instr.cp_data_proc.crn & 1) {
+                            cvttsd2si(edx, ptr[CPU(d[vm])]);
+                            cmp(edx, BIT(31));
+                            jnz(".nooverflow");
+                            mov(edx, MASK(31));
+                            L(".nooverflow");
+                            mov(ptr[CPU(s[vd])], edx);
+                        } else {
+                            cvttsd2si(rdx, ptr[CPU(d[vm])]);
+                            mov(rax, BITL(63));
+                            cmp(rdx, rax);
+                            jnz(".nooverflow");
+                            mov(edx, MASKL(32));
+                            L(".nooverflow");
+                            mov(ptr[CPU(s[vd])], edx);
+                        }
+                    } else {
+                        if (instr.cp_data_proc.crn & 1) {
+                            cvttss2si(edx, ptr[CPU(s[vm])]);
+                            cmp(edx, BIT(31));
+                            jnz(".nooverflow");
+                            mov(edx, MASK(31));
+                            L(".nooverflow");
+                            mov(ptr[CPU(s[vd])], edx);
+                        } else {
+                            cvttss2si(rdx, ptr[CPU(s[vm])]);
+                            mov(rax, BITL(63));
+                            cmp(rdx, rax);
+                            jnz(".nooverflow");
+                            mov(edx, MASKL(32));
+                            L(".nooverflow");
+                            mov(ptr[CPU(s[vd])], edx);
+                        }
+                    }
+                    outLocalLabel();
+                    break;
+            }
+            break;
+        }
+    }
 }
 
 void Code::compileVFPRead(ArmInstr instr, const Xbyak::Operand& dst) {
