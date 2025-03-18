@@ -396,6 +396,13 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
         return;
     }
 
+    if (srcfb) {
+        linfo("reading back fb into memory");
+        // this case requires us to read the framebuffer back to ram
+        // it is very slow
+        return;
+    }
+
     u8* src = PTR(srcpaddr);
     u8* dst = PTR(dstpaddr);
 
