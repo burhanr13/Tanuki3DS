@@ -200,15 +200,11 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
 }
 
 void gpu_reset_needs_rehesh(GPU* gpu) {
-    // this is called every time the gsp starts a new command list, since
+    // this is called every time gsp starts a new command list, since
     // the cpu cant modify a texture within a command list, so no need to rehash
     // textures more often than that
-    // we also only rehash textures that are not in
-    // vram, since games usually only access vram through methods we have
-    // already caught
     for (int i = 0; i < TEX_MAX; i++) {
-        auto t = &gpu->textures.d[i];
-        if (!is_vram_addr(t->paddr)) t->needs_rehash = true;
+        gpu->textures.d[i].needs_rehash = true;
     }
 }
 
