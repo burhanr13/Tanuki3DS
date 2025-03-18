@@ -444,39 +444,35 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
             gpu->curfb = &gpu->fbs.d[i];
 
             float r = 0, g = 0, b = 0, a = 1;
-            switch (datasz) {
-                case 1:
-                case 3:
-                    b = (value & 0xff) / 255.f;
-                    g = (value >> 8 & 0xff) / 255.f;
-                    r = (value >> 16 & 0xff) / 255.f;
-                    break;
-                case 2:
+            switch (gpu->curfb->color_fmt) {
+                case 0:
                     a = (value & 0xff) / 255.f;
                     b = (value >> 8 & 0xff) / 255.f;
                     g = (value >> 16 & 0xff) / 255.f;
                     r = (value >> 24 & 0xff) / 255.f;
                     break;
-                default:
-                    switch (gpu->curfb->color_fmt) {
-                        case 3:
-                            r = (value & 0x1f) / 31.f;
-                            g = (value >> 5 & 0x3f) / 63.f;
-                            b = (value >> 11 & 0x1f) / 31.f;
-                            break;
-                        case 4:
-                            r = (value & 0x1f) / 31.f;
-                            g = (value >> 5 & 0x1f) / 31.f;
-                            b = (value >> 10 & 0x1f) / 31.f;
-                            a = (value >> 15 & 1);
-                            break;
-                        case 5:
-                            r = (value & 0xf) / 15.f;
-                            g = (value >> 4 & 0xf) / 15.f;
-                            b = (value >> 8 & 0xf) / 15.f;
-                            a = (value >> 12 & 0xf) / 15.f;
-                            break;
-                    }
+                case 1:
+                    b = (value & 0xff) / 255.f;
+                    g = (value >> 8 & 0xff) / 255.f;
+                    r = (value >> 16 & 0xff) / 255.f;
+                    break;
+                case 2:
+                    r = (value & 0x1f) / 31.f;
+                    g = (value >> 5 & 0x3f) / 63.f;
+                    b = (value >> 11 & 0x1f) / 31.f;
+                    break;
+                case 3:
+                    r = (value & 0x1f) / 31.f;
+                    g = (value >> 5 & 0x1f) / 31.f;
+                    b = (value >> 10 & 0x1f) / 31.f;
+                    a = (value >> 15 & 1);
+                    break;
+                case 4:
+                    r = (value & 0xf) / 15.f;
+                    g = (value >> 4 & 0xf) / 15.f;
+                    b = (value >> 8 & 0xf) / 15.f;
+                    a = (value >> 12 & 0xf) / 15.f;
+                    break;
             }
 
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
@@ -510,13 +506,12 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
     void* cur = PTR(paddr);
     void* end = PTR(endPaddr);
     switch (datasz) {
-        case 0:
+        case 2:
             while (cur < end) {
                 *(u16*) cur = value;
                 cur += 2;
             }
             break;
-        case 1:
         case 3:
             while (cur < end) {
                 *(u16*) cur = value;
@@ -524,7 +519,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
                 cur += 3;
             }
             break;
-        case 2:
+        case 4:
             while (cur < end) {
                 *(u32*) cur = value;
                 cur += 4;

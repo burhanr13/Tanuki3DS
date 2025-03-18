@@ -229,7 +229,7 @@ void gsp_handle_command(E3DS* s) {
                       cmd->buf[i].end, cmd->buf[i].val);
                 gpu_clear_fb(&s->gpu, vaddr_to_paddr(cmd->buf[i].st),
                              vaddr_to_paddr(cmd->buf[i].end), cmd->buf[i].val,
-                             cmd->ctl[i] >> 8);
+                             (cmd->ctl[i] >> 8) + 2);
                 gsp_handle_event(s, SEA_INT(GSPEVENT_PSC0 + i));
             }
             break;
