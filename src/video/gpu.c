@@ -74,6 +74,14 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     gpu->regs.w[id] &= ~mask;
     gpu->regs.w[id] |= param & mask;
     switch (id) {
+        case GPUREG(geom.cmdbuf.jmp[0]):
+            gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[0] << 3,
+                                 gpu->regs.geom.cmdbuf.size[0] << 3);
+            return;
+        case GPUREG(geom.cmdbuf.jmp[1]):
+            gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[1] << 3,
+                                 gpu->regs.geom.cmdbuf.size[1] << 3);
+            return;
         case GPUREG(geom.drawarrays):
             gpu_drawarrays(gpu);
             break;
@@ -192,13 +200,11 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
 }
 
 void gpu_reset_needs_rehesh(GPU* gpu) {
-    // for fully accurate cache invalidation, this
-    // would need to be called on every command list
-    // however that can end up being painfully slow
-    // so we will do it each frame instead which should be
-    // good enough hopefully
-    // we only rehash textures that are not in vram, since
-    // games usually only access vram through methods we have
+    // this is called every time the gsp starts a new command list, since
+    // the cpu cant modify a texture within a command list, so no need to rehash
+    // textures more often than that
+    // we also only rehash textures that are not in
+    // vram, since games usually only access vram through methods we have
     // already caught
     for (int i = 0; i < TEX_MAX; i++) {
         auto t = &gpu->textures.d[i];
@@ -206,23 +212,7 @@ void gpu_reset_needs_rehesh(GPU* gpu) {
     }
 }
 
-#define NESTED_CMDLIST()                                                       \
-    ({                                                                         \
-        switch (c.id) {                                                        \
-            case GPUREG(geom.cmdbuf.jmp[0]):                                   \
-                gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[0] << 3,  \
-                                     gpu->regs.geom.cmdbuf.size[0] << 3,       \
-                                     true);                                    \
-                return;                                                        \
-            case GPUREG(geom.cmdbuf.jmp[1]):                                   \
-                gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[1] << 3,  \
-                                     gpu->regs.geom.cmdbuf.size[1] << 3,       \
-                                     true);                                    \
-                return;                                                        \
-        }                                                                      \
-    })
-
-void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size, bool nested) {
+void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
 
     paddr &= ~15;
     size &= ~15;
@@ -239,14 +229,10 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size, bool nested) {
         if (c.mask & BIT(2)) mask |= 0xff << 16;
         if (c.mask & BIT(3)) mask |= 0xff << 24;
 
-        // nested command lists are jumps, so we need to handle them over here
-        // to avoid possible stack overflow
-        NESTED_CMDLIST();
         gpu_write_internalreg(gpu, c.id, cur[0], mask);
         cur += 2;
         if (c.incmode) c.id++;
         for (int i = 0; i < c.nparams; i++) {
-            NESTED_CMDLIST();
             gpu_write_internalreg(gpu, c.id, *cur++, mask);
             if (c.incmode) c.id++;
         }
