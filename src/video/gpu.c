@@ -1165,7 +1165,7 @@ void update_gl_state(GPU* gpu) {
     COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
 
     GLuint vs;
-    if (ctremu.hwvshaders) {
+    if (ctremu.hwvshaders && !gpu->regs.geom.config.use_gsh) {
         if (gpu->vsh_uniform_dirty) {
             gpu->vsh_uniform_dirty = false;
             VertUniforms vubuf;
@@ -1186,8 +1186,11 @@ void update_gl_state(GPU* gpu) {
         } else {
             vs = LRU_mru(gpu->vshaders_hw)->vs;
         }
+
+        glBindVertexArray(gpu->gl.gpu_vao_hw);
     } else {
         vs = gpu->gl.gpu_vs;
+        glBindVertexArray(gpu->gl.gpu_vao_sw);
     }
 
     // todo: do similar dirty checking for the fs
