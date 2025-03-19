@@ -262,6 +262,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 break;
             }
             case IR_VFP_DATA_PROC: {
+                lastflags = 0;
                 compileVFPDataProc(backend, (ArmInstr) {inst.op1});
                 break;
             }
