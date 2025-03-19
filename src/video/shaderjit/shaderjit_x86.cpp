@@ -30,6 +30,9 @@ struct ShaderCode : Xbyak::CodeGenerator {
     Xbyak::Xmm tmp = xmm5;
     Xbyak::Reg8 loopcounter = r12b;
 
+    bool usingEx2;
+    bool usingLg2;
+
     std::vector<PICAInstr> calls;
     std::map<u32, u32> entrypoints;
 
@@ -41,6 +44,8 @@ struct ShaderCode : Xbyak::CodeGenerator {
     void compileAllEntries(ShaderUnit* shu) {
         reset();
         calls.clear();
+        usingEx2 = false;
+        usingLg2 = false;
         for (auto& e : entrypoints) {
             e.second = compileWithEntry(shu, e.first);
         }

@@ -37,7 +37,6 @@ int shader_dec_get(GPU* gpu) {
             char log[512];
             glGetShaderInfoLog(block->vs, sizeof log, nullptr, log);
             lerror("failed to compile shader: %s", log);
-            printf("%s", source);
         }
         free(source);
 
@@ -179,7 +178,7 @@ void decsrc(DecCTX* ctx, u32 n, u8 idx, u8 swizzle, bool neg) {
                     printf("a.y");
                     break;
                 case 3:
-                    printf("aL");
+                    printf("int(aL)");
                     break;
             }
             printf("]");
