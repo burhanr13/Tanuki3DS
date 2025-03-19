@@ -350,6 +350,10 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
     linfo("display transfer fb at %x to %s", paddr,
           screenid == SCREEN_TOP ? "top" : "bot");
 
+    // scissor test and color mask affects blit framebuffer
+    glDisable(GL_SCISSOR_TEST);
+    glColorMask(true, true, true, true);
+
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbo[screenid]);
 
@@ -392,6 +396,10 @@ void gpu_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid) {
     glBindTexture(GL_TEXTURE_2D, gpu->gl.swrendertex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT,
                  SCREEN_WIDTH(screenid), 0, glfmt, gltype, data);
+
+    // scissor test and color mask affects blit framebuffer
+    glDisable(GL_SCISSOR_TEST);
+    glColorMask(true, true, true, true);
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gpu->gl.swrenderfbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbo[screenid]);
