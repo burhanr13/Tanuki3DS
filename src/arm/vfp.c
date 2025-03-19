@@ -169,19 +169,20 @@ void exec_vfp_data_proc(ArmCore* cpu, ArmInstr instr) {
                     break;
                 case 12:
                 case 13:
+                    // todo: handle rounding mode
+                    double x;
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
-                        if (instr.cp_data_proc.crn & 1) {
-                            cpu->s[vd] = I2F((s32) cpu->d[vm]);
-                        } else {
-                            cpu->s[vd] = I2F(cpu->d[vm]);
-                        }
+                        x = cpu->d[vm];
                     } else {
-                        if (instr.cp_data_proc.crn & 1) {
-                            cpu->s[vd] = I2F((s32) cpu->s[vm]);
-                        } else {
-                            cpu->s[vd] = I2F(cpu->s[vm]);
-                        }
+                        x = cpu->s[vm];
+                    }
+
+                    // need to handle inf because things care about it
+                    if (instr.cp_data_proc.crn & 1) {
+                        cpu->s[vd] = I2F(isinf(x) ? INT32_MAX : (s32) x);
+                    } else {
+                        cpu->s[vd] = I2F(isinf(x) ? UINT32_MAX : (u32) x);
                     }
                     break;
             }

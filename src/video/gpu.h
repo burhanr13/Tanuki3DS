@@ -31,8 +31,8 @@ typedef union {
     };
 } Vertex;
 
-#define FB_MAX 8
-#define TEX_MAX 128
+#define FB_MAX 16
+#define TEX_MAX 256
 
 typedef struct _FBInfo {
     union {
@@ -56,9 +56,13 @@ typedef struct _TexInfo {
         u64 paddr;
         u64 key;
     };
-    u32 width, height;
-    u32 fmt;
+    u16 width, height;
+    u16 fmt;
     u32 size;
+    u16 minlod, maxlod;
+
+    u64 hash;
+    bool needs_rehash;
 
     struct _TexInfo *next, *prev;
 
@@ -141,12 +145,14 @@ void gpu_destroy(GPU* gpu);
 void gpu_vshrunner_init(GPU* gpu);
 void gpu_vshrunner_destroy(GPU* gpu);
 
+void gpu_reset_needs_rehesh(GPU* gpu);
+
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool vflip, int screenid);
 void gpu_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid);
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
-void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color);
+void gpu_clear_fb(GPU* gpu, u32 paddr, u32 len, u32 value, u32 datasz);
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len);
 

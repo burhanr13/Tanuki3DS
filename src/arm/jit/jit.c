@@ -90,13 +90,10 @@ void destroy_jit_block(JITBlock* block) {
         if (!(block->cpu->jit_cache[l->attrs] &&
               block->cpu->jit_cache[l->attrs][l->addr >> 16]))
             continue;
-        if (block->cpu->jit_cache[l->attrs] &&
-            block->cpu->jit_cache[l->addr >> 16]) {
-            JITBlock* linkingblock =
-                block->cpu->jit_cache[l->attrs][l->addr >> 16]
-                                     [(l->addr & 0xffff) >> 1];
-            if (linkingblock) destroy_jit_block(linkingblock);
-        }
+        JITBlock* linkingblock =
+            block->cpu
+                ->jit_cache[l->attrs][l->addr >> 16][(l->addr & 0xffff) >> 1];
+        if (linkingblock) destroy_jit_block(linkingblock);
     }
     Vec_free(block->linkingblocks);
     free(block);

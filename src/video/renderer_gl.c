@@ -288,7 +288,7 @@ void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs) {
         glUniformBlockBinding(
             ent->prog, glGetUniformBlockIndex(ent->prog, "FragUniforms"), 2);
 
-        linfo("linked new program");
+        linfo("linked new program from vs %d and fs %d", ent->vs, ent->fs);
     } else {
         glUseProgram(ent->prog);
     }

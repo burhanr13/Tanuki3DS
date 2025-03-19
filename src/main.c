@@ -81,7 +81,7 @@ void file_callback(void*, char** files, int n) {
 
 void load_rom_dialog() {
     SDL_DialogFileFilter filetypes = {
-        .name = "3DS Executables",
+        .name = "3DS Applications",
         .pattern = "3ds;cci;cxi;app;elf;axf;3dsx",
     };
 
@@ -266,10 +266,20 @@ int main(int argc, char** argv) {
 
     read_args(argc, argv);
 
-#ifdef NOPORTABLE
-    char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
-    chdir(prefpath);
-    SDL_free(prefpath);
+    const char* basepath = SDL_GetBasePath();
+
+    chdir(basepath);
+
+    FILE* fp;
+    if ((fp = fopen("portable.txt", "r"))) {
+        fclose(fp);
+    } else {
+        char* prefpath = SDL_GetPrefPath("", "Tanuki3DS");
+        chdir(prefpath);
+        SDL_free(prefpath);
+    }
+
+#ifdef REDIRECTSTDOUT
     int logfd =
         open("ctremu.log", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     dup2(logfd, STDOUT_FILENO);
@@ -287,8 +297,8 @@ int main(int argc, char** argv) {
 
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
                         SDL_GL_CONTEXT_PROFILE_CORE);
 #ifdef GLDEBUGCTX
@@ -298,6 +308,8 @@ int main(int argc, char** argv) {
         SDL_CreateWindow("Tanuki3DS", SCREEN_WIDTH_TOP * ctremu.videoscale,
                          2 * SCREEN_HEIGHT * ctremu.videoscale,
                          SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    SDL_SetWindowPosition(g_window, SDL_WINDOWPOS_CENTERED,
+                          SDL_WINDOWPOS_CENTERED);
 
     SDL_GLContext glcontext = SDL_GL_CreateContext(g_window);
     if (!glcontext) {
@@ -305,7 +317,7 @@ int main(int argc, char** argv) {
         lerror("could not create gl context");
         return 1;
     }
-    
+
     gladLoadGLLoader((void*) SDL_GL_GetProcAddress);
 
 #ifdef GLDEBUGCTX
