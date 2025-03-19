@@ -299,6 +299,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_DATA_PROC: {
+                lastflags = 0; // fcmp might trash flags
                 compileVFPDataProc(ArmInstr(inst.op1));
                 break;
             }

@@ -31,16 +31,17 @@ int shader_dec_get(GPU* gpu) {
         block->vs = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(block->vs, 1, &(const char*) {source}, nullptr);
         glCompileShader(block->vs);
-        free(source);
         int res;
         glGetShaderiv(block->vs, GL_COMPILE_STATUS, &res);
         if (!res) {
             char log[512];
             glGetShaderInfoLog(block->vs, sizeof log, nullptr, log);
             lerror("failed to compile shader: %s", log);
+            printf("%s", source);
         }
+        free(source);
 
-        linfo("compiled new vertex shader");
+        linfo("compiled new vertex shader with hash %llx", hash);
     }
     return block->vs;
 }
@@ -63,7 +64,7 @@ typedef struct {
 void dec_block(DecCTX* ctx, u32 start, u32 num);
 
 const char vs_header[] = R"(
-#version 410 core
+#version 330 core
 
 layout (location=0) in vec4 v0;
 layout (location=1) in vec4 v1;
@@ -96,11 +97,11 @@ bvec2 cmp;
 
 layout (std140) uniform VertUniforms {
     vec4 c[96];
-    ivec4 i[4];
-    int b_raw;
+    uvec4 i[4];
+    uint b_raw;
 };
 
-#define b(n) ((b_raw & (1 << n)) != 0)
+#define b(n) ((b_raw & (1u << n)) != 0u)
 
 layout (std140) uniform FreecamUniforms {
     mat4 freecam_mtx;
@@ -504,7 +505,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_LOOP: {
             printf("aL = i[%d].y;\n", instr.fmt3.c);
             INDENT(ctx->depth);
-            printf("for (int l = 0; l <= i[%d].x; l++, aL += i[%d].z) {\n",
+            printf("for (uint l = 0u; l <= i[%d].x; l++, aL += i[%d].z) {\n",
                    instr.fmt3.c, instr.fmt3.c);
             dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
             INDENT(ctx->depth);
@@ -734,32 +735,23 @@ char* shader_dec_vs(GPU* gpu) {
                   gpu->regs.raster.sh_outmap[o][2] << 8 |
                   gpu->regs.raster.sh_outmap[o][3];
         switch (all) {
-            case 0x00'01'02'03:
-                ds_printf(&final, "pos = o[%d];\n", o);
+            case 0x00'01'02'03: ds_printf(&final, "pos = o[%d];\n", o); break;
+                case 0x04'05'06'07: ds_printf(&final, "normquat = o[%d];\n",
+                                                o);
                 break;
-            case 0x04'05'06'07:
-                ds_printf(&final, "normquat = o[%d];\n", o);
-                break;
-            case 0x08'09'0a'0b:
-                ds_printf(&final, "color = o[%d];\n", o);
-                break;
-            case 0x0c'0d'1f'1f:
-                ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
-                break;
-            case 0x0c'0d'10'1f:
-                ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
-                ds_printf(&final, "texcoordw = o[%d].z;\n", o);
-                break;
-            case 0x0e'0f'1f'1f:
-                ds_printf(&final, "texcoord1 = o[%d].xy;\n", o);
-                break;
-            case 0x12'13'14'1f:
-                ds_printf(&final, "view = o[%d].xyz;\n", o);
-                break;
-            case 0x16'17'1f'1f:
-                ds_printf(&final, "texcoord2 = o[%d].xy;\n", o);
-                break;
-            default:
+                case 0x08'09'0a'0b: ds_printf(&final, "color = o[%d];\n", o);
+                break; case 0x0c'0d'1f'1f: ds_printf(
+                    &final, "texcoord0 = o[%d].xy;\n", o);
+                break; case 0x0c'0d'10'1f: ds_printf(
+                    &final, "texcoord0 = o[%d].xy;\n", o);
+                ds_printf(&final, "texcoordw = o[%d].z;\n", o); break;
+                case 0x0e'0f'1f'1f: ds_printf(&final,
+                                                "texcoord1 = o[%d].xy;\n", o);
+                break; case 0x12'13'14'1f: ds_printf(
+                    &final, "view = o[%d].xyz;\n", o);
+                break; case 0x16'17'1f'1f: ds_printf(
+                    &final, "texcoord2 = o[%d].xy;\n", o);
+                break; default:
                 for (int i = 0; i < 4; i++) {
                     int sem = gpu->regs.raster.sh_outmap[o][i];
                     if (sem < 0x18)

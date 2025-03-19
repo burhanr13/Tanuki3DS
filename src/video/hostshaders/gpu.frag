@@ -1,4 +1,4 @@
-#version 410 core
+#version 330 core
 
 in vec4 color;
 in vec2 texcoord0;
@@ -14,7 +14,7 @@ uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
-#define BIT(k, n) ((k&(1u<<n))!=0)
+#define BIT(k, n) ((k&(1u<<n))!=0u)
 
 #define TEVSRC_COLOR 0
 #define TEVSRC_LIGHT_PRIMARY 1
@@ -95,7 +95,7 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
     vec4 nq = normalize(normquat);
     vec3 v = normalize(quatrot(nq, view));
 
-    for (int i=0;i<numlights;i++) {
+    for (uint i=0u;i<numlights;i++) {
         primary.rgb += light[i].ambient;
 
         vec3 l;
@@ -213,12 +213,12 @@ void main() {
 
     vec4 next_buf = tev_buffer_color;
 
-    for (uint i = 0; i < 6; i++) {
+    for (uint i = 0u; i < 6u; i++) {
         tev_srcs[TEVSRC_CONSTANT] = tev_color[i];
 
         vec4 res;
         res.rgb = tev_combine_rgb(i);
-        if (tev[i].rgb.combiner == 7) {
+        if (tev[i].rgb.combiner == 7u) {
             res.a = res.r;
         } else {
             res.a = tev_combine_alpha(i);

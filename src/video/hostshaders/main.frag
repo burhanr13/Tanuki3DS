@@ -1,4 +1,4 @@
-#version 410 core
+#version 330 core
 
 in vec2 texcoord;
 out vec4 fragclr;

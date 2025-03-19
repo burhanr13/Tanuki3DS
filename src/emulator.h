@@ -31,6 +31,7 @@ typedef struct {
     bool hwvshaders;
     bool safeShaderMul;
     bool ubershader;
+    bool hashTextures;
 
     mat4 freecam_mtx;
     bool freecam_enable;

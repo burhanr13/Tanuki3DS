@@ -40,27 +40,17 @@ bool iropc_iscallback(IROpcode opc) {
         case IR_STORE_MEM8:
         case IR_STORE_MEM16:
         case IR_STORE_MEM32:
+        case IR_VFP_LOAD_MEM:
+        case IR_VFP_STORE_MEM:
 #endif
         case IR_MODESWITCH:
         case IR_EXCEPTION:
-        case IR_VFP_DATA_PROC:
-        case IR_VFP_LOAD_MEM:
-        case IR_VFP_STORE_MEM:
-        case IR_VFP_READ:
-        case IR_VFP_WRITE:
-        case IR_VFP_READ64L:
-        case IR_VFP_READ64H:
-        case IR_VFP_WRITE64L:
-        case IR_VFP_WRITE64H:
         case IR_CP15_READ:
         case IR_CP15_WRITE:
         case IR_MEDIA_UADD8:
         case IR_MEDIA_USUB8:
-        case IR_MEDIA_UQADD8:
-        case IR_MEDIA_UQSUB8:
         case IR_MEDIA_UHADD8:
         case IR_MEDIA_SSUB8:
-        case IR_MEDIA_QSUB8:
         case IR_MEDIA_SEL:
             return true;
         default:

@@ -1,5 +1,7 @@
 #include "gpu.h"
 
+#include <xxh3.h>
+
 #include "3ds.h"
 #include "emulator.h"
 #include "kernel/memory.h"
@@ -72,17 +74,14 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     gpu->regs.w[id] &= ~mask;
     gpu->regs.w[id] |= param & mask;
     switch (id) {
-        // this is a slow way to ensure texture cache coherency
-        // case GPUREG(tex.config):
-        //     if (gpu->regs.tex.config.clearcache) {
-        //         while (gpu->textures.size) {
-        //             TexInfo* t = LRU_eject(gpu->textures);
-        //             t->paddr = 0;
-        //             t->width = 0;
-        //             t->height = 0;
-        //         }
-        //     }
-        //     break;
+        case GPUREG(geom.cmdbuf.jmp[0]):
+            gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[0] << 3,
+                                 gpu->regs.geom.cmdbuf.size[0] << 3);
+            return;
+        case GPUREG(geom.cmdbuf.jmp[1]):
+            gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[1] << 3,
+                                 gpu->regs.geom.cmdbuf.size[1] << 3);
+            return;
         case GPUREG(geom.drawarrays):
             gpu_drawarrays(gpu);
             break;
@@ -200,21 +199,17 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
     }
 }
 
-#define NESTED_CMDLIST()                                                       \
-    ({                                                                         \
-        switch (c.id) {                                                        \
-            case GPUREG(geom.cmdbuf.jmp[0]):                                   \
-                gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[0] << 3,  \
-                                     gpu->regs.geom.cmdbuf.size[0] << 3);      \
-                return;                                                        \
-            case GPUREG(geom.cmdbuf.jmp[1]):                                   \
-                gpu_run_command_list(gpu, gpu->regs.geom.cmdbuf.addr[1] << 3,  \
-                                     gpu->regs.geom.cmdbuf.size[1] << 3);      \
-                return;                                                        \
-        }                                                                      \
-    })
+void gpu_reset_needs_rehesh(GPU* gpu) {
+    // this is called every time gsp starts a new command list, since
+    // the cpu cant modify a texture within a command list, so no need to rehash
+    // textures more often than that
+    for (int i = 0; i < TEX_MAX; i++) {
+        gpu->textures.d[i].needs_rehash = true;
+    }
+}
 
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
+
     paddr &= ~15;
     size &= ~15;
 
@@ -230,14 +225,10 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
         if (c.mask & BIT(2)) mask |= 0xff << 16;
         if (c.mask & BIT(3)) mask |= 0xff << 24;
 
-        // nested command lists are jumps, so we need to handle them over here
-        // to avoid possible stack overflow
-        NESTED_CMDLIST();
         gpu_write_internalreg(gpu, c.id, cur[0], mask);
         cur += 2;
         if (c.incmode) c.id++;
         for (int i = 0; i < c.nparams; i++) {
-            NESTED_CMDLIST();
             gpu_write_internalreg(gpu, c.id, *cur++, mask);
             if (c.incmode) c.id++;
         }
@@ -398,8 +389,17 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                                  ctremu.videoscale,
                              dsttex->width * ctremu.videoscale,
                              dsttex->height * ctremu.videoscale, 0);
+        } else {
+            linfo("unhandled texture copy case");
         }
 
+        return;
+    }
+
+    if (srcfb) {
+        linfo("reading back fb into memory");
+        // this case requires us to read the framebuffer back to ram
+        // it is very slow
         return;
     }
 
@@ -437,43 +437,111 @@ void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
     gpu_invalidate_range(gpu, dstpaddr, size);
 }
 
-void gpu_clear_fb(GPU* gpu, u32 paddr, u32 color) {
+void gpu_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
     // some of the current gl state can affect gl clear
     // so we need to reset it
     glDisable(GL_SCISSOR_TEST);
     glColorMask(true, true, true, true);
     glDepthMask(true);
     glStencilMask(0xff);
-    // right now we assume clear color is rgba8888 and d24s8 format, this should
-    // be changed
+    bool foundDb = false;
     for (int i = 0; i < FB_MAX; i++) {
         if (gpu->fbs.d[i].color_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             gpu->curfb = &gpu->fbs.d[i];
+
+            float r = 0, g = 0, b = 0, a = 1;
+            switch (gpu->curfb->color_fmt) {
+                case 0:
+                    a = (value & 0xff) / 255.f;
+                    b = (value >> 8 & 0xff) / 255.f;
+                    g = (value >> 16 & 0xff) / 255.f;
+                    r = (value >> 24 & 0xff) / 255.f;
+                    break;
+                case 1:
+                    b = (value & 0xff) / 255.f;
+                    g = (value >> 8 & 0xff) / 255.f;
+                    r = (value >> 16 & 0xff) / 255.f;
+                    break;
+                case 2:
+                    r = (value & 0x1f) / 31.f;
+                    g = (value >> 5 & 0x3f) / 63.f;
+                    b = (value >> 11 & 0x1f) / 31.f;
+                    break;
+                case 3:
+                    r = (value & 0x1f) / 31.f;
+                    g = (value >> 5 & 0x1f) / 31.f;
+                    b = (value >> 10 & 0x1f) / 31.f;
+                    a = (value >> 15 & 1);
+                    break;
+                case 4:
+                    r = (value & 0xf) / 15.f;
+                    g = (value >> 4 & 0xf) / 15.f;
+                    b = (value >> 8 & 0xf) / 15.f;
+                    a = (value >> 12 & 0xf) / 15.f;
+                    break;
+            }
+
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearColor((color >> 24) / 255.f, ((color >> 16) & 0xff) / 255.f,
-                         ((color >> 8) & 0xff) / 255.f, (color & 0xff) / 255.f);
+            glClearColor(r, g, b, a);
             glClear(GL_COLOR_BUFFER_BIT);
             linfo("cleared color buffer at %x of fb %d with value %x", paddr, i,
-                  color);
+                  value);
             return;
         }
         if (gpu->fbs.d[i].depth_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             gpu->curfb = &gpu->fbs.d[i];
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearDepthf((color & MASK(24)) / (float) BIT(24));
-            glClearStencil(color >> 24);
+            glClearDepth((value & MASK(24)) / (float) BIT(24));
+            glClearStencil(value >> 24);
             glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
             linfo("cleared depth buffer at %x of fb %d with value %x", paddr, i,
-                  color);
+                  value);
+            // dont return size multiple fbs can have the same db
+            foundDb = true;
         }
     }
+
+    if (foundDb) return;
+
+    // fallback to sw memfill if no fbs were filled
+
+    linfo("sw memfill at %x to %x value %x datasz %d", paddr, endPaddr, value,
+          datasz);
+
+    void* cur = PTR(paddr);
+    void* end = PTR(paddr) + endPaddr - paddr;
+    switch (datasz) {
+        case 2:
+            while (cur < end) {
+                *(u16*) cur = value;
+                cur += 2;
+            }
+            break;
+        case 3:
+            while (cur < end) {
+                *(u16*) cur = value;
+                *(u8*) (cur + 2) = value >> 16;
+                cur += 3;
+            }
+            break;
+        case 4:
+            while (cur < end) {
+                *(u32*) cur = value;
+                cur += 4;
+            }
+            break;
+    }
+
+    gpu_invalidate_range(gpu, paddr, endPaddr - paddr);
 }
+
 // the first wall of defense for texture cache invalidation
 void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len) {
     linfo("invalidating cache at %08x-%08x", paddr, paddr + len);
 
+    // probably should optimize this at some point to not be linear
     for (int i = 0; i < TEX_MAX; i++) {
         auto t = &gpu->textures.d[i];
         if ((t->paddr <= paddr && paddr < t->paddr + t->size) ||
@@ -504,7 +572,7 @@ void update_cur_fb(GPU* gpu) {
         if (gpu->fbs.d[i].depth_paddr == gpu->regs.fb.colorbuf_loc << 3) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
-            glClearDepthf(0);
+            glClearDepth(0);
             glDepthMask(true);
             glClear(GL_DEPTH_BUFFER_BIT);
             linfo("lmao");
@@ -687,7 +755,16 @@ static const GLenum stencil_op[8] = {
 };
 
 #define TEXSIZE(w, h, fmt, level)                                              \
-    ((w >> level) * (h >> level) * texfmtbpp[fmt] / 8)
+    (((w) >> (level)) * ((h) >> (level)) * texfmtbpp[fmt] / 8)
+
+// including all mip levels
+static inline u32 texsize_total(TexUnitRegs* regs, u32 fmt) {
+    u32 size = 0;
+    for (int i = regs->lod.min; i <= regs->lod.max; i++) {
+        size += TEXSIZE(regs->width, regs->height, fmt, i);
+    }
+    return size;
+}
 
 void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
     w >>= level;
@@ -757,6 +834,30 @@ void load_tex_image(void* rawdata, int w, int h, int level, int fmt) {
     }
 }
 
+void create_texture(GPU* gpu, TexInfo* tex, TexUnitRegs* regs) {
+    linfo("creating texture from %x with dims %dx%d and fmt=%d", tex->paddr,
+          tex->width, tex->height, tex->fmt);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, regs->lod.max);
+
+    glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                     texfmtswizzle[tex->fmt]);
+
+    // mipmap images are stored adjacent in memory and each image is
+    // half the width and height of the previous one
+    void* rawdata = PTR(tex->paddr);
+    for (int l = regs->lod.min; l <= regs->lod.max; l++) {
+        load_tex_image(rawdata, tex->width, tex->height, l, tex->fmt);
+        rawdata += TEXSIZE(tex->width, tex->height, tex->fmt, l);
+    }
+}
+
+u64 get_texture_hash(void* tex, u32 size) {
+    if (!ctremu.hashTextures) return 0;
+    // maybe we might want to do something different later but rn this is fine
+    return XXH3_64bits(tex, size);
+}
+
 void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     // make sure we are binding to the correct texture
     glActiveTexture(GL_TEXTURE0 + id);
@@ -769,6 +870,16 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         return;
     }
 
+    u32 texsize = texsize_total(regs, fmt);
+
+    // also check for out of bounds textures
+    if (!is_valid_physmem(regs->addr << 3) ||
+        !is_valid_physmem((regs->addr << 3) + texsize)) {
+        linfo("invalid texture address");
+        glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
+        return;
+    }
+
     FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
     if (fb) {
         // check for simple render to texture cases
@@ -777,41 +888,34 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         auto tex = LRU_load(gpu->textures, regs->addr << 3);
         glBindTexture(GL_TEXTURE_2D, tex->tex);
 
-        // this is not completely correct, since games often use different
-        // textures with the same attributes
-        // TODO: proper cache invalidation
+        // if the attributes are different we obviously need to recreate the
+        // texture
+        // if they are the same we check if the hash needs to be updated
+        // and if it does we get the hash and check if that is equal and
+        // recreate when it is not
         if (tex->paddr != (regs->addr << 3) || tex->width != regs->width ||
-            tex->height != regs->height || tex->fmt != fmt) {
+            tex->height != regs->height || tex->fmt != fmt ||
+            tex->minlod != regs->lod.min || tex->maxlod != regs->lod.max) {
             tex->paddr = regs->addr << 3;
             tex->width = regs->width;
             tex->height = regs->height;
             tex->fmt = fmt;
-            tex->size = 0;
+            tex->minlod = regs->lod.min;
+            tex->maxlod = regs->lod.max;
+            tex->size = texsize;
 
-            if (!is_valid_physmem(tex->paddr) ||
-                !is_valid_physmem(tex->paddr + TEXSIZE(tex->width, tex->height,
-                                                       tex->fmt, 0))) {
-                linfo("invalid texture address");
-                glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
-            } else {
+            void* data = PTR(tex->paddr);
+            tex->hash = get_texture_hash(data, tex->size);
+            tex->needs_rehash = false;
 
-                linfo("creating texture from %x with dims %dx%d and fmt=%d",
-                      tex->paddr, tex->width, tex->height, tex->fmt);
-
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL,
-                                regs->lod.max);
-
-                glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                                 texfmtswizzle[fmt]);
-
-                // mipmap images are stored adjacent in memory and each image is
-                // half the width and height of the previous one
-                void* rawdata = PTR(tex->paddr);
-                for (int l = regs->lod.min; l <= regs->lod.max; l++) {
-                    load_tex_image(rawdata, tex->width, tex->height, l, fmt);
-                    rawdata += TEXSIZE(tex->width, tex->height, fmt, l);
-                    tex->size += TEXSIZE(tex->width, tex->height, fmt, l);
-                }
+            create_texture(gpu, tex, regs);
+        } else if (tex->needs_rehash) {
+            void* data = PTR(tex->paddr);
+            u64 hash = get_texture_hash(data, tex->size);
+            tex->needs_rehash = false;
+            if (hash != tex->hash) {
+                tex->hash = hash;
+                create_texture(gpu, tex, regs);
             }
         }
     }
@@ -901,10 +1005,10 @@ void update_gl_state(GPU* gpu) {
         float offset = cvtf24(gpu->regs.raster.depthmap_offset);
         float scale = cvtf24(gpu->regs.raster.depthmap_scale);
         // pica near plane is -1 and farplane is 0
-        glDepthRangef(offset - scale, offset);
+        glDepthRange(offset - scale, offset);
     } else {
         // default depth range maps -1 -> 1 and 0 -> 0
-        glDepthRangef(1, 0);
+        glDepthRange(1, 0);
     }
 
     ubuf.tex2coord = gpu->regs.tex.config.tex2coord;

@@ -27,13 +27,13 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
             lerror("failed to compile shader: %s", log);
         }
 
-        linfo("compiled new fragment shader");
+        linfo("compiled new fragment shader with hash %llx", hash);
     }
     return block->fs;
 }
 
 const char fs_header[] = R"(
-#version 410 core
+#version 330 core
 
 in vec4 color;
 in vec2 texcoord0;

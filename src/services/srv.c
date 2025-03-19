@@ -5,6 +5,7 @@
 #include "kernel/memory.h"
 #include "kernel/svc.h"
 
+#include "font.h"
 #include "services.h"
 
 struct {
@@ -49,7 +50,7 @@ void services_init(E3DS* s) {
     s->services.apt.notif_event.sticky = true;
     srvobj_init(&s->services.apt.resume_event.hdr, KOT_EVENT);
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
-    s->services.apt.shared_font.size = sizeof shared_font;
+    s->services.apt.shared_font.size = 0x80 + sizeof shared_font;
     sharedmem_alloc(s, &s->services.apt.shared_font);
     // the shared font is treated as part of the linear heap
     // so its paddr and vaddr must be related appropriately
@@ -61,7 +62,12 @@ void services_init(E3DS* s) {
     fontdest[2] = sizeof shared_font; // size
     // font is at offset 0x80 of the memory block
     memcpy((void*) fontdest + 0x80, shared_font, sizeof shared_font);
+    // now we need to relocate the pointers in the font too (games will do it
+    // themselves but homebrew needs it to be already done)
+    font_relocate((void*) fontdest + 0x80,
+                  s->services.apt.shared_font.mapaddr + 0x80);
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
+    // rgba framebuffers for bottom, top left, top right
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
     sharedmem_alloc(s, &s->services.apt.capture_block);
 

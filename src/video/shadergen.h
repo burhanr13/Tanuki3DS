@@ -5,7 +5,7 @@
 
 #include "renderer_gl.h"
 
-#define FSH_MAX 256
+#define FSH_MAX 512
 
 typedef struct _GPU GPU;
 
