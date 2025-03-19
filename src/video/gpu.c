@@ -1587,7 +1587,7 @@ void gpu_drawarrays(GPU* gpu) {
 
             for (int p = 0; p < nverts; p += stride) {
                 for (int v = 0; v < stride; v++) {
-                    memcpy(gsh.v + v * vshoutct, vshout[p],
+                    memcpy(gsh.v + v * vshoutct, vshout[p + v],
                            vshoutct * sizeof(fvec4));
                 }
                 pica_shader_exec(&gsh);

@@ -772,6 +772,15 @@ u32 disasm_instr(ShaderUnit* shu, u32 pc) {
             pc = instr.fmt3.dest + 1;
             break;
         }
+        case PICA_SETEMIT: {
+            printf("setemit %d", instr.fmt4.vtxid);
+            if (instr.fmt4.inv) printf(" inv");
+            if (instr.fmt4.prim) printf(" prim");
+            break;
+        }
+        case PICA_EMIT:
+            printf("emit");
+            break;
         case PICA_JMPC:
         case PICA_JMPU: {
             if (instr.opcode == PICA_JMPU) {
