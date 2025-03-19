@@ -930,25 +930,46 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
 
     u32 texsize = texsize_total(regs, fmt);
 
-    // also check for out of bounds textures
-    if (!is_valid_physmem(regs->addr << 3) ||
-        !is_valid_physmem((regs->addr << 3) + texsize)) {
-        linfo("invalid texture address");
-        glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
-        return;
-    }
-
     auto tex = LRU_load(gpu->textures, regs->addr << 3);
     glBindTexture(GL_TEXTURE_2D, tex->tex);
 
-    // if the attributes are different we obviously need to recreate the
-    // texture
-    // if they are the same we check if the hash needs to be updated
-    // and if it does we get the hash and check if that is equal and
-    // recreate when it is not
-    if (tex->paddr != (regs->addr << 3) || tex->width != regs->width ||
-        tex->height != regs->height || tex->fmt != fmt ||
-        tex->minlod != regs->lod.min || tex->maxlod != regs->lod.max) {
+    // textures that are partially out of bounds can still be used with rtt ..?
+    if (is_valid_physmem(regs->addr << 3) &&
+        is_valid_physmem((regs->addr << 3) + texsize - 1)) {
+        // if the attributes are different we obviously need to recreate the
+        // texture
+        // if they are the same we check if the hash needs to be updated
+        // and if it does we get the hash and check if that is equal and
+        // recreate when it is not
+        if (tex->paddr != (regs->addr << 3) || tex->width != regs->width ||
+            tex->height != regs->height || tex->fmt != fmt ||
+            tex->minlod != regs->lod.min || tex->maxlod != regs->lod.max) {
+            tex->paddr = regs->addr << 3;
+            tex->width = regs->width;
+            tex->height = regs->height;
+            tex->fmt = fmt;
+            tex->minlod = regs->lod.min;
+            tex->maxlod = regs->lod.max;
+            tex->size = texsize;
+
+            void* data = PTR(tex->paddr);
+            tex->hash = get_texture_hash(data, tex->size);
+            tex->needs_rehash = false;
+
+            create_texture(gpu, tex, regs);
+        } else if (tex->needs_rehash) {
+            void* data = PTR(tex->paddr);
+            u64 hash = get_texture_hash(data, tex->size);
+            tex->needs_rehash = false;
+            if (hash != tex->hash) {
+                tex->hash = hash;
+                create_texture(gpu, tex, regs);
+            }
+        }
+    } else {
+        // just add this to the cache but dont actually send it image data ig
+        // we only care because you can still rtt to this .......
+        linfo("out of bounds texture");
         tex->paddr = regs->addr << 3;
         tex->width = regs->width;
         tex->height = regs->height;
@@ -956,31 +977,22 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         tex->minlod = regs->lod.min;
         tex->maxlod = regs->lod.max;
         tex->size = texsize;
-
-        void* data = PTR(tex->paddr);
-        tex->hash = get_texture_hash(data, tex->size);
-        tex->needs_rehash = false;
-
-        create_texture(gpu, tex, regs);
-    } else if (tex->needs_rehash) {
-        void* data = PTR(tex->paddr);
-        u64 hash = get_texture_hash(data, tex->size);
-        tex->needs_rehash = false;
-        if (hash != tex->hash) {
-            tex->hash = hash;
-            create_texture(gpu, tex, regs);
-        }
     }
 
     // handle simple render to texture cases, but better ...?
-    FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
+    FBInfo* fb = fbcache_find(gpu, tex->paddr);
     if (fb) {
+        linfo("rtt at %08x", fb->color_paddr);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
         glBindTexture(GL_TEXTURE_2D, tex->tex);
         glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
                          (fb->height - tex->height) * ctremu.videoscale,
                          tex->width * ctremu.videoscale,
                          tex->height * ctremu.videoscale, 0);
+        // no swizzling or mipmaps for rtt textures
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                         texswizzle_default);
     }
 
     glTexParameteri(
@@ -1591,8 +1603,8 @@ void gpu_drawarrays(GPU* gpu) {
             ShaderUnit gsh;
             init_gsh(gpu, &gsh);
 
-            // there are 3 geom shader modes, rn we only care about the normal
-            // mode
+            // there are 3 geom shader modes, rn we only care about the
+            // normal mode
 
             if (gpu->regs.geom.gsh_misc0.mode != 0)
                 lwarn("unknown geoshader mode");
