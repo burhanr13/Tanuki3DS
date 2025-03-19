@@ -511,7 +511,7 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
           datasz);
 
     void* cur = PTR(paddr);
-    void* end = PTR(endPaddr);
+    void* end = PTR(paddr) + endPaddr - paddr;
     switch (datasz) {
         case 2:
             while (cur < end) {
