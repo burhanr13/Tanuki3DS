@@ -1644,7 +1644,28 @@ void gpu_drawelements(GPU* gpu) {
         if (gpu->regs.geom.config.use_gsh) {
             ShaderUnit gsh;
             init_gsh(gpu, &gsh);
-            // do things
+
+            if (gpu->regs.geom.gsh_misc0.mode != 0)
+                lwarn("unknown geoshader mode");
+
+            int vshoutct = gpu->regs.geom.vsh_outmap_total1 + 1;
+            int gshinct = gpu->regs.gsh.inconfig.inattrs + 1;
+            int stride = gshinct / vshoutct;
+
+            for (int p = 0; p < nverts; p += stride) {
+                for (int v = 0; v < stride; v++) {
+                    int idx;
+                    if (gpu->regs.geom.indexfmt) {
+                        idx = ((u16*) indexbuf)[p + v];
+                    } else {
+                        idx = ((u8*) indexbuf)[p + v];
+                    }
+                    memcpy(gsh.v + v * vshoutct, vshout[idx],
+                           vshoutct * sizeof(fvec4));
+                }
+                pica_shader_exec(&gsh);
+            }
+
             draw_gsh_out(gpu, &gsh);
             return;
         } else {
@@ -1690,7 +1711,22 @@ void gpu_drawimmediate(GPU* gpu) {
         if (gpu->regs.geom.config.use_gsh) {
             ShaderUnit gsh;
             init_gsh(gpu, &gsh);
-            // do things
+
+            if (gpu->regs.geom.gsh_misc0.mode != 0)
+                lwarn("unknown geoshader mode");
+
+            int vshoutct = gpu->regs.geom.vsh_outmap_total1 + 1;
+            int gshinct = gpu->regs.gsh.inconfig.inattrs + 1;
+            int stride = gshinct / vshoutct;
+
+            for (int p = 0; p < nverts; p += stride) {
+                for (int v = 0; v < stride; v++) {
+                    memcpy(gsh.v + v * vshoutct, vshout[p + v],
+                           vshoutct * sizeof(fvec4));
+                }
+                pica_shader_exec(&gsh);
+            }
+
             draw_gsh_out(gpu, &gsh);
             return;
         } else {
