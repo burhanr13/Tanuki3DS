@@ -27,13 +27,12 @@ typedef union {
 
 typedef struct _3DS E3DS;
 
-typedef struct _FCRAMHeapNode {
+typedef struct _FreeListNode {
     u32 startpg;
     u32 endpg;
 
-    struct _FCRAMHeapNode* next;
-    struct _FCRAMHeapNode* prev;
-} FCRAMHeapNode;
+    struct _FreeListNode *next, *prev;
+} FreeListNode;
 
 typedef struct {
     u32 paddr;
