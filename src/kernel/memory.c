@@ -123,7 +123,7 @@ void memory_init(E3DS* s) {
     s->freelist.next = initNode;
     initNode->prev = &s->freelist;
     s->freelist.prev = initNode;
-    initNode->prev = &s->freelist;
+    initNode->next = &s->freelist;
 
     VMBlock* initblk = malloc(sizeof *initblk);
     *initblk = (VMBlock) {

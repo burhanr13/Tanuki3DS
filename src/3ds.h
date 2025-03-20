@@ -44,6 +44,8 @@ typedef struct _3DS {
 
     FreeListNode freelist;
 
+    KThread readylist;
+
     KProcess process;
 
     ServiceData services;

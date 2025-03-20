@@ -14,7 +14,9 @@ typedef struct _KProcess {
 
     KObject* handles[HANDLE_MAX];
 
-    KThread* threads[THREAD_MAX];
+    u32 nexttid;
+
+    u32 allocTls;
 
     u32 used_memory;
 } KProcess;
