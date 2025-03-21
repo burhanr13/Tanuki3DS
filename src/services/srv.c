@@ -143,10 +143,11 @@ DECL_PORT(srv) {
             }
             HANDLE_SET(handle, session);
             session->hdr.refcount = 1;
+            linfo("connected to service '%.8s' with handle %x", name, handle);
+
             cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
             cmdbuf[3] = handle;
-            linfo("connected to service '%.8s' with handle %x", name, handle);
             break;
         }
         case 0x0009:

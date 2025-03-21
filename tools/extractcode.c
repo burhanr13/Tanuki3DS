@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../src/loader.h"
+#include "kernel/loader.h"
 
 // i hate linkers
 u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size) {

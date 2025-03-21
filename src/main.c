@@ -348,6 +348,8 @@ int main(int argc, char** argv) {
         SDL_GL_SetSwapInterval(0);
     }
 
+    glClear(GL_COLOR_BUFFER_BIT);
+
     Uint64 prev_time = SDL_GetTicksNS();
     Uint64 prev_fps_update = prev_time;
     Uint64 prev_fps_frame = 0;

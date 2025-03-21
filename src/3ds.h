@@ -42,7 +42,9 @@ typedef struct _3DS {
     u8* virtmem;
 #endif
 
-    FCRAMHeapNode pheap;
+    FreeListNode freelist;
+
+    KThread readylist;
 
     KProcess process;
 

@@ -117,15 +117,13 @@ void memory_init(E3DS* s) {
     s->dsp.mem = s->mem;
 #endif
 
-    s->pheap.startpg = FCRAM_SIZE / PAGE_SIZE;
-    s->pheap.endpg = 0;
-    FCRAMHeapNode* linearnode = malloc(sizeof *linearnode);
-    linearnode->startpg = 0;
-    linearnode->endpg = 0;
-    s->pheap.next = linearnode;
-    linearnode->prev = &s->pheap;
-    s->pheap.prev = linearnode;
-    linearnode->next = &s->pheap;
+    FreeListNode* initNode = malloc(sizeof *initNode);
+    initNode->startpg = 0;
+    initNode->endpg = FCRAM_SIZE / PAGE_SIZE;
+    s->freelist.next = initNode;
+    initNode->prev = &s->freelist;
+    s->freelist.prev = initNode;
+    initNode->next = &s->freelist;
 
     VMBlock* initblk = malloc(sizeof *initblk);
     *initblk = (VMBlock) {
@@ -139,9 +137,9 @@ void memory_init(E3DS* s) {
 }
 
 void memory_destroy(E3DS* s) {
-    while (s->pheap.next != &s->pheap) {
-        auto tmp = s->pheap.next;
-        s->pheap.next = s->pheap.next->next;
+    while (s->freelist.next != &s->freelist) {
+        auto tmp = s->freelist.next;
+        s->freelist.next = s->freelist.next->next;
         free(tmp);
     }
     while (s->process.vmblocks.next != &s->process.vmblocks) {
@@ -171,29 +169,20 @@ u32 memory_physalloc(E3DS* s, u32 size) {
     size = PGROUNDUP(size);
     u32 npage = PGROUNDUP(size) / PAGE_SIZE;
 
-    auto cur = &s->pheap;
-    do {
-        u32 gap = cur->startpg - cur->prev->endpg;
-        if (gap < npage) {
-            cur = cur->prev;
-            continue;
+    auto cur = s->freelist.prev;
+    while (cur != &s->freelist) {
+        if (cur->endpg - cur->startpg >= npage) {
+            cur->endpg -= npage;
+            u32 paddr = FCRAM_PBASE + cur->endpg * PAGE_SIZE;
+            if (cur->startpg == cur->endpg) {
+                cur->prev->next = cur->next;
+                cur->next->prev = cur->prev;
+                free(cur);
+            }
+            return paddr;
         }
-
-        FCRAMHeapNode* n = malloc(sizeof *n);
-
-        n->endpg = cur->startpg;
-        n->startpg = n->endpg - npage;
-        n->next = cur;
-        n->prev = cur->prev;
-        cur->prev = n;
-        n->prev->next = n;
-
-        u32 paddr = FCRAM_PBASE + n->startpg * PAGE_SIZE;
-
-        linfo("allocating physical memory at %08x with size %x", paddr, size);
-
-        return paddr;
-    } while (cur != &s->pheap);
+        cur = cur->prev;
+    }
 
     lerror("ran out of physical memory");
     return 0;
@@ -384,18 +373,18 @@ u32 memory_virtalloc(E3DS* s, u32 addr, u32 size, u32 perm, u32 state) {
 u32 memory_linearheap_grow(E3DS* s, u32 size, u32 perm) {
     size = PGROUNDUP(size);
 
-    auto linearblk = s->pheap.next;
-    u32 npage = PGROUNDUP(size) / PAGE_SIZE;
+    auto linearblk = s->freelist.next;
+    u32 npage = size / PAGE_SIZE;
 
-    if (linearblk->endpg + npage > linearblk->next->startpg) {
+    if (linearblk == &s->freelist ||
+        linearblk->endpg - linearblk->startpg < npage) {
         lerror("ran of physical memory");
         return 0;
     }
-    u32 startaddr = LINEAR_HEAP_BASE + linearblk->endpg * PAGE_SIZE;
-    linearblk->endpg += npage;
+    u32 startaddr = LINEAR_HEAP_BASE + linearblk->startpg * PAGE_SIZE;
+    linearblk->startpg += npage;
     linfo("extending linear heap by %x", size);
-    memory_virtmap(s, FCRAM_PBASE, LINEAR_HEAP_BASE,
-                   (linearblk->endpg - linearblk->startpg) * PAGE_SIZE, perm,
+    memory_virtmap(s, FCRAM_PBASE, LINEAR_HEAP_BASE, npage * PAGE_SIZE, perm,
                    MEMST_CONTINUOUS);
     s->process.used_memory += size;
     return startaddr;

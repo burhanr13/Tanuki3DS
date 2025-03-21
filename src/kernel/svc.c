@@ -94,15 +94,11 @@ DECL_SVC(CreateThread) {
     }
     stacktop &= ~7;
 
-    u32 newtid = thread_create(s, entrypoint, stacktop, priority, arg);
-    if (newtid == -1) {
-        R(0) = -1;
-        return;
-    }
+    KThread* t = thread_create(s, entrypoint, stacktop, priority, arg);
 
-    HANDLE_SET(handle, s->process.threads[newtid]);
-    s->process.threads[newtid]->hdr.refcount = 1;
-    linfo("created thread with handle %x", handle);
+    HANDLE_SET(handle, t);
+    t->hdr.refcount = 1;
+    linfo("created thread %d with handle %x", t->id, handle);
 
     thread_reschedule(s);
 
@@ -126,7 +122,7 @@ DECL_SVC(SleepThread) {
         // we need to temporarily sleep this one so it does not get picked
         caller->state = THRD_SLEEP;
         thread_reschedule(s);
-        caller->state = THRD_READY;
+        thread_ready(s, caller);
     } else {
         thread_sleep(s, caller, timeout);
     }
@@ -142,6 +138,8 @@ DECL_SVC(GetThreadPriority) {
         return;
     }
 
+    linfo("thread %d has priority %#x", t->id, t->priority);
+
     R(0) = 0;
     R(1) = t->priority;
 }
@@ -155,7 +153,15 @@ DECL_SVC(SetThreadPriority) {
     }
 
     t->priority = R(1);
-    thread_reschedule(s);
+
+    if (t->state == THRD_READY) {
+        t->next->prev = t->prev;
+        t->prev->next = t->next;
+        thread_ready(s, t);
+        thread_reschedule(s);
+    }
+
+    linfo("thread %d has priority %#x", t->id, t->priority);
 
     R(0) = 0;
 }
@@ -216,7 +222,6 @@ DECL_SVC(ReleaseSemaphore) {
 
     linfo("releasing semaphore %x with count %d", R(0), R(2));
     semaphore_release(s, sem, R(2));
-
 }
 
 DECL_SVC(CreateEvent) {
@@ -446,6 +451,7 @@ DECL_SVC(ArbitrateAddress) {
                 klist_insert(&caller->waiting_objs, &arbiter->hdr);
                 caller->waiting_addr = addr;
                 linfo("waiting on address %08x", addr);
+                caller->wait_any = false;
                 if (type == ARBITRATE_WAIT_TIMEOUT ||
                     type == ARBITRATE_DEC_WAIT_TIMEOUT) {
                     thread_sleep(s, caller, timeout);
@@ -460,7 +466,7 @@ DECL_SVC(ArbitrateAddress) {
             break;
         default:
             R(0) = -1;
-            lwarn("unknown arbitration type");
+            lerror("unknown arbitration type");
     }
 }
 
@@ -497,6 +503,7 @@ DECL_SVC(WaitSynchronization1) {
     if (sync_wait(s, caller, obj)) {
         linfo("waiting on handle %x", handle);
         klist_insert(&caller->waiting_objs, obj);
+        caller->wait_any = false;
         thread_sleep(s, caller, timeout);
     } else {
         linfo("did not need to wait for handle %x", handle);
@@ -541,7 +548,7 @@ DECL_SVC(WaitSynchronizationN) {
         R(1) = wokeupi;
     } else {
         linfo("waiting on %d handles", count);
-        caller->wait_all = waitAll;
+        caller->wait_any = !waitAll;
         thread_sleep(s, caller, timeout);
     }
 }
@@ -558,12 +565,37 @@ DECL_SVC(DuplicateHandle) {
     HANDLE_SET(dup, o);
 
     R(0) = 0;
+    R(1) = dup;
 }
 
 DECL_SVC(GetSystemTick) {
     R(0) = s->sched.now;
     R(1) = s->sched.now >> 32;
     s->sched.now += 200; // make time advance so the next read happens later
+}
+
+DECL_SVC(GetSystemInfo) {
+    u32 type = R(1);
+    u32 param = R(2);
+
+    R(0) = 0;
+    switch (type) {
+        case 0:
+            switch (param) {
+                case 1:
+                    R(1) = s->process.used_memory;
+                    R(2) = 0;
+                    break;
+                default:
+                    R(0) = -1;
+                    lerror("unknown param");
+            }
+            break;
+        default:
+            R(0) = -1;
+            lerror("unknown system info type 0x%x", type);
+            break;
+    }
 }
 
 DECL_SVC(GetProcessInfo) {
@@ -620,12 +652,14 @@ DECL_SVC(SendSyncRequest) {
         return;
     }
     R(0) = 0;
-    u32 cmd_addr = GETTLS(caller) + IPC_CMD_OFF;
+    u32 cmd_addr = caller->tls + IPC_CMD_OFF;
     IPCHeader cmd = *(IPCHeader*) PTR(cmd_addr);
     session->handler(s, cmd, cmd_addr, session->arg);
 }
 
 DECL_SVC(GetProcessId) {
+    // rn we only emulate one process, also this only seems
+    // be used for errdisp anyway
     R(0) = 0;
     R(1) = 0;
 }
@@ -636,6 +670,8 @@ DECL_SVC(GetThreadId) {
         lerror("not a thread");
         R(0) = -1;
     }
+
+    linfo("handle %x thread %d", R(1), t->id);
 
     R(0) = 0;
     R(1) = t->id;
@@ -685,6 +721,11 @@ DECL_SVC(GetResourceLimitCurrentValues) {
                 R(0) = -1;
         }
     }
+}
+
+DECL_SVC(GetThreadContext) {
+    // supposedly this does nothing in the real kernel too
+    R(0) = 0;
 }
 
 DECL_SVC(Break) {
