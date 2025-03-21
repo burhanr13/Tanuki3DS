@@ -394,8 +394,7 @@ void shader_run(ShaderUnit* shu) {
                 break;
             }
             case PICA_EMIT: {
-                memcpy(shu->gsh.curvtx[shu->gsh.emit_vtxid], shu->o,
-                       sizeof shu->o);
+                shader_write_outmap(shu, shu->gsh.curvtx[shu->gsh.emit_vtxid]);
                 if (shu->gsh.emit_vtxid == 3) lwarn("gsh quads?");
                 if (shu->gsh.emit_prim) {
                     // right now we only emit tris, supposedly you can emit
@@ -861,4 +860,12 @@ void pica_shader_disasm(ShaderUnit* shu) {
         printf("end proc\n");
     }
     Vec_free(disasm.calls);
+}
+
+void shader_write_outmap(ShaderUnit* shu, fvec4* out) {
+    int dstidx = 0;
+    for (int i = 0; i < 16; i++) {
+        if (!(shu->outmap_mask & BIT(i))) continue;
+        memcpy(out[dstidx++], shu->o[i], sizeof(fvec4));
+    }
 }

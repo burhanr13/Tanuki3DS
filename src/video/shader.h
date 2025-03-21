@@ -141,6 +141,8 @@ typedef struct {
     OpDesc* opdescs;
     u32 entrypoint;
 
+    u32 outmap_mask;
+
     alignas(16) fvec4 v[16];
     alignas(16) fvec4 o[16];
 
@@ -169,5 +171,7 @@ typedef struct {
 void pica_shader_exec(ShaderUnit* shu);
 
 void pica_shader_disasm(ShaderUnit* shu);
+
+void shader_write_outmap(ShaderUnit* shu, fvec4* out);
 
 #endif

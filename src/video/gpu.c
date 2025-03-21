@@ -1391,6 +1391,7 @@ void init_vsh(GPU* gpu, ShaderUnit* shu) {
     shu->code = (PICAInstr*) gpu->vsh.progdata;
     shu->opdescs = (OpDesc*) gpu->vsh.opdescs;
     shu->entrypoint = gpu->regs.vsh.entrypoint;
+    shu->outmap_mask = gpu->regs.vsh.outmap_mask;
     shu->c = gpu->vsh.floatuniform;
     shu->i = gpu->regs.vsh.intuniform;
     shu->b = gpu->regs.vsh.booluniform;
@@ -1400,6 +1401,7 @@ void init_gsh(GPU* gpu, ShaderUnit* shu) {
     shu->code = (PICAInstr*) gpu->gsh.progdata;
     shu->opdescs = (OpDesc*) gpu->gsh.opdescs;
     shu->entrypoint = gpu->regs.gsh.entrypoint;
+    shu->outmap_mask = gpu->regs.gsh.outmap_mask;
     shu->c = gpu->gsh.floatuniform;
     shu->i = gpu->regs.gsh.intuniform;
     shu->b = gpu->regs.gsh.booluniform;
@@ -1413,7 +1415,7 @@ void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
     for (int i = 0; i < count; i++) {
         load_vtx(gpu, cfg, srcoff + i, vsh.v);
         gpu->vsh_runner.shaderfunc(&vsh);
-        memcpy(vbuf[dstoff + i], vsh.o, sizeof vsh.o);
+        shader_write_outmap(&vsh, vbuf[dstoff + i]);
     }
 }
 
