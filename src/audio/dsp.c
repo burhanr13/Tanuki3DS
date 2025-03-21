@@ -136,8 +136,14 @@ void update_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
 
 // queue new buffers that have been added
 void refill_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
-    int curBufid =
-        dsp->bufQueues[ch].size ? FIFO_back(dsp->bufQueues[ch]).id + 1 : 1;
+    int curBufid;
+    if (dsp->bufQueues[ch].size) {
+        curBufid = FIFO_back(dsp->bufQueues[ch]).id + 1;
+    } else {
+        // the embedded buffer id might not always be 1
+        if (cfg->buf_id) curBufid = cfg->buf_id;
+        else curBufid = 1;
+    }
     while (dsp->bufQueues[ch].size < FIFO_MAX(dsp->bufQueues[ch])) {
         BufInfo b;
         get_buf(cfg, curBufid++, &b);
@@ -162,14 +168,6 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     }
 
     stat->active = cfg->active;
-
-    // this bit is the embedded buffer dirty bit
-    // which begins playback of a new embedded buffer
-    // if it is not set and there is nothing in the queue
-    // then the channel is done playing
-    if (!dsp->bufQueues[ch].size && !(cfg->dirty_flags & BIT(30))) {
-        reset_chn(dsp, ch, stat);
-    }
 
     cfg->dirty_flags = 0;
 
@@ -200,7 +198,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
         if (bufRem > rem) bufRem = rem;
 
         linfo("ch%d playing buf %d at pos %d for %d samples", ch, buf->id,
-              buf->pos, bufRem);
+               buf->pos, bufRem);
 
         if (cfg->format.num_chan == 2) {
             switch (cfg->format.codec) {
