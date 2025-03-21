@@ -150,6 +150,13 @@ DECL_PORT(apt) {
             cmdbuf[1] = 0;
             break;
         }
+        case 0x003b: {
+            linfo("CancelLibraryApplet");
+            // i have no idea what this does but games seem to expect
+            // the apt even to get signaled after it
+            add_event(&s->sched, apt_resume_app, SEA_NONE, CPU_CLK / FPS);
+            break;
+        }
         case 0x0043:
             linfo("NotifyToWait");
             cmdbuf[0] = IPCHDR(1, 0);

@@ -570,6 +570,30 @@ DECL_SVC(GetSystemTick) {
     s->sched.now += 200; // make time advance so the next read happens later
 }
 
+DECL_SVC(GetSystemInfo) {
+    u32 type = R(1);
+    u32 param = R(2);
+
+    R(0) = 0;
+    switch (type) {
+        case 0:
+            switch (param) {
+                case 1:
+                    R(1) = s->process.used_memory;
+                    R(2) = 0;
+                    break;
+                default:
+                    R(0) = -1;
+                    lerror("unknown param");
+            }
+            break;
+        default:
+            R(0) = -1;
+            lerror("unknown system info type 0x%x", type);
+            break;
+    }
+}
+
 DECL_SVC(GetProcessInfo) {
     u32 type = R(2);
 
@@ -630,6 +654,8 @@ DECL_SVC(SendSyncRequest) {
 }
 
 DECL_SVC(GetProcessId) {
+    // rn we only emulate one process, also this only seems
+    // be used for errdisp anyway
     R(0) = 0;
     R(1) = 0;
 }
