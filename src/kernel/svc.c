@@ -138,6 +138,8 @@ DECL_SVC(GetThreadPriority) {
         return;
     }
 
+    linfo("thread %d has priority %#x", t->id, t->priority);
+
     R(0) = 0;
     R(1) = t->priority;
 }
@@ -156,9 +158,10 @@ DECL_SVC(SetThreadPriority) {
         t->next->prev = t->prev;
         t->prev->next = t->next;
         thread_ready(s, t);
+        thread_reschedule(s);
     }
 
-    thread_reschedule(s);
+    linfo("thread %d has priority %#x", t->id, t->priority);
 
     R(0) = 0;
 }
@@ -562,6 +565,7 @@ DECL_SVC(DuplicateHandle) {
     HANDLE_SET(dup, o);
 
     R(0) = 0;
+    R(1) = dup;
 }
 
 DECL_SVC(GetSystemTick) {
@@ -667,6 +671,8 @@ DECL_SVC(GetThreadId) {
         R(0) = -1;
     }
 
+    linfo("handle %x thread %d", R(1), t->id);
+
     R(0) = 0;
     R(1) = t->id;
 }
@@ -715,6 +721,11 @@ DECL_SVC(GetResourceLimitCurrentValues) {
                 R(0) = -1;
         }
     }
+}
+
+DECL_SVC(GetThreadContext) {
+    // supposedly this does nothing in the real kernel too
+    R(0) = 0;
 }
 
 DECL_SVC(Break) {
