@@ -1109,7 +1109,7 @@ void update_gl_state(GPU* gpu) {
     COPYRGBA(fbuf.tev_buffer_color, gpu->regs.tex.tev5.buffer_color);
 
     if (gpu->regs.fb.color_op.frag_mode != 0) {
-        return; // shadows or gas, ignore these for now
+        linfo("unknown frag mode");
     }
     if (gpu->regs.fb.color_op.blend_mode) {
         glDisable(GL_COLOR_LOGIC_OP);
