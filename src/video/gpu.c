@@ -1685,7 +1685,7 @@ void gpu_drawelements(GPU* gpu) {
                     } else {
                         idx = ((u8*) indexbuf)[p + v];
                     }
-                    memcpy(gsh.v + v * vshoutct, vshout[idx],
+                    memcpy(gsh.v + v * vshoutct, vshout[idx - minind],
                            vshoutct * sizeof(fvec4));
                 }
                 pica_shader_exec(&gsh);
