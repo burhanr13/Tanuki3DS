@@ -5,9 +5,14 @@
 #ifndef NOCAPSTONE
 #include <capstone/capstone.h>
 #endif
+#include <bit>
+#include <cmath>
 #include <map>
 #include <vector>
 #include <xbyak/xbyak.h>
+
+#undef F2I
+#define F2I(i) (std::bit_cast<u32>(i))
 
 // #define JIT_DISASM
 
@@ -25,9 +30,9 @@ struct ShaderCode : Xbyak::CodeGenerator {
     Xbyak::Reg8 reg_cmpx = al;
     Xbyak::Reg8 reg_cmpy = ah;
     Xbyak::Reg16 reg_cmp = ax;
-    Xbyak::Xmm negmask = xmm3;
-    Xbyak::Xmm ones = xmm4;
-    Xbyak::Xmm tmp = xmm5;
+    Xbyak::Xmm negmask = xmm4;
+    Xbyak::Xmm ones = xmm5;
+    Xbyak::Xmm tmp = xmm3;
     Xbyak::Reg8 loopcounter = r12b;
 
     bool usingEx2;
@@ -49,6 +54,8 @@ struct ShaderCode : Xbyak::CodeGenerator {
         for (auto& e : entrypoints) {
             e.second = compileWithEntry(shu, e.first);
         }
+        if (usingEx2) compileEx2();
+        if (usingLg2) compileLg2();
         ready();
     }
 
@@ -199,6 +206,9 @@ struct ShaderCode : Xbyak::CodeGenerator {
         cmpneqps(tmp, xmm0);
         andps(xmm1, tmp);
     }
+
+    void compileEx2();
+    void compileLg2();
 };
 
 std::string endLabel(u32 entry) {
@@ -319,6 +329,22 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
                 insertps(xmm0, ones, 0 << 6 | 3 << 4); // src1[3] = 1
                 setupMul();
                 dpps(xmm0, xmm1, 0xff);
+                DEST(xmm0, 1);
+                break;
+            }
+            case PICA_EX2: {
+                usingEx2 = true;
+                SRC1(xmm0, 1);
+                call("ex2");
+                shufps(xmm0, xmm0, 0);
+                DEST(xmm0, 1);
+                break;
+            }
+            case PICA_LG2: {
+                usingLg2 = true;
+                SRC1(xmm0, 1);
+                call("lg2");
+                shufps(xmm0, xmm0, 0);
                 DEST(xmm0, 1);
                 break;
             }
@@ -548,6 +574,174 @@ void ShaderCode::compileBlock(ShaderUnit* shu, u32 start, u32 len) {
                        instr.opcode);
         }
     }
+}
+
+void ShaderCode::compileEx2() {
+    // takes x in xmm0 and return in xmm0
+
+    Xbyak::Label end;
+
+    // constants for getting good input to polynomials (found through testing)
+    const float exthr = 0.535f;
+
+    L("ex2");
+    // check nan
+    comiss(xmm0, xmm0);
+    jne(end, T_NEAR);
+
+    // we need registers
+    push(rax);
+
+    // x = n + r where n in Z, r in [0,1)
+    // 2^x = 2^n * 2^r, 2^r will be in [1,2)
+    // so it ends up just being a float
+    roundss(xmm1, xmm0, 1);
+    cvtss2si(rbx, xmm1);
+    subss(xmm0, xmm1);
+    // now n in rbx and r in xmm0
+
+    // translate from [0, 1) -> [exthr-1, exthr)
+    mov(eax, F2I(exthr));
+    movd(xmm1, eax);
+    comiss(xmm0, xmm1);
+    Xbyak::Label l1;
+    jb(l1);
+    subss(xmm0, ones);
+    L(l1);
+
+    // make n into float exponent
+    add(rbx, 127);
+    mov(eax, 0);
+    cmp(rbx, rax);
+    cmovl(rbx, rax);
+    mov(eax, 0xff);
+    cmp(rbx, rax);
+    cmovg(rbx, rax);
+    shl(ebx, 23);
+
+    // 2^r = e^(r * ln2)
+    // e^x ~= ((1/6 * x + 1/2) * x + 1) * x + 1
+    const float c0 = M_LN2 * M_LN2 * M_LN2 / 6;
+    const float c1 = M_LN2 * M_LN2 / 2;
+    const float c2 = M_LN2;
+    // c3 is just 1
+    // now 2^x ~= ((c0 * x + c1) * x + c2) * x + c3
+
+    mov(eax, F2I(c0));
+    movd(xmm1, eax);
+    mov(eax, F2I(c1));
+    movd(xmm2, eax);
+    mov(eax, F2I(c2));
+    movd(xmm3, eax);
+
+    mulss(xmm1, xmm0);
+    addss(xmm1, xmm2);
+    mulss(xmm1, xmm0);
+    addss(xmm1, xmm3);
+    mulss(xmm1, xmm0);
+    addss(xmm1, ones);
+
+    // extract the mantissa and insert into the result
+    movd(eax, xmm1);
+    and_(eax, MASK(23));
+    or_(ebx, eax);
+    movd(xmm0, ebx);
+
+    pop(rax);
+
+    L(end);
+    ret();
+}
+
+void ShaderCode::compileLg2() {
+    // takes x in xmm0 and return in xmm0
+
+    // constants for getting good input to polynomials (found through testing)
+    const float lgthr = 1.35f;
+
+    Xbyak::Label lnan, lminf;
+
+    L("lg2");
+    // check nan and 0
+    comiss(xmm0, xmm0);
+    jne(lnan, T_NEAR);
+    xorps(xmm1, xmm1);
+    comiss(xmm0, xmm1);
+    je(lminf, T_NEAR);
+    jb(lnan, T_NEAR);
+
+    push(rax);
+
+    // x = 2^n * r where n in Z and r in [1,2)
+    // log2(x) = n + log2(r)
+
+    movd(eax, xmm0);
+    mov(ebx, eax);
+    shr(ebx, 23);
+    and_(eax, MASK(23));
+    or_(eax, 0x3f80'0000);
+    movd(xmm0, eax);
+    // now n in ebx and r in xmm0
+
+    // translate from [1, 2) -> [lgthr/2, lgthr)
+    mov(eax, F2I(lgthr));
+    movd(xmm1, eax);
+    comiss(xmm0, xmm1);
+    Xbyak::Label l1;
+    jb(l1);
+    mov(eax, F2I(0.5f));
+    movd(xmm1, eax);
+    mulss(xmm0, xmm1);
+    inc(ebx);
+    L(l1);
+
+    // log2(r) = ln(r)/ln2
+    // log polynomial is for x-1
+    subss(xmm0, ones);
+
+    // ln(x+1) ~= (((-1/4 * x + 1/3) * x - 1/2) * x + 1) * x
+    const float c0 = -1 / (4 * M_LN2);
+    const float c1 = 1 / (3 * M_LN2);
+    const float c2 = -1 / (2 * M_LN2);
+    const float c3 = 1 / M_LN2;
+    // log2(x+1) ~= (((c0 * x + c1) * x + c2) * x + c3) * x
+
+    mov(eax, F2I(c0));
+    movd(xmm1, eax);
+    mov(eax, F2I(c1));
+    movd(xmm2, eax);
+
+    mulss(xmm1, xmm0);
+    addss(xmm1, xmm2);
+
+    mov(eax, F2I(c2));
+    movd(xmm2, eax);
+    mov(eax, F2I(c3));
+    movd(xmm3, eax);
+
+    mulss(xmm1, xmm0);
+    addss(xmm1, xmm2);
+    mulss(xmm1, xmm0);
+    addss(xmm1, xmm3);
+    mulss(xmm1, xmm0);
+
+    // res is n + log r
+    cvtsi2ss(xmm0, ebx);
+    addss(xmm0, xmm1);
+
+    pop(rax);
+
+    ret();
+
+    // degenerate cases
+    L(lnan);
+    mov(eax, F2I(NAN));
+    movd(xmm0, eax);
+    ret();
+    L(lminf);
+    mov(eax, F2I(-INFINITY));
+    movd(xmm0, eax);
+    ret();
 }
 
 extern "C" {
