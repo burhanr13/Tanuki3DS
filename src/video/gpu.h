@@ -112,10 +112,9 @@ typedef struct _GPU {
         } thread[MAX_VSH_THREADS];
 
         pthread_cond_t cv1;
-        pthread_cond_t cv2;
         pthread_mutex_t mtx;
 
-        atomic_int cur;
+        volatile atomic_int cur;
         bool die;
 
         int base;
