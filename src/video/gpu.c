@@ -1427,8 +1427,9 @@ void vsh_thrd_func(GPU* gpu) {
         while (!gpu->vsh_runner.thread[id].ready) {
             pthread_cond_wait(&gpu->vsh_runner.cv1, &gpu->vsh_runner.mtx);
         }
-        gpu->vsh_runner.thread[id].ready = false;
         pthread_mutex_unlock(&gpu->vsh_runner.mtx);
+
+        gpu->vsh_runner.thread[id].ready = false;
 
         if (gpu->vsh_runner.die) return;
 
@@ -1452,6 +1453,8 @@ void gpu_vshrunner_init(GPU* gpu) {
         pthread_create(&gpu->vsh_runner.thread[i].thd, nullptr,
                        (void*) vsh_thrd_func, gpu);
     }
+
+    while (gpu->vsh_runner.cur < ctremu.vshthreads);
 }
 
 void gpu_vshrunner_destroy(GPU* gpu) {
@@ -1459,6 +1462,7 @@ void gpu_vshrunner_destroy(GPU* gpu) {
     for (int i = 0; i < ctremu.vshthreads; i++) {
         gpu->vsh_runner.thread[i].ready = true;
     }
+    pthread_mutex_lock(&gpu->vsh_runner.mtx);
     pthread_cond_broadcast(&gpu->vsh_runner.cv1);
     pthread_mutex_unlock(&gpu->vsh_runner.mtx);
     for (int i = 0; i < ctremu.vshthreads; i++) {
@@ -1498,7 +1502,9 @@ void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
         for (int i = 0; i < ctremu.vshthreads; i++) {
             gpu->vsh_runner.thread[i].ready = true;
         }
+        pthread_mutex_lock(&gpu->vsh_runner.mtx);
         pthread_cond_broadcast(&gpu->vsh_runner.cv1);
+        pthread_mutex_unlock(&gpu->vsh_runner.mtx);
         while (gpu->vsh_runner.cur < ctremu.vshthreads);
     }
 }
