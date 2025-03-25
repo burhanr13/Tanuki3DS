@@ -103,21 +103,14 @@ typedef struct _GPU {
     LRUCache(FSHCacheEntry, FSH_MAX) fshaders;
 
     struct {
-        struct {
-            pthread_t thd;
-
-            bool ready;
-            int off;
-            int count;
-        } thread[MAX_VSH_THREADS];
-
-        pthread_cond_t cv1;
-        pthread_mutex_t mtx;
+        pthread_t threads[MAX_VSH_THREADS];
+        volatile atomic_bool ready[MAX_VSH_THREADS];
 
         volatile atomic_int cur;
         bool die;
 
         int base;
+        int count;
         void* attrcfg;
         void* vbuf;
 

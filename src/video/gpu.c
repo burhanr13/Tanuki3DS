@@ -1423,20 +1423,15 @@ void vsh_thrd_func(GPU* gpu) {
     int id = gpu->vsh_runner.cur++;
 
     while (true) {
-        pthread_mutex_lock(&gpu->vsh_runner.mtx);
-        while (!gpu->vsh_runner.thread[id].ready) {
-            pthread_cond_wait(&gpu->vsh_runner.cv1, &gpu->vsh_runner.mtx);
-        }
-        pthread_mutex_unlock(&gpu->vsh_runner.mtx);
-
-        gpu->vsh_runner.thread[id].ready = false;
+        while (!gpu->vsh_runner.ready[id]);
+        gpu->vsh_runner.ready[id] = false;
 
         if (gpu->vsh_runner.die) return;
 
         vsh_run_range(gpu, gpu->vsh_runner.attrcfg,
-                      gpu->vsh_runner.base + gpu->vsh_runner.thread[id].off,
-                      gpu->vsh_runner.thread[id].off,
-                      gpu->vsh_runner.thread[id].count, gpu->vsh_runner.vbuf);
+                      gpu->vsh_runner.base + id * gpu->vsh_runner.count,
+                      id * gpu->vsh_runner.count, gpu->vsh_runner.count,
+                      gpu->vsh_runner.vbuf);
 
         gpu->vsh_runner.cur++;
     }
@@ -1444,32 +1439,20 @@ void vsh_thrd_func(GPU* gpu) {
 
 void gpu_vshrunner_init(GPU* gpu) {
     gpu->vsh_runner.cur = 0;
-
-    pthread_mutex_init(&gpu->vsh_runner.mtx, nullptr);
-    pthread_cond_init(&gpu->vsh_runner.cv1, nullptr);
-
     for (int i = 0; i < ctremu.vshthreads; i++) {
-        gpu->vsh_runner.thread[i].ready = false;
-        pthread_create(&gpu->vsh_runner.thread[i].thd, nullptr,
+        gpu->vsh_runner.ready[i] = false;
+        pthread_create(&gpu->vsh_runner.threads[i], nullptr,
                        (void*) vsh_thrd_func, gpu);
     }
-
     while (gpu->vsh_runner.cur < ctremu.vshthreads);
 }
 
 void gpu_vshrunner_destroy(GPU* gpu) {
     gpu->vsh_runner.die = true;
     for (int i = 0; i < ctremu.vshthreads; i++) {
-        gpu->vsh_runner.thread[i].ready = true;
+        gpu->vsh_runner.ready[i] = true;
+        pthread_join(gpu->vsh_runner.threads[i], nullptr);
     }
-    pthread_mutex_lock(&gpu->vsh_runner.mtx);
-    pthread_cond_broadcast(&gpu->vsh_runner.cv1);
-    pthread_mutex_unlock(&gpu->vsh_runner.mtx);
-    for (int i = 0; i < ctremu.vshthreads; i++) {
-        pthread_join(gpu->vsh_runner.thread[i].thd, nullptr);
-    }
-    pthread_mutex_destroy(&gpu->vsh_runner.mtx);
-    pthread_cond_destroy(&gpu->vsh_runner.cv1);
 }
 
 void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
@@ -1484,28 +1467,22 @@ void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
         gpu->vsh_runner.shaderfunc = pica_shader_exec;
     }
 
-    if (count < ctremu.vshthreads || ctremu.vshthreads < 2) {
-        vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
-    } else {
-        gpu->vsh_runner.attrcfg = attrcfg;
-        gpu->vsh_runner.vbuf = vbuf;
-        gpu->vsh_runner.base = base;
-
-        for (int i = 0; i < ctremu.vshthreads; i++) {
-            gpu->vsh_runner.thread[i].off = i * (count / ctremu.vshthreads);
-            gpu->vsh_runner.thread[i].count = count / ctremu.vshthreads;
-        }
-        gpu->vsh_runner.thread[ctremu.vshthreads - 1].count =
-            count - gpu->vsh_runner.thread[ctremu.vshthreads - 1].off;
-
+    gpu->vsh_runner.attrcfg = attrcfg;
+    gpu->vsh_runner.vbuf = vbuf;
+    gpu->vsh_runner.base = base;
+    gpu->vsh_runner.count = count / (ctremu.vshthreads + 1);
+    if (gpu->vsh_runner.count) {
         gpu->vsh_runner.cur = 0;
         for (int i = 0; i < ctremu.vshthreads; i++) {
-            gpu->vsh_runner.thread[i].ready = true;
+            gpu->vsh_runner.ready[i] = true;
         }
-        pthread_mutex_lock(&gpu->vsh_runner.mtx);
-        pthread_cond_broadcast(&gpu->vsh_runner.cv1);
-        pthread_mutex_unlock(&gpu->vsh_runner.mtx);
+        vsh_run_range(
+            gpu, attrcfg, base + gpu->vsh_runner.count * ctremu.vshthreads,
+            gpu->vsh_runner.count * ctremu.vshthreads,
+            gpu->vsh_runner.count + count % (ctremu.vshthreads + 1), vbuf);
         while (gpu->vsh_runner.cur < ctremu.vshthreads);
+    } else {
+        vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
     }
 }
 
