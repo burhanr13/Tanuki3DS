@@ -1423,7 +1423,7 @@ void vsh_thrd_func(GPU* gpu) {
     int id = gpu->vsh_runner.cur++;
 
     while (true) {
-        while (!gpu->vsh_runner.ready[id]);
+        while (!gpu->vsh_runner.ready[id]) sched_yield();
         gpu->vsh_runner.ready[id] = false;
 
         if (gpu->vsh_runner.die) return;
