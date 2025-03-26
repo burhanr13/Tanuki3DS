@@ -151,8 +151,6 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 len, u32 value, u32 datasz);
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len);
 
-void gpu_drawarrays(GPU* gpu);
-void gpu_drawelements(GPU* gpu);
-void gpu_drawimmediate(GPU* gpu);
+void gpu_draw(GPU* gpu, bool elements, bool immediate);
 
 #endif
