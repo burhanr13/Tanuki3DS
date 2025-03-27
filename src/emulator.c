@@ -38,7 +38,7 @@ void emulator_init() {
     if (ctremu.videoscale < 1) ctremu.videoscale = 1;
     if (ctremu.vshthreads > MAX_VSH_THREADS)
         ctremu.vshthreads = MAX_VSH_THREADS;
-    if (ctremu.vshthreads < 2) ctremu.vshthreads = 0;
+    if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
 
     save_config();
 }

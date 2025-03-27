@@ -79,7 +79,7 @@ typedef float fvec4[4];
 // N must be a power of 2
 #define FIFO(T, N)                                                             \
     struct {                                                                   \
-        T d[N];                                                                \
+        typeof(T) d[N];                                                                \
         ubi(INVBIT(N)) head;                                                   \
         ubi(INVBIT(N)) tail;                                                   \
         u32 size;                                                              \
@@ -97,7 +97,7 @@ typedef float fvec4[4];
 
 #define StaticVector(T, N)                                                     \
     struct {                                                                   \
-        T d[N];                                                                \
+        typeof(T) d[N];                                                                \
         size_t size;                                                           \
     }
 
@@ -111,7 +111,7 @@ typedef float fvec4[4];
 
 #define Vector(T)                                                              \
     struct {                                                                   \
-        T* d;                                                                  \
+        typeof(T)* d;                                                          \
         size_t size;                                                           \
         size_t cap;                                                            \
     }
@@ -120,12 +120,16 @@ typedef float fvec4[4];
 #define Vec_assn(v1, v2)                                                       \
     ((v1).d = (v2).d, (v1).size = (v2).size, (v1).cap = (v2).cap)
 #define Vec_free(v) (free((v).d), Vec_init(v))
-#define Vec_push(v, e)                                                         \
+#define Vec_grow(v)                                                            \
     ({                                                                         \
         if ((v).size == (v).cap) {                                             \
             (v).cap = (v).cap ? 2 * (v).cap : 8;                               \
             (v).d = (typeof((v).d)) realloc((v).d, (v).cap * sizeof *(v).d);   \
         }                                                                      \
+    })
+#define Vec_push(v, e)                                                         \
+    ({                                                                         \
+        Vec_grow(v);                                                           \
         (v).d[(v).size++] = (e);                                               \
         (v).size - 1;                                                          \
     })

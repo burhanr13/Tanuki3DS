@@ -11,12 +11,14 @@
 // #define VSH_DEBUG
 
 int shader_dec_get(GPU* gpu) {
-    // we need to hash the shader code, entrypoint, and outmap
+    // we need to hash the shader code, entrypoint, outmap_mask, and outmap
     XXH3_state_t* xxst = XXH3_createState();
     XXH3_64bits_reset(xxst);
-    XXH3_64bits_update(xxst, gpu->progdata, sizeof gpu->progdata);
+    XXH3_64bits_update(xxst, gpu->vsh.progdata, sizeof gpu->vsh.progdata);
     XXH3_64bits_update(xxst, &gpu->regs.vsh.entrypoint,
                        sizeof gpu->regs.vsh.entrypoint);
+    XXH3_64bits_update(xxst, &gpu->regs.vsh.outmap_mask,
+                       sizeof gpu->regs.vsh.outmap_mask);
     XXH3_64bits_update(xxst, gpu->regs.raster.sh_outmap,
                        sizeof gpu->regs.raster.sh_outmap);
     u64 hash = XXH3_64bits_digest(xxst);
@@ -680,8 +682,8 @@ char* shader_dec_vs(GPU* gpu) {
 
     DecCTX ctx = {};
     ds_init(&ctx.s, 32768);
-    ctx.shu.code = (PICAInstr*) gpu->progdata;
-    ctx.shu.opdescs = (OpDesc*) gpu->opdescs;
+    ctx.shu.code = (PICAInstr*) gpu->vsh.progdata;
+    ctx.shu.opdescs = (OpDesc*) gpu->vsh.opdescs;
     ctx.shu.entrypoint = gpu->regs.vsh.entrypoint;
 
     ctx.out_view = -1;
@@ -717,16 +719,24 @@ char* shader_dec_vs(GPU* gpu) {
 
     ds_printf(&final, "proc_main();\n\n");
 
-    ds_printf(&final, "vec4 pos = vec4(0);\n");
+    ds_printf(&final, "vec4 pos = vec4(1);\n");
     // macos gets mad if you dont write all the outputs
     // so we do that first
-    ds_printf(&final, "color = vec4(0);\n");
-    ds_printf(&final, "normquat = vec4(0);\n");
-    ds_printf(&final, "view = vec3(0);\n");
-    ds_printf(&final, "texcoord0 = vec2(0);\n");
-    ds_printf(&final, "texcoord1 = vec2(0);\n");
-    ds_printf(&final, "texcoord2 = vec2(0);\n");
-    ds_printf(&final, "texcoordw = 0;\n\n");
+    ds_printf(&final, "color = vec4(1);\n");
+    ds_printf(&final, "normquat = vec4(1);\n");
+    ds_printf(&final, "view = vec3(1);\n");
+    ds_printf(&final, "texcoord0 = vec2(1);\n");
+    ds_printf(&final, "texcoord1 = vec2(1);\n");
+    ds_printf(&final, "texcoord2 = vec2(1);\n");
+    ds_printf(&final, "texcoordw = 1;\n\n");
+
+    // handle the outmap mask
+    int dstidx = 0;
+    for (int i = 0; i < 16; i++) {
+        if (!(gpu->regs.vsh.outmap_mask & BIT(i))) continue;
+        if (dstidx != i) ds_printf(&final, "o[%d] = o[%d];\n", dstidx, i);
+        dstidx++;
+    }
 
     for (int o = 0; o < 7; o++) {
         u32 all = gpu->regs.raster.sh_outmap[o][0] << 24 |
