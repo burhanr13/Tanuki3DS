@@ -169,6 +169,14 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
 
     stat->active = cfg->active;
 
+    // bit 30 is embedded buffer dirty and is set when new data is in embedded
+    // buffer to start playing
+    // reset the channel
+    if (!dsp->bufQueues[ch].size && !(cfg->dirty_flags & BIT(30)) &&
+        !cfg->bufs_dirty) {
+        stat->active = false;
+    }
+
     cfg->dirty_flags = 0;
 
     if (!stat->active) {
@@ -198,9 +206,11 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
         if (bufRem > rem) bufRem = rem;
 
         linfo("ch%d playing buf %d at pos %d for %d samples", ch, buf->id,
-               buf->pos, bufRem);
+              buf->pos, bufRem);
 
-        if (cfg->format.num_chan == 2) {
+        if (!buf->paddr) {
+            lwarn("null audio buffer");
+        } else if (cfg->format.num_chan == 2) {
             switch (cfg->format.codec) {
                 case DSPFMT_PCM16: {
                     s16(*src)[2] = PTR(buf->paddr);
