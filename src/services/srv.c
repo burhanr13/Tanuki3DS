@@ -13,11 +13,12 @@ struct {
     PortRequestHandler handler;
 } srvhandlers[] = {
 #define SRV(portname, name) {portname, port_handle_##name}
-    SRV("APT:U", apt),     SRV("APT:A", apt),        SRV("APT:S", apt),
-    SRV("fs:USER", fs),    SRV("gsp::Gpu", gsp_gpu), SRV("hid:USER", hid),
-    SRV("hid:SPVR", hid),  SRV("dsp::DSP", dsp),     SRV("cfg:u", cfg),
-    SRV("cfg:s", cfg),     SRV("y2r:u", y2r),        SRV("cecd:u", cecd),
-    SRV("ldr:ro", ldr_ro), SRV("nwm::UDS", nwm_uds), SRV("ir:USER", ir),
+    SRV("APT:U", apt),    SRV("APT:A", apt),        SRV("APT:S", apt),
+    SRV("fs:USER", fs),   SRV("gsp::Gpu", gsp_gpu), SRV("hid:USER", hid),
+    SRV("hid:SPVR", hid), SRV("dsp::DSP", dsp),     SRV("cfg:u", cfg),
+    SRV("cfg:s", cfg),    SRV("cfg:i", cfg),        SRV("y2r:u", y2r),
+    SRV("cecd:u", cecd),  SRV("ldr:ro", ldr_ro),    SRV("nwm::UDS", nwm_uds),
+    SRV("ir:USER", ir),
 #undef SRV
 };
 
@@ -49,6 +50,7 @@ void services_init(E3DS* s) {
     srvobj_init(&s->services.apt.notif_event.hdr, KOT_EVENT);
     s->services.apt.notif_event.sticky = true;
     srvobj_init(&s->services.apt.resume_event.hdr, KOT_EVENT);
+    s->services.apt.resume_event.sticky = true;
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
     s->services.apt.shared_font.size = 0x80 + sizeof shared_font;
     sharedmem_alloc(s, &s->services.apt.shared_font);
