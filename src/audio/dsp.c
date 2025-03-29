@@ -171,7 +171,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
 
     // bit 30 is embedded buffer dirty and is set when new data is in embedded
     // buffer to start playing
-    // reset the channel
+    // reset the channel if the buffer queue is empty and there
+    // are no dirty buffers
     if (!dsp->bufQueues[ch].size && !(cfg->dirty_flags & BIT(30)) &&
         !cfg->bufs_dirty) {
         stat->active = false;

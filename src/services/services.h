@@ -3,6 +3,7 @@
 
 #include "kernel/thread.h"
 
+#include "am.h"
 #include "apt.h"
 #include "cecd.h"
 #include "cfg.h"
