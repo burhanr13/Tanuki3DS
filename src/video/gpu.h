@@ -11,7 +11,7 @@
 #include "renderer_gl.h"
 #include "shader.h"
 #include "shaderdec.h"
-#include "shadergen.h"
+#include "shadergen_fs.h"
 #include "shaderjit/shaderjit.h"
 
 #define MAX_VSH_THREADS 16

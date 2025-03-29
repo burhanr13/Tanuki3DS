@@ -10,7 +10,7 @@
 #include "renderer_gl.h"
 #include "shader.h"
 #include "shaderdec.h"
-#include "shadergen.h"
+#include "shadergen_fs.h"
 
 #include "gpuptr.inc"
 
@@ -1456,7 +1456,8 @@ void gpu_draw(GPU* gpu, bool elements, bool immediate) {
 
     // blending/logic ops
     if (gpu->regs.fb.color_op.frag_mode != 0) {
-        lwarn("unknown frag mode");
+        // gas or shadows, not implemented
+        linfo("unknown frag mode %d", gpu->regs.fb.color_op.frag_mode);
         return;
     }
     if (gpu->regs.fb.color_op.blend_mode) {
