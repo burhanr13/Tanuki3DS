@@ -7,6 +7,8 @@
 
 #include "dspptr.inc"
 
+u32 g_dsp_chn_disable;
+
 #define DSPMEM(b)                                                              \
     ((DSPMemory*) PTR(DSPRAM_PBASE + DSPRAM_DATA_OFF + b * DSPRAM_BANK_OFF))
 
@@ -125,9 +127,16 @@ void update_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
         auto old = &dsp->bufQueues[ch].d[i];
         BufInfo new;
         get_buf(cfg, old->id, &new);
-        if (new.id != old->id ||
-            (new.queuePos >= 0 && !(cfg->bufs_dirty & BIT(new.queuePos))))
-            continue;
+        // check if the buffer was found
+        if (new.id != old->id) continue;
+        // check if the buffer data is actually dirty
+        if (new.queuePos >= 0) {
+            if (cfg->bufs_dirty & BIT(new.queuePos)) {
+                cfg->bufs_dirty &= ~BIT(new.queuePos);
+            } else {
+                continue;
+            }
+        }
         old->paddr = new.paddr;
         old->len = new.len;
         old->looping = new.looping;
@@ -147,7 +156,17 @@ void refill_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
     while (dsp->bufQueues[ch].size < FIFO_MAX(dsp->bufQueues[ch])) {
         BufInfo b;
         get_buf(cfg, curBufid++, &b);
+        // the buffer was not found (end of queued data)
         if (b.id == 0) break;
+        // make sure to check the buffer dirty bit
+        // since we don't want to queue old buffer data
+        if (b.queuePos >= 0) {
+            if (cfg->bufs_dirty & BIT(b.queuePos)) {
+                cfg->bufs_dirty &= ~BIT(b.queuePos);
+            } else {
+                break;
+            }
+        }
         FIFO_push(dsp->bufQueues[ch], b);
     }
 }
@@ -187,8 +206,6 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
 
     update_bufs(dsp, ch, cfg);
     refill_bufs(dsp, ch, cfg);
-
-    cfg->bufs_dirty = 0;
 
     u32 nSamples = FRAME_SAMPLES * cfg->rate;
 
@@ -271,7 +288,7 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
                         src += 1 + (buf->pos % 14) / 2;
                     }
 
-                    s16* coeffs = m->input_adpcm_coeffs[ch];
+                    auto coeffs = m->input_adpcm_coeffs[ch];
 
                     for (int s = 0; s < bufRem; s++) {
                         // every 14 samples there is a new index
@@ -280,15 +297,15 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
                         }
 
                         int diff =
-                            (sbi(4))((buf->pos++ & 1) ? *src++ : *src >> 4);
+                            (sbit(4))((buf->pos++ & 1) ? *src++ : *src >> 4);
                         diff <<= buf->adpcm.scale;
                         // adpcm coeffs are fixed s5.11
                         // samples are fixed s1.15
 
-                        int sample = coeffs[buf->adpcm.index * 2 + 0] *
-                                         buf->adpcm.history[0] +
-                                     coeffs[buf->adpcm.index * 2 + 1] *
-                                         buf->adpcm.history[1];
+                        int sample =
+                            coeffs[buf->adpcm.index][0] *
+                                buf->adpcm.history[0] +
+                            coeffs[buf->adpcm.index][1] * buf->adpcm.history[1];
                         // sample is now fixed s6.26
                         sample += BIT(10); // round instead of floor
                         sample >>= 11;     // make it s6.15
@@ -338,6 +355,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     // interpolate samples or something
     // this is the most garbage interpolation ever
     // dsp does 4-channel mixing instead of just 2
+
+    if (g_dsp_chn_disable & BIT(ch)) return;
 
     for (int s = 0; s < FRAME_SAMPLES; s++) {
         mixer[s][0] +=

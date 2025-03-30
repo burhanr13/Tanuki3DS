@@ -41,8 +41,8 @@ typedef int32_t s32;
 typedef uint64_t u64;
 typedef int64_t s64;
 
-#define ubi(n) unsigned _BitInt(n)
-#define sbi(n) signed _BitInt(n)
+#define ubit(n) unsigned _BitInt(n)
+#define sbit(n) signed _BitInt(n)
 
 typedef float fvec2[2];
 typedef float fvec4[4];
@@ -79,9 +79,9 @@ typedef float fvec4[4];
 // N must be a power of 2
 #define FIFO(T, N)                                                             \
     struct {                                                                   \
-        typeof(T) d[N];                                                                \
-        ubi(INVBIT(N)) head;                                                   \
-        ubi(INVBIT(N)) tail;                                                   \
+        typeof(T) d[N];                                                        \
+        ubit(INVBIT(N)) head;                                                  \
+        ubit(INVBIT(N)) tail;                                                  \
         u32 size;                                                              \
     }
 
@@ -97,7 +97,7 @@ typedef float fvec4[4];
 
 #define StaticVector(T, N)                                                     \
     struct {                                                                   \
-        typeof(T) d[N];                                                                \
+        typeof(T) d[N];                                                        \
         size_t size;                                                           \
     }
 

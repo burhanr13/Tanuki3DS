@@ -115,6 +115,11 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_F6:
             ctremu.mute = !ctremu.mute;
             break;
+#ifdef AUDIO_DEBUG
+        case SDLK_0 ... SDLK_9:
+            g_dsp_chn_disable ^= BIT(key - SDLK_0);
+            break;
+#endif
         default:
             break;
     }
