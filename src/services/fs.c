@@ -31,27 +31,27 @@ u8 country_list[] = {
 #embed "countrylist.app.romfs"
 };
 
-char* archive_basepath(u64 archive) {
+char* archive_basepath(E3DS* s, u64 archive) {
     switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
         case ARCHIVE_SYSTEMSAVEDATA: {
             char* basepath;
-            asprintf(&basepath, "system/savedata/%s", ctremu.romfilenoext);
+            asprintf(&basepath, "3ds/savedata/%s", s->romimage.name);
             return basepath;
         }
         case ARCHIVE_EXTSAVEDATA: {
             char* basepath;
-            asprintf(&basepath, "system/extdata/%s", ctremu.romfilenoext);
+            asprintf(&basepath, "3ds/extdata/%s", s->romimage.name);
             return basepath;
         }
         case ARCHIVE_SHAREDEXTDATA: {
             char* basepath;
-            asprintf(&basepath, "system/extdata/shared");
+            asprintf(&basepath, "3ds/extdata/shared");
             return basepath;
         }
         case ARCHIVE_SDMC: {
             char* basepath;
-            asprintf(&basepath, "system/sdmc");
+            asprintf(&basepath, "3ds/sdmc");
             return basepath;
         }
         default:
@@ -60,8 +60,8 @@ char* archive_basepath(u64 archive) {
     }
 }
 
-FILE* open_formatinfo(u64 archive, bool write) {
-    char* basepath = archive_basepath(archive);
+FILE* open_formatinfo(E3DS* s, u64 archive, bool write) {
+    char* basepath = archive_basepath(s, archive);
     if (!basepath) {
         return nullptr;
     }
@@ -74,8 +74,9 @@ FILE* open_formatinfo(u64 archive, bool write) {
     return fp;
 }
 
-char* create_text_path(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
-    char* basepath = archive_basepath(archive);
+char* create_text_path(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
+                       u32 pathsize) {
+    char* basepath = archive_basepath(s, archive);
     if (!basepath) return nullptr;
 
     char* filepath = nullptr;
@@ -144,7 +145,7 @@ DECL_PORT(fs) {
             char* filepath = PTR(cmdbuf[12]);
             cmdbuf[0] = IPCHDR(1, 2);
             u64 ahandle =
-                fs_open_archive(archive, archivepathtype, archivepath);
+                fs_open_archive(s, archive, archivepathtype, archivepath);
             u32 h = handle_new(s);
             if (!h) {
                 cmdbuf[1] = -1;
@@ -171,7 +172,7 @@ DECL_PORT(fs) {
             void* path = PTR(cmdbuf[7]);
 
             cmdbuf[0] = IPCHDR(1, 0);
-            if (fs_delete_file(archivehandle, pathtype, path, pathsize)) {
+            if (fs_delete_file(s, archivehandle, pathtype, path, pathsize)) {
                 cmdbuf[1] = 0;
             } else {
                 cmdbuf[1] = FSERR_OPEN;
@@ -189,8 +190,8 @@ DECL_PORT(fs) {
             void* path = PTR(cmdbuf[10]);
 
             cmdbuf[0] = IPCHDR(1, 0);
-            if (fs_create_file(archivehandle, pathtype, path, pathsize, flags,
-                               filesize)) {
+            if (fs_create_file(s, archivehandle, pathtype, path, pathsize,
+                               flags, filesize)) {
                 cmdbuf[1] = 0;
             } else {
                 cmdbuf[1] = FSERR_CREATE;
@@ -205,7 +206,7 @@ DECL_PORT(fs) {
             void* path = PTR(cmdbuf[8]);
 
             cmdbuf[0] = IPCHDR(1, 0);
-            if (fs_create_dir(archivehandle, pathtype, path, pathsize)) {
+            if (fs_create_dir(s, archivehandle, pathtype, path, pathsize)) {
                 cmdbuf[1] = 0;
             } else {
                 cmdbuf[1] = FSERR_CREATE;
@@ -245,7 +246,7 @@ DECL_PORT(fs) {
             u32 archiveid = cmdbuf[1];
             u32 pathtype = cmdbuf[2];
             void* path = PTR(cmdbuf[5]);
-            u64 handle = fs_open_archive(archiveid, pathtype, path);
+            u64 handle = fs_open_archive(s, archiveid, pathtype, path);
 
             cmdbuf[0] = IPCHDR(3, 0);
             if (handle == -1) {
@@ -256,7 +257,7 @@ DECL_PORT(fs) {
             // cannot open these archives if they haven't been formatted yet
             if (handle == ARCHIVE_SAVEDATA || handle == ARCHIVE_EXTSAVEDATA ||
                 handle == ARCHIVE_SYSTEMSAVEDATA) {
-                FILE* fp = open_formatinfo(handle, false);
+                FILE* fp = open_formatinfo(s, handle, false);
                 if (!fp) {
                     cmdbuf[1] = FSERR_ARCHIVE;
                     break;
@@ -278,7 +279,7 @@ DECL_PORT(fs) {
         case 0x080f: {
             linfo("FormatThisUserSaveData");
 
-            FILE* fp = open_formatinfo(ARCHIVE_SAVEDATA, true);
+            FILE* fp = open_formatinfo(s, ARCHIVE_SAVEDATA, true);
             fwrite(&cmdbuf[3], sizeof(u32), 1, fp);
             fwrite(&cmdbuf[2], sizeof(u32), 1, fp);
             fwrite(&cmdbuf[6], sizeof(bool), 1, fp);
@@ -315,8 +316,8 @@ DECL_PORT(fs) {
 
             cmdbuf[0] = IPCHDR(5, 0);
 
-            FILE* fp = open_formatinfo(fs_open_archive(archive, pathtype, path),
-                                       false);
+            FILE* fp = open_formatinfo(
+                s, fs_open_archive(s, archive, pathtype, path), false);
             if (!fp) {
                 lwarn("opening unformatted archive %x", archive);
                 cmdbuf[1] = FSERR_ARCHIVE;
@@ -350,8 +351,8 @@ DECL_PORT(fs) {
                 "FormatSaveData for archive %x with numfiles=%d and numdirs=%d",
                 archive, numfiles, numdirs);
 
-            FILE* fp =
-                open_formatinfo(fs_open_archive(archive, pathtype, path), true);
+            FILE* fp = open_formatinfo(
+                s, fs_open_archive(s, archive, pathtype, path), true);
             fwrite(&numfiles, sizeof(u32), 1, fp);
             fwrite(&numdirs, sizeof(u32), 1, fp);
             fwrite(&duplicate, sizeof(bool), 1, fp);
@@ -368,7 +369,7 @@ DECL_PORT(fs) {
             linfo("CreateExtSaveData with numfiles=%d numdirs=%d", numfiles,
                   numdirs);
 
-            FILE* fp = open_formatinfo(ARCHIVE_EXTSAVEDATA, true);
+            FILE* fp = open_formatinfo(s, ARCHIVE_EXTSAVEDATA, true);
             fwrite(&numfiles, sizeof(u32), 1, fp);
             fwrite(&numdirs, sizeof(u32), 1, fp);
             fwrite(&(bool) {0}, sizeof(bool), 1, fp);
@@ -387,7 +388,7 @@ DECL_PORT(fs) {
             linfo("CreateSystemSaveData with numfiles=%d numdirs=%d", numfiles,
                   numdirs);
 
-            FILE* fp = open_formatinfo(ARCHIVE_SYSTEMSAVEDATA, true);
+            FILE* fp = open_formatinfo(s, ARCHIVE_SYSTEMSAVEDATA, true);
             fwrite(&numfiles, sizeof(u32), 1, fp);
             fwrite(&numdirs, sizeof(u32), 1, fp);
             fwrite(&duplicate, sizeof(bool), 1, fp);
@@ -721,7 +722,7 @@ DECL_PORT_ARG(fs_dir, fd) {
     }
 }
 
-u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
+u64 fs_open_archive(E3DS* s, u32 id, u32 pathtype, void* path) {
     switch (id) {
         case ARCHIVE_SELFNCCH:
             if (pathtype == FSPATH_EMPTY) {
@@ -735,7 +736,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
         case ARCHIVE_SAVEDATA: {
             if (pathtype == FSPATH_EMPTY) {
                 linfo("opening save data");
-                char* apath = archive_basepath(ARCHIVE_SAVEDATA);
+                char* apath = archive_basepath(s, ARCHIVE_SAVEDATA);
                 mkdir(apath, S_IRWXU);
                 free(apath);
                 return 4;
@@ -748,7 +749,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
             if (pathtype == FSPATH_BINARY) {
                 linfo("opening ext save data");
                 u64 aid = ARCHIVE_EXTSAVEDATA;
-                char* apath = archive_basepath(aid);
+                char* apath = archive_basepath(s, aid);
                 mkdir(apath, S_IRWXU);
                 free(apath);
                 return aid;
@@ -764,7 +765,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
                 linfo("opening shared extdata");
                 if (lowpath[1] != 0xf000'000b) lerror("unknown shared extdata");
                 u64 aid = 7;
-                char* apath = archive_basepath(aid);
+                char* apath = archive_basepath(s, aid);
                 mkdir(apath, S_IRWXU);
                 free(apath);
                 return aid;
@@ -779,7 +780,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
                 u32* lowpath = path;
                 linfo("opening system save data", id, lowpath[1]);
                 u64 aid = ARCHIVE_SYSTEMSAVEDATA;
-                char* apath = archive_basepath(aid);
+                char* apath = archive_basepath(s, aid);
                 mkdir(apath, S_IRWXU);
                 free(apath);
                 return aid;
@@ -791,7 +792,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
         case ARCHIVE_SDMC: {
             if (pathtype == FSPATH_EMPTY) {
                 linfo("opening sd card");
-                char* apath = archive_basepath(9);
+                char* apath = archive_basepath(s, ARCHIVE_SDMC);
                 free(apath);
                 return 9;
             } else {
@@ -825,7 +826,7 @@ u64 fs_open_archive(u32 id, u32 pathtype, void* path) {
         case 0x567890b4: {
             if (pathtype == FSPATH_BINARY) {
                 linfo("opening save data");
-                char* apath = archive_basepath(4);
+                char* apath = archive_basepath(s, ARCHIVE_SAVEDATA);
                 mkdir(apath, S_IRWXU);
                 free(apath);
                 return 4;
@@ -901,7 +902,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             }
 
             char* filepath =
-                create_text_path(archive, pathtype, rawpath, pathsize);
+                create_text_path(s, archive, pathtype, rawpath, pathsize);
 
             int mode = 0;
             switch (flags & 3) {
@@ -976,8 +977,8 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
     }
 }
 
-bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
-                    u32 flags, u64 filesize) {
+bool fs_create_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
+                    u32 pathsize, u32 flags, u64 filesize) {
     switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
         case ARCHIVE_EXTSAVEDATA:
@@ -985,7 +986,7 @@ bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
         case ARCHIVE_SYSTEMSAVEDATA:
         case ARCHIVE_SDMC: {
             char* filepath =
-                create_text_path(archive, pathtype, rawpath, pathsize);
+                create_text_path(s, archive, pathtype, rawpath, pathsize);
 
             linfo("creating file %s with size %x", filepath, filesize);
 
@@ -1007,7 +1008,8 @@ bool fs_create_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize,
     }
 }
 
-bool fs_delete_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
+bool fs_delete_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
+                    u32 pathsize) {
     switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
         case ARCHIVE_EXTSAVEDATA:
@@ -1015,7 +1017,7 @@ bool fs_delete_file(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
         case ARCHIVE_SYSTEMSAVEDATA:
         case ARCHIVE_SDMC: {
             char* filepath =
-                create_text_path(archive, pathtype, rawpath, pathsize);
+                create_text_path(s, archive, pathtype, rawpath, pathsize);
 
             linfo("deleting file %s", filepath);
 
@@ -1052,7 +1054,7 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             }
 
             char* filepath =
-                create_text_path(archive, pathtype, rawpath, pathsize);
+                create_text_path(s, archive, pathtype, rawpath, pathsize);
 
             DIR* dp = opendir(filepath);
             if (!dp) {
@@ -1076,7 +1078,8 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
     }
 }
 
-bool fs_create_dir(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
+bool fs_create_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
+                   u32 pathsize) {
     switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
         case ARCHIVE_EXTSAVEDATA:
@@ -1084,7 +1087,7 @@ bool fs_create_dir(u64 archive, u32 pathtype, void* rawpath, u32 pathsize) {
         case ARCHIVE_SYSTEMSAVEDATA:
         case ARCHIVE_SDMC: {
             char* filepath =
-                create_text_path(archive, pathtype, rawpath, pathsize);
+                create_text_path(s, archive, pathtype, rawpath, pathsize);
 
             linfo("creating directory %s", filepath);
 

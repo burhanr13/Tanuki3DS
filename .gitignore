@@ -21,6 +21,7 @@ ctremu*
 *.app
 
 system*
+3ds
 config.txt
 
 perf*

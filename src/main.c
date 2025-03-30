@@ -454,7 +454,7 @@ int main(int argc, char** argv) {
 
             char* wintitle;
             asprintf(&wintitle, "Tanuki3DS | %s | %.2lf FPS",
-                     ctremu.romfilenodir, fps);
+                     ctremu.system.romimage.name, fps);
             SDL_SetWindowTitle(g_window, wintitle);
             free(wintitle);
             prev_fps_update = cur_time;
