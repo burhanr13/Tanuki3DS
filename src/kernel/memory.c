@@ -35,13 +35,13 @@ void sigsegv_handler(int sig, siginfo_t* info, void* ucontext) {
                addr - ctremu.system.virtmem, ctremu.system.cpu.pc,
                ((KThread*) ctremu.system.process.handles[0])->id);
         cpu_print_state(&ctremu.system.cpu);
-        exit(1);
+        longjmp(ctremu.exceptionJmp, 1);
     }
     if (ctremu.system.physmem <= addr &&
         addr < ctremu.system.physmem + BITL(32)) {
         lerror("(FATAL) invalid 3DS physical memory access at %08x",
                addr - ctremu.system.physmem);
-        exit(1);
+        longjmp(ctremu.exceptionJmp, 1);
     }
     sigaction(sig, &(struct sigaction) {.sa_handler = SIG_DFL}, nullptr);
 }
@@ -59,7 +59,7 @@ u32 physaddr2memoff(u32 paddr) {
     }
     lerror("unknown physical memory address %08x", paddr);
     cpu_print_state(&ctremu.system.cpu);
-    exit(1);
+    longjmp(ctremu.exceptionJmp, 1);
 }
 
 void memory_init(E3DS* s) {
@@ -89,7 +89,7 @@ void memory_init(E3DS* s) {
     s->dsp.mem = s->physmem;
 
     struct sigaction sa = {.sa_sigaction = sigsegv_handler,
-                           .sa_flags = SA_SIGINFO};
+                           .sa_flags = SA_SIGINFO | SA_NODEFER};
     sigaction(SIGSEGV, &sa, nullptr);
     sigaction(SIGBUS, &sa, nullptr);
 
@@ -199,7 +199,7 @@ PageEntry ptabread(PageTable ptab, u32 vaddr) {
     if (res.state == MEMST_FREE) {
         lerror("invalid virtual memory address %08x", vaddr);
         cpu_print_state(&ctremu.system.cpu);
-        exit(1);
+        longjmp(ctremu.exceptionJmp, 1);
     }
     return res;
 }

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "emulator.h"
 #include "services/srv.h"
 
 #include "svc_types.h"
@@ -77,7 +78,7 @@ DECL_SVC(QueryMemory) {
 
 DECL_SVC(ExitProcess) {
     lerror("process exiting");
-    exit(1);
+    longjmp(ctremu.exceptionJmp, 1);
 }
 
 DECL_SVC(CreateThread) {
@@ -730,7 +731,7 @@ DECL_SVC(GetThreadContext) {
 
 DECL_SVC(Break) {
     lerror("at %08x (lr=%08x)", s->cpu.pc, s->cpu.lr);
-    exit(1);
+    longjmp(ctremu.exceptionJmp, 1);
 }
 
 DECL_SVC(OutputDebugString) {

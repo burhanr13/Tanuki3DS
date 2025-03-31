@@ -379,6 +379,16 @@ int main(int argc, char** argv) {
             SDL_ClearAudioStream(g_audio);
         }
 
+        if (setjmp(ctremu.exceptionJmp)) {
+            emulator_reset();
+            ctremu.pause = true;
+            SDL_ShowSimpleMessageBox(
+                SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
+                "A fatal error has occurred or the application has exited. "
+                "Please see the log for details.",
+                g_window);
+        }
+
         if (!ctremu.pause) {
             renderer_gl_setup_gpu(&ctremu.system.gpu.gl);
 

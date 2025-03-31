@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "emulator.h"
 #include "kernel/memory.h"
 #include "kernel/svc.h"
 
@@ -194,7 +195,7 @@ DECL_PORT(errf) {
             lerror("fatal error type %d, result %08x, pc %08x, message: %s",
                    errinfo->type, errinfo->resultcode, errinfo->pc,
                    errinfo->message);
-            exit(1);
+            longjmp(ctremu.exceptionJmp, 1);
             break;
         }
         default:
