@@ -171,7 +171,7 @@ void decsrc(DecCTX* ctx, u32 n, u8 idx, u8 swizzle, bool neg) {
     else {
         n -= 0x20;
         if (idx) {
-            printf("c[%d + ", n);
+            printf("c[(%d + ", n);
             switch (idx) {
                 case 1:
                     printf("a.x");
@@ -183,7 +183,7 @@ void decsrc(DecCTX* ctx, u32 n, u8 idx, u8 swizzle, bool neg) {
                     printf("int(aL)");
                     break;
             }
-            printf("]");
+            printf(") & 0x7f]");
         } else printf("c[%d]", n);
     }
     if (swizzle != 0b00011011) {
@@ -415,9 +415,9 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
                         printf("%c", coordnames[i]);
                     }
                 }
-                printf(" = ivec4(");
+                printf(" = ivec4(clamp(");
                 SRC1(1);
-                printf(").");
+                printf(", -128, 127)).");
                 for (int i = 0; i < 2; i++) {
                     if (desc.destmask & BIT(3 - i)) {
                         printf("%c", coordnames[i]);
@@ -506,7 +506,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_LOOP: {
             printf("aL = i[%d].y;\n", instr.fmt3.c);
             INDENT(ctx->depth);
-            printf("for (uint l = 0u; l <= i[%d].x; l++, aL += i[%d].z) {\n",
+            printf("for (uint l = 0u; l <= i[%d].x; l++, aL = (aL + i[%d].z) & 0xffu) {\n",
                    instr.fmt3.c, instr.fmt3.c);
             dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
             INDENT(ctx->depth);
