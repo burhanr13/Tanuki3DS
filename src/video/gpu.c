@@ -1251,6 +1251,8 @@ void gpu_vshrunner_destroy(GPU* gpu) {
     gpu->vsh_runner.die = true;
     for (int i = 0; i < ctremu.vshthreads; i++) {
         gpu->vsh_runner.ready[i] = true;
+    }
+    for (int i = 0; i < ctremu.vshthreads; i++) {
         pthread_join(gpu->vsh_runner.threads[i], nullptr);
     }
 }
