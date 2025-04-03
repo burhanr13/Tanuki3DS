@@ -11,12 +11,14 @@
 // #define VSH_DEBUG
 
 int shader_dec_get(GPU* gpu) {
-    // we need to hash the shader code, entrypoint, and outmap
+    // we need to hash the shader code, entrypoint, outmap_mask, and outmap
     XXH3_state_t* xxst = XXH3_createState();
     XXH3_64bits_reset(xxst);
-    XXH3_64bits_update(xxst, gpu->progdata, sizeof gpu->progdata);
+    XXH3_64bits_update(xxst, gpu->vsh.progdata, sizeof gpu->vsh.progdata);
     XXH3_64bits_update(xxst, &gpu->regs.vsh.entrypoint,
                        sizeof gpu->regs.vsh.entrypoint);
+    XXH3_64bits_update(xxst, &gpu->regs.vsh.outmap_mask,
+                       sizeof gpu->regs.vsh.outmap_mask);
     XXH3_64bits_update(xxst, gpu->regs.raster.sh_outmap,
                        sizeof gpu->regs.raster.sh_outmap);
     u64 hash = XXH3_64bits_digest(xxst);
@@ -37,7 +39,6 @@ int shader_dec_get(GPU* gpu) {
             char log[512];
             glGetShaderInfoLog(block->vs, sizeof log, nullptr, log);
             lerror("failed to compile shader: %s", log);
-            printf("%s", source);
         }
         free(source);
 
@@ -170,7 +171,7 @@ void decsrc(DecCTX* ctx, u32 n, u8 idx, u8 swizzle, bool neg) {
     else {
         n -= 0x20;
         if (idx) {
-            printf("c[%d + ", n);
+            printf("c[(%d + ", n);
             switch (idx) {
                 case 1:
                     printf("a.x");
@@ -179,10 +180,10 @@ void decsrc(DecCTX* ctx, u32 n, u8 idx, u8 swizzle, bool neg) {
                     printf("a.y");
                     break;
                 case 3:
-                    printf("aL");
+                    printf("int(aL)");
                     break;
             }
-            printf("]");
+            printf(") & 0x7f]");
         } else printf("c[%d]", n);
     }
     if (swizzle != 0b00011011) {
@@ -414,9 +415,9 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
                         printf("%c", coordnames[i]);
                     }
                 }
-                printf(" = ivec4(");
+                printf(" = ivec4(clamp(");
                 SRC1(1);
-                printf(").");
+                printf(", -128, 127)).");
                 for (int i = 0; i < 2; i++) {
                     if (desc.destmask & BIT(3 - i)) {
                         printf("%c", coordnames[i]);
@@ -505,7 +506,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_LOOP: {
             printf("aL = i[%d].y;\n", instr.fmt3.c);
             INDENT(ctx->depth);
-            printf("for (uint l = 0u; l <= i[%d].x; l++, aL += i[%d].z) {\n",
+            printf("for (uint l = 0u; l <= i[%d].x; l++, aL = (aL + i[%d].z) & 0xffu) {\n",
                    instr.fmt3.c, instr.fmt3.c);
             dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
             INDENT(ctx->depth);
@@ -681,8 +682,8 @@ char* shader_dec_vs(GPU* gpu) {
 
     DecCTX ctx = {};
     ds_init(&ctx.s, 32768);
-    ctx.shu.code = (PICAInstr*) gpu->progdata;
-    ctx.shu.opdescs = (OpDesc*) gpu->opdescs;
+    ctx.shu.code = (PICAInstr*) gpu->vsh.progdata;
+    ctx.shu.opdescs = (OpDesc*) gpu->vsh.opdescs;
     ctx.shu.entrypoint = gpu->regs.vsh.entrypoint;
 
     ctx.out_view = -1;
@@ -718,16 +719,24 @@ char* shader_dec_vs(GPU* gpu) {
 
     ds_printf(&final, "proc_main();\n\n");
 
-    ds_printf(&final, "vec4 pos = vec4(0);\n");
+    ds_printf(&final, "vec4 pos = vec4(1);\n");
     // macos gets mad if you dont write all the outputs
     // so we do that first
-    ds_printf(&final, "color = vec4(0);\n");
-    ds_printf(&final, "normquat = vec4(0);\n");
-    ds_printf(&final, "view = vec3(0);\n");
-    ds_printf(&final, "texcoord0 = vec2(0);\n");
-    ds_printf(&final, "texcoord1 = vec2(0);\n");
-    ds_printf(&final, "texcoord2 = vec2(0);\n");
-    ds_printf(&final, "texcoordw = 0;\n\n");
+    ds_printf(&final, "color = vec4(1);\n");
+    ds_printf(&final, "normquat = vec4(1);\n");
+    ds_printf(&final, "view = vec3(1);\n");
+    ds_printf(&final, "texcoord0 = vec2(1);\n");
+    ds_printf(&final, "texcoord1 = vec2(1);\n");
+    ds_printf(&final, "texcoord2 = vec2(1);\n");
+    ds_printf(&final, "texcoordw = 1;\n\n");
+
+    // handle the outmap mask
+    int dstidx = 0;
+    for (int i = 0; i < 16; i++) {
+        if (!(gpu->regs.vsh.outmap_mask & BIT(i))) continue;
+        if (dstidx != i) ds_printf(&final, "o[%d] = o[%d];\n", dstidx, i);
+        dstidx++;
+    }
 
     for (int o = 0; o < 7; o++) {
         u32 all = gpu->regs.raster.sh_outmap[o][0] << 24 |

@@ -46,7 +46,7 @@ typedef struct {
 
 typedef struct {
     u8 signature[0x100];
-    char magic[4];
+    char magic[4]; // NCSD
     u32 size;
     u64 media_id;
     u8 part_type[8];
@@ -59,7 +59,7 @@ typedef struct {
 
 typedef struct {
     u8 signature[0x100];
-    char magic[4];
+    char magic[4]; // NCCH
     u32 size;
     u64 part_id;
     u8 _110[0x90];
@@ -137,19 +137,47 @@ typedef struct {
     u16 patch;
 } _3DSXRelocation;
 
+typedef struct {
+    char magic[4]; // SMDH
+    u16 version;
+    u16 res1;
+    struct {
+        u16 shortname[64];
+        u16 longname[128];
+        u16 publisher[64];
+    } titles[16];
+    struct {
+        u32 ratings[4];
+        u32 regionLock;
+        u32 matchMakerIDs[3];
+        u32 flags;
+        u16 eula;
+        u16 res;
+        u32 animDefaultFrame;
+        u32 cecID;
+    } settings;
+    u32 res2[2];
+    u8 icon[];
+} SMDHFile;
+
 typedef struct _3DS E3DS;
 
 typedef struct {
     FILE* fp;
     u32 exheader_off;
     u32 exefs_off;
+    u32 smdh_off;
     u32 romfs_off;
+
+    char name[64];
 } RomImage;
 
 u32 load_elf(E3DS* s, char* filename);
 u32 load_3dsx(E3DS* s, char* filename);
 u32 load_ncsd(E3DS* s, char* filename);
 u32 load_ncch(E3DS* s, char* filename, u64 offset);
+
+void parse_smdh(E3DS* s);
 
 u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size);
 

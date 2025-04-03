@@ -115,6 +115,11 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_F6:
             ctremu.mute = !ctremu.mute;
             break;
+#ifdef AUDIO_DEBUG
+        case SDLK_0 ... SDLK_9:
+            g_dsp_chn_disable ^= BIT(key - SDLK_0);
+            break;
+#endif
         default:
             break;
     }
@@ -348,6 +353,8 @@ int main(int argc, char** argv) {
         SDL_GL_SetSwapInterval(0);
     }
 
+    glClear(GL_COLOR_BUFFER_BIT);
+
     Uint64 prev_time = SDL_GetTicksNS();
     Uint64 prev_fps_update = prev_time;
     Uint64 prev_fps_frame = 0;
@@ -370,6 +377,16 @@ int main(int argc, char** argv) {
             }
             SDL_RaiseWindow(g_window);
             SDL_ClearAudioStream(g_audio);
+        }
+
+        if (setjmp(ctremu.exceptionJmp)) {
+            emulator_reset();
+            ctremu.pause = true;
+            SDL_ShowSimpleMessageBox(
+                SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
+                "A fatal error has occurred or the application has exited. "
+                "Please see the log for details.",
+                g_window);
         }
 
         if (!ctremu.pause) {
@@ -447,7 +464,7 @@ int main(int argc, char** argv) {
 
             char* wintitle;
             asprintf(&wintitle, "Tanuki3DS | %s | %.2lf FPS",
-                     ctremu.romfilenodir, fps);
+                     ctremu.system.romimage.name, fps);
             SDL_SetWindowTitle(g_window, wintitle);
             free(wintitle);
             prev_fps_update = cur_time;

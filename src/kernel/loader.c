@@ -1,9 +1,11 @@
 #include "loader.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "3ds.h"
+#include "emulator.h"
 
 #include "svc_types.h"
 
@@ -53,6 +55,8 @@ u32 load_elf(E3DS* s, char* filename) {
 
     memory_virtalloc(s, STACK_BASE - BIT(14), BIT(14), PERM_RW, MEMST_PRIVATE);
 
+    strncpy(s->romimage.name, ctremu.romfilenoext, sizeof s->romimage.name - 1);
+
     return ehdr.e_entry;
 }
 
@@ -66,6 +70,11 @@ u32 load_3dsx(E3DS* s, char* filename) {
 
     _3DSXHeader hdr;
     fread(&hdr, 1, sizeof(_3DSXHeader), fp);
+
+    if (strncmp(hdr.magic, "3DSX", 4)) {
+        lerror("bad magic for 3DSX: %.4s", hdr.magic);
+        return -1;
+    }
 
     fseek(fp, hdr.hdrSz, SEEK_SET);
     _3DSXRelHeader relhdr[3];
@@ -115,8 +124,11 @@ u32 load_3dsx(E3DS* s, char* filename) {
 
     s->romimage.fp = fp;
     s->romimage.romfs_off = hdr.romfsOff;
+    s->romimage.smdh_off = hdr.smdhOff;
 
     memory_virtalloc(s, STACK_BASE - BIT(14), BIT(14), PERM_RW, MEMST_PRIVATE);
+
+    parse_smdh(s);
 
     return start_addr;
 }
@@ -127,6 +139,11 @@ u32 load_ncsd(E3DS* s, char* filename) {
 
     NCSDHeader hdrncsd;
     fread(&hdrncsd, sizeof hdrncsd, 1, fp);
+
+    if (strncmp(hdrncsd.magic, "NCSD", 4)) {
+        lerror("bad magic for NCSD: %.4s", hdrncsd.magic);
+        return -1;
+    }
 
     u32 ncchbase = hdrncsd.part[0].offset * 0x200;
     fclose(fp);
@@ -146,6 +163,11 @@ u32 load_ncch(E3DS* s, char* filename, u64 offset) {
     NCCHHeader hdrncch;
     fread(&hdrncch, sizeof hdrncch, 1, fp);
 
+    if (strncmp(hdrncch.magic, "NCCH", 4)) {
+        lerror("bad magic for NCCH: %.4s", hdrncch.magic);
+        return -1;
+    }
+
     ExHeader exhdr;
     fread(&exhdr, sizeof exhdr, 1, fp);
 
@@ -162,10 +184,15 @@ u32 load_ncch(E3DS* s, char* filename, u64 offset) {
 
     u32 codeoffset = 0;
     u32 codesize = 0;
+    u32 iconoff = 0;
+
     for (int i = 0; i < 10; i++) {
         if (!strcmp(hdrexefs.file[i].name, ".code")) {
             codeoffset = hdrexefs.file[i].offset;
             codesize = hdrexefs.file[i].size;
+        }
+        if (!strcmp(hdrexefs.file[i].name, "icon")) {
+            iconoff = hdrexefs.file[i].offset;
         }
     }
     if (!codesize) return -1;
@@ -206,11 +233,33 @@ u32 load_ncch(E3DS* s, char* filename, u64 offset) {
     s->romimage.exheader_off = ncchbase + 0x200;
     s->romimage.exefs_off = ncchbase + hdrncch.exefs.offset * 0x200;
     s->romimage.romfs_off = ncchbase + hdrncch.romfs.offset * 0x200 + 0x1000;
+    s->romimage.smdh_off = base + iconoff;
 
     memory_virtalloc(s, STACK_BASE - exhdr.sci.stacksz, exhdr.sci.stacksz,
                      PERM_RW, MEMST_PRIVATE);
 
+    parse_smdh(s);
+
     return exhdr.sci.text.vaddr;
+}
+
+void parse_smdh(E3DS* s) {
+
+    SMDHFile smdh;
+    fseek(s->romimage.fp, s->romimage.smdh_off, SEEK_SET);
+    fread(&smdh, sizeof smdh, 1, s->romimage.fp);
+    if (strncmp(smdh.magic, "SMDH", 4)) {
+        lerror("bad magic for SMDH: %.4s", smdh.magic);
+        return;
+    }
+
+    for (int i = 0; i < 64; i++) {
+        char c = smdh.titles[1].shortname[i];
+        // at some point properly convert from utf16
+        if (c && !isprint(c)) c = '?';
+        s->romimage.name[i] = c;
+    }
+    linfo("name from smdh: %s", s->romimage.name);
 }
 
 u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size) {

@@ -42,15 +42,19 @@ typedef struct _KThread {
 
     u32 waiting_addr;
     KListNode* waiting_objs;
-    bool wait_all;
+    bool wait_any;
 
     KListNode* waiting_thrds;
 
     KListNode* owned_mutexes;
 
+    struct _KThread *next, *prev;
+
     u32 id;
     s32 priority;
     u32 state;
+
+    u32 tls;
 } KThread;
 
 typedef void (*KEventCallback)(E3DS*);
@@ -103,13 +107,13 @@ typedef struct {
 
 #define CUR_THREAD ((KThread*) s->process.handles[0])
 
-#define GETTLS(t) (TLS_BASE + TLS_SIZE * (t)->id)
-
 void e3ds_restore_context(E3DS* s);
 void e3ds_save_context(E3DS* s);
 
 void thread_init(E3DS* s, u32 entrypoint);
-u32 thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority, u32 arg);
+KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
+                       u32 arg);
+void thread_ready(E3DS* s, KThread* t);
 void thread_reschedule(E3DS* s);
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout);

@@ -5,8 +5,10 @@
 
 void dsp_event(E3DS* s, SchedEventArg) {
     s->lastAudioFrame = s->sched.now;
-    if (s->services.dsp.audio_event)
+    if (s->services.dsp.audio_event) {
+        linfo("signaling dsp event");
         event_signal(s, s->services.dsp.audio_event);
+    }
 }
 
 // runs when the application signals the dsp semaphore

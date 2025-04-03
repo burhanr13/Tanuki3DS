@@ -317,7 +317,10 @@ typedef union {
                     u32 indexfmt : 1;
                 };
                 u32 nverts;
-                u32 config;
+                struct {
+                    u32 use_gsh : 2;
+                    u32 : 30;
+                } config;
                 u32 vtx_off;
                 u32 _22b[3];
                 u32 drawarrays;
@@ -336,12 +339,22 @@ typedef union {
                 u32 _243;
                 u32 vsh_com_mode;
                 u32 start_draw_func0;
-                u32 _246[0x18];
+                u32 _246[4];
+                u32 vsh_outmap_total1;
+                u32 _24b[6];
+                u32 vsh_outmap_total2;
                 struct {
-                    u32 outmapcount : 8;
                     u32 mode : 2;
-                    u32 : 6;
-                    u32 : 16;
+                    u32 : 30;
+                } gsh_misc0;
+                u32 config2;
+                u32 gsh_misc1;
+                u32 _255[9];
+                struct {
+                    u32 vsh_outmapcount : 4;
+                    u32 : 4;
+                    u32 mode : 2;
+                    u32 : 22;
                 } prim_config;
                 u32 restart_primitive;
             };
@@ -352,7 +365,10 @@ typedef union {
                 u32 booluniform;
                 u8 intuniform[4][4];
                 u32 _285[4];
-                u32 inconfig;
+                struct {
+                    u32 inattrs : 4;
+                    u32 : 28;
+                } inconfig;
                 struct {
                     u16 entrypoint;
                     u16 entrypointhi;

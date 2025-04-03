@@ -393,6 +393,42 @@ void shader_run(ShaderUnit* shu) {
                 TOP.max = shu->i[instr.fmt3.c & 3][0];
                 break;
             }
+            case PICA_EMIT: {
+                shader_write_outmap(shu, shu->gsh.curvtx[shu->gsh.emit_vtxid]);
+                if (shu->gsh.emit_vtxid == 3) lwarn("gsh quads?");
+                if (shu->gsh.emit_prim) {
+                    // right now we only emit tris, supposedly you can emit
+                    // quads but not known how to tell
+                    if (shu->gsh.emit_inv) {
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[2], sizeof shu->gsh.curvtx[2]);
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[1], sizeof shu->gsh.curvtx[1]);
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[0], sizeof shu->gsh.curvtx[0]);
+                    } else {
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[0], sizeof shu->gsh.curvtx[0]);
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[1], sizeof shu->gsh.curvtx[1]);
+                        Vec_grow(shu->gsh.outvtx);
+                        memcpy(shu->gsh.outvtx.d[shu->gsh.outvtx.size++],
+                               shu->gsh.curvtx[2], sizeof shu->gsh.curvtx[2]);
+                    }
+                }
+                break;
+            }
+            case PICA_SETEMIT: {
+                shu->gsh.emit_vtxid = instr.fmt4.vtxid;
+                shu->gsh.emit_inv = instr.fmt4.inv;
+                shu->gsh.emit_prim = instr.fmt4.prim;
+                break;
+            }
             case PICA_JMPC:
             case PICA_JMPU: {
                 bool cond;
@@ -735,6 +771,15 @@ u32 disasm_instr(ShaderUnit* shu, u32 pc) {
             pc = instr.fmt3.dest + 1;
             break;
         }
+        case PICA_SETEMIT: {
+            printf("setemit %d", instr.fmt4.vtxid);
+            if (instr.fmt4.inv) printf(" inv");
+            if (instr.fmt4.prim) printf(" prim");
+            break;
+        }
+        case PICA_EMIT:
+            printf("emit");
+            break;
         case PICA_JMPC:
         case PICA_JMPU: {
             if (instr.opcode == PICA_JMPU) {
@@ -815,4 +860,12 @@ void pica_shader_disasm(ShaderUnit* shu) {
         printf("end proc\n");
     }
     Vec_free(disasm.calls);
+}
+
+void shader_write_outmap(ShaderUnit* shu, fvec4* out) {
+    int dstidx = 0;
+    for (int i = 0; i < 16; i++) {
+        if (!(shu->outmap_mask & BIT(i))) continue;
+        memcpy(out[dstidx++], shu->o[i], sizeof(fvec4));
+    }
 }

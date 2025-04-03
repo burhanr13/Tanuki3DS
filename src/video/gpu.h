@@ -11,7 +11,7 @@
 #include "renderer_gl.h"
 #include "shader.h"
 #include "shaderdec.h"
-#include "shadergen.h"
+#include "shadergen_fs.h"
 #include "shaderjit/shaderjit.h"
 
 #define MAX_VSH_THREADS 16
@@ -77,20 +77,23 @@ typedef struct _GPU {
     E3DSMemory* mem;
 #endif
 
-    u32 progdata[SHADER_CODE_SIZE];
-    u32 opdescs[SHADER_OPDESC_SIZE];
-    u32 sh_idx;
-    bool sh_dirty;
+    struct {
+        u32 progdata[SHADER_CODE_SIZE];
+        u32 opdescs[SHADER_OPDESC_SIZE];
+        u32 code_idx;
+        bool code_dirty;
+
+        u32 curuniform;
+        int curunifi;
+        alignas(16) fvec4 floatuniform[96];
+    } gsh, vsh;
+
+    bool vsh_uniform_dirty; // for hw vertex shaders
 
     fvec4 fixattrs[16];
     u32 curfixattr;
     int curfixi;
     Vector(fvec4) immattrs;
-
-    u32 curuniform;
-    int curunifi;
-    alignas(16) fvec4 floatuniform[96];
-    bool uniform_dirty;
 
     LRUCache(FBInfo, FB_MAX) fbs;
     FBInfo* curfb;
@@ -100,22 +103,14 @@ typedef struct _GPU {
     LRUCache(FSHCacheEntry, FSH_MAX) fshaders;
 
     struct {
-        struct {
-            pthread_t thd;
+        pthread_t threads[MAX_VSH_THREADS];
+        volatile atomic_bool ready[MAX_VSH_THREADS];
 
-            bool ready;
-            int off;
-            int count;
-        } thread[MAX_VSH_THREADS];
-
-        pthread_cond_t cv1;
-        pthread_cond_t cv2;
-        pthread_mutex_t mtx;
-
-        atomic_int cur;
+        volatile atomic_int cur;
         bool die;
 
         int base;
+        int count;
         void* attrcfg;
         void* vbuf;
 
@@ -156,8 +151,6 @@ void gpu_clear_fb(GPU* gpu, u32 paddr, u32 len, u32 value, u32 datasz);
 void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
 void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len);
 
-void gpu_drawarrays(GPU* gpu);
-void gpu_drawelements(GPU* gpu);
-void gpu_drawimmediate(GPU* gpu);
+void gpu_draw(GPU* gpu, bool elements, bool immediate);
 
 #endif

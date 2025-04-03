@@ -10,7 +10,7 @@
 #include "renderer_gl.h"
 #include "shader.h"
 #include "shaderdec.h"
-#include "shadergen.h"
+#include "shadergen_fs.h"
 
 #include "gpuptr.inc"
 
@@ -83,21 +83,16 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
                                  gpu->regs.geom.cmdbuf.size[1] << 3);
             return;
         case GPUREG(geom.drawarrays):
-            gpu_drawarrays(gpu);
+            gpu_draw(gpu, false, false);
             break;
         case GPUREG(geom.drawelements):
-            gpu_drawelements(gpu);
+            gpu_draw(gpu, true, false);
             break;
         case GPUREG(geom.fixattr_data[0])... GPUREG(geom.fixattr_data[2]): {
             fvec4* fattr;
             bool immediatemode = false;
             if (gpu->regs.geom.fixattr_idx == 0xf) {
-                if (gpu->immattrs.size == gpu->immattrs.cap) {
-                    gpu->immattrs.cap =
-                        gpu->immattrs.cap ? 2 * gpu->immattrs.cap : 8;
-                    gpu->immattrs.d = realloc(
-                        gpu->immattrs.d, gpu->immattrs.cap * sizeof(fvec4));
-                }
+                Vec_grow(gpu->immattrs);
                 fattr = &gpu->immattrs.d[gpu->immattrs.size];
                 immediatemode = true;
             } else {
@@ -131,42 +126,85 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             // use it to end an immediate draw call, since there is no explicit
             // way to end an immediate mode draw call like glEnd
             if (gpu->immattrs.size) {
-                gpu_drawimmediate(gpu);
+                gpu_draw(gpu, false, true);
             }
             break;
-        case GPUREG(vsh.floatuniform_data[0])... GPUREG(
-            vsh.floatuniform_data[7]): {
-            gpu->uniform_dirty = true;
-            u32 idx = gpu->regs.vsh.floatuniform_idx;
+        case GPUREG(gsh.floatuniform_data[0])... GPUREG(
+            gsh.floatuniform_data[7]): {
+            u32 idx = gpu->regs.gsh.floatuniform_idx;
             if (idx >= 96) {
-                lwarn("writing to out of bound uniform");
+                linfo("writing to out of bound uniform");
                 break;
             }
-            fvec4* uniform = &gpu->floatuniform[idx];
-            if (gpu->regs.vsh.floatuniform_mode) {
-                (*uniform)[3 - gpu->curunifi] = I2F(param);
-                if (++gpu->curunifi == 4) {
-                    gpu->curunifi = 0;
-                    gpu->regs.vsh.floatuniform_idx++;
+            fvec4* uniform = &gpu->gsh.floatuniform[idx];
+            if (gpu->regs.gsh.floatuniform_mode) {
+                (*uniform)[3 - gpu->gsh.curunifi] = I2F(param);
+                if (++gpu->gsh.curunifi == 4) {
+                    gpu->gsh.curunifi = 0;
+                    gpu->regs.gsh.floatuniform_idx++;
                 }
             } else {
-                switch (gpu->curunifi) {
+                switch (gpu->gsh.curunifi) {
                     case 0: {
                         (*uniform)[3] = cvtf24(param >> 8);
-                        gpu->curuniform = (param & 0xff) << 16;
-                        gpu->curunifi = 1;
+                        gpu->gsh.curuniform = (param & 0xff) << 16;
+                        gpu->gsh.curunifi = 1;
                         break;
                     }
                     case 1: {
-                        (*uniform)[2] = cvtf24(param >> 16 | gpu->curuniform);
-                        gpu->curuniform = (param & MASK(16)) << 8;
-                        gpu->curunifi = 2;
+                        (*uniform)[2] =
+                            cvtf24(param >> 16 | gpu->gsh.curuniform);
+                        gpu->gsh.curuniform = (param & MASK(16)) << 8;
+                        gpu->gsh.curunifi = 2;
                         break;
                     }
                     case 2: {
-                        (*uniform)[1] = cvtf24(param >> 24 | gpu->curuniform);
+                        (*uniform)[1] =
+                            cvtf24(param >> 24 | gpu->gsh.curuniform);
                         (*uniform)[0] = cvtf24(param & MASK(24));
-                        gpu->curunifi = 0;
+                        gpu->gsh.curunifi = 0;
+                        gpu->regs.gsh.floatuniform_idx++;
+                        break;
+                    }
+                }
+            }
+            break;
+        }
+        case GPUREG(vsh.floatuniform_data[0])... GPUREG(
+            vsh.floatuniform_data[7]): {
+            gpu->vsh_uniform_dirty = true;
+            u32 idx = gpu->regs.vsh.floatuniform_idx;
+            if (idx >= 96) {
+                linfo("writing to out of bound uniform");
+                break;
+            }
+            fvec4* uniform = &gpu->vsh.floatuniform[idx];
+            if (gpu->regs.vsh.floatuniform_mode) {
+                (*uniform)[3 - gpu->vsh.curunifi] = I2F(param);
+                if (++gpu->vsh.curunifi == 4) {
+                    gpu->vsh.curunifi = 0;
+                    gpu->regs.vsh.floatuniform_idx++;
+                }
+            } else {
+                switch (gpu->vsh.curunifi) {
+                    case 0: {
+                        (*uniform)[3] = cvtf24(param >> 8);
+                        gpu->vsh.curuniform = (param & 0xff) << 16;
+                        gpu->vsh.curunifi = 1;
+                        break;
+                    }
+                    case 1: {
+                        (*uniform)[2] =
+                            cvtf24(param >> 16 | gpu->vsh.curuniform);
+                        gpu->vsh.curuniform = (param & MASK(16)) << 8;
+                        gpu->vsh.curunifi = 2;
+                        break;
+                    }
+                    case 2: {
+                        (*uniform)[1] =
+                            cvtf24(param >> 24 | gpu->vsh.curuniform);
+                        (*uniform)[0] = cvtf24(param & MASK(24));
+                        gpu->vsh.curunifi = 0;
                         gpu->regs.vsh.floatuniform_idx++;
                         break;
                     }
@@ -176,25 +214,37 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
         }
         case GPUREG(vsh.intuniform[0])... GPUREG(vsh.intuniform[3]):
         case GPUREG(vsh.booluniform):
-            gpu->uniform_dirty = true;
+            gpu->vsh_uniform_dirty = true;
+            break;
+        case GPUREG(gsh.entrypoint):
+            gpu->gsh.code_dirty = true;
+            break;
+        case GPUREG(gsh.codetrans_data[0])... GPUREG(gsh.codetrans_data[8]):
+            gpu->gsh.code_dirty = true;
+            gpu->gsh
+                .progdata[gpu->regs.gsh.codetrans_idx++ % SHADER_CODE_SIZE] =
+                param;
+            break;
+        case GPUREG(gsh.opdescs_data[0])... GPUREG(gsh.opdescs_data[8]):
+            gpu->gsh.code_dirty = true;
+            gpu->gsh.opdescs[gpu->regs.gsh.opdescs_idx++ % SHADER_OPDESC_SIZE] =
+                param;
             break;
         case GPUREG(vsh.entrypoint):
         case GPUREG(raster.sh_outmap[0])... GPUREG(raster.sh_outmap[6]):
             // entrypoint and outmap both affect the decompiled vs
-            gpu->sh_dirty = true;
+            gpu->vsh.code_dirty = true;
             break;
         case GPUREG(vsh.codetrans_data[0])... GPUREG(vsh.codetrans_data[8]):
-            gpu->sh_dirty = true;
-            gpu->progdata[gpu->regs.vsh.codetrans_idx++ % SHADER_CODE_SIZE] =
+            gpu->vsh.code_dirty = true;
+            gpu->vsh
+                .progdata[gpu->regs.vsh.codetrans_idx++ % SHADER_CODE_SIZE] =
                 param;
             break;
         case GPUREG(vsh.opdescs_data[0])... GPUREG(vsh.opdescs_data[8]):
-            gpu->sh_dirty = true;
-            gpu->opdescs[gpu->regs.vsh.opdescs_idx++ % SHADER_OPDESC_SIZE] =
+            gpu->vsh.code_dirty = true;
+            gpu->vsh.opdescs[gpu->regs.vsh.opdescs_idx++ % SHADER_OPDESC_SIZE] =
                 param;
-            break;
-        case GPUREG(geom.restart_primitive):
-            Vec_free(gpu->immattrs);
             break;
     }
 }
@@ -300,6 +350,10 @@ void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
     linfo("display transfer fb at %x to %s", paddr,
           screenid == SCREEN_TOP ? "top" : "bot");
 
+    // scissor test and color mask affects blit framebuffer
+    glDisable(GL_SCISSOR_TEST);
+    glColorMask(true, true, true, true);
+
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbo[screenid]);
 
@@ -342,6 +396,10 @@ void gpu_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid) {
     glBindTexture(GL_TEXTURE_2D, gpu->gl.swrendertex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_HEIGHT,
                  SCREEN_WIDTH(screenid), 0, glfmt, gltype, data);
+
+    // scissor test and color mask affects blit framebuffer
+    glDisable(GL_SCISSOR_TEST);
+    glColorMask(true, true, true, true);
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gpu->gl.swrenderfbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbo[screenid]);
@@ -872,22 +930,12 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
 
     u32 texsize = texsize_total(regs, fmt);
 
-    // also check for out of bounds textures
-    if (!is_valid_physmem(regs->addr << 3) ||
-        !is_valid_physmem((regs->addr << 3) + texsize)) {
-        linfo("invalid texture address");
-        glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
-        return;
-    }
+    auto tex = LRU_load(gpu->textures, regs->addr << 3);
+    glBindTexture(GL_TEXTURE_2D, tex->tex);
 
-    FBInfo* fb = fbcache_find(gpu, regs->addr << 3);
-    if (fb) {
-        // check for simple render to texture cases
-        glBindTexture(GL_TEXTURE_2D, fb->color_tex);
-    } else {
-        auto tex = LRU_load(gpu->textures, regs->addr << 3);
-        glBindTexture(GL_TEXTURE_2D, tex->tex);
-
+    // textures that are partially out of bounds can still be used with rtt ..?
+    if (is_valid_physmem(regs->addr << 3) &&
+        is_valid_physmem((regs->addr << 3) + texsize - 1)) {
         // if the attributes are different we obviously need to recreate the
         // texture
         // if they are the same we check if the hash needs to be updated
@@ -918,6 +966,33 @@ void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
                 create_texture(gpu, tex, regs);
             }
         }
+    } else {
+        // just add this to the cache but dont actually send it image data ig
+        // we only care because you can still rtt to this .......
+        linfo("out of bounds texture");
+        tex->paddr = regs->addr << 3;
+        tex->width = regs->width;
+        tex->height = regs->height;
+        tex->fmt = fmt;
+        tex->minlod = regs->lod.min;
+        tex->maxlod = regs->lod.max;
+        tex->size = texsize;
+    }
+
+    // handle simple render to texture cases, but better ...?
+    FBInfo* fb = fbcache_find(gpu, tex->paddr);
+    if (fb) {
+        linfo("rtt at %08x", fb->color_paddr);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
+        glBindTexture(GL_TEXTURE_2D, tex->tex);
+        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
+                         (fb->height - tex->height) * ctremu.videoscale,
+                         tex->width * ctremu.videoscale,
+                         tex->height * ctremu.videoscale, 0);
+        // no swizzling or mipmaps for rtt textures
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                         texswizzle_default);
     }
 
     glTexParameteri(
@@ -957,203 +1032,6 @@ void load_texenv(UberUniforms* ubuf, FragUniforms* fbuf, int i,
     COPYRGBA(fbuf->tev_color[i], regs->color);
     ubuf->tev[i].rgb.scale = 1 << (regs->scale.rgb);
     ubuf->tev[i].a.scale = 1 << (regs->scale.a);
-}
-
-void update_gl_state(GPU* gpu) {
-
-    update_cur_fb(gpu);
-
-    // ensure unused entries are 0 so the hashing is consistent
-    UberUniforms ubuf = {};
-
-    FragUniforms fbuf;
-
-    switch (gpu->regs.raster.cullmode) {
-        case 0:
-        case 3:
-            glDisable(GL_CULL_FACE);
-            break;
-        case 1:
-            glEnable(GL_CULL_FACE);
-            glCullFace(GL_FRONT);
-            break;
-        case 2:
-            glEnable(GL_CULL_FACE);
-            glCullFace(GL_BACK);
-            break;
-    }
-
-    glViewport(gpu->regs.raster.view_x * ctremu.videoscale,
-               gpu->regs.raster.view_y * ctremu.videoscale,
-               2 * cvtf24(gpu->regs.raster.view_w) * ctremu.videoscale,
-               2 * cvtf24(gpu->regs.raster.view_h) * ctremu.videoscale);
-    if (gpu->regs.raster.scisssortest.enable) {
-        glEnable(GL_SCISSOR_TEST);
-        glScissor(gpu->regs.raster.scisssortest.x1 * ctremu.videoscale,
-                  gpu->regs.raster.scisssortest.y1 * ctremu.videoscale,
-                  (gpu->regs.raster.scisssortest.x2 + 1 -
-                   gpu->regs.raster.scisssortest.x1) *
-                      ctremu.videoscale,
-                  (gpu->regs.raster.scisssortest.y2 + 1 -
-                   gpu->regs.raster.scisssortest.y1) *
-                      ctremu.videoscale);
-    } else {
-        glDisable(GL_SCISSOR_TEST);
-    }
-
-    if (gpu->regs.raster.depthmap_enable) {
-        float offset = cvtf24(gpu->regs.raster.depthmap_offset);
-        float scale = cvtf24(gpu->regs.raster.depthmap_scale);
-        // pica near plane is -1 and farplane is 0
-        glDepthRange(offset - scale, offset);
-    } else {
-        // default depth range maps -1 -> 1 and 0 -> 0
-        glDepthRange(1, 0);
-    }
-
-    ubuf.tex2coord = gpu->regs.tex.config.tex2coord;
-
-    if (gpu->regs.tex.config.tex0enable) {
-        load_texture(gpu, 0, &gpu->regs.tex.tex0, gpu->regs.tex.tex0_fmt);
-    }
-    if (gpu->regs.tex.config.tex1enable) {
-        load_texture(gpu, 1, &gpu->regs.tex.tex1, gpu->regs.tex.tex1_fmt);
-    }
-    if (gpu->regs.tex.config.tex2enable) {
-        load_texture(gpu, 2, &gpu->regs.tex.tex2, gpu->regs.tex.tex2_fmt);
-    }
-
-    load_texenv(&ubuf, &fbuf, 0, &gpu->regs.tex.tev0);
-    load_texenv(&ubuf, &fbuf, 1, &gpu->regs.tex.tev1);
-    load_texenv(&ubuf, &fbuf, 2, &gpu->regs.tex.tev2);
-    load_texenv(&ubuf, &fbuf, 3, &gpu->regs.tex.tev3);
-    load_texenv(&ubuf, &fbuf, 4, &gpu->regs.tex.tev4);
-    load_texenv(&ubuf, &fbuf, 5, &gpu->regs.tex.tev5);
-    ubuf.tev_update_rgb = gpu->regs.tex.tev_buffer.update_rgb;
-    ubuf.tev_update_alpha = gpu->regs.tex.tev_buffer.update_alpha;
-    COPYRGBA(fbuf.tev_buffer_color, gpu->regs.tex.tev5.buffer_color);
-
-    if (gpu->regs.fb.color_op.frag_mode != 0) {
-        return; // shadows or gas, ignore these for now
-    }
-    if (gpu->regs.fb.color_op.blend_mode) {
-        glDisable(GL_COLOR_LOGIC_OP);
-        glEnable(GL_BLEND);
-        glBlendEquationSeparate(blend_eq[gpu->regs.fb.blend_func.rgb_eq],
-                                blend_eq[gpu->regs.fb.blend_func.a_eq]);
-        glBlendFuncSeparate(blend_func[gpu->regs.fb.blend_func.rgb_src],
-                            blend_func[gpu->regs.fb.blend_func.rgb_dst],
-                            blend_func[gpu->regs.fb.blend_func.a_src],
-                            blend_func[gpu->regs.fb.blend_func.a_dst]);
-        glBlendColor(gpu->regs.fb.blend_color.r / 255.f,
-                     gpu->regs.fb.blend_color.g / 255.f,
-                     gpu->regs.fb.blend_color.b / 255.f,
-                     gpu->regs.fb.blend_color.a / 255.f);
-    } else {
-        glDisable(GL_BLEND);
-        glEnable(GL_COLOR_LOGIC_OP);
-        glLogicOp(logic_ops[gpu->regs.fb.logic_op]);
-    }
-
-    ubuf.alphatest = gpu->regs.fb.alpha_test.enable;
-    ubuf.alphafunc = gpu->regs.fb.alpha_test.func;
-    fbuf.alpharef = (float) gpu->regs.fb.alpha_test.ref / 255;
-
-    if (gpu->regs.fb.stencil_test.enable) {
-        glEnable(GL_STENCIL_TEST);
-        if (gpu->regs.fb.perms.depthbuf.write) {
-            glStencilMask(gpu->regs.fb.stencil_test.bufmask);
-        } else {
-            glStencilMask(0);
-        }
-        glStencilFunc(compare_func[gpu->regs.fb.stencil_test.func],
-                      gpu->regs.fb.stencil_test.ref,
-                      gpu->regs.fb.stencil_test.mask);
-        glStencilOp(stencil_op[gpu->regs.fb.stencil_op.fail],
-                    stencil_op[gpu->regs.fb.stencil_op.zfail],
-                    stencil_op[gpu->regs.fb.stencil_op.zpass]);
-    } else {
-        glDisable(GL_STENCIL_TEST);
-    }
-
-    if (gpu->regs.fb.perms.colorbuf.write) {
-        glColorMask(gpu->regs.fb.color_mask.red, gpu->regs.fb.color_mask.green,
-                    gpu->regs.fb.color_mask.blue,
-                    gpu->regs.fb.color_mask.alpha);
-    } else {
-        glColorMask(false, false, false, false);
-    }
-    // you can disable writing to the depth buffer with this register
-    // instead of using the depth mask
-    if (gpu->regs.fb.perms.depthbuf.write) {
-        glDepthMask(gpu->regs.fb.color_mask.depth);
-    } else {
-        glDepthMask(false);
-    }
-
-    // we need to always enable the depth test, since the pica can still
-    // write the depth buffer even if depth testing is disabled
-    glEnable(GL_DEPTH_TEST);
-    if (gpu->regs.fb.color_mask.depthtest) {
-        glDepthFunc(compare_func[gpu->regs.fb.color_mask.depthfunc]);
-    } else {
-        glDepthFunc(GL_ALWAYS);
-    }
-
-    ubuf.numlights = gpu->regs.lighting.numlights + 1;
-    for (int i = 0; i < ubuf.numlights; i++) {
-        // TODO: handle light permutation
-        COPYRGB(fbuf.light[i].specular0, gpu->regs.lighting.light[i].specular0);
-        COPYRGB(fbuf.light[i].specular1, gpu->regs.lighting.light[i].specular1);
-        COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
-        COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
-        fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
-        fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
-        fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
-        ubuf.light[i].config = gpu->regs.lighting.light[i].config;
-    }
-    COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
-
-    GLuint vs;
-    if (ctremu.hwvshaders) {
-        if (gpu->uniform_dirty) {
-            gpu->uniform_dirty = false;
-            VertUniforms vubuf;
-            memcpy(vubuf.c, gpu->floatuniform, sizeof vubuf.c);
-            // expand intuniform from bytes to ints
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
-                    vubuf.i[i][j] = gpu->regs.vsh.intuniform[i][j];
-                }
-            }
-            vubuf.b_raw = gpu->regs.vsh.booluniform;
-            glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.vert_ubo);
-            glBufferData(GL_UNIFORM_BUFFER, sizeof vubuf, &vubuf,
-                         GL_DYNAMIC_DRAW);
-        }
-        if (gpu->sh_dirty) {
-            vs = shader_dec_get(gpu);
-        } else {
-            vs = LRU_mru(gpu->vshaders_hw)->vs;
-        }
-    } else {
-        vs = gpu->gl.gpu_vs;
-    }
-
-    // todo: do similar dirty checking for the fs
-    glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
-
-    GLuint fs;
-    if (ctremu.ubershader) {
-        glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
-        fs = gpu->gl.gpu_uberfs;
-    } else {
-        fs = shader_gen_get(gpu, &ubuf);
-    }
-
-    gpu_gl_load_prog(&gpu->gl, vs, fs);
 }
 
 typedef struct {
@@ -1310,22 +1188,34 @@ void store_vtx(GPU* gpu, int i, Vertex* vbuf, fvec4* src) {
 }
 
 void init_vsh(GPU* gpu, ShaderUnit* shu) {
-    shu->code = (PICAInstr*) gpu->progdata;
-    shu->opdescs = (OpDesc*) gpu->opdescs;
+    shu->code = (PICAInstr*) gpu->vsh.progdata;
+    shu->opdescs = (OpDesc*) gpu->vsh.opdescs;
     shu->entrypoint = gpu->regs.vsh.entrypoint;
-    shu->c = gpu->floatuniform;
+    shu->outmap_mask = gpu->regs.vsh.outmap_mask;
+    shu->c = gpu->vsh.floatuniform;
     shu->i = gpu->regs.vsh.intuniform;
     shu->b = gpu->regs.vsh.booluniform;
 }
 
+void init_gsh(GPU* gpu, ShaderUnit* shu) {
+    shu->code = (PICAInstr*) gpu->gsh.progdata;
+    shu->opdescs = (OpDesc*) gpu->gsh.opdescs;
+    shu->entrypoint = gpu->regs.gsh.entrypoint;
+    shu->outmap_mask = gpu->regs.gsh.outmap_mask;
+    shu->c = gpu->gsh.floatuniform;
+    shu->i = gpu->regs.gsh.intuniform;
+    shu->b = gpu->regs.gsh.booluniform;
+    Vec_init(shu->gsh.outvtx);
+}
+
 void vsh_run_range(GPU* gpu, AttrConfig cfg, int srcoff, int dstoff, int count,
-                   Vertex* vbuf) {
+                   fvec4 (*vbuf)[16]) {
     ShaderUnit vsh;
     init_vsh(gpu, &vsh);
     for (int i = 0; i < count; i++) {
         load_vtx(gpu, cfg, srcoff + i, vsh.v);
         gpu->vsh_runner.shaderfunc(&vsh);
-        store_vtx(gpu, dstoff + i, vbuf, vsh.o);
+        shader_write_outmap(&vsh, vbuf[dstoff + i]);
     }
 }
 
@@ -1333,97 +1223,69 @@ void vsh_thrd_func(GPU* gpu) {
     int id = gpu->vsh_runner.cur++;
 
     while (true) {
-        while (!gpu->vsh_runner.thread[id].ready) {
-            pthread_cond_wait(&gpu->vsh_runner.cv1, &gpu->vsh_runner.mtx);
-        }
-        gpu->vsh_runner.thread[id].ready = false;
-        pthread_mutex_unlock(&gpu->vsh_runner.mtx);
+        while (!gpu->vsh_runner.ready[id]) sched_yield();
+        gpu->vsh_runner.ready[id] = false;
 
         if (gpu->vsh_runner.die) return;
 
         vsh_run_range(gpu, gpu->vsh_runner.attrcfg,
-                      gpu->vsh_runner.base + gpu->vsh_runner.thread[id].off,
-                      gpu->vsh_runner.thread[id].off,
-                      gpu->vsh_runner.thread[id].count, gpu->vsh_runner.vbuf);
+                      gpu->vsh_runner.base + id * gpu->vsh_runner.count,
+                      id * gpu->vsh_runner.count, gpu->vsh_runner.count,
+                      gpu->vsh_runner.vbuf);
 
-        pthread_mutex_lock(&gpu->vsh_runner.mtx);
         gpu->vsh_runner.cur++;
-        pthread_cond_signal(&gpu->vsh_runner.cv2);
     }
 }
 
 void gpu_vshrunner_init(GPU* gpu) {
     gpu->vsh_runner.cur = 0;
-
-    pthread_mutex_init(&gpu->vsh_runner.mtx, nullptr);
-    pthread_cond_init(&gpu->vsh_runner.cv1, nullptr);
-    pthread_cond_init(&gpu->vsh_runner.cv2, nullptr);
-
     for (int i = 0; i < ctremu.vshthreads; i++) {
-        gpu->vsh_runner.thread[i].ready = false;
-        pthread_create(&gpu->vsh_runner.thread[i].thd, nullptr,
+        gpu->vsh_runner.ready[i] = false;
+        pthread_create(&gpu->vsh_runner.threads[i], nullptr,
                        (void*) vsh_thrd_func, gpu);
     }
+    while (gpu->vsh_runner.cur < ctremu.vshthreads);
 }
 
 void gpu_vshrunner_destroy(GPU* gpu) {
     gpu->vsh_runner.die = true;
     for (int i = 0; i < ctremu.vshthreads; i++) {
-        gpu->vsh_runner.thread[i].ready = true;
+        gpu->vsh_runner.ready[i] = true;
     }
-    pthread_cond_broadcast(&gpu->vsh_runner.cv1);
-    pthread_mutex_unlock(&gpu->vsh_runner.mtx);
     for (int i = 0; i < ctremu.vshthreads; i++) {
-        pthread_join(gpu->vsh_runner.thread[i].thd, nullptr);
+        pthread_join(gpu->vsh_runner.threads[i], nullptr);
     }
-    pthread_mutex_destroy(&gpu->vsh_runner.mtx);
-    pthread_cond_destroy(&gpu->vsh_runner.cv1);
-    pthread_cond_destroy(&gpu->vsh_runner.cv2);
 }
 
 void dispatch_vsh(GPU* gpu, void* attrcfg, int base, int count, void* vbuf) {
     if (ctremu.shaderjit) {
-        if (gpu->sh_dirty) {
+        if (gpu->vsh.code_dirty) {
             ShaderUnit shu;
             init_vsh(gpu, &shu);
             gpu->vsh_runner.shaderfunc = shaderjit_get(gpu, &shu);
-            gpu->sh_dirty = false;
+            gpu->vsh.code_dirty = false;
         }
     } else {
         gpu->vsh_runner.shaderfunc = pica_shader_exec;
     }
 
-    if (count < ctremu.vshthreads || ctremu.vshthreads < 2) {
-        vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
-    } else {
-        gpu->vsh_runner.attrcfg = attrcfg;
-        gpu->vsh_runner.vbuf = vbuf;
-        gpu->vsh_runner.base = base;
-
-        for (int i = 0; i < ctremu.vshthreads; i++) {
-            gpu->vsh_runner.thread[i].off = i * (count / ctremu.vshthreads);
-            gpu->vsh_runner.thread[i].count = count / ctremu.vshthreads;
-        }
-        gpu->vsh_runner.thread[ctremu.vshthreads - 1].count =
-            count - gpu->vsh_runner.thread[ctremu.vshthreads - 1].off;
-
+    gpu->vsh_runner.attrcfg = attrcfg;
+    gpu->vsh_runner.vbuf = vbuf;
+    gpu->vsh_runner.base = base;
+    gpu->vsh_runner.count = count / (ctremu.vshthreads + 1);
+    if (gpu->vsh_runner.count) {
         gpu->vsh_runner.cur = 0;
         for (int i = 0; i < ctremu.vshthreads; i++) {
-            gpu->vsh_runner.thread[i].ready = true;
+            gpu->vsh_runner.ready[i] = true;
         }
-        pthread_cond_broadcast(&gpu->vsh_runner.cv1);
-        while (gpu->vsh_runner.cur < ctremu.vshthreads) {
-            pthread_cond_wait(&gpu->vsh_runner.cv2, &gpu->vsh_runner.mtx);
-        }
+        vsh_run_range(
+            gpu, attrcfg, base + gpu->vsh_runner.count * ctremu.vshthreads,
+            gpu->vsh_runner.count * ctremu.vshthreads,
+            gpu->vsh_runner.count + count % (ctremu.vshthreads + 1), vbuf);
+        while (gpu->vsh_runner.cur < ctremu.vshthreads);
+    } else {
+        vsh_run_range(gpu, attrcfg, base, 0, count, vbuf);
     }
-}
-
-void setup_vbos_sw(GPU* gpu, int start, int num) {
-    AttrConfig cfg;
-    vtx_loader_setup(gpu, cfg);
-    Vertex vbuf[num];
-    dispatch_vsh(gpu, cfg, start, num, vbuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
 }
 
 static const GLuint attrtypes[] = {
@@ -1443,7 +1305,7 @@ void setup_fixattrs_hw(GPU* gpu) {
     }
 }
 
-void setup_vbos_hw(GPU* gpu, int start, int num) {
+void setup_hw_vao(GPU* gpu, int start, int num) {
     setup_fixattrs_hw(gpu);
 
     for (int vbo = 0; vbo < 12; vbo++) {
@@ -1483,6 +1345,23 @@ void setup_vbos_hw(GPU* gpu, int start, int num) {
     }
 }
 
+void setup_hw_vao_imm(GPU* gpu) {
+    setup_fixattrs_hw(gpu);
+
+    int nattrs = gpu->regs.geom.vsh_num_attr + 1;
+    // only need to use one vbo
+    glBindBuffer(GL_ARRAY_BUFFER, gpu->gl.gpu_vbos[0]);
+    for (int i = 0; i < nattrs; i++) {
+        int attr = (gpu->regs.vsh.permutation >> 4 * i) & 0xf;
+        glVertexAttribPointer(attr, 4, GL_FLOAT, GL_FALSE,
+                              nattrs * sizeof(fvec4),
+                              (void*) (i * sizeof(fvec4)));
+        glEnableVertexAttribArray(attr);
+    }
+    glBufferData(GL_ARRAY_BUFFER, gpu->immattrs.size * sizeof(fvec4),
+                 gpu->immattrs.d, GL_STREAM_DRAW);
+}
+
 static const GLenum prim_mode[4] = {
     GL_TRIANGLES,
     GL_TRIANGLE_STRIP,
@@ -1490,89 +1369,339 @@ static const GLenum prim_mode[4] = {
     GL_TRIANGLES,
 };
 
-void gpu_drawarrays(GPU* gpu) {
-    linfo("drawing arrays nverts=%d primmode=%d", gpu->regs.geom.nverts,
-          gpu->regs.geom.prim_config.mode);
-
-    update_gl_state(gpu);
-
-    if (ctremu.hwvshaders) {
-        setup_vbos_hw(gpu, gpu->regs.geom.vtx_off, gpu->regs.geom.nverts);
-    } else {
-        setup_vbos_sw(gpu, gpu->regs.geom.vtx_off, gpu->regs.geom.nverts);
-    }
-
-    glDrawArrays(prim_mode[gpu->regs.geom.prim_config.mode], 0,
-                 gpu->regs.geom.nverts);
-}
-
 static const GLuint indextypes[2] = {GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT};
 
-void gpu_drawelements(GPU* gpu) {
-    linfo("drawing elements nverts=%d primmode=%d", gpu->regs.geom.nverts,
-          gpu->regs.geom.prim_config.mode);
+void gpu_draw(GPU* gpu, bool elements, bool immediate) {
+    int nattrs = gpu->regs.geom.vsh_num_attr + 1;
+    int nverts =
+        immediate ? gpu->immattrs.size / nattrs : gpu->regs.geom.nverts;
+    int primMode = gpu->regs.geom.prim_config.mode;
 
-    update_gl_state(gpu);
+    linfo("drawing %s %s nverts=%d, prim mode=%d",
+          elements ? "elements" : "arrays", immediate ? "immediate mode" : "",
+          nverts, primMode);
 
-    u32 minind = 0xffff, maxind = 0;
-    void* indexbuf =
-        PTR(gpu->regs.geom.attr_base * 8 + gpu->regs.geom.indexbufoff);
-    for (int i = 0; i < gpu->regs.geom.nverts; i++) {
-        int idx;
-        if (gpu->regs.geom.indexfmt) {
-            idx = ((u16*) indexbuf)[i];
+    update_cur_fb(gpu);
+
+    // ensure unused entries are 0 so the hashing is consistent
+    UberUniforms ubuf = {};
+    FragUniforms fbuf;
+
+    // cull mode
+    switch (gpu->regs.raster.cullmode) {
+        case 0:
+        case 3:
+            glDisable(GL_CULL_FACE);
+            break;
+        case 1:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            break;
+        case 2:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            break;
+    }
+
+    // viewport and scissor
+    glViewport(gpu->regs.raster.view_x * ctremu.videoscale,
+               gpu->regs.raster.view_y * ctremu.videoscale,
+               2 * cvtf24(gpu->regs.raster.view_w) * ctremu.videoscale,
+               2 * cvtf24(gpu->regs.raster.view_h) * ctremu.videoscale);
+    if (gpu->regs.raster.scisssortest.enable) {
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(gpu->regs.raster.scisssortest.x1 * ctremu.videoscale,
+                  gpu->regs.raster.scisssortest.y1 * ctremu.videoscale,
+                  (gpu->regs.raster.scisssortest.x2 + 1 -
+                   gpu->regs.raster.scisssortest.x1) *
+                      ctremu.videoscale,
+                  (gpu->regs.raster.scisssortest.y2 + 1 -
+                   gpu->regs.raster.scisssortest.y1) *
+                      ctremu.videoscale);
+    } else {
+        glDisable(GL_SCISSOR_TEST);
+    }
+
+    // depth map
+    if (gpu->regs.raster.depthmap_enable) {
+        float offset = cvtf24(gpu->regs.raster.depthmap_offset);
+        float scale = cvtf24(gpu->regs.raster.depthmap_scale);
+        // pica near plane is -1 and farplane is 0
+        glDepthRange(offset - scale, offset);
+    } else {
+        // default depth range maps -1 -> 1 and 0 -> 0
+        glDepthRange(1, 0);
+    }
+
+    // textures
+    ubuf.tex2coord = gpu->regs.tex.config.tex2coord;
+    if (gpu->regs.tex.config.tex0enable) {
+        load_texture(gpu, 0, &gpu->regs.tex.tex0, gpu->regs.tex.tex0_fmt);
+    }
+    if (gpu->regs.tex.config.tex1enable) {
+        load_texture(gpu, 1, &gpu->regs.tex.tex1, gpu->regs.tex.tex1_fmt);
+    }
+    if (gpu->regs.tex.config.tex2enable) {
+        load_texture(gpu, 2, &gpu->regs.tex.tex2, gpu->regs.tex.tex2_fmt);
+    }
+
+    // texenvs
+    load_texenv(&ubuf, &fbuf, 0, &gpu->regs.tex.tev0);
+    load_texenv(&ubuf, &fbuf, 1, &gpu->regs.tex.tev1);
+    load_texenv(&ubuf, &fbuf, 2, &gpu->regs.tex.tev2);
+    load_texenv(&ubuf, &fbuf, 3, &gpu->regs.tex.tev3);
+    load_texenv(&ubuf, &fbuf, 4, &gpu->regs.tex.tev4);
+    load_texenv(&ubuf, &fbuf, 5, &gpu->regs.tex.tev5);
+    ubuf.tev_update_rgb = gpu->regs.tex.tev_buffer.update_rgb;
+    ubuf.tev_update_alpha = gpu->regs.tex.tev_buffer.update_alpha;
+    COPYRGBA(fbuf.tev_buffer_color, gpu->regs.tex.tev5.buffer_color);
+
+    // blending/logic ops
+    if (gpu->regs.fb.color_op.frag_mode != 0) {
+        // gas or shadows, not implemented
+        linfo("unknown frag mode %d", gpu->regs.fb.color_op.frag_mode);
+        return;
+    }
+    if (gpu->regs.fb.color_op.blend_mode) {
+        glDisable(GL_COLOR_LOGIC_OP);
+        glEnable(GL_BLEND);
+        glBlendEquationSeparate(blend_eq[gpu->regs.fb.blend_func.rgb_eq],
+                                blend_eq[gpu->regs.fb.blend_func.a_eq]);
+        glBlendFuncSeparate(blend_func[gpu->regs.fb.blend_func.rgb_src],
+                            blend_func[gpu->regs.fb.blend_func.rgb_dst],
+                            blend_func[gpu->regs.fb.blend_func.a_src],
+                            blend_func[gpu->regs.fb.blend_func.a_dst]);
+        glBlendColor(gpu->regs.fb.blend_color.r / 255.f,
+                     gpu->regs.fb.blend_color.g / 255.f,
+                     gpu->regs.fb.blend_color.b / 255.f,
+                     gpu->regs.fb.blend_color.a / 255.f);
+    } else {
+        glDisable(GL_BLEND);
+        glEnable(GL_COLOR_LOGIC_OP);
+        glLogicOp(logic_ops[gpu->regs.fb.logic_op]);
+    }
+
+    // alpha test
+    ubuf.alphatest = gpu->regs.fb.alpha_test.enable;
+    ubuf.alphafunc = gpu->regs.fb.alpha_test.func;
+    fbuf.alpharef = (float) gpu->regs.fb.alpha_test.ref / 255;
+
+    // stencil test
+    if (gpu->regs.fb.stencil_test.enable) {
+        glEnable(GL_STENCIL_TEST);
+        if (gpu->regs.fb.perms.depthbuf.write) {
+            glStencilMask(gpu->regs.fb.stencil_test.bufmask);
         } else {
-            idx = ((u8*) indexbuf)[i];
+            glStencilMask(0);
         }
-        if (idx < minind) minind = idx;
-        if (idx > maxind) maxind = idx;
-    }
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 gpu->regs.geom.nverts * BIT(gpu->regs.geom.indexfmt), indexbuf,
-                 GL_STREAM_DRAW);
-
-    if (ctremu.hwvshaders) {
-        setup_vbos_hw(gpu, minind, maxind + 1 - minind);
+        glStencilFunc(compare_func[gpu->regs.fb.stencil_test.func],
+                      gpu->regs.fb.stencil_test.ref,
+                      gpu->regs.fb.stencil_test.mask);
+        glStencilOp(stencil_op[gpu->regs.fb.stencil_op.fail],
+                    stencil_op[gpu->regs.fb.stencil_op.zfail],
+                    stencil_op[gpu->regs.fb.stencil_op.zpass]);
     } else {
-        setup_vbos_sw(gpu, minind, maxind + 1 - minind);
+        glDisable(GL_STENCIL_TEST);
     }
 
-    glDrawElementsBaseVertex(prim_mode[gpu->regs.geom.prim_config.mode],
-                             gpu->regs.geom.nverts,
-                             indextypes[gpu->regs.geom.indexfmt], 0, -minind);
-}
-
-void gpu_drawimmediate(GPU* gpu) {
-    u32 nattrs = gpu->regs.geom.vsh_num_attr + 1;
-    u32 nverts = gpu->immattrs.size / nattrs;
-
-    linfo("drawing immediate mode nverts=%d primmode=%d", nverts,
-          gpu->regs.geom.prim_config.mode);
-
-    update_gl_state(gpu);
-
-    if (ctremu.hwvshaders) {
-        setup_fixattrs_hw(gpu);
-        // only need to use one vbo
-        glBindBuffer(GL_ARRAY_BUFFER, gpu->gl.gpu_vbos[0]);
-        for (int i = 0; i < nattrs; i++) {
-            int attr = (gpu->regs.vsh.permutation >> 4 * i) & 0xf;
-            glVertexAttribPointer(attr, 4, GL_FLOAT, GL_FALSE,
-                                  nattrs * sizeof(fvec4),
-                                  (void*) (i * sizeof(fvec4)));
-            glEnableVertexAttribArray(attr);
-        }
-        glBufferData(GL_ARRAY_BUFFER, gpu->immattrs.size * sizeof(fvec4),
-                     gpu->immattrs.d, GL_STREAM_DRAW);
+    // color mask and depth mask
+    if (gpu->regs.fb.perms.colorbuf.write) {
+        glColorMask(gpu->regs.fb.color_mask.red, gpu->regs.fb.color_mask.green,
+                    gpu->regs.fb.color_mask.blue,
+                    gpu->regs.fb.color_mask.alpha);
     } else {
+        glColorMask(false, false, false, false);
+    }
+    // you can disable writing to the depth buffer with this register
+    // instead of using the depth mask
+    if (gpu->regs.fb.perms.depthbuf.write) {
+        glDepthMask(gpu->regs.fb.color_mask.depth);
+    } else {
+        glDepthMask(false);
+    }
+
+    // depth test
+    // we need to always enable the depth test, since the pica can still
+    // write the depth buffer even if depth testing is disabled
+    glEnable(GL_DEPTH_TEST);
+    if (gpu->regs.fb.color_mask.depthtest) {
+        glDepthFunc(compare_func[gpu->regs.fb.color_mask.depthfunc]);
+    } else {
+        glDepthFunc(GL_ALWAYS);
+    }
+
+    // lighting params
+    ubuf.numlights = gpu->regs.lighting.numlights + 1;
+    for (int i = 0; i < ubuf.numlights; i++) {
+        // TODO: handle light permutation
+        COPYRGB(fbuf.light[i].specular0, gpu->regs.lighting.light[i].specular0);
+        COPYRGB(fbuf.light[i].specular1, gpu->regs.lighting.light[i].specular1);
+        COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
+        COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
+        fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
+        fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
+        fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
+        ubuf.light[i].config = gpu->regs.lighting.light[i].config;
+    }
+    COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
+
+    // vertex shaders
+    bool swshaders = !ctremu.hwvshaders || gpu->regs.geom.config.use_gsh;
+    GLuint vs;
+    if (swshaders) {
+        vs = gpu->gl.gpu_vs;
+        glBindVertexArray(gpu->gl.gpu_vao_sw);
+    } else {
+        if (gpu->vsh_uniform_dirty) {
+            gpu->vsh_uniform_dirty = false;
+            VertUniforms vubuf;
+            memcpy(vubuf.c, gpu->vsh.floatuniform, sizeof vubuf.c);
+            // expand intuniform from bytes to ints
+            for (int i = 0; i < 4; i++) {
+                for (int j = 0; j < 4; j++) {
+                    vubuf.i[i][j] = gpu->regs.vsh.intuniform[i][j];
+                }
+            }
+            vubuf.b_raw = gpu->regs.vsh.booluniform;
+            glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.vert_ubo);
+            glBufferData(GL_UNIFORM_BUFFER, sizeof vubuf, &vubuf,
+                         GL_DYNAMIC_DRAW);
+        }
+        if (gpu->vsh.code_dirty) {
+            vs = shader_dec_get(gpu);
+        } else {
+            vs = LRU_mru(gpu->vshaders_hw)->vs;
+        }
+        glBindVertexArray(gpu->gl.gpu_vao_hw);
+    }
+
+    // fragment shaders
+    // todo: do similar dirty checking for the fs
+    glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
+    GLuint fs;
+    if (ctremu.ubershader) {
+        glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
+        fs = gpu->gl.gpu_uberfs;
+    } else {
+        fs = shader_gen_get(gpu, &ubuf);
+    }
+
+    // finally get the program
+    gpu_gl_load_prog(&gpu->gl, vs, fs);
+
+    // starting  index
+    int basevert = immediate ? 0 : gpu->regs.geom.vtx_off;
+    // how many verts are sent to the VS (can be more than nverts for
+    // drawelements)
+    int nbufverts = nverts;
+
+    // setup index buffer and find min/max index
+    void* indexbuf = nullptr;
+    bool indexsize = gpu->regs.geom.indexfmt;
+    if (elements) {
+        u32 minind = 0xffff, maxind = 0;
+        indexbuf =
+            PTR(gpu->regs.geom.attr_base * 8 + gpu->regs.geom.indexbufoff);
+        for (int i = 0; i < gpu->regs.geom.nverts; i++) {
+            int idx;
+            if (indexsize) {
+                idx = ((u16*) indexbuf)[i];
+            } else {
+                idx = ((u8*) indexbuf)[i];
+            }
+            if (idx < minind) minind = idx;
+            if (idx > maxind) maxind = idx;
+        }
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, nverts * BIT(indexsize), indexbuf,
+                     GL_STREAM_DRAW);
+        // update these since we are drawing elements
+        basevert = minind;
+        nbufverts = maxind + 1 - minind;
+    }
+
+    if (swshaders) {
+        fvec4 vshout[nbufverts][16];
+        // setup vertex loader
         AttrConfig cfg;
-        vtx_loader_imm_setup(gpu, cfg);
-        Vertex vbuf[nverts];
-        dispatch_vsh(gpu, cfg, 0, nverts, vbuf);
+        if (immediate) {
+            vtx_loader_imm_setup(gpu, cfg);
+        } else {
+            vtx_loader_setup(gpu, cfg);
+        }
+
+        // run the vertex shader (possibly parallelized)
+        dispatch_vsh(gpu, cfg, basevert, nbufverts, vshout);
+
+        // fshin is either vshout or gshout
+        fvec4(*fshin)[16] = vshout;
+
+        // run the geometry shader if enabled
+        ShaderUnit gsh;
+        init_gsh(gpu, &gsh);
+        if (gpu->regs.geom.config.use_gsh) {
+
+            // there are 3 geom shader modes, rn we only care about the
+            // normal mode
+
+            if (gpu->regs.geom.gsh_misc0.mode != 0) {
+                lwarn("unknown geoshader mode");
+                return;
+            }
+
+            int vshoutct = gpu->regs.geom.vsh_outmap_total1 + 1;
+            int gshinct = gpu->regs.gsh.inconfig.inattrs + 1;
+            int stride = gshinct / vshoutct;
+
+            for (int p = 0; p < nverts; p += stride) {
+                for (int v = 0; v < stride; v++) {
+                    int idx = p + v;
+                    if (elements) {
+                        if (indexsize) {
+                            idx = ((u16*) indexbuf)[idx] - basevert;
+                        } else {
+                            idx = ((u8*) indexbuf)[idx] - basevert;
+                        }
+                    }
+                    memcpy(gsh.v + v * vshoutct, vshout[idx],
+                           vshoutct * sizeof(fvec4));
+                }
+
+                pica_shader_exec(&gsh);
+            }
+
+            // since we are drawing geometry shader output, these are changed
+            // appriopriately
+            fshin = gsh.gsh.outvtx.d;
+            basevert = 0;
+            nverts = gsh.gsh.outvtx.size;
+            nbufverts = nverts;
+            elements = false;
+        }
+
+        // use the outmap config to setup the final vertex buffer sent to gpu
+        // for the fragment shader
+        Vertex vbuf[nbufverts];
+        for (int i = 0; i < nbufverts; i++) {
+            store_vtx(gpu, i, vbuf, fshin[i]);
+        }
         glBufferData(GL_ARRAY_BUFFER, sizeof vbuf, vbuf, GL_STREAM_DRAW);
+        Vec_free(gsh.gsh.outvtx);
+    } else {
+        if (immediate) {
+            setup_hw_vao_imm(gpu);
+        } else {
+            setup_hw_vao(gpu, basevert, nbufverts);
+        }
     }
-
-    glDrawArrays(prim_mode[gpu->regs.geom.prim_config.mode], 0, nverts);
-
     Vec_free(gpu->immattrs);
+
+    // finally do the draw call
+    if (elements) {
+        glDrawElementsBaseVertex(prim_mode[primMode], nverts,
+                                 indextypes[indexsize], 0, -basevert);
+    } else {
+        glDrawArrays(prim_mode[primMode], 0, nverts);
+    }
 }

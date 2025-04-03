@@ -14,15 +14,15 @@ bool g_infologs = false;
 EmulatorState ctremu;
 
 void emulator_init() {
-    mkdir("system", S_IRWXU);
-    mkdir("system/savedata", S_IRWXU);
-    mkdir("system/extdata", S_IRWXU);
-    mkdir("system/sdmc", S_IRWXU);
-    mkdir("system/sdmc/3ds", S_IRWXU);
+    mkdir("3ds", S_IRWXU);
+    mkdir("3ds/savedata", S_IRWXU);
+    mkdir("3ds/extdata", S_IRWXU);
+    mkdir("3ds/sdmc", S_IRWXU);
+    mkdir("3ds/sdmc/3ds", S_IRWXU);
     // homebrew needs this file to exist but the contents dont matter for hle
     // audio
     FILE* fp;
-    if ((fp = fopen("system/sdmc/3ds/dspfirm.cdc", "wx"))) fclose(fp);
+    if ((fp = fopen("3ds/sdmc/3ds/dspfirm.cdc", "wx"))) fclose(fp);
 
     ctremu.syncmode = SYNC_VIDEO;
     ctremu.videoscale = 1;
@@ -38,7 +38,7 @@ void emulator_init() {
     if (ctremu.videoscale < 1) ctremu.videoscale = 1;
     if (ctremu.vshthreads > MAX_VSH_THREADS)
         ctremu.vshthreads = MAX_VSH_THREADS;
-    if (ctremu.vshthreads < 2) ctremu.vshthreads = 0;
+    if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
 
     save_config();
 }

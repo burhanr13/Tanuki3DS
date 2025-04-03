@@ -64,42 +64,44 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glBufferData(GL_UNIFORM_BUFFER, 17 * 4, nullptr, GL_STATIC_DRAW);
     renderer_gl_update_freecam(state);
 
-    glGenVertexArrays(1, &state->gpu_vao);
-    glBindVertexArray(state->gpu_vao);
-
     glGenBuffers(12, state->gpu_vbos);
     glGenBuffers(1, &state->gpu_ebo);
+
+    // we have 2 vaos since with geoshaders we need to fallback to sw shaders
+    glGenVertexArrays(1, &state->gpu_vao_sw);
+    glBindVertexArray(state->gpu_vao_sw);
+    glBindBuffer(GL_ARRAY_BUFFER, state->gpu_vbos[0]);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state->gpu_ebo);
 
-    // for hw vshaders attributes are setup at run time
-    if (!ctremu.hwvshaders) {
-        glBindBuffer(GL_ARRAY_BUFFER, state->gpu_vbos[0]);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, pos));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, color));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, texcoord0));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, texcoord1));
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, texcoord2));
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, texcoordw));
+    glEnableVertexAttribArray(5);
+    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, normquat));
+    glEnableVertexAttribArray(6);
+    glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void*) offsetof(Vertex, view));
+    glEnableVertexAttribArray(7);
 
-        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void*) offsetof(Vertex, pos));
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void*) offsetof(Vertex, color));
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void*) offsetof(Vertex, texcoord0));
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void*) offsetof(Vertex, texcoord1));
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void*) offsetof(Vertex, texcoord2));
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void*) offsetof(Vertex, texcoordw));
-        glEnableVertexAttribArray(5);
-        glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void*) offsetof(Vertex, normquat));
-        glEnableVertexAttribArray(6);
-        glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              (void*) offsetof(Vertex, view));
-        glEnableVertexAttribArray(7);
-    }
+    // for hw vshaders attributes are setup at run time
+    glGenVertexArrays(1, &state->gpu_vao_hw);
+    glBindVertexArray(state->gpu_vao_hw);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state->gpu_ebo);
 
     glGenTextures(2, state->screentex);
     glGenFramebuffers(2, state->screenfbo);
@@ -159,7 +161,6 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         gpu->textures.d[i].tex = textures[i];
     }
 
-    glBindVertexArray(state->gpu_vao);
 }
 
 void renderer_gl_destroy(GLState* state) {
@@ -176,7 +177,8 @@ void renderer_gl_destroy(GLState* state) {
         glDeleteShader(state->gpu->fshaders.d[i].fs);
     }
     glDeleteVertexArrays(1, &state->main_vao);
-    glDeleteVertexArrays(1, &state->gpu_vao);
+    glDeleteVertexArrays(1, &state->gpu_vao_sw);
+    glDeleteVertexArrays(1, &state->gpu_vao_hw);
     glDeleteBuffers(1, &state->main_vbo);
     glDeleteBuffers(12, state->gpu_vbos);
     glDeleteBuffers(4, state->ubos);
@@ -197,7 +199,6 @@ void renderer_gl_destroy(GLState* state) {
 
 // call before emulating gpu drawing
 void renderer_gl_setup_gpu(GLState* state) {
-    glBindVertexArray(state->gpu_vao);
     glUseProgram(LRU_mru(state->progcache)->prog);
     glBindFramebuffer(GL_FRAMEBUFFER, state->gpu->curfb->fbo);
 }
