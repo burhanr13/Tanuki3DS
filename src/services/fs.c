@@ -31,33 +31,48 @@ u8 country_list[] = {
 #embed "countrylist.app.romfs"
 };
 
+void sanitize_filepath(char* s) {
+    // windows forbids a bunch of characters in filepaths
+    // so we replace them here
+    // on non-windows this isnt a problem so we do nothing
+#ifdef _WIN32
+    for (char* p = filepath; *p; p++) {
+        switch (*p) {
+            case '<':
+            case '>':
+            case ':':
+            case '"':
+            case '|':
+            case '?':
+            case '*':
+                *p = ' ';
+        }
+    }
+#endif
+}
+
 char* archive_basepath(E3DS* s, u64 archive) {
+    char* basepath;
     switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
-        case ARCHIVE_SYSTEMSAVEDATA: {
-            char* basepath;
+        case ARCHIVE_SYSTEMSAVEDATA:
             asprintf(&basepath, "3ds/savedata/%s", s->romimage.name);
-            return basepath;
-        }
-        case ARCHIVE_EXTSAVEDATA: {
-            char* basepath;
+            break;
+        case ARCHIVE_EXTSAVEDATA:
             asprintf(&basepath, "3ds/extdata/%s", s->romimage.name);
-            return basepath;
-        }
-        case ARCHIVE_SHAREDEXTDATA: {
-            char* basepath;
+            break;
+        case ARCHIVE_SHAREDEXTDATA:
             asprintf(&basepath, "3ds/extdata/shared");
-            return basepath;
-        }
-        case ARCHIVE_SDMC: {
-            char* basepath;
+            break;
+        case ARCHIVE_SDMC:
             asprintf(&basepath, "3ds/sdmc");
-            return basepath;
-        }
+            break;
         default:
             lerror("invalid archive");
             return nullptr;
     }
+    sanitize_filepath(basepath);
+    return basepath;
 }
 
 FILE* open_formatinfo(E3DS* s, u64 archive, bool write) {
@@ -84,15 +99,16 @@ char* create_text_path(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
         asprintf(&filepath, "%s%s", basepath, rawpath);
     } else if (pathtype == FSPATH_UTF16) {
         u16* path16 = rawpath;
-        u8 path[pathsize];
-        for (int i = 0; i < pathsize / 2; i++) {
-            path[i] = path16[i];
-        }
+        char path[pathsize];
+        convert_utf16(path, pathsize, path16, pathsize / 2);
         asprintf(&filepath, "%s%s", basepath, path);
     } else {
         lerror("unknown text file path type");
         return nullptr;
     }
+
+    sanitize_filepath(filepath);
+
     free(basepath);
     return filepath;
 }
