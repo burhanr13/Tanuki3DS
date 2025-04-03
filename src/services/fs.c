@@ -36,7 +36,7 @@ void sanitize_filepath(char* s) {
     // so we replace them here
     // on non-windows this isnt a problem so we do nothing
 #ifdef _WIN32
-    for (char* p = filepath; *p; p++) {
+    for (char* p = s; *p; p++) {
         switch (*p) {
             case '<':
             case '>':
