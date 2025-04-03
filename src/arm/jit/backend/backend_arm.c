@@ -694,24 +694,20 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 break;
             }
             case IR_MEDIA_UADD8: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
                 movx(r0, r29);
-                mov(r1, src1);
-                mov(r2, src2);
+                MOVOP1(r1);
+                MOVOP2(r2);
                 movx(ip0, (uintptr_t) media_uadd8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
             }
             case IR_MEDIA_USUB8: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
                 movx(r0, r29);
-                mov(r1, src1);
-                mov(r2, src2);
+                MOVOP1(r1);
+                MOVOP2(r2);
                 movx(ip0, (uintptr_t) media_usub8);
                 blr(ip0);
                 mov(dst, r0);
@@ -728,12 +724,10 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 //     break;
                 // }
             case IR_MEDIA_UQSUB8: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
                 movx(r0, r29);
-                mov(r1, src1);
-                mov(r2, src2);
+                MOVOP1(r1);
+                MOVOP2(r2);
                 movx(ip0, (uintptr_t) media_uqsub8);
                 blr(ip0);
                 mov(dst, r0);
@@ -760,12 +754,10 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
             //     break;
             // }
             case IR_MEDIA_SSUB8: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
                 movx(r0, r29);
-                mov(r1, src1);
-                mov(r2, src2);
+                MOVOP1(r1);
+                MOVOP2(r2);
                 movx(ip0, (uintptr_t) media_ssub8);
                 blr(ip0);
                 mov(dst, r0);
@@ -782,12 +774,10 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
             //     break;
             // }
             case IR_MEDIA_SEL: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
                 movx(r0, r29);
-                mov(r1, src1);
-                mov(r2, src2);
+                MOVOP1(r1);
+                MOVOP2(r2);
                 movx(ip0, (uintptr_t) media_sel);
                 blr(ip0);
                 mov(dst, r0);
