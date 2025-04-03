@@ -288,6 +288,7 @@ void mutex_release(E3DS* s, KMutex* mtx) {
     KThread* wakeupthread = remove_highest_prio(&mtx->waiting_thrds);
     thread_wakeup(s, wakeupthread, &mtx->hdr);
     mtx->locker_thrd = wakeupthread;
+    klist_insert(&wakeupthread->owned_mutexes, &mtx->hdr);
 }
 
 KSemaphore* semaphore_create(s32 init, s32 max) {
@@ -335,8 +336,10 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
                 klist_insert(&mtx->waiting_thrds, &t->hdr);
                 return true;
             }
-            mtx->locker_thrd = t;
-            klist_insert(&t->owned_mutexes, &mtx->hdr);
+            if (mtx->locker_thrd != t) {
+                mtx->locker_thrd = t;
+                klist_insert(&t->owned_mutexes, &mtx->hdr);
+            }
             return false;
         }
         case KOT_SEMAPHORE: {

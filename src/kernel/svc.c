@@ -171,7 +171,10 @@ DECL_SVC(CreateMutex) {
     MAKE_HANDLE(handle);
 
     KMutex* mtx = mutex_create();
-    if (R(1)) mtx->locker_thrd = caller;
+    if (R(1)) {
+        mtx->locker_thrd = caller;
+        klist_insert(&caller->owned_mutexes, &mtx->hdr);
+    }
     mtx->hdr.refcount = 1;
     HANDLE_SET(handle, mtx);
 
