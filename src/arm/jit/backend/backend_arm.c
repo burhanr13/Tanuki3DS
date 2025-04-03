@@ -6,8 +6,7 @@
 #include <capstone/capstone.h>
 #endif
 
-#include "../../media.h"
-#include "../../vfp.h"
+#include "arm/media.h"
 
 #define RAS_MACROS
 #define RAS_DEFAULT_SUFFIX w

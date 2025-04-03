@@ -3,8 +3,8 @@
 
 #include <ras/ras.h>
 
-#include "../jit.h"
-#include "../register_allocator.h"
+#include "arm/jit/jit.h"
+#include "arm/jit/register_allocator.h"
 #include "common.h"
 
 typedef struct {
