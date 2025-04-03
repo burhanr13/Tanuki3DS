@@ -140,6 +140,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
 
     u32 jmptarget = -1;
 
+    // callback address literal pool
     Label(lld8);
     Label(lld16);
     Label(lld32);
@@ -151,8 +152,10 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
     Label(lstf32);
     Label(lstf64);
 
+    // label for END_LOOP (jump to the same the block)
     Label(looplabel);
 
+    // labels for jump instructions
     rasLabel labels[MAX_BLOCK_INSTRS];
     int nlabel = 0;
 
@@ -312,7 +315,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto dst = DSTREG();
                 movx(r0, r29);
                 mov(r1, inst.op1);
-                movx(ip0, (size_t) cpu->cp15_read);
+                movx(ip0, (uintptr_t) cpu->cp15_read);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -322,7 +325,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, inst.op1);
                 mov(r2, src);
-                movx(ip0, (size_t) cpu->cp15_write);
+                movx(ip0, (uintptr_t) cpu->cp15_write);
                 blr(ip0);
                 break;
             }
@@ -698,7 +701,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, src1);
                 mov(r2, src2);
-                movx(ip0, (size_t) media_uadd8);
+                movx(ip0, (uintptr_t) media_uadd8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -710,21 +713,33 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, src1);
                 mov(r2, src2);
-                movx(ip0, (size_t) media_usub8);
+                movx(ip0, (uintptr_t) media_usub8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
             }
-            // case IR_MEDIA_UQADD8: {
-            //     auto src1 = LOADOP1();
-            //     auto src2 = LOADOP2();
-            //     auto dst = DSTREG();
-            //     mov(v0.s[0], src1);
-            //     mov(v1.s[0], src2);
-            //     uqadd(v0.b8, v0.b8, v1.b8);
-            //     mov(dst, v0.s[0]);
-            //     break;
-            // }
+                // case IR_MEDIA_UQADD8: {
+                //     auto src1 = LOADOP1();
+                //     auto src2 = LOADOP2();
+                //     auto dst = DSTREG();
+                //     mov(v0.s[0], src1);
+                //     mov(v1.s[0], src2);
+                //     uqadd(v0.b8, v0.b8, v1.b8);
+                //     mov(dst, v0.s[0]);
+                //     break;
+                // }
+            case IR_MEDIA_UQSUB8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                movx(r0, r29);
+                mov(r1, src1);
+                mov(r2, src2);
+                movx(ip0, (uintptr_t) media_uqsub8);
+                blr(ip0);
+                mov(dst, r0);
+                break;
+            }
             // case IR_MEDIA_UQSUB8: {
             //     auto src1 = LOADOP1();
             //     auto src2 = LOADOP2();
@@ -752,7 +767,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, src1);
                 mov(r2, src2);
-                movx(ip0, (size_t) media_ssub8);
+                movx(ip0, (uintptr_t) media_ssub8);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -774,7 +789,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 movx(r0, r29);
                 mov(r1, src1);
                 mov(r2, src2);
-                movx(ip0, (size_t) media_sel);
+                movx(ip0, (uintptr_t) media_sel);
                 blr(ip0);
                 mov(dst, r0);
                 break;
@@ -864,7 +879,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
             case IR_MODESWITCH: {
                 movx(r0, r29);
                 mov(r1, inst.op1);
-                movx(ip0, (size_t) cpu_update_mode);
+                movx(ip0, (uintptr_t) cpu_update_mode);
                 blr(ip0);
                 break;
             }
@@ -873,13 +888,13 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     case E_SWI:
                         movx(r0, r29);
                         mov(r1, (ArmInstr) {inst.op2}.sw_intr.arg);
-                        movx(ip0, (size_t) cpu->handle_svc);
+                        movx(ip0, (uintptr_t) cpu->handle_svc);
                         blr(ip0);
                         break;
                     case E_UND:
                         movx(r0, r29);
                         mov(r1, inst.op2);
-                        movx(ip0, (size_t) cpu_undefined_fail);
+                        movx(ip0, (uintptr_t) cpu_undefined_fail);
                         blr(ip0);
                         break;
                 }
@@ -899,7 +914,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 int spdisp = SPDISP();
                 if (spdisp) subx(sp, sp, spdisp);
 
-                movx(r29, (size_t) cpu);
+                movx(r29, (uintptr_t) cpu);
                 L(looplabel);
 
                 break;
@@ -926,26 +941,27 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 }
                 pop(fp, lr);
 
-                // if (inst.opcode == IR_END_LINK) {
-                //     Label nolink, linkaddr;
-                //     cmp(x0, 0);
-                //     ble(nolink);
-                //     ldr(x16, linkaddr);
-                //     br(x16);
-                //     align(8);
-                //     L(linkaddr);
-                //     links.push_back((LinkPatch) {(u32) (getCurr() -
-                //     getCode()),
-                //                                  inst.op1, inst.op2});
-                //     dd(0);
-                //     dd(0);
-                //     L(nolink);
-                // }
+                if (inst.opcode == IR_END_LINK) {
+                    Label(nolink);
+                    Label(linkaddr);
+                    cmpx(r0, 0);
+                    ble(nolink);
+                    ldrlx(r16, linkaddr);
+                    br(r16);
+                    align(8);
+                    L(linkaddr);
+                    Label(linklabel);
+                    backend->links[backend->nlinks++] =
+                        (LinkPatch) {linklabel, inst.op1, inst.op2};
+                    dword(linklabel);
+                    L(nolink);
+                }
 
                 ret();
                 break;
             }
             default:
+                lerror("unimpl ir instr %d", inst.opcode);
                 break;
         }
         STOREDST();
@@ -1279,6 +1295,14 @@ JITFunc backend_arm_get_code(ArmCodeBackend* backend) {
 
 void backend_arm_patch_links(JITBlock* block) {
     ArmCodeBackend* backend = block->backend;
+    for (int i = 0; i < backend->nlinks; i++) {
+        auto patch = backend->links[i];
+        JITBlock* linkblock =
+            get_jitblock(backend->cpu, patch.attrs, patch.addr);
+        rasDefineLabelExternal(patch.lab, linkblock->code);
+        Vec_push(linkblock->linkingblocks,
+                 ((BlockLocation) {block->attrs, block->start_addr}));
+    }   
     rasReady(backend->code);
 }
 
