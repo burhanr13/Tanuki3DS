@@ -49,6 +49,7 @@ bool iropc_iscallback(IROpcode opc) {
         case IR_CP15_WRITE:
         case IR_MEDIA_UADD8:
         case IR_MEDIA_USUB8:
+        case IR_MEDIA_UQSUB8:
         case IR_MEDIA_UHADD8:
         case IR_MEDIA_SSUB8:
         case IR_MEDIA_SEL:
