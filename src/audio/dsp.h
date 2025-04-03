@@ -59,6 +59,8 @@ typedef struct {
 
 } DSP;
 
+extern u32 g_dsp_chn_disable;
+
 // pipe 2
 void dsp_write_audio_pipe(DSP* dsp, void* buf, u32 len);
 void dsp_read_audio_pipe(DSP* dsp, void* buf, u32 len);

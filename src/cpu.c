@@ -150,7 +150,7 @@ u32 cp15_read(E3DS* s, ArmInstr instr) {
                 case 0:
                     switch (instr.cp_reg_trans.cp) {
                         case 3:
-                            return GETTLS(CUR_THREAD);
+                            return CUR_THREAD->tls;
                     }
                     break;
             }

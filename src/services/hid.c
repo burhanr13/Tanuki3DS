@@ -89,7 +89,7 @@ void hid_update_pad(E3DS* s, u32 btns, s32 cx, s32 cy) {
 }
 
 void hid_update_touch(E3DS* s, u16 x, u16 y, bool pressed) {
-    int curidx = 0; //(HIDMEM->pad.idx + 1) % 8;
+    int curidx = 0;
     HIDMEM->touch.idx = curidx;
 
     if (curidx == 0) {
@@ -97,11 +97,11 @@ void hid_update_touch(E3DS* s, u16 x, u16 y, bool pressed) {
         HIDMEM->touch.time = s->sched.now;
     }
 
-    HIDMEM->touch.entries[curidx].x = x;
-    HIDMEM->touch.entries[curidx].y = y;
-    HIDMEM->touch.entries[curidx].pressed = pressed;
-
-    linfo("signaling hid event pad0");
-    event_signal(s, &s->services.hid.events[HIDEVENT_PAD0]);
-    event_signal(s, &s->services.hid.events[HIDEVENT_PAD1]);
+    // apparently some games just ignore the index field
+    // so we set all entries
+    for (int i = 0; i < 8; i++) {
+        HIDMEM->touch.entries[i].x = x;
+        HIDMEM->touch.entries[i].y = y;
+        HIDMEM->touch.entries[i].pressed = pressed;
+    }
 }

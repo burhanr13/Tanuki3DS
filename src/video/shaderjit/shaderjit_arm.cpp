@@ -54,6 +54,8 @@ struct ShaderCode : Xbyak_aarch64::CodeGenerator {
         jmplabels.clear();
         jmplabels.resize(SHADER_CODE_SIZE);
         calls.clear();
+        usingex2 = false;
+        usinglg2 = false;
         ex2func = Label();
         lg2func = Label();
         for (auto& e : entrypoints) {

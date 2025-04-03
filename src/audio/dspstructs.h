@@ -76,7 +76,7 @@ typedef struct {
 } DSPInputStatus;
 
 // 4
-typedef s16 DSPInputADPCMCoeffs[16];
+typedef s16 DSPInputADPCMCoeffs[8][2];
 
 // 5, this struct is only in libctru for some reason
 // i have no idea what any of these mean

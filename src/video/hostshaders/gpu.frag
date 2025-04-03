@@ -125,30 +125,30 @@ vec4 tev_srcs[16];
 
 vec3 tev_operand_rgb(vec4 v, uint op) {
     switch (op) {
-        case 0: return v.rgb;
-        case 1: return 1 - v.rgb;
-        case 2: return vec3(v.a);
-        case 3: return vec3(1 - v.a);
-        case 4: return vec3(v.r);
-        case 5: return vec3(1 - v.r);
-        case 8: return vec3(v.g);
-        case 9: return vec3(1 - v.g);
-        case 12: return vec3(v.b);
-        case 13: return vec3(1 - v.b);
+        case 0u: return v.rgb;
+        case 1u: return 1 - v.rgb;
+        case 2u: return vec3(v.a);
+        case 3u: return vec3(1 - v.a);
+        case 4u: return vec3(v.r);
+        case 5u: return vec3(1 - v.r);
+        case 8u: return vec3(v.g);
+        case 9u: return vec3(1 - v.g);
+        case 12u: return vec3(v.b);
+        case 13u: return vec3(1 - v.b);
         default: return v.rgb;
     }
 }
 
 float tev_operand_alpha(vec4 v, uint op) {
     switch (op) {
-        case 0: return v.a;
-        case 1: return 1 - v.a;
-        case 2: return v.r;
-        case 3: return 1 - v.r;
-        case 4: return v.g;
-        case 5: return 1 - v.g;
-        case 6: return v.b;
-        case 7: return 1 - v.b;
+        case 0u: return v.a;
+        case 1u: return 1 - v.a;
+        case 2u: return v.r;
+        case 3u: return 1 - v.r;
+        case 4u: return v.g;
+        case 5u: return 1 - v.g;
+        case 6u: return v.b;
+        case 7u: return 1 - v.b;
         default: return v.a;
     }
 }
@@ -156,16 +156,16 @@ float tev_operand_alpha(vec4 v, uint op) {
 vec3 tev_combine_rgb(uint i) {
 #define SRC(n) tev_operand_rgb(tev_srcs[tev[i].rgb.src##n], tev[i].rgb.op##n)
     switch (tev[i].rgb.combiner) {
-        case 0: return SRC(0);
-        case 1: return SRC(0) * SRC(1);
-        case 2: return SRC(0) + SRC(1);
-        case 3: return SRC(0) + SRC(1) - 0.5;
-        case 4: return mix(SRC(1), SRC(0), SRC(2));
-        case 5: return SRC(0) - SRC(1);
-        case 6:
-        case 7: return vec3(4 * dot(SRC(0) - 0.5, SRC(1) - 0.5));
-        case 8: return SRC(0) * SRC(1) + SRC(2);
-        case 9: return (SRC(0) + SRC(1)) * SRC(2);
+        case 0u: return SRC(0);
+        case 1u: return SRC(0) * SRC(1);
+        case 2u: return SRC(0) + SRC(1);
+        case 3u: return SRC(0) + SRC(1) - 0.5;
+        case 4u: return mix(SRC(1), SRC(0), SRC(2));
+        case 5u: return SRC(0) - SRC(1);
+        case 6u:
+        case 7u: return vec3(4 * dot(SRC(0) - 0.5, SRC(1) - 0.5));
+        case 8u: return SRC(0) * SRC(1) + SRC(2);
+        case 9u: return (SRC(0) + SRC(1)) * SRC(2);
         default: return SRC(0);
     }
 #undef SRC
@@ -174,16 +174,16 @@ vec3 tev_combine_rgb(uint i) {
 float tev_combine_alpha(uint i) {
 #define SRC(n) tev_operand_alpha(tev_srcs[tev[i].a.src##n], tev[i].a.op##n)
     switch (tev[i].a.combiner) {
-        case 0: return SRC(0);
-        case 1: return SRC(0) * SRC(1);
-        case 2: return SRC(0) + SRC(1);
-        case 3: return SRC(0) + SRC(1) - 0.5;
-        case 4: return mix(SRC(1), SRC(0), SRC(2));
-        case 5: return SRC(0) - SRC(1);
-        case 6: 
-        case 7: return 4 * (SRC(0) - 0.5) * (SRC(1) - 0.5);
-        case 8: return SRC(0) * SRC(1) + SRC(2);
-        case 9: return (SRC(0) + SRC(1)) * SRC(2);
+        case 0u: return SRC(0);
+        case 1u: return SRC(0) * SRC(1);
+        case 2u: return SRC(0) + SRC(1);
+        case 3u: return SRC(0) + SRC(1) - 0.5;
+        case 4u: return mix(SRC(1), SRC(0), SRC(2));
+        case 5u: return SRC(0) - SRC(1);
+        case 6u: 
+        case 7u: return 4 * (SRC(0) - 0.5) * (SRC(1) - 0.5);
+        case 8u: return SRC(0) * SRC(1) + SRC(2);
+        case 9u: return (SRC(0) + SRC(1)) * SRC(2);
         default: return SRC(0);
     }
 #undef SRC
@@ -191,14 +191,14 @@ float tev_combine_alpha(uint i) {
 
 bool run_alphatest(float a) {
     switch (alphafunc) {
-        case 0: return false;
-        case 1: return true;
-        case 2: return a == alpharef;
-        case 3: return a != alpharef;
-        case 4: return a < alpharef;
-        case 5: return a <= alpharef;
-        case 6: return a > alpharef;
-        case 7: return a >= alpharef;
+        case 0u: return false;
+        case 1u: return true;
+        case 2u: return a == alpharef;
+        case 3u: return a != alpharef;
+        case 4u: return a < alpharef;
+        case 5u: return a <= alpharef;
+        case 6u: return a > alpharef;
+        case 7u: return a >= alpharef;
         default: return true;
     }
 }

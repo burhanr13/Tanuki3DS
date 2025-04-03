@@ -1,4 +1,4 @@
-#include "shadergen.h"
+#include "shadergen_fs.h"
 
 #define XXH_INLINE_ALL
 #include <xxh3.h>

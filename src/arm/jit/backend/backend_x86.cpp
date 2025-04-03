@@ -25,10 +25,12 @@ struct Code : Xbyak::CodeGenerator {
     Xbyak::Reg64 arg1 = rcx;
     Xbyak::Reg32 arg2 = edx;
     Xbyak::Reg32 arg3 = r8d;
+    Xbyak::Xmm arg3f = xmm2;
 #else
     Xbyak::Reg64 arg1 = rdi;
     Xbyak::Reg32 arg2 = esi;
     Xbyak::Reg32 arg3 = edx;
+    Xbyak::Xmm arg3f = xmm0;
 #endif
     std::vector<Xbyak::Reg32> tempregs =
 #ifdef _WIN32
@@ -1785,11 +1787,11 @@ void Code::compileVFPStoreMem(ArmInstr instr, const Xbyak::Operand& _addr) {
 
     if (instr.cp_data_trans.cpnum & 1) {
         for (int i = 0; i < rcount; i++) {
-            movsd(xmm0, ptr[CPU(d[(vd + i) & 15])]);
+            movsd(arg3f, ptr[CPU(d[(vd + i) & 15])]);
 #ifdef JIT_FASTMEM
             mov(rax, (u64) cpu->fastmem);
             if (addr != edx) mov(edx, addr);
-            movsd(ptr[rax + rdx], xmm0);
+            movsd(ptr[rax + rdx], arg3f);
 #else
             mov(arg2, addr);
             mov(arg1, rbx);
@@ -1802,11 +1804,11 @@ void Code::compileVFPStoreMem(ArmInstr instr, const Xbyak::Operand& _addr) {
         vd = vd << 1 | instr.cp_data_trans.n;
 
         for (int i = 0; i < rcount; i++) {
-            movss(xmm0, ptr[CPU(s[(vd + i) & 31])]);
+            movss(arg3f, ptr[CPU(s[(vd + i) & 31])]);
 #ifdef JIT_FASTMEM
             mov(rax, (u64) cpu->fastmem);
             if (addr != edx) mov(edx, addr);
-            movss(ptr[rax + rdx], xmm0);
+            movss(ptr[rax + rdx], arg3f);
 #else
             mov(arg2, addr);
             mov(arg1, rbx);

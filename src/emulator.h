@@ -2,6 +2,7 @@
 #define EMULATOR_H
 
 #include <cglm/cglm.h>
+#include <setjmp.h>
 
 #include "3ds.h"
 #include "common.h"
@@ -37,6 +38,8 @@ typedef struct {
     bool freecam_enable;
 
     EmuAudioCallback audio_cb;
+
+    jmp_buf exceptionJmp;
 
     E3DS system;
 
