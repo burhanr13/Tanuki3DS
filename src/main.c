@@ -361,6 +361,9 @@ int main(int argc, char** argv) {
     const Uint64 frame_ticks = SDL_NS_PER_SECOND / FPS;
     Uint64 frame = 0;
 
+    double avg_frame_time = 0;
+    int avg_frame_time_ct = 0;
+
     ctremu.running = true;
     while (ctremu.running) {
         Uint64 cur_time;
@@ -389,6 +392,7 @@ int main(int argc, char** argv) {
                 g_window);
         }
 
+        Uint64 frame_start = SDL_GetTicksNS();
         if (!ctremu.pause) {
             renderer_gl_setup_gpu(&ctremu.system.gpu.gl);
 
@@ -400,6 +404,9 @@ int main(int argc, char** argv) {
                 elapsed = cur_time - prev_time;
             } while (ctremu.uncap && elapsed < frame_ticks);
         }
+        Uint64 frame_time = SDL_GetTicksNS() - frame_start;
+        avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
+        avg_frame_time_ct++;
 
         int w, h;
         SDL_GetWindowSizeInPixels(g_window, &w, &h);
@@ -463,12 +470,15 @@ int main(int argc, char** argv) {
                 (double) SDL_NS_PER_SECOND * (frame - prev_fps_frame) / elapsed;
 
             char* wintitle;
-            asprintf(&wintitle, "Tanuki3DS | %s | %.2lf FPS",
-                     ctremu.system.romimage.name, fps);
+            asprintf(&wintitle, "Tanuki3DS | %s | %.2lf FPS, %.3lf ms",
+                     ctremu.system.romimage.name, fps,
+                     avg_frame_time / avg_frame_time_ct);
             SDL_SetWindowTitle(g_window, wintitle);
             free(wintitle);
             prev_fps_update = cur_time;
             prev_fps_frame = frame;
+            avg_frame_time = 0;
+            avg_frame_time_ct = 0;
         }
         prev_time = cur_time;
     }
