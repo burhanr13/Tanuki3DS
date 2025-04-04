@@ -1664,8 +1664,11 @@ void gpu_draw(GPU* gpu, bool elements, bool immediate) {
                             idx = ((u8*) indexbuf)[idx] - basevert;
                         }
                     }
-                    memcpy(gsh.v + v * vshoutct, vshout[idx],
-                           vshoutct * sizeof(fvec4));
+                    for (int i = 0; i < vshoutct; i++) {
+                        int attr = v * vshoutct + i;
+                        attr = (gpu->regs.gsh.permutation >> 4 * attr) & 0xf;
+                        memcpy(gsh.v[attr], vshout[idx][i], sizeof(fvec4));
+                    }
                 }
 
                 pica_shader_exec(&gsh);
