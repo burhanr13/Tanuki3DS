@@ -1551,6 +1551,7 @@ void gpu_draw(GPU* gpu, bool elements, bool immediate) {
     if (swshaders) {
         vs = gpu->gl.gpu_vs;
         glBindVertexArray(gpu->gl.gpu_vao_sw);
+        glBindBuffer(GL_ARRAY_BUFFER, gpu->gl.gpu_vbos[0]);
     } else {
         if (gpu->vsh_uniform_dirty) {
             gpu->vsh_uniform_dirty = false;
