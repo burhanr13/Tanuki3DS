@@ -37,6 +37,8 @@ typedef struct {
     GLuint gpu_vs;
     GLuint gpu_uberfs;
 
+    GLuint gpu_pipeline;
+
     LRUCache(ProgCacheEntry, MAX_PROGRAM) progcache;
 
     GLuint screentex[2];

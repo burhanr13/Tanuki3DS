@@ -14,18 +14,24 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
 
         char* source = shader_gen_fs(ubuf);
 
-        block->fs = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(block->fs, 1, &(const char*) {source}, nullptr);
-        glCompileShader(block->fs);
-        free(source);
-
+        block->fs = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1,
+                                           &(const char*) {source});
         int res;
-        glGetShaderiv(block->fs, GL_COMPILE_STATUS, &res);
+        glGetProgramiv(block->fs, GL_LINK_STATUS, &res);
         if (!res) {
             char log[512];
-            glGetShaderInfoLog(block->fs, sizeof log, nullptr, log);
+            glGetProgramInfoLog(block->fs, sizeof log, nullptr, log);
             lerror("failed to compile shader: %s", log);
         }
+
+        glProgramUniform1i(block->fs, glGetUniformLocation(block->fs, "tex0"),
+                           0);
+        glProgramUniform1i(block->fs, glGetUniformLocation(block->fs, "tex1"),
+                           1);
+        glProgramUniform1i(block->fs, glGetUniformLocation(block->fs, "tex2"),
+                           2);
+        glUniformBlockBinding(
+            block->fs, glGetUniformBlockIndex(block->fs, "FragUniforms"), 2);
 
         linfo("compiled new fragment shader with hash %llx", hash);
     }
@@ -33,7 +39,7 @@ int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
 }
 
 const char fs_header[] = R"(
-#version 330 core
+#version 410 core
 
 in vec4 color;
 in vec2 texcoord0;
