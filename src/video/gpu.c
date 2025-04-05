@@ -1547,9 +1547,9 @@ void gpu_draw(GPU* gpu, bool elements, bool immediate) {
 
     // vertex shaders
     bool swshaders = !ctremu.hwvshaders || gpu->regs.geom.config.use_gsh;
-    GLuint vs;
     if (swshaders) {
-        vs = gpu->gl.gpu_vs;
+        glUseProgramStages(gpu->gl.gpu_pipeline, GL_VERTEX_SHADER_BIT,
+                           gpu->gl.gpu_vs);
         glBindVertexArray(gpu->gl.gpu_vao_sw);
         glBindBuffer(GL_ARRAY_BUFFER, gpu->gl.gpu_vbos[0]);
     } else {
@@ -1569,9 +1569,8 @@ void gpu_draw(GPU* gpu, bool elements, bool immediate) {
                          GL_DYNAMIC_DRAW);
         }
         if (gpu->vsh.code_dirty) {
-            vs = shader_dec_get(gpu);
-        } else {
-            vs = LRU_mru(gpu->vshaders_hw)->vs;
+            GLuint vs = shader_dec_get(gpu);
+            glUseProgramStages(gpu->gl.gpu_pipeline, GL_VERTEX_SHADER_BIT, vs);
         }
         glBindVertexArray(gpu->gl.gpu_vao_hw);
     }
@@ -1580,17 +1579,15 @@ void gpu_draw(GPU* gpu, bool elements, bool immediate) {
     // todo: do similar dirty checking for the fs
     glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
-    GLuint fs;
     if (ctremu.ubershader) {
         glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
         glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
-        fs = gpu->gl.gpu_uberfs;
+        glUseProgramStages(gpu->gl.gpu_pipeline, GL_FRAGMENT_SHADER_BIT,
+                           gpu->gl.gpu_uberfs);
     } else {
-        fs = shader_gen_get(gpu, &ubuf);
+        GLuint fs = shader_gen_get(gpu, &ubuf);
+        glUseProgramStages(gpu->gl.gpu_pipeline, GL_FRAGMENT_SHADER_BIT, fs);
     }
-
-    // finally get the program
-    gpu_gl_load_prog(&gpu->gl, vs, fs);
 
     // starting  index
     int basevert = immediate ? 0 : gpu->regs.geom.vtx_off;
