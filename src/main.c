@@ -96,7 +96,7 @@ void hotkey_press(SDL_Keycode key) {
             ctremu.pause = !ctremu.pause;
             break;
         case SDLK_TAB:
-            ctremu.uncap = !ctremu.uncap;
+            ctremu.fastforward = !ctremu.fastforward;
             break;
         case SDLK_F1:
             g_pending_reset = true;
@@ -262,7 +262,7 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
 }
 
 void audio_callback(s16 (*samples)[2], u32 count) {
-    if (ctremu.uncap || ctremu.mute) return;
+    if (ctremu.fastforward || ctremu.mute) return;
     SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
 }
 
@@ -357,7 +357,6 @@ int main(int argc, char** argv) {
 
     Uint64 prev_frame_time = SDL_GetTicksNS();
     Uint64 prev_fps_update = prev_frame_time;
-    Uint64 prev_input_update = prev_frame_time;
     Uint64 prev_fps_frame = 0;
     const Uint64 frame_ticks = SDL_NS_PER_SECOND / FPS;
     Uint64 frame = 0;
@@ -390,55 +389,49 @@ int main(int argc, char** argv) {
                 g_window);
         }
 
-        Uint64 elapsed = SDL_GetTicksNS() - prev_input_update;
-        if (elapsed >= frame_ticks || ctremu.vsync || !ctremu.uncap) {
-            prev_input_update = SDL_GetTicksNS();
-
-            SDL_Event e;
-            while (SDL_PollEvent(&e)) {
-                switch (e.type) {
-                    case SDL_EVENT_QUIT:
-                        ctremu.running = false;
-                        break;
-                    case SDL_EVENT_KEY_DOWN:
-                        hotkey_press(e.key.key);
-                        break;
-                    case SDL_EVENT_GAMEPAD_ADDED:
-                        if (!g_gamepad) {
-                            g_gamepad_id = e.gdevice.which;
-                            g_gamepad = SDL_OpenGamepad(g_gamepad_id);
-                        }
-                        break;
-                    case SDL_EVENT_GAMEPAD_REMOVED:
-                        if (g_gamepad && e.gdevice.which == g_gamepad_id) {
-                            g_gamepad = nullptr;
-                        }
-                        break;
-                    case SDL_EVENT_DROP_FILE:
-                        emulator_set_rom(e.drop.data);
-                        g_pending_reset = true;
-                        break;
-                    case SDL_EVENT_WINDOW_RESIZED:
-                        const float aspect =
-                            (float) SCREEN_WIDTH_TOP / (2 * SCREEN_HEIGHT);
-                        SDL_SetWindowAspectRatio(g_window, aspect, aspect);
-                        break;
-                }
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            switch (e.type) {
+                case SDL_EVENT_QUIT:
+                    ctremu.running = false;
+                    break;
+                case SDL_EVENT_KEY_DOWN:
+                    hotkey_press(e.key.key);
+                    break;
+                case SDL_EVENT_GAMEPAD_ADDED:
+                    if (!g_gamepad) {
+                        g_gamepad_id = e.gdevice.which;
+                        g_gamepad = SDL_OpenGamepad(g_gamepad_id);
+                    }
+                    break;
+                case SDL_EVENT_GAMEPAD_REMOVED:
+                    if (g_gamepad && e.gdevice.which == g_gamepad_id) {
+                        g_gamepad = nullptr;
+                    }
+                    break;
+                case SDL_EVENT_DROP_FILE:
+                    emulator_set_rom(e.drop.data);
+                    g_pending_reset = true;
+                    break;
+                case SDL_EVENT_WINDOW_RESIZED:
+                    const float aspect =
+                        (float) SCREEN_WIDTH_TOP / (2 * SCREEN_HEIGHT);
+                    SDL_SetWindowAspectRatio(g_window, aspect, aspect);
+                    break;
             }
         }
 
         if (!ctremu.pause) {
-            Uint64 frame_start = SDL_GetTicksNS();
-
             int w, h;
             SDL_GetWindowSizeInPixels(g_window, &w, &h);
 
             update_input(&ctremu.system, g_gamepad, w, h);
 
             gpu_gl_start_frame(&ctremu.system.gpu);
+
+            Uint64 frame_start = SDL_GetTicksNS();
             e3ds_run_frame(&ctremu.system);
             frame++;
-
             Uint64 frame_time = SDL_GetTicksNS() - frame_start;
             avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
             avg_frame_time_ct++;
@@ -448,7 +441,7 @@ int main(int argc, char** argv) {
             SDL_GL_SwapWindow(g_window);
         }
 
-        elapsed = SDL_GetTicksNS() - prev_fps_update;
+        Uint64 elapsed = SDL_GetTicksNS() - prev_fps_update;
         if (!ctremu.pause && elapsed >= SDL_NS_PER_SECOND / 2) {
             prev_fps_update = SDL_GetTicksNS();
 
@@ -466,7 +459,17 @@ int main(int argc, char** argv) {
             avg_frame_time_ct = 0;
         }
 
-        if (!ctremu.uncap) {
+        if (ctremu.fastforward && !ctremu.pause) {
+            gpu_gl_start_frame(&ctremu.system.gpu);
+            while (SDL_GetTicksNS() - prev_frame_time < frame_ticks) {
+                Uint64 frame_start = SDL_GetTicksNS();
+                e3ds_run_frame(&ctremu.system);
+                frame++;
+                Uint64 frame_time = SDL_GetTicksNS() - frame_start;
+                avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
+                avg_frame_time_ct++;
+            }
+        } else {
             if (ctremu.audiosync && !ctremu.mute) {
                 while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
                     SDL_Delay(1);

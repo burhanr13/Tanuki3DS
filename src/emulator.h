@@ -16,7 +16,7 @@ typedef struct {
 
     bool initialized;
     bool running;
-    bool uncap;
+    bool fastforward;
     bool pause;
     bool mute;
 
