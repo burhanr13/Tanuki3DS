@@ -355,12 +355,12 @@ int main(int argc, char** argv) {
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    Uint64 prev_time = SDL_GetTicksNS();
-    Uint64 prev_fps_update = prev_time;
+    Uint64 prev_frame_time = SDL_GetTicksNS();
+    Uint64 prev_fps_update = prev_frame_time;
+    Uint64 prev_input_update = prev_frame_time;
     Uint64 prev_fps_frame = 0;
     const Uint64 frame_ticks = SDL_NS_PER_SECOND / FPS;
     Uint64 frame = 0;
-
     double avg_frame_time = 0;
     int avg_frame_time_ct = 0;
 
@@ -390,8 +390,51 @@ int main(int argc, char** argv) {
                 g_window);
         }
 
-        Uint64 frame_start = SDL_GetTicksNS();
+        Uint64 elapsed = SDL_GetTicksNS() - prev_input_update;
+        if (elapsed >= frame_ticks || ctremu.vsync || !ctremu.uncap) {
+            prev_input_update = SDL_GetTicksNS();
+
+            SDL_Event e;
+            while (SDL_PollEvent(&e)) {
+                switch (e.type) {
+                    case SDL_EVENT_QUIT:
+                        ctremu.running = false;
+                        break;
+                    case SDL_EVENT_KEY_DOWN:
+                        hotkey_press(e.key.key);
+                        break;
+                    case SDL_EVENT_GAMEPAD_ADDED:
+                        if (!g_gamepad) {
+                            g_gamepad_id = e.gdevice.which;
+                            g_gamepad = SDL_OpenGamepad(g_gamepad_id);
+                        }
+                        break;
+                    case SDL_EVENT_GAMEPAD_REMOVED:
+                        if (g_gamepad && e.gdevice.which == g_gamepad_id) {
+                            g_gamepad = nullptr;
+                        }
+                        break;
+                    case SDL_EVENT_DROP_FILE:
+                        emulator_set_rom(e.drop.data);
+                        g_pending_reset = true;
+                        break;
+                    case SDL_EVENT_WINDOW_RESIZED:
+                        const float aspect =
+                            (float) SCREEN_WIDTH_TOP / (2 * SCREEN_HEIGHT);
+                        SDL_SetWindowAspectRatio(g_window, aspect, aspect);
+                        break;
+                }
+            }
+        }
+
         if (!ctremu.pause) {
+            Uint64 frame_start = SDL_GetTicksNS();
+
+            int w, h;
+            SDL_GetWindowSizeInPixels(g_window, &w, &h);
+
+            update_input(&ctremu.system, g_gamepad, w, h);
+
             gpu_gl_start_frame(&ctremu.system.gpu);
             e3ds_run_frame(&ctremu.system);
             frame++;
@@ -400,65 +443,15 @@ int main(int argc, char** argv) {
             avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
             avg_frame_time_ct++;
 
-            int w, h;
-            SDL_GetWindowSizeInPixels(g_window, &w, &h);
-
             render_gl_main(&ctremu.system.gpu.gl, w, h);
 
             SDL_GL_SwapWindow(g_window);
         }
 
-        SDL_Event e;
-        while (SDL_PollEvent(&e)) {
-            switch (e.type) {
-                case SDL_EVENT_QUIT:
-                    ctremu.running = false;
-                    break;
-                case SDL_EVENT_KEY_DOWN:
-                    hotkey_press(e.key.key);
-                    break;
-                case SDL_EVENT_GAMEPAD_ADDED:
-                    if (!g_gamepad) {
-                        g_gamepad_id = e.gdevice.which;
-                        g_gamepad = SDL_OpenGamepad(g_gamepad_id);
-                    }
-                    break;
-                case SDL_EVENT_GAMEPAD_REMOVED:
-                    if (g_gamepad && e.gdevice.which == g_gamepad_id) {
-                        g_gamepad = nullptr;
-                    }
-                    break;
-                case SDL_EVENT_DROP_FILE:
-                    emulator_set_rom(e.drop.data);
-                    g_pending_reset = true;
-                    break;
-                case SDL_EVENT_WINDOW_RESIZED:
-                    const float aspect =
-                        (float) SCREEN_WIDTH_TOP / (2 * SCREEN_HEIGHT);
-                    SDL_SetWindowAspectRatio(g_window, aspect, aspect);
-                    break;
-            }
-        }
-
-        if (!ctremu.pause) update_input(&ctremu.system, g_gamepad, w, h);
-
-        if (!ctremu.uncap) {
-            if (ctremu.audiosync && !ctremu.mute) {
-                while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
-                    SDL_Delay(1);
-            } else if (!ctremu.vsync) {
-                Uint64 cur_time = SDL_GetTicksNS();
-                Uint64 elapsed = cur_time - prev_time;
-                Sint64 wait = frame_ticks - elapsed;
-                if (wait > 0) {
-                    SDL_DelayPrecise(wait);
-                }
-            }
-        }
-
-        Uint64 cur_time = SDL_GetTicksNS();
-        Uint64 elapsed = cur_time - prev_fps_update;
+        elapsed = SDL_GetTicksNS() - prev_fps_update;
         if (!ctremu.pause && elapsed >= SDL_NS_PER_SECOND / 2) {
+            prev_fps_update = SDL_GetTicksNS();
+
             double fps =
                 (double) SDL_NS_PER_SECOND * (frame - prev_fps_frame) / elapsed;
 
@@ -468,12 +461,25 @@ int main(int argc, char** argv) {
                      avg_frame_time / avg_frame_time_ct);
             SDL_SetWindowTitle(g_window, wintitle);
             free(wintitle);
-            prev_fps_update = cur_time;
             prev_fps_frame = frame;
             avg_frame_time = 0;
             avg_frame_time_ct = 0;
         }
-        prev_time = cur_time;
+
+        if (!ctremu.uncap) {
+            if (ctremu.audiosync && !ctremu.mute) {
+                while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
+                    SDL_Delay(1);
+            } else if (!ctremu.vsync) {
+                Uint64 elapsed = SDL_GetTicksNS() - prev_frame_time;
+                Sint64 wait = frame_ticks - elapsed;
+                if (wait > 0) {
+                    SDL_DelayPrecise(wait);
+                }
+            }
+        }
+
+        prev_frame_time = SDL_GetTicksNS();
     }
 
     SDL_DestroyAudioStream(g_audio);
