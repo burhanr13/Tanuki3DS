@@ -47,8 +47,6 @@ int shader_dec_get(GPU* gpu) {
     return block->vs;
 }
 
-#define printf(...) ds_printf(&ctx->s, __VA_ARGS__)
-
 typedef struct {
     Vector(PICAInstr) calls;
     u32 depth;
@@ -132,90 +130,90 @@ void deccondop(DecCTX* ctx, u32 op, bool refx, bool refy) {
         case 0:
             if (refx == refy) { // special faster cases
                 if (refx) {     // or
-                    printf("any(cmp)");
+                    ds_printf(&ctx->s, "any(cmp)");
                 } else { // nand
-                    printf("!all(cmp)");
+                    ds_printf(&ctx->s, "!all(cmp)");
                 }
             } else {
-                printf("%scmp.x || %scmp.y", refx ? "" : "!", refy ? "" : "!");
+                ds_printf(&ctx->s, "%scmp.x || %scmp.y", refx ? "" : "!", refy ? "" : "!");
             }
             break;
         case 1:
             if (refx == refy) {
                 if (refx) { // and
-                    printf("all(cmp)");
+                    ds_printf(&ctx->s, "all(cmp)");
                 } else { // nor
-                    printf("!any(cmp)");
+                    ds_printf(&ctx->s, "!any(cmp)");
                 }
             } else {
-                printf("%scmp.x && %scmp.y", refx ? "" : "!", refy ? "" : "!");
+                ds_printf(&ctx->s, "%scmp.x && %scmp.y", refx ? "" : "!", refy ? "" : "!");
             }
             break;
         case 2:
-            printf("%scmp.x", refx ? "" : "!");
+            ds_printf(&ctx->s, "%scmp.x", refx ? "" : "!");
             break;
         case 3:
-            printf("%scmp.y", refy ? "" : "!");
+            ds_printf(&ctx->s, "%scmp.y", refy ? "" : "!");
             break;
     }
 }
 
 void decsrc(DecCTX* ctx, u32 n, u8 idx, u8 swizzle, bool neg) {
-    if (neg) printf("-");
+    if (neg) ds_printf(&ctx->s, "-");
     if (n < 0x10) {
         // pica only supports 12 vertex attributes
         // so we will also only have 12 vertex attributes
-        if (n < 12) printf("v%d", n);
-        else printf("vec4(0)");
-    } else if (n < 0x20) printf("r[%d]", n - 0x10);
+        if (n < 12) ds_printf(&ctx->s, "v%d", n);
+        else ds_printf(&ctx->s, "vec4(0)");
+    } else if (n < 0x20) ds_printf(&ctx->s, "r[%d]", n - 0x10);
     else {
         n -= 0x20;
         if (idx) {
-            printf("c[(%d + ", n);
+            ds_printf(&ctx->s, "c[(%d + ", n);
             switch (idx) {
                 case 1:
-                    printf("a.x");
+                    ds_printf(&ctx->s, "a.x");
                     break;
                 case 2:
-                    printf("a.y");
+                    ds_printf(&ctx->s, "a.y");
                     break;
                 case 3:
-                    printf("int(aL)");
+                    ds_printf(&ctx->s, "int(aL)");
                     break;
             }
-            printf(") & 0x7f]");
-        } else printf("c[%d]", n);
+            ds_printf(&ctx->s, ") & 0x7f]");
+        } else ds_printf(&ctx->s, "c[%d]", n);
     }
     if (swizzle != 0b00011011) {
-        printf(".");
+        ds_printf(&ctx->s, ".");
         for (int i = 0; i < 4; i++) {
-            printf("%c", coordnames[(swizzle >> 2 * (3 - i)) & 3]);
+            ds_printf(&ctx->s, "%c", coordnames[(swizzle >> 2 * (3 - i)) & 3]);
         }
     }
 }
 
 void decdest(DecCTX* ctx, u32 n, u8 mask) {
     if (mask == 0) return;
-    if (n < 0x10) printf("o[%d]", n);
-    else printf("r[%d]", n - 0x10);
+    if (n < 0x10) ds_printf(&ctx->s, "o[%d]", n);
+    else ds_printf(&ctx->s, "r[%d]", n - 0x10);
     if (mask != 0b1111) {
-        printf(".");
+        ds_printf(&ctx->s, ".");
         for (int i = 0; i < 4; i++) {
-            if (mask & BIT(3 - i)) printf("%c", coordnames[i]);
+            if (mask & BIT(3 - i)) ds_printf(&ctx->s, "%c", coordnames[i]);
         }
     }
-    if (mask == 0b1111) printf(" = ");
-    else printf(" = (");
+    if (mask == 0b1111) ds_printf(&ctx->s, " = ");
+    else ds_printf(&ctx->s, " = (");
 }
 
 void decdestend(DecCTX* ctx, u8 mask) {
     if (mask != 0b1111 && mask != 0) {
-        printf(").");
+        ds_printf(&ctx->s, ").");
         for (int i = 0; i < 4; i++) {
-            if (mask & BIT(3 - i)) printf("%c", coordnames[i]);
+            if (mask & BIT(3 - i)) ds_printf(&ctx->s, "%c", coordnames[i]);
         }
     }
-    printf(";\n");
+    ds_printf(&ctx->s, ";\n");
 }
 
 #define SRC(i, _fmt)                                                           \
@@ -230,7 +228,7 @@ void decdestend(DecCTX* ctx, u8 mask) {
 #define INDENT(n)                                                              \
     ({                                                                         \
         for (int i = 0; i < (n); i++) {                                        \
-            printf("%4s", "");                                                 \
+            ds_printf(&ctx->s, "%4s", "");                                                 \
         }                                                                      \
     })
 
@@ -255,41 +253,41 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_ADD:
             DEST(1);
             SRC1(1);
-            printf(" + ");
+            ds_printf(&ctx->s, " + ");
             SRC2(1);
             FIN(1);
             break;
         case PICA_DP3:
             DEST(1);
             if (ctremu.safeShaderMul) {
-                printf("vec4(dot(SAFEMUL(");
+                ds_printf(&ctx->s, "vec4(dot(SAFEMUL(");
                 SRC1(1);
-                printf(", ");
+                ds_printf(&ctx->s, ", ");
                 SRC2(1);
-                printf(").xyz, vec3(1)))");
+                ds_printf(&ctx->s, ").xyz, vec3(1)))");
             } else {
-                printf("vec4(dot(");
+                ds_printf(&ctx->s, "vec4(dot(");
                 SRC1(1);
-                printf(".xyz, ");
+                ds_printf(&ctx->s, ".xyz, ");
                 SRC2(1);
-                printf(".xyz))");
+                ds_printf(&ctx->s, ".xyz))");
             }
             FIN(1);
             break;
         case PICA_DP4:
             DEST(1);
             if (ctremu.safeShaderMul) {
-                printf("vec4(dot(SAFEMUL(");
+                ds_printf(&ctx->s, "vec4(dot(SAFEMUL(");
                 SRC1(1);
-                printf(", ");
+                ds_printf(&ctx->s, ", ");
                 SRC2(1);
-                printf("), vec4(1)))");
+                ds_printf(&ctx->s, "), vec4(1)))");
             } else {
-                printf("vec4(dot(");
+                ds_printf(&ctx->s, "vec4(dot(");
                 SRC1(1);
-                printf(", ");
+                ds_printf(&ctx->s, ", ");
                 SRC2(1);
-                printf("))");
+                ds_printf(&ctx->s, "))");
             }
             FIN(1);
             break;
@@ -297,49 +295,49 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_DPHI:
             DEST(1);
             if (ctremu.safeShaderMul) {
-                printf("vec4(dot(SAFEMUL(vec4(");
+                ds_printf(&ctx->s, "vec4(dot(SAFEMUL(vec4(");
                 if (instr.opcode == PICA_DPHI) SRC1(1i);
                 else SRC1(1);
-                printf(".xyz, 1), ");
+                ds_printf(&ctx->s, ".xyz, 1), ");
                 if (instr.opcode == PICA_DPHI) SRC2(1i);
                 else SRC2(1);
-                printf("), vec4(1)))");
+                ds_printf(&ctx->s, "), vec4(1)))");
             } else {
-                printf("vec4(dot(vec4(");
+                ds_printf(&ctx->s, "vec4(dot(vec4(");
                 if (instr.opcode == PICA_DPHI) SRC1(1i);
                 else SRC1(1);
-                printf(".xyz, 1), ");
+                ds_printf(&ctx->s, ".xyz, 1), ");
                 if (instr.opcode == PICA_DPHI) SRC2(1i);
                 else SRC2(1);
-                printf("))");
+                ds_printf(&ctx->s, "))");
             }
             FIN(1);
             break;
         case PICA_EX2:
             DEST(1);
-            printf("vec4(exp2(");
+            ds_printf(&ctx->s, "vec4(exp2(");
             SRC1(1);
-            printf(".x))");
+            ds_printf(&ctx->s, ".x))");
             FIN(1);
             break;
         case PICA_LG2:
             DEST(1);
-            printf("vec4(log2(");
+            ds_printf(&ctx->s, "vec4(log2(");
             SRC1(1);
-            printf(".x))");
+            ds_printf(&ctx->s, ".x))");
             FIN(1);
             break;
         case PICA_MUL:
             DEST(1);
             if (ctremu.safeShaderMul) {
-                printf("SAFEMUL(");
+                ds_printf(&ctx->s, "SAFEMUL(");
                 SRC1(1);
-                printf(", ");
+                ds_printf(&ctx->s, ", ");
                 SRC2(1);
-                printf(")");
+                ds_printf(&ctx->s, ")");
             } else {
                 SRC1(1);
-                printf(" * ");
+                ds_printf(&ctx->s, " * ");
                 SRC2(1);
             }
             FIN(1);
@@ -347,90 +345,90 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_SGE:
         case PICA_SGEI:
             DEST(1);
-            printf("vec4(greaterThanEqual(");
+            ds_printf(&ctx->s, "vec4(greaterThanEqual(");
             if (instr.opcode == PICA_SGEI) SRC1(1i);
             else SRC1(1);
-            printf(", ");
+            ds_printf(&ctx->s, ", ");
             if (instr.opcode == PICA_SGEI) SRC2(1i);
             else SRC2(1);
-            printf("))");
+            ds_printf(&ctx->s, "))");
             FIN(1);
             break;
         case PICA_SLT:
         case PICA_SLTI:
             DEST(1);
-            printf("vec4(lessThan(");
+            ds_printf(&ctx->s, "vec4(lessThan(");
             if (instr.opcode == PICA_SLTI) SRC1(1i);
             else SRC1(1);
-            printf(", ");
+            ds_printf(&ctx->s, ", ");
             if (instr.opcode == PICA_SLTI) SRC2(1i);
             else SRC2(1);
-            printf("))");
+            ds_printf(&ctx->s, "))");
             FIN(1);
             break;
         case PICA_FLR:
             DEST(1);
-            printf("floor(");
+            ds_printf(&ctx->s, "floor(");
             SRC1(1);
-            printf(")");
+            ds_printf(&ctx->s, ")");
             FIN(1);
             break;
         case PICA_MAX:
             DEST(1);
-            printf("max(");
+            ds_printf(&ctx->s, "max(");
             SRC1(1);
-            printf(", ");
+            ds_printf(&ctx->s, ", ");
             SRC2(1);
-            printf(")");
+            ds_printf(&ctx->s, ")");
             FIN(1);
             break;
         case PICA_MIN:
             DEST(1);
-            printf("min(");
+            ds_printf(&ctx->s, "min(");
             SRC1(1);
-            printf(", ");
+            ds_printf(&ctx->s, ", ");
             SRC2(1);
-            printf(")");
+            ds_printf(&ctx->s, ")");
             FIN(1);
             break;
         case PICA_RCP:
             DEST(1);
-            printf("vec4(1 / ");
+            ds_printf(&ctx->s, "vec4(1 / ");
             SRC1(1);
-            printf(".x)");
+            ds_printf(&ctx->s, ".x)");
             FIN(1);
             break;
         case PICA_RSQ:
             DEST(1);
-            printf("vec4(inversesqrt(");
+            ds_printf(&ctx->s, "vec4(inversesqrt(");
             SRC1(1);
-            printf(".x))");
+            ds_printf(&ctx->s, ".x))");
             FIN(1);
             break;
         case PICA_MOVA:
             if (desc.destmask & 0b1100) {
-                printf("a.");
+                ds_printf(&ctx->s, "a.");
                 for (int i = 0; i < 2; i++) {
                     if (desc.destmask & BIT(3 - i)) {
-                        printf("%c", coordnames[i]);
+                        ds_printf(&ctx->s, "%c", coordnames[i]);
                     }
                 }
-                printf(" = ivec4(clamp(");
+                ds_printf(&ctx->s, " = ivec4(clamp(");
                 SRC1(1);
-                printf(", -128, 127)).");
+                ds_printf(&ctx->s, ", -128, 127)).");
                 for (int i = 0; i < 2; i++) {
                     if (desc.destmask & BIT(3 - i)) {
-                        printf("%c", coordnames[i]);
+                        ds_printf(&ctx->s, "%c", coordnames[i]);
                     }
                 }
-                printf(";\n");
+                ds_printf(&ctx->s, ";\n");
             }
             break;
         case PICA_MOV:
             if (instr.fmt1.dest == ctx->out_view) {
                 u32 rn = instr.fmt1.src1 - 0x10;
                 if (rn < 0x10) {
-                    printf("if (freecam_enable) r[%d] = freecam_mtx * "
+                    ds_printf(&ctx->s, "if (freecam_enable) r[%d] = freecam_mtx * "
                            "r[%d];\n",
                            rn, rn);
                     INDENT(ctx->depth);
@@ -441,34 +439,34 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             FIN(1);
             break;
         case PICA_NOP:
-            printf("\n");
+            ds_printf(&ctx->s, "\n");
             break;
         case PICA_BREAK:
-            printf("break;\n");
+            ds_printf(&ctx->s, "break;\n");
             break;
         case PICA_BREAKC:
-            printf("if (");
+            ds_printf(&ctx->s, "if (");
             deccondop(ctx, instr.fmt2.op, instr.fmt2.refx, instr.fmt2.refy);
-            printf(") break;\n");
+            ds_printf(&ctx->s, ") break;\n");
             break;
         case PICA_END:
-            printf("return;\n");
+            ds_printf(&ctx->s, "return;\n");
             if (ctx->farthestjmp < pc) pc = -1;
             break;
         case PICA_CALL:
         case PICA_CALLC:
         case PICA_CALLU: {
             if (instr.opcode != PICA_CALL) {
-                printf("if (");
+                ds_printf(&ctx->s, "if (");
                 if (instr.opcode == PICA_CALLC) {
                     deccondop(ctx, instr.fmt2.op, instr.fmt2.refx,
                               instr.fmt2.refy);
                 } else {
-                    printf("b(%d)", instr.fmt3.c);
+                    ds_printf(&ctx->s, "b(%d)", instr.fmt3.c);
                 }
-                printf(") ");
+                ds_printf(&ctx->s, ") ");
             }
-            printf("proc_%03x();\n", instr.fmt2.dest);
+            ds_printf(&ctx->s, "proc_%03x();\n", instr.fmt2.dest);
 
             bool found = false;
             Vec_foreach(c, ctx->calls) {
@@ -485,32 +483,32 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         }
         case PICA_IFU:
         case PICA_IFC: {
-            printf("if (");
+            ds_printf(&ctx->s, "if (");
             if (instr.opcode == PICA_IFU) {
-                printf("b(%d)", instr.fmt3.c);
+                ds_printf(&ctx->s, "b(%d)", instr.fmt3.c);
             } else {
                 deccondop(ctx, instr.fmt2.op, instr.fmt2.refx, instr.fmt2.refy);
             }
-            printf(") {\n");
+            ds_printf(&ctx->s, ") {\n");
             dec_block(ctx, pc, instr.fmt2.dest - pc);
             if (instr.fmt2.num) {
                 INDENT(ctx->depth);
-                printf("} else {\n");
+                ds_printf(&ctx->s, "} else {\n");
                 dec_block(ctx, instr.fmt2.dest, instr.fmt2.num);
             }
             INDENT(ctx->depth);
-            printf("}\n");
+            ds_printf(&ctx->s, "}\n");
             pc = instr.fmt2.dest + instr.fmt2.num;
             break;
         }
         case PICA_LOOP: {
-            printf("aL = i[%d].y;\n", instr.fmt3.c);
+            ds_printf(&ctx->s, "aL = i[%d].y;\n", instr.fmt3.c);
             INDENT(ctx->depth);
-            printf("for (uint l = 0u; l <= i[%d].x; l++, aL = (aL + i[%d].z) & 0xffu) {\n",
+            ds_printf(&ctx->s, "for (uint l = 0u; l <= i[%d].x; l++, aL = (aL + i[%d].z) & 0xffu) {\n",
                    instr.fmt3.c, instr.fmt3.c);
             dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
             INDENT(ctx->depth);
-            printf("}\n");
+            ds_printf(&ctx->s, "}\n");
             pc = instr.fmt3.dest + 1;
             break;
         }
@@ -520,7 +518,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
 
             // jmp to next instr - nop
             if (dst == pc) {
-                printf("\n");
+                ds_printf(&ctx->s, "\n");
                 break;
             }
             // loop - handle this later
@@ -535,20 +533,20 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             // if its a block from a prior jmp, then we have ensured already
             // that this is a function return
             if (dst > ctx->curblockend) {
-                printf("if (");
+                ds_printf(&ctx->s, "if (");
                 if (instr.opcode == PICA_JMPC) {
                     deccondop(ctx, instr.fmt2.op, instr.fmt2.refx,
                               instr.fmt2.refy);
                 } else {
-                    printf("%sb(%d)", instr.fmt3.num & 1 ? "!" : "",
+                    ds_printf(&ctx->s, "%sb(%d)", instr.fmt3.num & 1 ? "!" : "",
                            instr.fmt3.c);
                 }
-                printf(") {\n");
+                ds_printf(&ctx->s, ") {\n");
                 dec_block(ctx, dst, ctx->curfuncend - dst);
                 INDENT(ctx->depth + 1);
-                printf("return;\n");
+                ds_printf(&ctx->s, "return;\n");
                 INDENT(ctx->depth);
-                printf("}\n");
+                ds_printf(&ctx->s, "}\n");
             } else {
                 // jmp within the same block
                 // we need to check here if there is a jmp out of the block
@@ -560,18 +558,18 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
                     (jmpout || ctx->curblockstart == ctx->curfuncstart)) {
                     // treat the jmp as an if statement
                     // if condition is inverse of jmp condition
-                    printf("if (!(");
+                    ds_printf(&ctx->s, "if (!(");
                     if (instr.opcode == PICA_JMPC) {
                         deccondop(ctx, instr.fmt2.op, instr.fmt2.refx,
                                   instr.fmt2.refy);
                     } else {
-                        printf("%sb(%d)", instr.fmt3.num & 1 ? "!" : "",
+                        ds_printf(&ctx->s, "%sb(%d)", instr.fmt3.num & 1 ? "!" : "",
                                instr.fmt3.c);
                     }
-                    printf(")) {\n");
+                    ds_printf(&ctx->s, ")) {\n");
                     dec_block(ctx, pc, dst - pc);
                     INDENT(ctx->depth);
-                    printf("}\n");
+                    ds_printf(&ctx->s, "}\n");
                     pc = dst;
                 } else {
                     lerror("unhandled control flow");
@@ -585,39 +583,39 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_CMP ... PICA_CMP + 1: {
             // for vector we need the function but for scalars the operator :/
             if (instr.fmt1c.cmpx == instr.fmt1c.cmpy) {
-                printf("cmp = ");
+                ds_printf(&ctx->s, "cmp = ");
                 if (instr.fmt1c.cmpx < 6) {
-                    printf("%s(", comparefuncs[instr.fmt1c.cmpx]);
+                    ds_printf(&ctx->s, "%s(", comparefuncs[instr.fmt1c.cmpx]);
                     SRC1(1c);
-                    printf(".xy, ");
+                    ds_printf(&ctx->s, ".xy, ");
                     SRC2(1c);
-                    printf(".xy)");
+                    ds_printf(&ctx->s, ".xy)");
                 } else {
-                    printf("bvec2(true)");
+                    ds_printf(&ctx->s, "bvec2(true)");
                 }
-                printf(";\n");
+                ds_printf(&ctx->s, ";\n");
             } else {
-                printf("cmp.x = ");
+                ds_printf(&ctx->s, "cmp.x = ");
                 if (instr.fmt1c.cmpx < 6) {
                     SRC1(1c);
-                    printf(".x %s ", compareops[instr.fmt1c.cmpx]);
+                    ds_printf(&ctx->s, ".x %s ", compareops[instr.fmt1c.cmpx]);
                     SRC2(1c);
-                    printf(".x");
+                    ds_printf(&ctx->s, ".x");
                 } else {
-                    printf("true");
+                    ds_printf(&ctx->s, "true");
                 }
-                printf(";\n");
+                ds_printf(&ctx->s, ";\n");
                 INDENT(ctx->depth);
-                printf("cmp.y = ");
+                ds_printf(&ctx->s, "cmp.y = ");
                 if (instr.fmt1c.cmpy < 6) {
                     SRC1(1c);
-                    printf(".y %s ", compareops[instr.fmt1c.cmpy]);
+                    ds_printf(&ctx->s, ".y %s ", compareops[instr.fmt1c.cmpy]);
                     SRC2(1c);
-                    printf(".y");
+                    ds_printf(&ctx->s, ".y");
                 } else {
-                    printf("true");
+                    ds_printf(&ctx->s, "true");
                 }
-                printf(";\n");
+                ds_printf(&ctx->s, ";\n");
             }
             break;
         }
@@ -625,28 +623,28 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             desc = ctx->shu.opdescs[instr.fmt5.desc];
             DEST(5);
             if (ctremu.safeShaderMul) {
-                printf("SAFEMUL(");
+                ds_printf(&ctx->s, "SAFEMUL(");
                 SRC1(5);
-                printf(", ");
+                ds_printf(&ctx->s, ", ");
                 if (instr.fmt5.opcode & 1) {
                     SRC2(5);
-                    printf(") + ");
+                    ds_printf(&ctx->s, ") + ");
                     SRC3(5);
                 } else {
                     SRC2(5i);
-                    printf(") + ");
+                    ds_printf(&ctx->s, ") + ");
                     SRC3(5i);
                 }
             } else {
                 SRC1(5);
-                printf(" * ");
+                ds_printf(&ctx->s, " * ");
                 if (instr.fmt5.opcode & 1) {
                     SRC2(5);
-                    printf(" + ");
+                    ds_printf(&ctx->s, " + ");
                     SRC3(5);
                 } else {
                     SRC2(5i);
-                    printf(" + ");
+                    ds_printf(&ctx->s, " + ");
                     SRC3(5i);
                 }
             }
@@ -778,7 +776,7 @@ char* shader_dec_vs(GPU* gpu) {
 
 #ifdef VSH_DEBUG
     pica_shader_disasm(&ctx.shu);
-    printf(final.str);
+    ds_printf(&ctx->s, final.str);
 #endif
 
     return final.str;

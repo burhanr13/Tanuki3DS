@@ -20,7 +20,7 @@ extern bool g_infologs;
                 : (void) 0)
 
 #define ldebug(format, ...)                                                    \
-    printf("\e[36m[DEBUG](%s) " format "\e[0m\n",                              \
+    printf("\e[96m[DEBUG](%s) " format "\e[0m\n",                              \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
 
 #define lwarn(format, ...)                                                     \

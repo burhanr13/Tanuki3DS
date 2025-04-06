@@ -56,11 +56,12 @@ bool e3ds_init(E3DS* s, char* romfile) {
 
     // config page and shared page are owned by kernel but whatever
     memory_virtalloc(s, CONFIG_MEM, PAGE_SIZE, PERM_R, MEMST_STATIC);
-    *(u8*) PTR(CONFIG_MEM + 0x14) = 1;
+    *(u8*) PTR(CONFIG_MEM + 0x14) = 1; // ENVINFO: 1 for prod
     *(u32*) PTR(CONFIG_MEM + 0x40) = FCRAMUSERSIZE; // APPMEMALLOC
 
     memory_virtalloc(s, SHARED_PAGE, PAGE_SIZE, PERM_R, MEMST_SHARED);
-    *(u32*) PTR(SHARED_PAGE + 4) = 1;
+    *(u32*) PTR(SHARED_PAGE + 4) = 1; // RUNNING_HW: 1 for prod
+    *(u8*) PTR(SHARED_PAGE + 0x86) = 1; // "ptm sets this value to 1"
 
     memory_virtalloc(s, TLS_BASE, TLS_SIZE * THREAD_MAX, PERM_RW,
                      MEMST_PRIVATE);

@@ -41,7 +41,7 @@ bool g_pending_reset;
 #ifdef GLDEBUGCTX
 void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
                    GLsizei length, const char* message, const void* userParam) {
-    printfln("[GLDEBUG]%d %d %d %d %s", source, type, id, severity, message);
+    ldebug("[GLDEBUG]%d %d %d %d %s", source, type, id, severity, message);
 }
 #endif
 
