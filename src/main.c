@@ -347,7 +347,7 @@ int main(int argc, char** argv) {
         g_pending_reset = true;
     }
 
-    if (ctremu.syncmode == SYNC_VIDEO) {
+    if (ctremu.vsync) {
         if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
     } else {
         SDL_GL_SetSwapInterval(0);
@@ -366,8 +366,6 @@ int main(int argc, char** argv) {
 
     ctremu.running = true;
     while (ctremu.running) {
-        Uint64 cur_time;
-        Uint64 elapsed;
 
         if (g_pending_reset) {
             g_pending_reset = false;
@@ -395,25 +393,20 @@ int main(int argc, char** argv) {
         Uint64 frame_start = SDL_GetTicksNS();
         if (!ctremu.pause) {
             gpu_gl_start_frame(&ctremu.system.gpu);
+            e3ds_run_frame(&ctremu.system);
+            frame++;
 
-            do {
-                e3ds_run_frame(&ctremu.system);
-                frame++;
+            Uint64 frame_time = SDL_GetTicksNS() - frame_start;
+            avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
+            avg_frame_time_ct++;
 
-                cur_time = SDL_GetTicksNS();
-                elapsed = cur_time - prev_time;
-            } while (ctremu.uncap && elapsed < frame_ticks);
+            int w, h;
+            SDL_GetWindowSizeInPixels(g_window, &w, &h);
+
+            render_gl_main(&ctremu.system.gpu.gl, w, h);
+
+            SDL_GL_SwapWindow(g_window);
         }
-        Uint64 frame_time = SDL_GetTicksNS() - frame_start;
-        avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
-        avg_frame_time_ct++;
-
-        int w, h;
-        SDL_GetWindowSizeInPixels(g_window, &w, &h);
-
-        render_gl_main(&ctremu.system.gpu.gl, w, h);
-
-        SDL_GL_SwapWindow(g_window);
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -450,12 +443,12 @@ int main(int argc, char** argv) {
         if (!ctremu.pause) update_input(&ctremu.system, g_gamepad, w, h);
 
         if (!ctremu.uncap) {
-            if (ctremu.syncmode == SYNC_AUDIO && !ctremu.mute) {
+            if (ctremu.audiosync && !ctremu.mute) {
                 while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
                     SDL_Delay(1);
-            } else if (ctremu.syncmode != SYNC_VIDEO) {
-                cur_time = SDL_GetTicksNS();
-                elapsed = cur_time - prev_time;
+            } else if (!ctremu.vsync) {
+                Uint64 cur_time = SDL_GetTicksNS();
+                Uint64 elapsed = cur_time - prev_time;
                 Sint64 wait = frame_ticks - elapsed;
                 if (wait > 0) {
                     SDL_DelayPrecise(wait);
@@ -463,8 +456,8 @@ int main(int argc, char** argv) {
             }
         }
 
-        cur_time = SDL_GetTicksNS();
-        elapsed = cur_time - prev_fps_update;
+        Uint64 cur_time = SDL_GetTicksNS();
+        Uint64 elapsed = cur_time - prev_fps_update;
         if (!ctremu.pause && elapsed >= SDL_NS_PER_SECOND / 2) {
             double fps =
                 (double) SDL_NS_PER_SECOND * (frame - prev_fps_frame) / elapsed;
