@@ -1,51 +1,12 @@
 #include "shaderdec.h"
 
-#define XXH_INLINE_ALL
-#include <xxh3.h>
-
 #include "emulator.h"
 
 #include "gpu.h"
+#include "gpu_hash.h"
 #include "renderer_gl.h"
 
 // #define VSH_DEBUG
-
-int shader_dec_get(GPU* gpu) {
-    // we need to hash the shader code, entrypoint, outmap_mask, and outmap
-    XXH3_state_t* xxst = XXH3_createState();
-    XXH3_64bits_reset(xxst);
-    XXH3_64bits_update(xxst, gpu->vsh.progdata, sizeof gpu->vsh.progdata);
-    XXH3_64bits_update(xxst, &gpu->regs.vsh.entrypoint,
-                       sizeof gpu->regs.vsh.entrypoint);
-    XXH3_64bits_update(xxst, &gpu->regs.vsh.outmap_mask,
-                       sizeof gpu->regs.vsh.outmap_mask);
-    XXH3_64bits_update(xxst, gpu->regs.raster.sh_outmap,
-                       sizeof gpu->regs.raster.sh_outmap);
-    u64 hash = XXH3_64bits_digest(xxst);
-    XXH3_freeState(xxst);
-
-    auto block = LRU_load(gpu->vshaders_hw, hash);
-    if (block->hash != hash) {
-        block->hash = hash;
-        glDeleteShader(block->vs);
-
-        char* source = shader_dec_vs(gpu);
-        block->vs = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(block->vs, 1, &(const char*) {source}, nullptr);
-        glCompileShader(block->vs);
-        int res;
-        glGetShaderiv(block->vs, GL_COMPILE_STATUS, &res);
-        if (!res) {
-            char log[512];
-            glGetShaderInfoLog(block->vs, sizeof log, nullptr, log);
-            lerror("failed to compile shader: %s", log);
-        }
-        free(source);
-
-        linfo("compiled new vertex shader with hash %llx", hash);
-    }
-    return block->vs;
-}
 
 typedef struct {
     Vector(PICAInstr) calls;

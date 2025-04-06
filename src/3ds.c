@@ -16,7 +16,6 @@ bool e3ds_init(E3DS* s, char* romfile) {
 
     cpu_init(s);
     gpu_init(&s->gpu);
-    renderer_gl_init(&s->gpu.gl, &s->gpu);
     memory_init(s);
 
     services_init(s); // start up and allocate memory for services first
@@ -82,7 +81,6 @@ void e3ds_destroy(E3DS* s) {
     cpu_free(s);
 
     gpu_destroy(&s->gpu);
-    renderer_gl_destroy(&s->gpu.gl);
 
     aac_shutdown(&s->dsp);
 

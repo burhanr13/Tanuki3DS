@@ -85,6 +85,4 @@ typedef struct _FSHCacheEntry {
 
 char* shader_gen_fs(UberUniforms* ubuf);
 
-int shader_gen_get(GPU* gpu, UberUniforms* ubuf);
-
 #endif

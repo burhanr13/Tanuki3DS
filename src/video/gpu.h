@@ -134,6 +134,30 @@ typedef union {
     };
 } GPUCommand;
 
+#define CONVERTFLOAT(e, m, i)                                                  \
+    ({                                                                         \
+        u32 sgn = (i >> (e + m)) & 1;                                          \
+        u32 exp = (i >> m) & MASK(e);                                          \
+        u32 mantissa = i & MASK(m);                                            \
+        if (exp == 0 && mantissa == 0) {                                       \
+            exp = 0;                                                           \
+        } else if (exp == MASK(e)) {                                           \
+            exp = 0xff;                                                        \
+        } else {                                                               \
+            exp += BIT(7) - BIT(e - 1);                                        \
+        }                                                                      \
+        mantissa <<= 23 - m;                                                   \
+        I2F(sgn << 31 | exp << 23 | mantissa);                                 \
+    })
+
+static inline float cvtf24(u32 i) {
+    return CONVERTFLOAT(7, 16, i);
+}
+
+static inline float cvtf16(u32 i) {
+    return CONVERTFLOAT(5, 10, i);
+}
+
 void gpu_init(GPU* gpu);
 void gpu_destroy(GPU* gpu);
 
@@ -141,6 +165,8 @@ void gpu_vshrunner_init(GPU* gpu);
 void gpu_vshrunner_destroy(GPU* gpu);
 
 void gpu_reset_needs_rehesh(GPU* gpu);
+void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
+void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len);
 
 void gpu_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
                           bool scaley, bool vflip, int screenid);
@@ -148,9 +174,23 @@ void gpu_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid);
 void gpu_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                       u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
 void gpu_clear_fb(GPU* gpu, u32 paddr, u32 len, u32 value, u32 datasz);
-void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size);
-void gpu_invalidate_range(GPU* gpu, u32 paddr, u32 len);
 
 void gpu_draw(GPU* gpu, bool elements, bool immediate);
+
+FBInfo* gpu_fbcache_find_within(GPU* gpu, u32 color_paddr);
+TexInfo* gpu_texcache_find_within(GPU* gpu, u32 paddr);
+
+void gpu_init_vsh(GPU* gpu, ShaderUnit* shu);
+void gpu_init_gsh(GPU* gpu, ShaderUnit* shu);
+
+void gpu_run_vsh(GPU* gpu, bool immediate, int basevert, int nbufverts,
+                 fvec4 (*vshout)[16]);
+void gpu_run_gsh(GPU* gpu, ShaderUnit* gsh, bool elements, int basevert,
+                 int nverts, fvec4 (*vshout)[16], bool indexsize,
+                 void* indexbuf);
+
+void gpu_write_outmap_vtx(GPU* gpu, Vertex* dst, fvec4* src);
+
+    u32 morton_swizzle(u32 w, u32 x, u32 y);
 
 #endif

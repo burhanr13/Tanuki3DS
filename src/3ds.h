@@ -72,6 +72,15 @@ typedef struct _3DS {
 #define TLS_SIZE 0x200
 #define IPC_CMD_OFF 0x80
 
+static inline bool is_valid_physmem(u32 addr) {
+    return (VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAM_SIZE) ||
+           (FCRAM_PBASE <= addr && addr < FCRAM_PBASE + FCRAM_SIZE);
+}
+
+static inline bool is_vram_addr(u32 addr) {
+    return VRAM_PBASE <= addr && addr < VRAM_PBASE + VRAM_SIZE;
+}
+
 bool e3ds_init(E3DS* s, char* romfile);
 void e3ds_destroy(E3DS* s);
 

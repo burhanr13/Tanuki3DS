@@ -1,37 +1,5 @@
 #include "shadergen_fs.h"
 
-#define XXH_INLINE_ALL
-#include <xxh3.h>
-
-#include "gpu.h"
-
-int shader_gen_get(GPU* gpu, UberUniforms* ubuf) {
-    u64 hash = XXH3_64bits(ubuf, sizeof *ubuf);
-    auto block = LRU_load(gpu->fshaders, hash);
-    if (block->hash != hash) {
-        block->hash = hash;
-        glDeleteShader(block->fs);
-
-        char* source = shader_gen_fs(ubuf);
-
-        block->fs = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(block->fs, 1, &(const char*) {source}, nullptr);
-        glCompileShader(block->fs);
-        free(source);
-
-        int res;
-        glGetShaderiv(block->fs, GL_COMPILE_STATUS, &res);
-        if (!res) {
-            char log[512];
-            glGetShaderInfoLog(block->fs, sizeof log, nullptr, log);
-            lerror("failed to compile shader: %s", log);
-        }
-
-        linfo("compiled new fragment shader with hash %llx", hash);
-    }
-    return block->fs;
-}
-
 const char fs_header[] = R"(
 #version 330 core
 

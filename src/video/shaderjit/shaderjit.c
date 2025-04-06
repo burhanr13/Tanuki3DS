@@ -1,14 +1,12 @@
 #include "shaderjit.h"
 
-#define XXH_INLINE_ALL
-#include <xxh3.h>
-
 #include "video/gpu.h"
+#include "video/gpu_hash.h"
 
 #include "shaderjit_backend.h"
 
 ShaderJitFunc shaderjit_get(GPU* gpu, ShaderUnit* shu) {
-    u64 hash = XXH3_64bits(shu->code, SHADER_CODE_SIZE * sizeof(PICAInstr));
+    u64 hash = gpu_hash_sw_shader(shu);
     auto block = LRU_load(gpu->vshaders_sw, hash);
     if (block->hash != hash) {
         block->hash = hash;

@@ -144,6 +144,13 @@ typedef float fvec4[4];
 #define Vec_foreach(e, v) for (auto* e = (v).d; e < (v).d + (v).size; e++)
 #define SVec_foreach Vec_foreach
 
+#define BitVec(N) typeof(u8[N / 8])
+
+#define BitVec_test(b, i) (((b)[(i) / 8] & BIT((i) % 8)) != 0)
+#define BitVec_set(b, i) ((b)[(i) / 8] |= BIT((i) % 8))
+#define BitVec_clear(b, i) ((b)[(i) / 8] &= ~BIT((i) % 8))
+#define BitVec_flip(b, i) ((b)[(i) / 8] ^= BIT((i) % 8))
+
 // T must have fields: u64 key, T* next, T* prev
 // key=0 is empty
 // N hould be a power of 2
@@ -152,6 +159,7 @@ typedef float fvec4[4];
         T d[N];                                                                \
         T root;                                                                \
         size_t size;                                                           \
+        BitVec(N) occupied;                                                    \
     }
 
 #define LRU_MAX(c) lengthof((c).d)
@@ -195,20 +203,41 @@ typedef float fvec4[4];
 
 #define LRU_mru(c) ((c).root.next)
 
-#define LRU_load(c, k)                                                         \
+// helper for find and load
+#define LRU_search(c, k)                                                       \
     ({                                                                         \
         assert(k);                                                             \
         typeof(c.root)* ent = nullptr;                                         \
         for (int i = 0; i < LRU_MAX(c); i++) {                                 \
-            if ((c).d[i].key == (k) || (c).d[i].key == 0) {                    \
+            if ((c).d[i].key == (k)) {                                         \
                 ent = &(c).d[i];                                               \
                 break;                                                         \
             }                                                                  \
+            if ((c).d[i].key == 0) {                                           \
+                if (!ent) ent = &(c).d[i];                                     \
+                if (!BitVec_test((c).occupied, i)) break;                      \
+            }                                                                  \
         }                                                                      \
-        if (!ent) {                                                            \
-            ent = LRU_eject(c);                                                \
+        ent;                                                                   \
+    })
+
+// nullptr if not found, else the entry is updated to MRU
+#define LRU_find(c, k)                                                         \
+    ({                                                                         \
+        auto ent = LRU_search(c, k);                                           \
+        if (ent) {                                                             \
+            if (ent->key != (k)) ent = nullptr;                                \
+            else LRU_use(c, ent);                                              \
         }                                                                      \
-        LRU_use((c), ent);                                                     \
+        ent;                                                                   \
+    })
+
+// always produces and uses an entry, key may or not match
+#define LRU_load(c, k)                                                         \
+    ({                                                                         \
+        auto ent = LRU_search(c, k);                                           \
+        if (!ent) ent = LRU_eject(c);                                          \
+        LRU_use(c, ent);                                                       \
         ent;                                                                   \
     })
 

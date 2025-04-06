@@ -23,8 +23,6 @@ typedef struct _ProgCacheEntry {
 } ProgCacheEntry;
 
 typedef struct {
-    GPU* gpu;
-
     GLuint main_vao;
     GLuint main_vbo;
     GLuint main_program;
@@ -60,12 +58,19 @@ typedef struct {
 } GLState;
 
 void renderer_gl_init(GLState* state, GPU* gpu);
-void renderer_gl_destroy(GLState* state);
+void renderer_gl_destroy(GLState* state, GPU* gpu);
 
-void renderer_gl_setup_gpu(GLState* state);
+void gpu_gl_start_frame(GPU* gpu);
 void render_gl_main(GLState* state, int view_w, int view_h);
 void renderer_gl_update_freecam(GLState* state);
 
-void gpu_gl_load_prog(GLState* state, GLuint vs, GLuint fs);
+void gpu_gl_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
+                          bool scaley, bool vflip, int screenid);
+void gpu_gl_render_lcd_fb(GPU* gpu, u32 paddr, u32 fmt, int screenid);
+void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
+                      u32 srcpitch, u32 srcgap, u32 dstpitch, u32 dstgap);
+void gpu_gl_clear_fb(GPU* gpu, u32 paddr, u32 len, u32 value, u32 datasz);
+
+void gpu_gl_draw(GPU* gpu, bool elements, bool immediate);
 
 #endif

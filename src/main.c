@@ -394,7 +394,7 @@ int main(int argc, char** argv) {
 
         Uint64 frame_start = SDL_GetTicksNS();
         if (!ctremu.pause) {
-            renderer_gl_setup_gpu(&ctremu.system.gpu.gl);
+            gpu_gl_start_frame(&ctremu.system.gpu);
 
             do {
                 e3ds_run_frame(&ctremu.system);
