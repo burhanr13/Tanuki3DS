@@ -237,6 +237,7 @@ typedef float fvec4[4];
     ({                                                                         \
         auto ent = LRU_search(c, k);                                           \
         if (!ent) ent = LRU_eject(c);                                          \
+        BitVec_set((c).occupied, ent - (c).d);                                 \
         LRU_use(c, ent);                                                       \
         ent;                                                                   \
     })
