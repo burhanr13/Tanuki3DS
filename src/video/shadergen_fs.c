@@ -1,7 +1,7 @@
 #include "shadergen_fs.h"
 
 const char fs_header[] = R"(
-#version 330 core
+#version 410 core
 
 in vec4 color;
 in vec2 texcoord0;

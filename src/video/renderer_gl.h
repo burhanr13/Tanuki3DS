@@ -7,22 +7,7 @@
 
 #include "common.h"
 
-#define MAX_PROGRAM 1024
-
 typedef struct _GPU GPU;
-
-typedef struct _ProgCacheEntry {
-    union {
-        struct {
-            GLuint vs;
-            GLuint fs;
-        };
-        u64 key;
-    };
-    GLuint prog;
-
-    struct _ProgCacheEntry *next, *prev;
-} ProgCacheEntry;
 
 typedef struct {
     GLuint main_vao;
@@ -37,7 +22,7 @@ typedef struct {
     GLuint gpu_vs;
     GLuint gpu_uberfs;
 
-    LRUCache(ProgCacheEntry, MAX_PROGRAM) progcache;
+    GLuint gpu_pipeline;
 
     struct {
         volatile atomic_bool busy;
