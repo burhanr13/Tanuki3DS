@@ -28,6 +28,9 @@ char* romfile_arg;
 
 SDL_Window* g_window;
 
+SDL_GLContext g_main_context;
+SDL_GLContext g_thread_context;
+
 SDL_JoystickID g_gamepad_id;
 SDL_Gamepad* g_gamepad;
 
@@ -266,6 +269,10 @@ void audio_callback(s16 (*samples)[2], u32 count) {
     SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
 }
 
+void gl_thread_setup() {
+    SDL_GL_MakeCurrent(g_window, g_thread_context);
+}
+
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
@@ -306,6 +313,7 @@ int main(int argc, char** argv) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
                         SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
 #ifdef GLDEBUGCTX
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
@@ -316,12 +324,14 @@ int main(int argc, char** argv) {
     SDL_SetWindowPosition(g_window, SDL_WINDOWPOS_CENTERED,
                           SDL_WINDOWPOS_CENTERED);
 
-    SDL_GLContext glcontext = SDL_GL_CreateContext(g_window);
-    if (!glcontext) {
+    g_thread_context = SDL_GL_CreateContext(g_window);
+    g_main_context = SDL_GL_CreateContext(g_window);
+    if (!g_main_context) {
         SDL_Quit();
         lerror("could not create gl context");
         return 1;
     }
+    ctremu.thread_gl_setup = gl_thread_setup;
 
     gladLoadGLLoader((void*) SDL_GL_GetProcAddress);
 
@@ -485,15 +495,16 @@ int main(int argc, char** argv) {
         prev_frame_time = SDL_GetTicksNS();
     }
 
+    emulator_quit();
+
     SDL_DestroyAudioStream(g_audio);
 
-    SDL_GL_DestroyContext(glcontext);
+    SDL_GL_DestroyContext(g_main_context);
+    SDL_GL_DestroyContext(g_thread_context);
     SDL_DestroyWindow(g_window);
     SDL_CloseGamepad(g_gamepad);
 
     SDL_Quit();
-
-    emulator_quit();
 
     return 0;
 }

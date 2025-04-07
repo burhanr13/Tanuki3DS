@@ -162,9 +162,13 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     for (int i = 0; i < TEX_MAX; i++) {
         gpu->textures.d[i].tex = textures[i];
     }
+
+    renderer_gl_async_compiler_init(gpu);
 }
 
 void renderer_gl_destroy(GLState* state, GPU* gpu) {
+    renderer_gl_async_compiler_destroy(gpu);
+
     glDeleteProgram(state->main_program);
     glDeleteShader(state->gpu_vs);
     glDeleteShader(state->gpu_uberfs);
@@ -257,6 +261,8 @@ static GLuint compile_shader(GLuint type, char* source) {
         char log[512];
         glGetShaderInfoLog(sh, sizeof log, nullptr, log);
         lerror("failed to compile shader: %s", log);
+        glDeleteShader(sh);
+        return 0;
     }
     return sh;
 }
@@ -272,6 +278,8 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
         char log[512];
         glGetProgramInfoLog(prog, sizeof log, nullptr, log);
         lerror("failed to link program: %s", log);
+        glDeleteProgram(prog);
+        return 0;
     }
     glUseProgram(prog);
     glUniform1i(glGetUniformLocation(prog, "tex0"), 0);
@@ -289,6 +297,69 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
     glUniformBlockBinding(prog, glGetUniformBlockIndex(prog, "FragUniforms"),
                           2);
     return prog;
+}
+
+void shader_compilation_thread_func(GPU* gpu) {
+    ctremu.thread_gl_setup();
+
+    while (true) {
+        pthread_mutex_lock(&gpu->gl.asyncCompiler.mtx);
+        gpu->gl.asyncCompiler.busy = false;
+        if (gpu->gl.asyncCompiler.die) return;
+
+        while (!gpu->gl.asyncCompiler.busy) {
+            pthread_cond_wait(&gpu->gl.asyncCompiler.cv,
+                              &gpu->gl.asyncCompiler.mtx);
+        }
+        pthread_mutex_unlock(&gpu->gl.asyncCompiler.mtx);
+
+        if (gpu->gl.asyncCompiler.die) return;
+
+        auto sh = compile_shader(gpu->gl.asyncCompiler.shaderType,
+                                 gpu->gl.asyncCompiler.source);
+        free(gpu->gl.asyncCompiler.source);
+
+        if (gpu->gl.asyncCompiler.shaderType == GL_VERTEX_SHADER) {
+            auto key = gpu->gl.asyncCompiler.key;
+            while (atomic_flag_test_and_set(&gpu->gl.asyncCompiler.lock));
+            auto ent = LRU_load(gpu->vshaders_hw, key);
+            GLuint old = ent->vs;
+            ent->vs = 0;
+            atomic_flag_clear(&gpu->gl.asyncCompiler.lock);
+            glDeleteShader(old);
+            ent->vs = sh;
+            ent->hash = key;
+        } else if (gpu->gl.asyncCompiler.shaderType == GL_FRAGMENT_SHADER) {
+            auto key = gpu->gl.asyncCompiler.key;
+            while (atomic_flag_test_and_set(&gpu->gl.asyncCompiler.lock));
+            auto ent = LRU_load(gpu->fshaders, key);
+            GLuint old = ent->fs;
+            ent->fs = 0;
+            atomic_flag_clear(&gpu->gl.asyncCompiler.lock);
+            glDeleteShader(old);
+            ent->fs = sh;
+            ent->hash = key;
+        }
+    }
+}
+
+void renderer_gl_async_compiler_init(GPU* gpu) {
+    pthread_mutex_init(&gpu->gl.asyncCompiler.mtx, nullptr);
+    pthread_cond_init(&gpu->gl.asyncCompiler.cv, nullptr);
+    pthread_create(&gpu->gl.asyncCompiler.thd, nullptr,
+                   (void*) shader_compilation_thread_func, gpu);
+    atomic_flag_clear(&gpu->gl.asyncCompiler.lock);
+}
+
+void renderer_gl_async_compiler_destroy(GPU* gpu) {
+    pthread_mutex_lock(&gpu->gl.asyncCompiler.mtx);
+    gpu->gl.asyncCompiler.die = true;
+    gpu->gl.asyncCompiler.busy = true;
+    pthread_cond_signal(&gpu->gl.asyncCompiler.cv);
+    pthread_mutex_unlock(&gpu->gl.asyncCompiler.mtx);
+    pthread_join(gpu->gl.asyncCompiler.thd, nullptr);
+    pthread_mutex_destroy(&gpu->gl.asyncCompiler.mtx);
+    pthread_cond_destroy(&gpu->gl.asyncCompiler.cv);
 }
 
 static void update_cur_fb(GPU* gpu) {
@@ -1226,9 +1297,53 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
 
     // vertex shaders
     bool swshaders = !ctremu.hwvshaders || gpu->regs.geom.config.use_gsh;
-    GLuint vs;
+    GLuint vs = gpu->gl.gpu_vs;
+    if (!swshaders) {
+        if (gpu->vsh.code_dirty) {
+            u64 hash = gpu_hash_hw_shader(gpu);
+            if (ctremu.asyncshadercompilation) {
+                while (atomic_flag_test_and_set(&gpu->gl.asyncCompiler.lock));
+                auto ent = LRU_find(gpu->vshaders_hw, hash);
+                atomic_flag_clear(&gpu->gl.asyncCompiler.lock);
+                if (!ent) {
+                    pthread_mutex_lock(&gpu->gl.asyncCompiler.mtx);
+                    if (!gpu->gl.asyncCompiler.busy) {
+                        char* source = shader_dec_vs(gpu);
+
+                        gpu->gl.asyncCompiler.shaderType = GL_VERTEX_SHADER;
+                        gpu->gl.asyncCompiler.key = hash;
+                        gpu->gl.asyncCompiler.source = source;
+                        gpu->gl.asyncCompiler.busy = true;
+                        pthread_cond_signal(&gpu->gl.asyncCompiler.cv);
+                        linfo(
+                            "async compiling new vertex shader with hash %llx",
+                            hash);
+                    }
+                    pthread_mutex_unlock(&gpu->gl.asyncCompiler.mtx);
+
+                    swshaders = true;
+                } else {
+                    vs = ent->vs;
+                }
+            } else {
+                auto ent = LRU_load(gpu->vshaders_hw, hash);
+                if (ent->hash != hash) {
+                    char* source = shader_dec_vs(gpu);
+
+                    ent->hash = hash;
+                    glDeleteShader(ent->vs);
+                    ent->vs = compile_shader(GL_VERTEX_SHADER, source);
+                    free(source);
+                    linfo("compiled new vertex shader with hash %llx", hash);
+                }
+                vs = ent->vs;
+            }
+        } else {
+            vs = LRU_mru(gpu->vshaders_hw)->vs;
+        }
+    }
+
     if (swshaders) {
-        vs = gpu->gl.gpu_vs;
         glBindVertexArray(gpu->gl.gpu_vao_sw);
         glBindBuffer(GL_ARRAY_BUFFER, gpu->gl.gpu_vbos[0]);
     } else {
@@ -1247,21 +1362,6 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
             glBufferData(GL_UNIFORM_BUFFER, sizeof vubuf, &vubuf,
                          GL_DYNAMIC_DRAW);
         }
-        if (gpu->vsh.code_dirty) {
-            u64 hash = gpu_hash_hw_shader(gpu);
-            auto ent = LRU_load(gpu->vshaders_hw, hash);
-            if (ent->hash != hash) {
-                ent->hash = hash;
-                glDeleteShader(ent->vs);
-                char* source = shader_dec_vs(gpu);
-                ent->vs = compile_shader(GL_VERTEX_SHADER, source);
-                free(source);
-                linfo("compiled new vertex shader with hash %llx", hash);
-            }
-            vs = ent->vs;
-        } else {
-            vs = LRU_mru(gpu->vshaders_hw)->vs;
-        }
         glBindVertexArray(gpu->gl.gpu_vao_hw);
     }
 
@@ -1269,23 +1369,50 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // todo: do similar dirty checking for the fs
     glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
-    GLuint fs;
-    if (ctremu.ubershader) {
+    bool ubershader = ctremu.ubershader;
+    GLuint fs = gpu->gl.gpu_uberfs;
+    if (!ubershader) {
+        u64 hash = gpu_hash_fs(&ubuf);
+        if (ctremu.asyncshadercompilation) {
+            while (atomic_flag_test_and_set(&gpu->gl.asyncCompiler.lock));
+            auto ent = LRU_find(gpu->fshaders, hash);
+            atomic_flag_clear(&gpu->gl.asyncCompiler.lock);
+            if (!ent) {
+                pthread_mutex_lock(&gpu->gl.asyncCompiler.mtx);
+                if (!gpu->gl.asyncCompiler.busy) {
+                    char* source = shader_gen_fs(&ubuf);
+
+                    gpu->gl.asyncCompiler.shaderType = GL_FRAGMENT_SHADER;
+                    gpu->gl.asyncCompiler.key = hash;
+                    gpu->gl.asyncCompiler.source = source;
+                    gpu->gl.asyncCompiler.busy = true;
+                    pthread_cond_signal(&gpu->gl.asyncCompiler.cv);
+                    linfo("async compiling new fragment shader with hash %llx",
+                          hash);
+                }
+                pthread_mutex_unlock(&gpu->gl.asyncCompiler.mtx);
+
+                ubershader = true;
+            } else {
+                fs = ent->fs;
+            }
+        } else {
+            auto ent = LRU_load(gpu->fshaders, hash);
+            if (ent->hash != hash) {
+                ent->hash = hash;
+                char* source = shader_gen_fs(&ubuf);
+
+                glDeleteShader(ent->fs);
+                ent->fs = compile_shader(GL_FRAGMENT_SHADER, source);
+                free(source);
+                linfo("compiled new fragment shader with hash %llx", hash);
+            }
+            fs = ent->fs;
+        }
+    }
+    if (ubershader) {
         glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
         glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
-        fs = gpu->gl.gpu_uberfs;
-    } else {
-        u64 hash = gpu_hash_fs(&ubuf);
-        auto ent = LRU_load(gpu->fshaders, hash);
-        if (ent->hash != hash) {
-            ent->hash = hash;
-            glDeleteShader(ent->fs);
-            char* source = shader_gen_fs(&ubuf);
-            ent->fs = compile_shader(GL_FRAGMENT_SHADER, source);
-            free(source);
-            linfo("compiled new fragment shader with hash %llx", hash);
-        }
-        fs = ent->fs;
     }
 
     // finally get the program

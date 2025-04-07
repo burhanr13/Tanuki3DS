@@ -2,6 +2,8 @@
 #define RENDERER_GL_H
 
 #include <glad/glad.h>
+#include <pthread.h>
+#include <stdatomic.h>
 
 #include "common.h"
 
@@ -36,6 +38,21 @@ typedef struct {
     GLuint gpu_uberfs;
 
     LRUCache(ProgCacheEntry, MAX_PROGRAM) progcache;
+
+    struct {
+        volatile atomic_bool busy;
+        volatile atomic_bool die;
+
+        GLuint shaderType;
+        char* source;
+        u64 key;
+
+        volatile atomic_flag lock;
+
+        pthread_t thd;
+        pthread_cond_t cv;
+        pthread_mutex_t mtx;
+    } asyncCompiler;
 
     GLuint screentex[2];
     GLuint screenfbo[2];
@@ -72,5 +89,8 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
 void gpu_gl_clear_fb(GPU* gpu, u32 paddr, u32 len, u32 value, u32 datasz);
 
 void gpu_gl_draw(GPU* gpu, bool elements, bool immediate);
+
+void renderer_gl_async_compiler_init(GPU* gpu);
+void renderer_gl_async_compiler_destroy(GPU* gpu);
 
 #endif
