@@ -8,6 +8,7 @@
 #include "cecd.h"
 #include "cfg.h"
 #include "dsp.h"
+#include "frd.h"
 #include "fs.h"
 #include "gsp.h"
 #include "hid.h"

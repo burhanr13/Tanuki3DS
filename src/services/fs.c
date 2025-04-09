@@ -101,7 +101,7 @@ char* create_text_path(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
         u16* path16 = rawpath;
         char path[pathsize];
         convert_utf16(path, pathsize, path16, pathsize / 2);
-        asprintf(&filepath, "%s%s", basepath, path);
+        asprintf(&filepath, "%s/%s", basepath, path);
     } else {
         lerror("unknown text file path type");
         return nullptr;
@@ -246,7 +246,18 @@ DECL_PORT(fs) {
             KSession* ses =
                 fs_open_dir(s, archivehandle, pathtype, path, pathsize);
             if (!ses) {
-                cmdbuf[1] = FSERR_OPEN;
+                // if the requested path is a regular file, the error code is
+                // different
+                ses =
+                    fs_open_file(s, archivehandle, pathtype, path, pathsize, 0);
+                if (ses) {
+                    fclose(s->services.fs.files[ses->arg]);
+                    s->services.fs.files[ses->arg] = nullptr;
+                    kobject_destroy(s, &ses->hdr);
+                    cmdbuf[1] = -1;
+                } else {
+                    cmdbuf[1] = FSERR_OPEN;
+                }
                 return;
             }
             HANDLE_SET(h, ses);
@@ -275,6 +286,7 @@ DECL_PORT(fs) {
                 handle == ARCHIVE_SYSTEMSAVEDATA) {
                 FILE* fp = open_formatinfo(s, handle, false);
                 if (!fp) {
+                    lwarn("opening unformatted archive");
                     cmdbuf[1] = FSERR_ARCHIVE;
                     break;
                 }
@@ -712,8 +724,7 @@ DECL_PORT_ARG(fs_dir, fd) {
                 ents[i].isarchive = 0;
                 ents[i].ishidden = ent->d_name[0] == '.';
 
-                linfo("entry %s (%s.%s)", ent->d_name, ents[i].shortname,
-                      ents[i].shortext);
+                linfo("entry %s %s", ent->d_name, ents[i].isdir ? "(dir)" : "");
             }
 
             cmdbuf[0] = IPCHDR(2, 0);
