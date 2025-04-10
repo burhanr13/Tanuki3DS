@@ -48,12 +48,12 @@ typedef struct _KThread {
 
     KListNode* owned_mutexes;
 
-    struct _KThread *next, *prev;
+    struct _KThread *next, *prev; // in the ready list
 
     u32 id;
     s32 priority;
     u32 state;
-
+    u32 cpu; // 0: appcore, 1: syscore, 2: new3ds appcore2
     u32 tls;
 } KThread;
 
@@ -112,7 +112,7 @@ void e3ds_save_context(E3DS* s);
 
 void thread_init(E3DS* s, u32 entrypoint);
 KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
-                       u32 arg);
+                       u32 arg, s32 processorID);
 void thread_ready(E3DS* s, KThread* t);
 void thread_reschedule(E3DS* s);
 

@@ -86,6 +86,7 @@ DECL_SVC(CreateThread) {
     u32 entrypoint = R(1);
     u32 arg = R(2);
     u32 stacktop = R(3);
+    s32 processor = R(4);
 
     MAKE_HANDLE(handle);
 
@@ -95,7 +96,8 @@ DECL_SVC(CreateThread) {
     }
     stacktop &= ~7;
 
-    KThread* t = thread_create(s, entrypoint, stacktop, priority, arg);
+    KThread* t =
+        thread_create(s, entrypoint, stacktop, priority, arg, processor);
 
     HANDLE_SET(handle, t);
     t->hdr.refcount = 1;
