@@ -170,6 +170,11 @@ DECL_PORT(apt) {
             cmdbuf[4] = srvobj_make_handle(s, &s->services.apt.shared_font.hdr);
             break;
         }
+        case 0x0046:
+            linfo("Wrap"); // does some crypt stuff
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
         case 0x004b: {
             u32 utility = cmdbuf[1];
             u32 insize = cmdbuf[2];
