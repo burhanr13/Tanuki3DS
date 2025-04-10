@@ -93,6 +93,7 @@ typedef struct {
     KObject hdr;
 
     KThread* locker_thrd;
+    u32 recursive_lock_count;
 
     KListNode* waiting_thrds;
 } KMutex;

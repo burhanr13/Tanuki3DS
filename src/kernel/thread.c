@@ -291,16 +291,27 @@ KMutex* mutex_create() {
 }
 
 void mutex_release(E3DS* s, KMutex* mtx) {
-    if (mtx->locker_thrd) {
-        klist_remove_key(&mtx->locker_thrd->owned_mutexes, &mtx->hdr);
+    if (!mtx->locker_thrd) {
+        // this mutex was not locked already
+        return;
     }
 
+    if (mtx->recursive_lock_count > 0) {
+        // this mutex was recursively locked so decrement the count only
+        mtx->recursive_lock_count--;
+        return;
+    }
+
+    klist_remove_key(&mtx->locker_thrd->owned_mutexes, &mtx->hdr);
+
+    // no threads are waiting so this mutex is now free
     if (!mtx->waiting_thrds) {
         mtx->locker_thrd = nullptr;
         return;
     }
-    if (!mtx->locker_thrd) return;
 
+    // find the highest priority thread waiting on this mutex
+    // give it the lock and wake it up
     KThread* wakeupthread = remove_highest_prio(&mtx->waiting_thrds);
     thread_wakeup(s, wakeupthread, &mtx->hdr);
     mtx->locker_thrd = wakeupthread;
@@ -355,6 +366,11 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
             if (mtx->locker_thrd != t) {
                 mtx->locker_thrd = t;
                 klist_insert(&t->owned_mutexes, &mtx->hdr);
+            } else {
+                // this thread is locking the mutex more than once
+                // we need to record this since release mutex
+                // now needs to be called multiple times as well
+                mtx->recursive_lock_count++;
             }
             return false;
         }
