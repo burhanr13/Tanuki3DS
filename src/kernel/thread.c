@@ -25,7 +25,7 @@ void thread_init(E3DS* s, u32 entrypoint) {
     s->process.nexttid = 0;
     s->process.allocTls = 0;
 
-    KThread* thd = thread_create(s, entrypoint, STACK_BASE, 0x30, 0);
+    KThread* thd = thread_create(s, entrypoint, STACK_BASE, 0x30, 0, 0);
 
     s->process.handles[0] = &thd->hdr;
     s->process.handles[0]->refcount = 2;
@@ -34,7 +34,7 @@ void thread_init(E3DS* s, u32 entrypoint) {
 }
 
 KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
-                       u32 arg) {
+                       u32 arg, s32 processorID) {
 
     KThread* thrd = calloc(1, sizeof *thrd);
     thrd->hdr.type = KOT_THREAD;
@@ -44,6 +44,14 @@ KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
     thrd->ctx.cpsr = M_USER;
     thrd->priority = priority;
     thrd->id = s->process.nexttid++;
+    if (processorID < 0) { // negative means the kernel picks a cpu
+        thrd->cpu = 0;
+    } else {
+        thrd->cpu = processorID;
+        if (thrd->cpu > 0) {
+            lwarn("scheduling thread on core %d", thrd->cpu);
+        }
+    }
 
     for (int i = 0; i < 32; i++) {
         if (!(s->process.allocTls & BIT(i))) {
