@@ -47,6 +47,8 @@ void sanitize_filepath(char* s) {
             case '*':
                 *p = ' ';
         }
+        // utf8 characters seem to cause problems too for some reason
+        if (!isprint(*p)) *p = ' ';
     }
 #endif
 }
