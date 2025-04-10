@@ -18,6 +18,7 @@ void e3ds_save_context(E3DS* s) {
 
 void thread_init(E3DS* s, u32 entrypoint) {
     s->readylist.priority = 0;
+    s->readylist.id = 0;
     s->readylist.next = &s->readylist;
     s->readylist.prev = &s->readylist;
 
@@ -62,6 +63,10 @@ KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
 }
 
 void thread_ready(E3DS* s, KThread* t) {
+    if (t->state == THRD_READY || t->next || t->prev) {
+        lerror("thread already ready (this should never happen)");
+        return;
+    }
 
     t->state = THRD_READY;
 
@@ -115,11 +120,11 @@ void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
 
     if (timeout == 0) {
         // instantly wakup the thread and set the return to timeout
+        // without rescheduling
         // waitsync with timeout=0 is used to poll a sync object
         thread_wakeup_timeout(s, SEA_PTR(t));
         return;
     } else if (timeout > 0) {
-        t->state = THRD_SLEEP;
         add_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t),
                   NS_TO_CYCLES(timeout));
     }
@@ -145,7 +150,10 @@ void thread_wakeup_timeout(E3DS* s, SchedEventArg arg) {
 }
 
 bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
-    if (t->state != THRD_SLEEP) return false;
+    if (t->state != THRD_SLEEP) {
+        lerror("thread already awake (this should never happen)");
+        return false;
+    }
     u32 val = klist_remove_key(&t->waiting_objs, reason);
     if (t->wait_any) t->ctx.r[1] = val;
     if (!t->waiting_objs || t->wait_any) {

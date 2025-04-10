@@ -117,13 +117,14 @@ DECL_SVC(SleepThread) {
     s64 timeout = R(0) | (u64) R(1) << 32;
 
     if (timeout == 0) {
-        // timeout 0 will switch to a different thread without sleeping this
-        // thread
-        // since the scheduler always picks the thread with highest priority
-        // we need to temporarily sleep this one so it does not get picked
-        caller->state = THRD_SLEEP;
-        thread_reschedule(s);
-        thread_ready(s, caller);
+        // this acts as thread yield, this thread will stay
+        // ready but let another thread run for now
+        // importantly if no other threads are ready we do nothing
+        if (s->readylist.next != &s->readylist) {
+            caller->state = THRD_SLEEP;
+            thread_reschedule(s);
+            thread_ready(s, caller);
+        }
     } else {
         thread_sleep(s, caller, timeout);
     }
