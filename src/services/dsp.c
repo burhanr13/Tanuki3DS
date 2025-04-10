@@ -3,7 +3,7 @@
 #include "3ds.h"
 #include "audio/dsp.h"
 
-void dsp_event(E3DS* s, SchedEventArg) {
+void dsp_event(E3DS* s) {
     s->lastAudioFrame = s->sched.now;
     if (s->services.dsp.audio_event) {
         linfo("signaling dsp event");
@@ -23,7 +23,7 @@ void sem_event_handler(E3DS* s) {
     u64 audioFrameCycles = CPU_CLK * FRAME_SAMPLES / SAMPLE_RATE;
     if (timeSinceLastFrame >= audioFrameCycles) timeSinceLastFrame = 0;
 
-    add_event(&s->sched, dsp_event, SEA_NONE,
+    add_event(&s->sched, (SchedulerCallback) dsp_event, 0,
               audioFrameCycles - timeSinceLastFrame);
 }
 
@@ -128,7 +128,7 @@ DECL_PORT(dsp) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             dsp_reset(&s->dsp);
-            remove_event(&s->sched, dsp_event, SEA_NONE);
+            remove_event(&s->sched, (SchedulerCallback) dsp_event, 0);
             s->services.dsp.comp_loaded = false;
             break;
         case 0x0013:

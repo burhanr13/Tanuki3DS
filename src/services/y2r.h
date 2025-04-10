@@ -7,7 +7,6 @@
 
 typedef struct {
     bool enableInterrupt;
-    bool busy;
     KEvent transferend;
 } Y2RData;
 

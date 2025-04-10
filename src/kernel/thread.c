@@ -130,17 +130,16 @@ void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
         // instantly wakup the thread and set the return to timeout
         // without rescheduling
         // waitsync with timeout=0 is used to poll a sync object
-        thread_wakeup_timeout(s, SEA_PTR(t));
+        thread_wakeup_timeout(s, t);
         return;
     } else if (timeout > 0) {
-        add_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t),
+        add_event(&s->sched, (SchedulerCallback) thread_wakeup_timeout, t,
                   NS_TO_CYCLES(timeout));
     }
     thread_reschedule(s);
 }
 
-void thread_wakeup_timeout(E3DS* s, SchedEventArg arg) {
-    KThread* t = arg.p;
+void thread_wakeup_timeout(E3DS* s, KThread* t) {
     if (t->state != THRD_SLEEP) {
         lerror("thread already awake (this should never happen)");
         return;
@@ -171,7 +170,7 @@ bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
             sync_cancel(t, (*cur)->key);
             klist_remove(cur);
         }
-        remove_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t));
+        remove_event(&s->sched, (SchedulerCallback) thread_wakeup_timeout, t);
         thread_ready(s, t);
         thread_reschedule(s);
         return true;
@@ -211,7 +210,7 @@ void thread_kill(E3DS* s, KThread* t) {
         klist_remove(cur);
     }
 
-    remove_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t));
+    remove_event(&s->sched, (SchedulerCallback) thread_wakeup_timeout, t);
 
     thread_reschedule(s);
 }
@@ -264,8 +263,7 @@ KTimer* timer_create_(bool sticky, bool repeat) {
     return tmr;
 }
 
-void timer_signal(E3DS* s, SchedEventArg arg) {
-    KTimer* tmr = arg.p;
+void timer_signal(E3DS* s, KTimer* tmr) {
     if (tmr->sticky) {
         KListNode** cur = &tmr->waiting_thrds;
         while (*cur) {
@@ -279,7 +277,7 @@ void timer_signal(E3DS* s, SchedEventArg arg) {
     }
 
     if (tmr->repeat) {
-        add_event(&s->sched, timer_signal, SEA_PTR(tmr),
+        add_event(&s->sched, (SchedulerCallback) timer_signal, tmr,
                   NS_TO_CYCLES(tmr->interval));
     }
 }

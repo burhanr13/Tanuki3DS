@@ -118,7 +118,7 @@ void thread_ready(E3DS* s, KThread* t);
 void thread_reschedule(E3DS* s);
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout);
-void thread_wakeup_timeout(E3DS* s, SchedEventArg arg);
+void thread_wakeup_timeout(E3DS* s, KThread* t);
 bool thread_wakeup(E3DS* s, KThread* t, KObject* reason);
 
 void thread_kill(E3DS* s, KThread* t);
@@ -127,7 +127,7 @@ KEvent* event_create(bool sticky);
 void event_signal(E3DS* s, KEvent* ev);
 
 KTimer* timer_create_(bool sticky, bool repeat);
-void timer_signal(E3DS* s, SchedEventArg arg);
+void timer_signal(E3DS* s, KTimer* tmr);
 
 KMutex* mutex_create();
 void mutex_release(E3DS* s, KMutex* mtx);

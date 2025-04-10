@@ -298,7 +298,7 @@ DECL_SVC(SetTimer) {
           interval);
 
     t->interval = interval;
-    add_event(&s->sched, timer_signal, SEA_PTR(t), delay);
+    add_event(&s->sched, (SchedulerCallback) timer_signal, t, delay);
 
     R(0) = 0;
 }
@@ -311,7 +311,7 @@ DECL_SVC(CancelTimer) {
         return;
     }
 
-    remove_event(&s->sched, timer_signal, SEA_PTR(t));
+    remove_event(&s->sched, (SchedulerCallback) timer_signal, t);
 
     R(0) = 0;
 }
