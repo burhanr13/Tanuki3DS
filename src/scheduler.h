@@ -7,21 +7,12 @@
 
 typedef struct _3DS E3DS;
 
-typedef union {
-    size_t i;
-    void* p;
-} SchedEventArg;
-
-#define SEA_NONE ((SchedEventArg) {})
-#define SEA_INT(_i) ((SchedEventArg) {.i = _i})
-#define SEA_PTR(_p) ((SchedEventArg) {.p = _p})
-
-typedef void (*SchedEventHandler)(E3DS*, SchedEventArg);
+typedef void (*SchedulerCallback)(E3DS*, void*);
 
 typedef struct {
     u64 time;
-    SchedEventHandler handler;
-    SchedEventArg arg;
+    SchedulerCallback handler;
+    void* arg;
 } SchedulerEvent;
 
 typedef struct _3DS E3DS;
@@ -41,11 +32,10 @@ int run_next_event(Scheduler* sched);
     (sched).event_queue.size &&                                                \
         (sched).now >= FIFO_peek((sched).event_queue).time
 
-void add_event(Scheduler* sched, SchedEventHandler f, SchedEventArg event_arg,
+void add_event(Scheduler* sched, SchedulerCallback f, void* event_arg,
                s64 reltime);
-void remove_event(Scheduler* sched, SchedEventHandler f,
-                  SchedEventArg event_arg);
-u64 find_event(Scheduler* sched, SchedEventHandler f);
+void remove_event(Scheduler* sched, SchedulerCallback f, void* event_arg);
+u64 find_event(Scheduler* sched, SchedulerCallback f);
 
 void print_scheduled_events(Scheduler* sched);
 

@@ -64,7 +64,7 @@ void kobject_destroy(E3DS* s, KObject* o) {
         case KOT_TIMER: {
             auto t = (KTimer*) o;
             FREE_SYNCOBJ(t);
-            remove_event(&s->sched, timer_signal, SEA_PTR(t));
+            remove_event(&s->sched, (SchedulerCallback) timer_signal, t);
             free(t);
             break;
         }
