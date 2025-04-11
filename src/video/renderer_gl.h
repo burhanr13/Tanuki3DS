@@ -2,25 +2,12 @@
 #define RENDERER_GL_H
 
 #include <glad/glad.h>
+#include <pthread.h>
+#include <stdatomic.h>
 
 #include "common.h"
 
-#define MAX_PROGRAM 1024
-
 typedef struct _GPU GPU;
-
-typedef struct _ProgCacheEntry {
-    union {
-        struct {
-            GLuint vs;
-            GLuint fs;
-        };
-        u64 key;
-    };
-    GLuint prog;
-
-    struct _ProgCacheEntry *next, *prev;
-} ProgCacheEntry;
 
 typedef struct {
     GLuint main_vao;
@@ -35,7 +22,22 @@ typedef struct {
     GLuint gpu_vs;
     GLuint gpu_uberfs;
 
-    LRUCache(ProgCacheEntry, MAX_PROGRAM) progcache;
+    GLuint gpu_pipeline;
+
+    struct {
+        volatile atomic_bool busy;
+        volatile atomic_bool die;
+
+        GLuint shaderType;
+        char* source;
+        u64 key;
+
+        volatile atomic_flag lock;
+
+        pthread_t thd;
+        pthread_cond_t cv;
+        pthread_mutex_t mtx;
+    } asyncCompiler;
 
     GLuint screentex[2];
     GLuint screenfbo[2];
@@ -72,5 +74,8 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
 void gpu_gl_clear_fb(GPU* gpu, u32 paddr, u32 len, u32 value, u32 datasz);
 
 void gpu_gl_draw(GPU* gpu, bool elements, bool immediate);
+
+void renderer_gl_async_compiler_init(GPU* gpu);
+void renderer_gl_async_compiler_destroy(GPU* gpu);
 
 #endif

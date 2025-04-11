@@ -28,12 +28,14 @@ typedef struct {
     bool hwvshaders;
     bool safeShaderMul;
     bool ubershader;
+    bool asyncshadercompilation;
     bool hashTextures;
 
     mat4 freecam_mtx;
     bool freecam_enable;
 
     EmuAudioCallback audio_cb;
+    void (*thread_gl_setup)();
 
     jmp_buf exceptionJmp;
 

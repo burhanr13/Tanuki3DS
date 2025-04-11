@@ -10,6 +10,7 @@ BOOL("HwVertexShaders", ctremu.hwvshaders)
 CMT("necessary for a few games to not have graphical issues")
 BOOL("HWShaderSafeMul", ctremu.safeShaderMul)
 BOOL("Ubershader", ctremu.ubershader)
+BOOL("AsyncShaderCompilation", ctremu.asyncshadercompilation)
 BOOL("HashTextures", ctremu.hashTextures)
 
 SECT("Audio")

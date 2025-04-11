@@ -24,7 +24,7 @@ typedef struct {
 void dec_block(DecCTX* ctx, u32 start, u32 num);
 
 const char vs_header[] = R"(
-#version 330 core
+#version 410 core
 
 layout (location=0) in vec4 v0;
 layout (location=1) in vec4 v1;
@@ -38,6 +38,10 @@ layout (location=8) in vec4 v8;
 layout (location=9) in vec4 v9;
 layout (location=10) in vec4 v10;
 layout (location=11) in vec4 v11;
+
+out gl_PerVertex {
+    vec4 gl_Position;
+};
 
 out vec4 color;
 out vec2 texcoord0;
@@ -703,23 +707,32 @@ char* shader_dec_vs(GPU* gpu) {
                   gpu->regs.raster.sh_outmap[o][2] << 8 |
                   gpu->regs.raster.sh_outmap[o][3];
         switch (all) {
-            case 0x00'01'02'03: ds_printf(&final, "pos = o[%d];\n", o); break;
-                case 0x04'05'06'07: ds_printf(&final, "normquat = o[%d];\n",
-                                                o);
+            case 0x00'01'02'03:
+                ds_printf(&final, "pos = o[%d];\n", o);
                 break;
-                case 0x08'09'0a'0b: ds_printf(&final, "color = o[%d];\n", o);
-                break; case 0x0c'0d'1f'1f: ds_printf(
-                    &final, "texcoord0 = o[%d].xy;\n", o);
-                break; case 0x0c'0d'10'1f: ds_printf(
-                    &final, "texcoord0 = o[%d].xy;\n", o);
-                ds_printf(&final, "texcoordw = o[%d].z;\n", o); break;
-                case 0x0e'0f'1f'1f: ds_printf(&final,
-                                                "texcoord1 = o[%d].xy;\n", o);
-                break; case 0x12'13'14'1f: ds_printf(
-                    &final, "view = o[%d].xyz;\n", o);
-                break; case 0x16'17'1f'1f: ds_printf(
-                    &final, "texcoord2 = o[%d].xy;\n", o);
-                break; default:
+            case 0x04'05'06'07:
+                ds_printf(&final, "normquat = o[%d];\n", o);
+                break;
+            case 0x08'09'0a'0b:
+                ds_printf(&final, "color = o[%d];\n", o);
+                break;
+            case 0x0c'0d'1f'1f:
+                ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                break;
+            case 0x0c'0d'10'1f:
+                ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                ds_printf(&final, "texcoordw = o[%d].z;\n", o);
+                break;
+            case 0x0e'0f'1f'1f:
+                ds_printf(&final, "texcoord1 = o[%d].xy;\n", o);
+                break;
+            case 0x12'13'14'1f:
+                ds_printf(&final, "view = o[%d].xyz;\n", o);
+                break;
+            case 0x16'17'1f'1f:
+                ds_printf(&final, "texcoord2 = o[%d].xy;\n", o);
+                break;
+            default:
                 for (int i = 0; i < 4; i++) {
                     int sem = gpu->regs.raster.sh_outmap[o][i];
                     if (sem < 0x18)
