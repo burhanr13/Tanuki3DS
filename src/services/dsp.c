@@ -5,7 +5,6 @@
 
 // lle dsp code is based directly on citra
 
-
 DECL_PORT(dsp) {
     u32* cmdbuf = PTR(cmd_addr);
 
@@ -100,18 +99,7 @@ DECL_PORT(dsp) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
 
-            KEvent** event;
-            if (interrupt != 2) {
-                lwarn("unknown interrupt event");
-                break;
-            } else {
-                if (channel == 2) event = &s->services.dsp.audio_event;
-                else if (channel == 3) event = &s->services.dsp.binary_event;
-                else {
-                    lwarn("unknown channel for pipe event");
-                    break;
-                }
-            }
+            KEvent** event = &s->services.dsp.events[interrupt][channel];
 
             // unregister an existing event
             if (*event) {
@@ -289,7 +277,8 @@ void dsp_lle_run_slice(E3DS* s) {
 
 void dsp_lle_run_event(E3DS* s, u32) {
     dsp_lle_run_slice(s);
-    add_event(&s->sched, dsp_lle_run_event, 0, DSP_SLICE_CYCLES);
+    add_event(&s->sched, (SchedulerCallback) dsp_lle_run_event, 0,
+              DSP_SLICE_CYCLES);
 }
 
 void dsp_lle_read_pipe(E3DS* s, u32 index, u8* dst, u32 len) {
@@ -402,7 +391,8 @@ void dsp_lle_load_component(E3DS* s, void* buf) {
     s->services.dsp.pipe_addr = Teakra_RecvData(s->services.dsp.teakra, 2);
     linfo("loaded dsp component, pipe addr is %04x", s->services.dsp.pipe_addr);
     // finally schedule dsp to keep running
-    add_event(&s->sched, dsp_lle_run_event, 0, DSP_SLICE_CYCLES);
+    add_event(&s->sched, (SchedulerCallback) dsp_lle_run_event, 0,
+              DSP_SLICE_CYCLES);
 
     s->services.dsp.component_loaded = true;
 }
@@ -423,5 +413,5 @@ void dsp_lle_unload_component(E3DS* s) {
         dsp_lle_run_slice(s);
     (void) Teakra_RecvData(s->services.dsp.teakra, 2);
 
-    remove_event(&s->sched, dsp_lle_run_event, 0);
+    remove_event(&s->sched, (SchedulerCallback) dsp_lle_run_event, 0);
 }

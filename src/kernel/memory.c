@@ -86,7 +86,6 @@ void memory_init(E3DS* s) {
     }
     s->cpu.fastmem = s->virtmem;
     s->gpu.mem = s->physmem;
-    s->dsp.mem = s->physmem;
 
     struct sigaction sa = {.sa_sigaction = sigsegv_handler,
                            .sa_flags = SA_SIGINFO | SA_NODEFER};
@@ -114,7 +113,6 @@ void memory_init(E3DS* s) {
     }
 #else
     s->gpu.mem = s->mem;
-    s->dsp.mem = s->mem;
 #endif
 
     FreeListNode* initNode = malloc(sizeof *initNode);

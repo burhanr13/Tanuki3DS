@@ -2,7 +2,6 @@
 #define _3DS_H
 
 #include "arm/arm_core.h"
-#include "audio/dsp.h"
 #include "common.h"
 #include "kernel/kernel.h"
 #include "kernel/loader.h"
@@ -32,7 +31,6 @@ typedef struct _3DS {
     ArmCore cpu;
 
     GPU gpu;
-    DSP dsp;
 
     E3DSMemory* mem;
 

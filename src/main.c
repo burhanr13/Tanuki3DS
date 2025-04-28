@@ -32,8 +32,6 @@ SDL_Window* g_window;
 SDL_JoystickID g_gamepad_id;
 SDL_Gamepad* g_gamepad;
 
-SDL_AudioStream* g_audio;
-
 bool g_pending_reset;
 
 SNDFILE* g_sndfp;
@@ -268,11 +266,6 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
     }
 }
 
-void audio_callback(s16 (*samples)[2], u32 count) {
-    if (ctremu.fastforward || ctremu.mute) return;
-    SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
-}
-
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
@@ -340,14 +333,6 @@ int main(int argc, char** argv) {
                           GL_TRUE);
 #endif
 
-    SDL_AudioSpec as = {
-        .format = SDL_AUDIO_S16, .channels = 2, .freq = SAMPLE_RATE};
-    g_audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &as,
-                                        nullptr, nullptr);
-
-    SDL_ResumeAudioStreamDevice(g_audio);
-    ctremu.audio_cb = audio_callback;
-
     if (!ctremu.romfile) {
         load_rom_dialog();
     } else {
@@ -389,7 +374,6 @@ int main(int argc, char** argv) {
                 ctremu.pause = true;
             }
             SDL_RaiseWindow(g_window);
-            SDL_ClearAudioStream(g_audio);
         }
 
         if (setjmp(ctremu.exceptionJmp)) {
@@ -484,8 +468,7 @@ int main(int argc, char** argv) {
             }
         } else {
             if (ctremu.audiosync && !ctremu.mute) {
-                while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
-                    SDL_Delay(1);
+                
             } else if (!ctremu.vsync) {
                 Uint64 elapsed = SDL_GetTicksNS() - prev_frame_time;
                 Sint64 wait = frame_ticks - elapsed;
@@ -497,8 +480,6 @@ int main(int argc, char** argv) {
 
         prev_frame_time = SDL_GetTicksNS();
     }
-
-    SDL_DestroyAudioStream(g_audio);
 
     SDL_GL_DestroyContext(glcontext);
     SDL_DestroyWindow(g_window);

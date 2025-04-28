@@ -27,7 +27,7 @@ CPPFLAGS := -MP -MMD -D_GNU_SOURCE -isystem /usr/local/include -Isrc --embed-dir
 
 LIBDIRS := /usr/local/lib
 
-LIBS := -lSDL3
+LIBS := -lSDL3 -lsndfile
 STATIC_LIBS := -lfdk-aac -lteakra_c -lteakra
 
 ifeq ($(shell uname),Darwin)

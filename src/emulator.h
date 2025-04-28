@@ -7,7 +7,7 @@
 #include "3ds.h"
 #include "common.h"
 
-typedef void (*EmuAudioCallback)(s16 (*samples)[2], u32 num);
+typedef void (*EmuAudioCallback)(s16*);
 
 typedef struct {
     char* romfile;

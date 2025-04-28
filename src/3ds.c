@@ -4,7 +4,6 @@
 #include <string.h>
 #include <time.h>
 
-#include "audio/aac.h"
 #include "cpu.h"
 #include "kernel/loader.h"
 #include "kernel/svc_types.h"
