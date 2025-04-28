@@ -32,7 +32,7 @@ typedef struct _JITBlock JITBlock;
 
 typedef struct _ArmCore {
     union {
-        u32 r[16];
+        alignas(16) u32 r[16];
         struct {
             u32 _r[13];
             u32 sp;
@@ -65,8 +65,8 @@ typedef struct _ArmCore {
     u32 spsr;
 
     union {
-        float s[32];
-        double d[16];
+        alignas(16) float s[32];
+        alignas(16) double d[16];
     };
 
     union {
@@ -111,7 +111,7 @@ typedef struct _ArmCore {
 
     s64 cycles;
 
-    bool wfe;
+    bool halt;
 
     bool irq;
 

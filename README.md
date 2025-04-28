@@ -1,13 +1,16 @@
 # Tanuki3DS
 
 [![](https://github.com/burhanr13/Tanuki3DS/actions/workflows/ci.yml/badge.svg)](https://github.com/burhanr13/Tanuki3DS/actions/workflows/ci.yml)
-[![](https://dcbadge.limes.pink/api/server/6ya65fvD3g?style=flat)](https://discord.gg/6ya65fvD3g)
 
 <img src=images/logo.png width=100>
 
-Tanuki3DS is a 3DS emulator for MacOS and Linux written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games at full speed and supports some nice features like controller input, video upscaling, and experimental free camera.
+Tanuki3DS is a 3DS emulator for MacOS, Linux and Windows written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games with reasonable graphics and audio at full speed. It also supports some nice features like controller input, fast-forward, video upscaling, and free camera.
 
-<img src=images/oot3d.png width=200><img src=images/mk7.png width=200><img src=images/pokemon.png width=200>
+If you want to ask questions or discuss the emulator, join our discord:
+
+[![](https://discord.com/api/guilds/1309172325203054612/widget.png?style=banner2)](https://discord.gg/6ya65fvD3g)
+
+<img src=images/oot3d.png width=200><img src=images/mk7.png width=200><img src=images/pokemon.png width=200><img src=images/pmdgti.png width=200>
 
 ## Download
 
@@ -16,12 +19,20 @@ You can download a stable release from the releases tab, or the latest build bel
 | Platform | Download |
 | -------- | -------- |
 | Linux | [Binary](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-binary.zip) <br> [AppImage](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-appimage.zip) |
-| MacOS | [x86_64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) <br> [arm64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) | 
+| MacOS | [x86_64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) <br> [arm64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) |
+| Windows | [Executable](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-windows.zip) |
 
 ## Usage
-Launching the app should give you a prompt to select the game file (currently supports .elf, .3ds/.cci, .cxi/.app files, roms must be decrypted). You can also start a game by dropping its file onto the window.
+Launching the app should give you a prompt to select the game file. You can also start a game by dropping its file onto the window. The supported formats are:
 
-You can modify emulator settings in the generated config file.
+- .cci/.3ds
+- .cxi/.app
+- .elf/.axf
+- .3dsx
+
+All games must be decrypted.
+
+You can modify emulator settings in the generated `ctremu.ini` file. The settings and save data are stored by default in the application data path of your OS, but you can optionally create a file called `portable.txt` in the same directory as the executable to have them be created there.
 
 You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 
@@ -40,39 +51,43 @@ The keyboard controls are as follows:
 | `Start` | `Return` |
 | `Select` | `RShift` |
 | Pause/Resume | `F5` |
+| Mute/Unmute | `F6` |
 | Toggle fast-forward | `Tab` |
 | Reset | `F1` |
 | Switch game | `F2` |
-| Toggle free cam | `F7` |
+| Toggle freecam | `F7` |
 
 The touch screen can be used with the mouse.
 
-You can also connect a controller to use controller input.
+You can also connect a controller to use controller input. When using the
+controller the right shoulder button can be used to tap the touch screen
+at the current mouse location.
 
-Freecam controls:
+Freecam controls (regular keyboard input is disabled):
 - WASD: move
-- arrow keys: look around
-- QE: move vertically
-- Left Shift: go slower
-- Right Shift: go faster 
+- RF: move vertically
+- arrow keys: look
+- QE: roll
+- Left Shift (hold): move slower
+- Right Shift (hold): move faster
 
 ## Building
-You need the following dependencies installed to build and run:
+You need the following dependencies installed to build:
 - sdl3
-- glew
-- capstone
 - xxhash
-- libconfuse
 - cglm
-- xbyak (x86 only)
+- fdk-aac
+- capstone
+- xbyak (x86_64 only)
 - xbyak_aarch64 (arm64 only)
 
-To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23 such as `clang-19` for both linux and MacOS. For MacOS it can be installed via brew. Windows support is planned.
+To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23 such as `clang-19`. To compile on Windows, you need to install Msys2 and mingw-w64 and compile within the mingw64 shell.
 
 
 ## Compatibility
 
-Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. Also we don't have audio support yet. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed.
+Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed. When reporting an issue, please always include the generated `ctremu.log` file which is located
+in the application data folder of your system.
 
 ## Acknowledgements
 

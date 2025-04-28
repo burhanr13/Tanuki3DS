@@ -2,9 +2,13 @@
 
 #include "backend_x86.h"
 
+#ifndef NOCAPSTONE
 #include <capstone/capstone.h>
+#endif
+#include <utility>
 #include <vector>
 #include <xbyak/xbyak.h>
+#include <xbyak/xbyak_util.h>
 
 struct LinkPatch {
     u32 jmp_offset;
@@ -17,8 +21,29 @@ struct Code : Xbyak::CodeGenerator {
     HostRegAllocation hralloc;
     ArmCore* cpu;
 
-    std::vector<Xbyak::Reg32> tempregs = {esi, edi, r8d, r9d, r10d, r11d};
-    std::vector<Xbyak::Reg32> savedregs = {ebp, r12d, r13d, r14d, r15d};
+#ifdef _WIN32
+    Xbyak::Reg64 arg1 = rcx;
+    Xbyak::Reg32 arg2 = edx;
+    Xbyak::Reg32 arg3 = r8d;
+    Xbyak::Xmm arg3f = xmm2;
+#else
+    Xbyak::Reg64 arg1 = rdi;
+    Xbyak::Reg32 arg2 = esi;
+    Xbyak::Reg32 arg3 = edx;
+    Xbyak::Xmm arg3f = xmm0;
+#endif
+    std::vector<Xbyak::Reg32> tempregs =
+#ifdef _WIN32
+        {r9d, r10d, r11d};
+#else
+        {esi, edi, r8d, r9d, r10d, r11d};
+#endif
+    std::vector<Xbyak::Reg32> savedregs =
+#ifdef _WIN32
+        {ebp, edi, esi, r12d, r13d, r14d, r15d};
+#else
+        {ebp, r12d, r13d, r14d, r15d};
+#endif
     std::vector<Xbyak::Address> stackslots;
 
     std::vector<LinkPatch> links;
@@ -58,14 +83,37 @@ struct Code : Xbyak::CodeGenerator {
             case REG_STACK:
                 return stackslots[hr.index];
             default:
-                break;
+                std::unreachable();
         }
-        return rdx;
     }
 
     const Xbyak::Operand& getOp(int i) {
         return _getOp(regalloc->reg_assn[i]);
     }
+
+    // older cpus don't support lzcnt
+    // and will silently execute a bsr instead
+    // very annoying
+    void lzcnt_portable(const Xbyak::Reg dst, const Xbyak::Operand& src) {
+        Xbyak::util::Cpu cpu;
+        if (cpu.has(Xbyak::util::Cpu::tLZCNT)) {
+            lzcnt(dst, src);
+        } else {
+            bsr(dst, src);
+            mov(ecx, -1);
+            cmove(dst, ecx);
+            neg(dst);
+            add(dst, 31);
+        }
+    }
+
+    void compileVFPDataProc(ArmInstr instr);
+    void compileVFPLoadMem(ArmInstr instr, const Xbyak::Operand& addr);
+    void compileVFPStoreMem(ArmInstr instr, const Xbyak::Operand& addr);
+    void compileVFPRead(ArmInstr instr, const Xbyak::Operand& dst);
+    void compileVFPWrite(ArmInstr instr, const Xbyak::Operand& src);
+    void compileVFPRead64(ArmInstr instr, const Xbyak::Operand& dst, bool hi);
+    void compileVFPWrite64(ArmInstr instr, const Xbyak::Operand& src, bool hi);
 };
 
 #define CPU(m) (rbx + offsetof(ArmCore, m))
@@ -231,96 +279,70 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_DATA_PROC: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
-                mov(rax, (u64) exec_vfp_data_proc);
-                call(rax);
+                compileVFPDataProc(ArmInstr(inst.op1));
                 break;
             }
             case IR_VFP_LOAD_MEM: {
                 if (inst.imm2) {
                     mov(edx, inst.op2);
+                    compileVFPLoadMem(ArmInstr(inst.op1), edx);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    compileVFPLoadMem(ArmInstr(inst.op1), getOp(inst.op2));
                 }
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
-                mov(rax, (u64) exec_vfp_load_mem);
-                call(rax);
                 break;
             }
             case IR_VFP_STORE_MEM: {
                 if (inst.imm2) {
                     mov(edx, inst.op2);
+                    compileVFPStoreMem(ArmInstr(inst.op1), edx);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    compileVFPStoreMem(ArmInstr(inst.op1), getOp(inst.op2));
                 }
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
-                mov(rax, (u64) exec_vfp_store_mem);
-                call(rax);
                 break;
             }
             case IR_VFP_READ: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
-                mov(rax, (u64) exec_vfp_read);
-                call(rax);
-                mov(getOp(i), eax);
+                compileVFPRead(ArmInstr(inst.op1), getOp(i));
                 break;
             }
             case IR_VFP_WRITE: {
                 if (inst.imm2) {
                     mov(edx, inst.op2);
+                    compileVFPWrite(ArmInstr(inst.op1), edx);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    compileVFPWrite(ArmInstr(inst.op1), getOp(inst.op2));
                 }
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
-                mov(rax, (u64) exec_vfp_write);
-                call(rax);
                 break;
             }
             case IR_VFP_READ64L: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
-                mov(rax, (u64) exec_vfp_read64);
-                call(rax);
-                mov(getOp(i), eax);
-                shr(rax, 32);
-                mov(getOp(i + 1), eax);
-                i++;
+                compileVFPRead64(ArmInstr(inst.op1), getOp(i), false);
                 break;
             }
             case IR_VFP_READ64H:
+                compileVFPRead64(ArmInstr(inst.op1), getOp(i), true);
                 break;
             case IR_VFP_WRITE64L: {
                 if (inst.imm2) {
                     mov(edx, inst.op2);
+                    compileVFPWrite64(ArmInstr(inst.op1), edx, false);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    compileVFPWrite64(ArmInstr(inst.op1), getOp(inst.op2),
+                                      false);
                 }
-                IRInstr hinst = ir->code.d[i + 1];
-                if (hinst.imm2) {
-                    mov(eax, hinst.op2);
-                } else {
-                    mov(eax, getOp(hinst.op2));
-                }
-                shl(rax, 32);
-                or_(rdx, rax);
-
-                mov(esi, inst.op1);
-                mov(rdi, rbx);
-                mov(rax, (u64) exec_vfp_write64);
-                call(rax);
-                i++;
                 break;
             }
             case IR_VFP_WRITE64H:
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                    compileVFPWrite64(ArmInstr(inst.op1), edx, true);
+                } else {
+                    compileVFPWrite64(ArmInstr(inst.op1), getOp(inst.op2),
+                                      true);
+                }
+                break;
                 break;
             case IR_CP15_READ: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) cpu->cp15_read);
                 call(rax);
                 mov(getOp(i), eax);
@@ -328,12 +350,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_CP15_WRITE: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) cpu->cp15_write);
                 call(rax);
                 break;
@@ -441,56 +463,56 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
 #else
             case IR_LOAD_MEM8: {
-                xor_(edx, edx);
+                xor_(arg3, arg3);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS8: {
-                mov(edx, 1);
+                mov(arg3, 1);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEM16: {
-                xor_(edx, edx);
+                xor_(arg3, arg3);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS16: {
-                mov(edx, 1);
+                mov(arg3, 1);
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
                 mov(getOp(i), eax);
@@ -498,12 +520,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_LOAD_MEM32: {
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->read32);
                 call(rax);
                 mov(getOp(i), eax);
@@ -511,51 +533,51 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_STORE_MEM8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->write8);
                 call(rax);
                 break;
             }
             case IR_STORE_MEM16: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->write16);
                 call(rax);
                 break;
             }
             case IR_STORE_MEM32: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
                     auto& src = getOp(inst.op1);
-                    if (src != esi) mov(esi, src);
+                    if (src != arg2) mov(arg2, src);
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) cpu->write32);
                 call(rax);
                 break;
@@ -835,14 +857,14 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 auto& dest = getOp(i);
                 if (inst.imm2) {
                     mov(edx, inst.op2);
-                    lzcnt(edx, edx);
+                    lzcnt_portable(edx, edx);
                     mov(dest, edx);
                 } else {
                     if (dest.isMEM()) {
-                        lzcnt(edx, getOp(inst.op2));
+                        lzcnt_portable(edx, getOp(inst.op2));
                         mov(dest, edx);
                     } else {
-                        lzcnt(dest.getReg(), getOp(inst.op2));
+                        lzcnt_portable(dest.getReg(), getOp(inst.op2));
                     }
                 }
                 break;
@@ -887,18 +909,33 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(getOp(i), edx);
                 break;
             }
-            case IR_MEDIA_UADD8: {
+            case IR_SSAT: {
                 if (inst.imm2) {
                     mov(edx, inst.op2);
                 } else {
                     mov(edx, getOp(inst.op2));
                 }
-                if (inst.imm1) {
-                    mov(esi, inst.op1);
+                mov(ecx, ~MASK(inst.op1));
+                cmp(edx, ecx);
+                cmovl(edx, ecx);
+                mov(ecx, MASK(inst.op1));
+                cmp(edx, ecx);
+                cmovg(edx, ecx);
+                mov(getOp(i), edx);
+                break;
+            }
+            case IR_MEDIA_UADD8: {
+                if (inst.imm2) {
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg3, getOp(inst.op2));
                 }
-                mov(rdi, rbx);
+                if (inst.imm1) {
+                    mov(arg2, inst.op1);
+                } else {
+                    mov(arg2, getOp(inst.op1));
+                }
+                mov(arg1, rbx);
                 mov(rax, (u64) media_uadd8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -906,67 +943,69 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_USUB8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_usub8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_MEDIA_UQADD8: {
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                movd(xmm0, edx);
                 if (inst.imm2) {
                     mov(edx, inst.op2);
                 } else {
                     mov(edx, getOp(inst.op2));
                 }
-                if (inst.imm1) {
-                    mov(esi, inst.op1);
-                } else {
-                    mov(esi, getOp(inst.op1));
-                }
-                mov(rdi, rbx);
-                mov(rax, (u64) media_uqadd8);
-                call(rax);
+                movd(xmm1, edx);
+                paddusb(xmm0, xmm1);
+                movd(eax, xmm0);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_MEDIA_UQSUB8: {
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                movd(xmm0, edx);
                 if (inst.imm2) {
                     mov(edx, inst.op2);
                 } else {
                     mov(edx, getOp(inst.op2));
                 }
-                if (inst.imm1) {
-                    mov(esi, inst.op1);
-                } else {
-                    mov(esi, getOp(inst.op1));
-                }
-                mov(rdi, rbx);
-                mov(rax, (u64) media_uqsub8);
-                call(rax);
+                movd(xmm1, edx);
+                psubusb(xmm0, xmm1);
+                movd(eax, xmm0);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_MEDIA_UHADD8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_uhadd8);
                 call(rax);
                 mov(getOp(i), eax);
@@ -974,50 +1013,51 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_MEDIA_SSUB8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_ssub8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_MEDIA_QSUB8: {
+                if (inst.imm1) {
+                    mov(edx, inst.op1);
+                } else {
+                    mov(edx, getOp(inst.op1));
+                }
+                movd(xmm0, edx);
                 if (inst.imm2) {
                     mov(edx, inst.op2);
                 } else {
                     mov(edx, getOp(inst.op2));
                 }
-                if (inst.imm1) {
-                    mov(esi, inst.op1);
-                } else {
-                    mov(esi, getOp(inst.op1));
-                }
-                mov(rdi, rbx);
-                mov(rax, (u64) media_qsub8);
-                call(rax);
+                movd(xmm1, edx);
+                psubsb(xmm0, xmm1);
+                movd(eax, xmm0);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_MEDIA_SEL: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2);
+                    mov(arg3, inst.op2);
                 } else {
-                    mov(edx, getOp(inst.op2));
+                    mov(arg3, getOp(inst.op2));
                 }
                 if (inst.imm1) {
-                    mov(esi, inst.op1);
+                    mov(arg2, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    mov(arg2, getOp(inst.op1));
                 }
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 mov(rax, (u64) media_sel);
                 call(rax);
                 mov(getOp(i), eax);
@@ -1161,22 +1201,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mov(getOp(i), inst.op1 ? ~1 : ~3);
                 } else {
                     auto& op1 = getOp(inst.op1);
-                    if (op1.isMEM()) {
-                        cmp(op1, 0);
-                    } else {
-                        test(op1.getReg(), op1.getReg());
-                    }
                     auto& dest = getOp(i);
-                    if (dest.isMEM()) {
-                        mov(ecx, ~3);
-                        mov(edx, ~1);
-                        cmovne(ecx, edx);
-                        mov(dest, ecx);
-                    } else {
-                        mov(dest, ~3);
-                        mov(edx, ~1);
-                        cmovne(dest.getReg(), edx);
-                    }
+                    OP(mov, dest, op1);
+                    shl(dest, 1);
+                    sub(dest, 4);
                 }
                 break;
             }
@@ -1217,30 +1245,30 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_MODESWITCH: {
-                mov(rdi, rbx);
-                mov(esi, inst.op1);
+                mov(arg1, rbx);
+                mov(arg2, inst.op1);
                 mov(rax, (u64) cpu_update_mode);
                 call(rax);
                 break;
             }
             case IR_EXCEPTION: {
-                mov(rdi, rbx);
+                mov(arg1, rbx);
                 switch (inst.op1) {
                     case E_SWI:
-                        mov(esi, (ArmInstr) {inst.op2}.sw_intr.arg);
+                        mov(arg2, (ArmInstr) {inst.op2}.sw_intr.arg);
                         mov(rax, (u64) cpu->handle_svc);
                         call(rax);
                         break;
                     case E_UND:
-                        mov(esi, inst.op2);
+                        mov(arg2, inst.op2);
                         mov(rax, (u64) cpu_undefined_fail);
                         call(rax);
                         break;
                 }
                 break;
             }
-            case IR_WFE: {
-                mov(byte[CPU(wfe)], 1);
+            case IR_HALT: {
+                mov(byte[CPU(halt)], 1);
                 break;
             }
             case IR_BEGIN: {
@@ -1259,10 +1287,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_END_LINK:
             case IR_END_LOOP: {
 
-                sub(qword[CPU(cycles)], ir->numinstr);
+                mov(rax, qword[CPU(cycles)]);
+                sub(rax, inst.cycles);
+                mov(qword[CPU(cycles)], rax);
 
                 if (inst.opcode == IR_END_LOOP) {
-                    cmp(qword[CPU(cycles)], 0);
+                    cmp(rax, 0);
                     jg("loopblock");
                 }
 
@@ -1271,12 +1301,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 for (int i = hralloc.count[REG_SAVED] - 1; i >= 0; i--) {
                     pop(savedregs[i].cvt64());
                 }
+                pop(rbx);
 
                 if (inst.opcode == IR_END_LINK) {
                     inLocalLabel();
-                    cmp(qword[CPU(cycles)], 0);
+                    cmp(rax, 0);
                     jle(".nolink");
-                    pop(rbx);
                     links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
                                                  inst.op1, inst.op2});
                     nop(10);
@@ -1284,8 +1314,6 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     L(".nolink");
                     outLocalLabel();
                 }
-
-                pop(rbx);
                 ret();
                 break;
             }
@@ -1293,8 +1321,508 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
         }
     }
+}
 
-    ready();
+void Code::compileVFPDataProc(ArmInstr instr) {
+    bool dp = instr.cp_data_proc.cpnum & 1;
+    u32 vd = instr.cp_data_proc.crd;
+    u32 vn = instr.cp_data_proc.crn;
+    u32 vm = instr.cp_data_proc.crm;
+    if (!dp) {
+        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+        vn = vn << 1 | (instr.cp_data_proc.cp >> 2);
+        vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+    }
+    bool op = instr.cp_data_proc.cp & 2;
+
+    switch (instr.cp_data_proc.cpopc & 0b1011) {
+        case 0:
+            if (op) {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vd])]);
+                    movsd(xmm1, ptr[CPU(d[vn])]);
+                    mulsd(xmm1, ptr[CPU(d[vm])]);
+                    subsd(xmm0, xmm1);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vd])]);
+                    movss(xmm1, ptr[CPU(s[vn])]);
+                    mulss(xmm1, ptr[CPU(s[vm])]);
+                    subss(xmm0, xmm1);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            } else {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    mulsd(xmm0, ptr[CPU(d[vm])]);
+                    addsd(xmm0, ptr[CPU(d[vd])]);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    mulss(xmm0, ptr[CPU(s[vm])]);
+                    addss(xmm0, ptr[CPU(s[vd])]);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            }
+            break;
+        case 1:
+            if (op) {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    mulsd(xmm0, ptr[CPU(d[vm])]);
+                    addsd(xmm0, ptr[CPU(d[vd])]);
+                    xorpd(xmm1, xmm1);
+                    subsd(xmm1, xmm0);
+                    movsd(ptr[CPU(d[vd])], xmm1);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    mulss(xmm0, ptr[CPU(s[vm])]);
+                    addss(xmm0, ptr[CPU(s[vd])]);
+                    xorps(xmm1, xmm1);
+                    subss(xmm1, xmm0);
+                    movss(ptr[CPU(s[vd])], xmm1);
+                }
+            } else {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    mulsd(xmm0, ptr[CPU(d[vm])]);
+                    subsd(xmm0, ptr[CPU(d[vd])]);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    mulss(xmm0, ptr[CPU(s[vm])]);
+                    subss(xmm0, ptr[CPU(s[vd])]);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            }
+            break;
+        case 2:
+            if (dp) {
+                movsd(xmm0, ptr[CPU(d[vn])]);
+                mulsd(xmm0, ptr[CPU(d[vm])]);
+                if (op) {
+                    xorpd(xmm1, xmm1);
+                    subsd(xmm1, xmm0);
+                    movsd(ptr[CPU(d[vd])], xmm1);
+                } else {
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                }
+            } else {
+                movss(xmm0, ptr[CPU(s[vn])]);
+                mulss(xmm0, ptr[CPU(s[vm])]);
+                if (op) {
+                    xorps(xmm1, xmm1);
+                    subss(xmm1, xmm0);
+                    movss(ptr[CPU(s[vd])], xmm1);
+                } else {
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            }
+            break;
+        case 3:
+            if (op) {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    subsd(xmm0, ptr[CPU(d[vm])]);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    subss(xmm0, ptr[CPU(s[vm])]);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            } else {
+                if (dp) {
+                    movsd(xmm0, ptr[CPU(d[vn])]);
+                    addsd(xmm0, ptr[CPU(d[vm])]);
+                    movsd(ptr[CPU(d[vd])], xmm0);
+                } else {
+                    movss(xmm0, ptr[CPU(s[vn])]);
+                    addss(xmm0, ptr[CPU(s[vm])]);
+                    movss(ptr[CPU(s[vd])], xmm0);
+                }
+            }
+            break;
+        case 8:
+            if (dp) {
+                movsd(xmm0, ptr[CPU(d[vn])]);
+                divsd(xmm0, ptr[CPU(d[vm])]);
+                movsd(ptr[CPU(d[vd])], xmm0);
+            } else {
+                movss(xmm0, ptr[CPU(s[vn])]);
+                divss(xmm0, ptr[CPU(s[vm])]);
+                movss(ptr[CPU(s[vd])], xmm0);
+            }
+            break;
+        case 11: {
+            op = instr.cp_data_proc.cp & 4;
+            switch (instr.cp_data_proc.crn) {
+                case 0:
+                    if (op) {
+                        if (dp) {
+                            mov(rdx, MASKL(63));
+                            and_(rdx, ptr[CPU(d[vm])]);
+                            mov(ptr[CPU(d[vd])], rdx);
+                        } else {
+                            mov(edx, ptr[CPU(s[vm])]);
+                            and_(edx, MASK(31));
+                            mov(ptr[CPU(s[vd])], edx);
+                        }
+                    } else {
+                        if (dp) {
+                            movsd(xmm0, ptr[CPU(d[vm])]);
+                            movsd(ptr[CPU(d[vd])], xmm0);
+                        } else {
+                            movss(xmm0, ptr[CPU(s[vm])]);
+                            movss(ptr[CPU(s[vd])], xmm0);
+                        }
+                    }
+                    break;
+                case 1:
+                    if (op) {
+                        if (dp) {
+                            sqrtsd(xmm0, ptr[CPU(d[vm])]);
+                            movsd(ptr[CPU(d[vd])], xmm0);
+                        } else {
+                            sqrtss(xmm0, ptr[CPU(s[vm])]);
+                            movss(ptr[CPU(s[vd])], xmm0);
+                        }
+                    } else {
+                        if (dp) {
+                            mov(rdx, BITL(63));
+                            xor_(rdx, ptr[CPU(d[vm])]);
+                            mov(ptr[CPU(d[vd])], rdx);
+                        } else {
+                            mov(edx, ptr[CPU(s[vm])]);
+                            xor_(edx, BIT(31));
+                            mov(ptr[CPU(s[vd])], edx);
+                        }
+                    }
+                    break;
+                case 4:
+                case 5:
+                    if (dp) {
+                        movsd(xmm0, ptr[CPU(d[vd])]);
+                        if (instr.cp_data_proc.crn & 1) {
+                            xorpd(xmm1, xmm1);
+                            comisd(xmm0, xmm1);
+                        } else {
+                            comisd(xmm0, ptr[CPU(d[vm])]);
+                        }
+                    } else {
+                        movss(xmm0, ptr[CPU(s[vd])]);
+                        if (instr.cp_data_proc.crn & 1) {
+                            xorps(xmm1, xmm1);
+                            comiss(xmm0, xmm1);
+                        } else {
+                            comiss(xmm0, ptr[CPU(s[vm])]);
+                        }
+                    }
+                    // x86 flags to arm flags
+                    // 00 -> 0010 (gt)
+                    // 01 -> 1000 (lt)
+                    // 10 -> 0110 (eq)
+                    // 11 -> 0011 (uo)
+                    inLocalLabel();
+                    lahf();
+                    and_(dword[CPU(fpscr)], 0x0fff'ffff);
+                    and_(ah, 0x41);
+                    jz(".l0");
+                    cmp(ah, 0x01);
+                    jz(".l1");
+                    cmp(ah, 0x40);
+                    jz(".l2");
+                    or_(dword[CPU(fpscr)], 3 << 28);
+                    jmp(".end");
+                    L(".l2");
+                    or_(dword[CPU(fpscr)], 6 << 28);
+                    jmp(".end");
+                    L(".l1");
+                    or_(dword[CPU(fpscr)], 8 << 28);
+                    jmp(".end");
+                    L(".l0");
+                    or_(dword[CPU(fpscr)], 2 << 28);
+                    L(".end");
+                    outLocalLabel();
+                    break;
+                case 7:
+                    if (dp) {
+                        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+
+                        cvtsd2ss(xmm0, ptr[CPU(d[vm])]);
+                        movss(ptr[CPU(s[vd])], xmm0);
+                    } else {
+                        vd = vd >> 1;
+
+                        cvtss2sd(xmm0, ptr[CPU(s[vm])]);
+                        movsd(ptr[CPU(d[vd])], xmm0);
+                    }
+                    break;
+                case 8:
+                    if (dp) {
+                        vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+
+                        if (op) {
+                            cvtsi2sd(xmm0, ptr[CPU(s[vm])]);
+                            movsd(ptr[CPU(d[vd])], xmm0);
+                        } else {
+                            mov(edx, ptr[CPU(s[vm])]);
+                            cvtsi2sd(xmm0, rdx);
+                            movsd(ptr[CPU(d[vd])], xmm0);
+                        }
+                    } else {
+                        if (op) {
+                            cvtsi2ss(xmm0, ptr[CPU(s[vm])]);
+                            movss(ptr[CPU(s[vd])], xmm0);
+                        } else {
+                            mov(edx, ptr[CPU(s[vm])]);
+                            cvtsi2ss(xmm0, rdx);
+                            movss(ptr[CPU(s[vd])], xmm0);
+                        }
+                    }
+                    break;
+                case 12:
+                case 13:
+                    inLocalLabel();
+                    if (dp) {
+                        vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
+
+                        if (instr.cp_data_proc.crn & 1) {
+                            cvttsd2si(edx, ptr[CPU(d[vm])]);
+                            cmp(edx, BIT(31));
+                            jnz(".nooverflow");
+                            mov(edx, MASK(31));
+                            L(".nooverflow");
+                            mov(ptr[CPU(s[vd])], edx);
+                        } else {
+                            cvttsd2si(rdx, ptr[CPU(d[vm])]);
+                            mov(rax, BITL(63));
+                            cmp(rdx, rax);
+                            jnz(".nooverflow");
+                            mov(edx, MASKL(32));
+                            L(".nooverflow");
+                            mov(ptr[CPU(s[vd])], edx);
+                        }
+                    } else {
+                        if (instr.cp_data_proc.crn & 1) {
+                            cvttss2si(edx, ptr[CPU(s[vm])]);
+                            cmp(edx, BIT(31));
+                            jnz(".nooverflow");
+                            mov(edx, MASK(31));
+                            L(".nooverflow");
+                            mov(ptr[CPU(s[vd])], edx);
+                        } else {
+                            cvttss2si(rdx, ptr[CPU(s[vm])]);
+                            mov(rax, BITL(63));
+                            cmp(rdx, rax);
+                            jnz(".nooverflow");
+                            mov(edx, MASKL(32));
+                            L(".nooverflow");
+                            mov(ptr[CPU(s[vd])], edx);
+                        }
+                    }
+                    outLocalLabel();
+                    break;
+            }
+            break;
+        }
+    }
+}
+
+void Code::compileVFPRead(ArmInstr instr, const Xbyak::Operand& dst) {
+    if (instr.cp_reg_trans.cpopc == 7) {
+        if (instr.cp_reg_trans.crn == 1) {
+            OP(mov, dst, ptr[CPU(fpscr)]);
+        } else {
+            lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
+            mov(dst, 0);
+        }
+        return;
+    }
+
+    u32 vn = instr.cp_reg_trans.crn << 1;
+    if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
+    else vn |= instr.cp_reg_trans.cp >> 2;
+
+    OP(mov, dst, ptr[CPU(s[vn])]);
+}
+
+void Code::compileVFPWrite(ArmInstr instr, const Xbyak::Operand& src) {
+    if (instr.cp_reg_trans.cpopc == 7) {
+        if (instr.cp_reg_trans.crn == 1) {
+            OP(mov, ptr[CPU(fpscr)], src);
+        } else {
+            lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
+        }
+        return;
+    }
+
+    u32 vn = instr.cp_reg_trans.crn << 1;
+    if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
+    else vn |= instr.cp_reg_trans.cp >> 2;
+
+    OP(mov, ptr[CPU(s[vn])], src);
+}
+
+void Code::compileVFPRead64(ArmInstr instr, const Xbyak::Operand& dst,
+                            bool hi) {
+    if (instr.cp_double_reg_trans.cpnum & 1) {
+        u32 vm = instr.cp_double_reg_trans.crm;
+        if (hi) {
+            OP(mov, dst, ptr[CPU(d[vm]) + 4]);
+        } else {
+            OP(mov, dst, ptr[CPU(d[vm])]);
+        }
+    } else {
+        u32 vm = instr.cp_double_reg_trans.crm << 1 |
+                 ((instr.cp_double_reg_trans.cp >> 1) & 1);
+        if (hi) {
+            OP(mov, dst, ptr[CPU(s[vm + 1])]);
+        } else {
+            OP(mov, dst, ptr[CPU(s[vm])]);
+        }
+    }
+}
+
+void Code::compileVFPWrite64(ArmInstr instr, const Xbyak::Operand& src,
+                             bool hi) {
+    if (instr.cp_double_reg_trans.cpnum & 1) {
+        u32 vm = instr.cp_double_reg_trans.crm;
+        if (hi) {
+            OP(mov, ptr[CPU(d[vm]) + 4], src);
+        } else {
+            OP(mov, ptr[CPU(d[vm])], src);
+        }
+    } else {
+        u32 vm = instr.cp_double_reg_trans.crm << 1 |
+                 ((instr.cp_double_reg_trans.cp >> 1) & 1);
+        if (hi) {
+            if (vm < 31) OP(mov, ptr[CPU(s[vm + 1])], src);
+        } else {
+            OP(mov, ptr[CPU(s[vm])], src);
+        }
+    }
+}
+
+void Code::compileVFPLoadMem(ArmInstr instr, const Xbyak::Operand& _addr) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    const Xbyak::Operand* addr_ = &_addr;
+    if (rcount > 1) {
+        // need to set ebp with addr before modifying rsp
+        mov(ptr[rsp - 8], rbp);
+        mov(ebp, _addr);
+        sub(rsp, 16);
+        addr_ = &ebp;
+    }
+    auto& addr = *addr_;
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+#ifdef JIT_FASTMEM
+            mov(rax, (u64) cpu->fastmem);
+            if (addr != edx) mov(edx, addr);
+            movsd(xmm0, ptr[rax + rdx]);
+#else
+            mov(arg2, addr);
+            mov(arg1, rbx);
+            mov(rax, (u64) cpu->readf64);
+            call(rax);
+#endif
+            movsd(ptr[CPU(d[(vd + i) & 15])], xmm0);
+            if (i < rcount - 1) add(addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+#ifdef JIT_FASTMEM
+            mov(rax, (u64) cpu->fastmem);
+            if (addr != edx) mov(edx, addr);
+            movss(xmm0, ptr[rax + rdx]);
+#else
+            mov(arg2, addr);
+            mov(arg1, rbx);
+            mov(rax, (u64) cpu->readf32);
+            call(rax);
+#endif
+            movss(ptr[CPU(s[(vd + i) & 31])], xmm0);
+            if (i < rcount - 1) add(addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        add(rsp, 8);
+        pop(rbp);
+    }
+}
+
+void Code::compileVFPStoreMem(ArmInstr instr, const Xbyak::Operand& _addr) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    const Xbyak::Operand* addr_ = &_addr;
+    if (rcount > 1) {
+        // need to set ebp with addr before modifying rsp
+        mov(ptr[rsp - 8], rbp);
+        mov(ebp, _addr);
+        sub(rsp, 16);
+        addr_ = &ebp;
+    }
+    auto& addr = *addr_;
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+            movsd(arg3f, ptr[CPU(d[(vd + i) & 15])]);
+#ifdef JIT_FASTMEM
+            mov(rax, (u64) cpu->fastmem);
+            if (addr != edx) mov(edx, addr);
+            movsd(ptr[rax + rdx], arg3f);
+#else
+            mov(arg2, addr);
+            mov(arg1, rbx);
+            mov(rax, (u64) cpu->writef64);
+            call(rax);
+#endif
+            if (i < rcount - 1) add(addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+            movss(arg3f, ptr[CPU(s[(vd + i) & 31])]);
+#ifdef JIT_FASTMEM
+            mov(rax, (u64) cpu->fastmem);
+            if (addr != edx) mov(edx, addr);
+            movss(ptr[rax + rdx], arg3f);
+#else
+            mov(arg2, addr);
+            mov(arg1, rbx);
+            mov(rax, (u64) cpu->writef32);
+            call(rax);
+#endif
+            if (i < rcount - 1) add(addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        add(rsp, 8);
+        pop(rbp);
+    }
 }
 
 extern "C" {
@@ -1327,6 +1855,7 @@ void backend_x86_free(void* backend) {
     delete ((Code*) backend);
 }
 
+#ifndef NOCAPSTONE
 void backend_x86_disassemble(void* backend) {
     Code* code = (Code*) backend;
     code->print_hostregs();
@@ -1342,6 +1871,7 @@ void backend_x86_disassemble(void* backend) {
     }
     cs_free(insn, count);
 }
+#endif
 }
 
 #endif

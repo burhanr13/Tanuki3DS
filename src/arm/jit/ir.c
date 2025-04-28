@@ -40,27 +40,17 @@ bool iropc_iscallback(IROpcode opc) {
         case IR_STORE_MEM8:
         case IR_STORE_MEM16:
         case IR_STORE_MEM32:
+        case IR_VFP_LOAD_MEM:
+        case IR_VFP_STORE_MEM:
 #endif
         case IR_MODESWITCH:
         case IR_EXCEPTION:
-        case IR_VFP_DATA_PROC:
-        case IR_VFP_LOAD_MEM:
-        case IR_VFP_STORE_MEM:
-        case IR_VFP_READ:
-        case IR_VFP_WRITE:
-        case IR_VFP_READ64L:
-        case IR_VFP_READ64H:
-        case IR_VFP_WRITE64L:
-        case IR_VFP_WRITE64H:
         case IR_CP15_READ:
         case IR_CP15_WRITE:
         case IR_MEDIA_UADD8:
         case IR_MEDIA_USUB8:
-        case IR_MEDIA_UQADD8:
-        case IR_MEDIA_UQSUB8:
         case IR_MEDIA_UHADD8:
         case IR_MEDIA_SSUB8:
-        case IR_MEDIA_QSUB8:
         case IR_MEDIA_SEL:
             return true;
         default:
@@ -377,6 +367,13 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 v[i] = x;
                 break;
             }
+            case IR_SSAT: {
+                s32 x = OP(2);
+                if (x < ~MASK(OP(1))) x = ~MASK(OP(1));
+                if (x > MASK(OP(1))) x = MASK(OP(1));
+                v[i] = x;
+                break;
+            }
             case IR_MEDIA_UADD8: {
                 v[i] = media_uadd8(cpu, OP(1), OP(2));
                 break;
@@ -461,15 +458,15 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                         break;
                 }
                 break;
-            case IR_WFE:
-                cpu->wfe = true;
+            case IR_HALT:
+                cpu->halt = true;
                 break;
             case IR_BEGIN:
                 break;
             case IR_END_LINK:
             case IR_END_LOOP:
             case IR_END_RET:
-                cpu->cycles -= block->numinstr;
+                cpu->cycles -= block->code.d[i].cycles;
                 return;
         }
 #ifdef IR_TRACE
@@ -678,8 +675,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
         case IR_EXCEPTION:
             DISASM(exception, 0, 1, 1);
             break;
-        case IR_WFE:
-            DISASM(wfe, 0, 0, 0);
+        case IR_HALT:
+            DISASM(halt, 0, 0, 0);
             break;
         case IR_BEGIN:
             DISASM(begin, 0, 0, 0);

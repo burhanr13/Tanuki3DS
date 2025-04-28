@@ -3,6 +3,7 @@
 
 #include "kernel/memory.h"
 #include "kernel/thread.h"
+#include "scheduler.h"
 
 #include "srv.h"
 
@@ -68,16 +69,22 @@ typedef struct {
 } GSPSharedMem;
 
 typedef struct {
+    u32 vaddr;
+    u32 fmt;
+    bool wasDisplayTransferred;
+} LCDFBInfo;
+
+typedef struct {
     KEvent* event;
     KSharedMem sharedmem;
     bool registered;
 
-    FIFO(u32, 2) lcdfbs[2];
+    FIFO(LCDFBInfo, 4) lcdfbs[2];
 } GSPData;
 
 DECL_PORT(gsp_gpu);
 
-void gsp_handle_event(E3DS* s, u32 arg);
+void gsp_handle_event(E3DS* s, u32 id);
 void gsp_handle_command(E3DS* s);
 
 #endif

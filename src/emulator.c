@@ -1,65 +1,43 @@
 #include "emulator.h"
 
-#include <confuse.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 
 #include "3ds.h"
-#include "services/hid.h"
+#include "config.h"
+
+#ifdef _WIN32
+#define mkdir(path, ...) mkdir(path)
+#endif
 
 bool g_infologs = false;
 EmulatorState ctremu;
 
-void load_config() {
-    cfg_opt_t opts[] = {
-        CFG_BOOL("verbose_log", cfg_false, 0),
-        CFG_BOOL("vsync", cfg_true, 0),
-        CFG_INT("video_scale", 1, 0),
-        CFG_BOOL("shaderjit", cfg_true, 0),
-        CFG_INT("vsh_threads", 0, 0),
-        CFG_BOOL("hw_vertexshaders", cfg_true, 0),
-        CFG_BOOL("ubershader", cfg_false, 0),
-        CFG_END(),
-    };
-    cfg_t* cfg = cfg_init(opts, 0);
-
-    cfg_parse(cfg, "config.txt");
-
-    g_infologs = cfg_getbool(cfg, "verbose_log");
-    ctremu.vsync = cfg_getbool(cfg, "vsync");
-    ctremu.videoscale = cfg_getint(cfg, "video_scale");
-    if (ctremu.videoscale < 1) ctremu.videoscale = 1;
-    cfg_setint(cfg, "video_scale", ctremu.videoscale);
-    ctremu.shaderjit = cfg_getbool(cfg, "shaderjit");
-    ctremu.vshthreads = cfg_getint(cfg, "vsh_threads");
-    if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
-    if (ctremu.vshthreads > MAX_VSH_THREADS)
-        ctremu.vshthreads = MAX_VSH_THREADS;
-    cfg_setint(cfg, "vsh_threads", ctremu.vshthreads);
-    ctremu.hwvshaders = cfg_getbool(cfg, "hw_vertexshaders");
-    ctremu.ubershader = cfg_getbool(cfg, "ubershader");
-
-    FILE* fp = fopen("config.txt", "w");
-    if (fp) {
-        cfg_print(cfg, fp);
-        fclose(fp);
-    }
-
-    cfg_free(cfg);
-}
-
 void emulator_init() {
-    mkdir("system", S_IRWXU);
-    mkdir("system/savedata", S_IRWXU);
-    mkdir("system/extdata", S_IRWXU);
-    mkdir("system/sdmc", S_IRWXU);
+    mkdir("3ds", S_IRWXU);
+    mkdir("3ds/savedata", S_IRWXU);
+    mkdir("3ds/extdata", S_IRWXU);
+    mkdir("3ds/sdmc", S_IRWXU);
+    mkdir("3ds/sdmc/3ds", S_IRWXU);
+    // homebrew needs this file to exist but the contents dont matter for hle
+    // audio
+    FILE* fp;
+    if ((fp = fopen("3ds/sdmc/3ds/dspfirm.cdc", "wx"))) fclose(fp);
 
     ctremu.videoscale = 1;
-    ctremu.vsync = true;
     ctremu.shaderjit = true;
-    ctremu.vshthreads = 0;
+    ctremu.hwvshaders = true;
+    ctremu.safeShaderMul = true;
+    ctremu.hashTextures = true;
 
     load_config();
+
+    if (ctremu.videoscale < 1) ctremu.videoscale = 1;
+    if (ctremu.vshthreads > MAX_VSH_THREADS)
+        ctremu.vshthreads = MAX_VSH_THREADS;
+    if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
+
+    save_config();
 }
 
 void emulator_quit() {
@@ -89,6 +67,11 @@ void emulator_set_rom(const char* filename) {
     ctremu.romfile = strdup(filename);
 
     ctremu.romfilenodir = strrchr(ctremu.romfile, '/');
+#ifdef _WIN32
+    if (!ctremu.romfilenodir) {
+        ctremu.romfilenodir = strrchr(ctremu.romfile, '\\');
+    }
+#endif
     if (ctremu.romfilenodir) ctremu.romfilenodir++;
     else ctremu.romfilenodir = ctremu.romfile;
     ctremu.romfilenoext = strdup(ctremu.romfilenodir);

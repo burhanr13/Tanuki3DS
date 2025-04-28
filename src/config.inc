@@ -1,0 +1,17 @@
+SECT("General")
+BOOL("VerboseLog", g_infologs)
+
+SECT("Video")
+BOOL("VSync", ctremu.vsync)
+INT("VideoScale", ctremu.videoscale)
+INT("SwVshNumThreads", ctremu.vshthreads)
+BOOL("ShaderJIT", ctremu.shaderjit)
+BOOL("HwVertexShaders", ctremu.hwvshaders)
+CMT("necessary for a few games to not have graphical issues")
+BOOL("HWShaderSafeMul", ctremu.safeShaderMul)
+BOOL("Ubershader", ctremu.ubershader)
+BOOL("HashTextures", ctremu.hashTextures)
+
+SECT("Audio")
+BOOL("AudioSync", ctremu.audiosync)
+BOOL("StartMuted", ctremu.mute)

@@ -32,7 +32,7 @@ DECL_PORT(apt) {
             linfo("Initialize with notif event %x and resume event %x",
                   cmdbuf[3], cmdbuf[4]);
             // dont signal this immediately
-            add_event(&s->sched, (SchedEventHandler) apt_resume_app, 0,
+            add_event(&s->sched, (SchedulerCallback) apt_resume_app, 0,
                       CPU_CLK / FPS);
             break;
         case 0x0003:
@@ -151,6 +151,14 @@ DECL_PORT(apt) {
             cmdbuf[1] = 0;
             break;
         }
+        case 0x003b: {
+            linfo("CancelLibraryApplet");
+            // i have no idea what this does but games seem to expect
+            // the apt even to get signaled after it
+            add_event(&s->sched, (SchedulerCallback) apt_resume_app, 0,
+                      CPU_CLK / FPS);
+            break;
+        }
         case 0x0043:
             linfo("NotifyToWait");
             cmdbuf[0] = IPCHDR(1, 0);
@@ -164,6 +172,11 @@ DECL_PORT(apt) {
             cmdbuf[4] = srvobj_make_handle(s, &s->services.apt.shared_font.hdr);
             break;
         }
+        case 0x0046:
+            linfo("Wrap"); // does some crypt stuff
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
         case 0x004b: {
             u32 utility = cmdbuf[1];
             u32 insize = cmdbuf[2];
@@ -214,6 +227,13 @@ DECL_PORT(apt) {
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0; // 0 for old 3ds
+            break;
+        }
+        case 0x0103: {
+            linfo("GetApplicationRunningMode");
+            cmdbuf[0] = IPCHDR(2, 0);
+            cmdbuf[1] = 0;
+            cmdbuf[2] = 1; // old 3ds + apt
             break;
         }
         default:

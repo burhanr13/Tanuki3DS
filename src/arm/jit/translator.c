@@ -36,7 +36,8 @@ ArmCompileFunc compile_funcs[ARM_MAX] = {
                                      .imm1 = _imm1,                            \
                                      .imm2 = _imm2,                            \
                                      .op1 = _op1,                              \
-                                     .op2 = _op2}))
+                                     .op2 = _op2,                              \
+                                     .cycles = block->numinstr + 1}))
 
 #define EMITVX(opc, op1, op2, imm) EMITXX(opc, op1, op2, 0, imm)
 #define EMITVV(opc, op1, op2) EMITVX(opc, op1, op2, 0)
@@ -625,7 +626,10 @@ DECL_ARM_COMPILE(pack_sat) {
             EMITIV(USAT, satamt, vop2);
             EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
         } else if (instr.pack_sat.s) {
-            lwarn("unknown sat %08x at %08x", instr.w, addr);
+            u32 satamt = instr.pack_sat.rn | instr.pack_sat.h << 4;
+            // set q flag
+            EMITIV(SSAT, satamt, vop2);
+            EMITV_STORE_REG(instr.pack_sat.rd, LASTV);
         } else {
             u32 vop1 = EMIT_LOAD_REG(instr.pack_sat.rn);
             if (instr.pack_sat.x) {

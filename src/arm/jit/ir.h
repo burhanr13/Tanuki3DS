@@ -69,7 +69,7 @@ typedef enum {
     // special instructions
     IR_MODESWITCH, // -i-
     IR_EXCEPTION,  // -ii
-    IR_WFE,        // ---
+    IR_HALT,       // ---
 
     // special control instructions
     IR_BEGIN,    // ---, always the first instruction
@@ -110,6 +110,7 @@ typedef enum {
     IR_REV,   // r-v
     IR_REV16, // r-v
     IR_USAT,  // riv
+    IR_SSAT,  // riv
 
     // media instructions (all rvv)
     IR_MEDIA_UADD8,
@@ -144,6 +145,7 @@ typedef struct {
     };
     u32 op1;
     u32 op2;
+    u32 cycles; // cycle count up to this instruction
 } IRInstr;
 
 typedef struct {

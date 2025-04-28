@@ -5,10 +5,6 @@
 
 // lle dsp code is based directly on citra
 
-u16 dsp_addrs[15] = {
-    0xBFFF, 0x9E92, 0x8680, 0xA792, 0x9430, 0x8400, 0x8540, 0x9492,
-    0x8710, 0x8410, 0xA912, 0xAA12, 0xAAD2, 0xAC52, 0xAC5C,
-};
 
 DECL_PORT(dsp) {
     u32* cmdbuf = PTR(cmd_addr);
@@ -100,12 +96,22 @@ DECL_PORT(dsp) {
             int channel = cmdbuf[2];
             linfo("RegisterInterruptEvents int=%d,ch=%d with handle %x",
                   interrupt, channel, cmdbuf[4]);
-            if (interrupt >= 3 || channel >= 4) {
-                lerror("invalid channel");
-                break;
-            }
 
-            KEvent** event = &s->services.dsp.events[interrupt][channel];
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+
+            KEvent** event;
+            if (interrupt != 2) {
+                lwarn("unknown interrupt event");
+                break;
+            } else {
+                if (channel == 2) event = &s->services.dsp.audio_event;
+                else if (channel == 3) event = &s->services.dsp.binary_event;
+                else {
+                    lwarn("unknown channel for pipe event");
+                    break;
+                }
+            }
 
             // unregister an existing event
             if (*event) {
@@ -117,9 +123,6 @@ DECL_PORT(dsp) {
             if (*event) {
                 (*event)->hdr.refcount++;
             }
-
-            cmdbuf[0] = IPCHDR(1, 0);
-            cmdbuf[1] = 0;
             break;
         }
         case 0x0016:
@@ -139,7 +142,7 @@ DECL_PORT(dsp) {
             linfo("GetHeadphoneStatus");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = false;
+            cmdbuf[2] = true;
             break;
         default:
             lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,

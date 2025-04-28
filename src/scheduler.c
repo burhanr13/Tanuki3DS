@@ -28,7 +28,7 @@ int run_next_event(Scheduler* sched) {
     return sched->now - e.time;
 }
 
-void add_event(Scheduler* sched, SchedEventHandler f, u32 event_arg,
+void add_event(Scheduler* sched, SchedulerCallback f, void* event_arg,
                s64 reltime) {
     if (sched->event_queue.size == EVENT_MAX) {
         lerror("event queue is full");
@@ -51,7 +51,7 @@ void add_event(Scheduler* sched, SchedEventHandler f, u32 event_arg,
     }
 }
 
-void remove_event(Scheduler* sched, SchedEventHandler f, u32 event_arg) {
+void remove_event(Scheduler* sched, SchedulerCallback f, void* event_arg) {
     FIFO_foreach(i, sched->event_queue) {
         if (sched->event_queue.d[i].handler == f &&
             sched->event_queue.d[i].arg == event_arg) {
@@ -67,7 +67,7 @@ void remove_event(Scheduler* sched, SchedEventHandler f, u32 event_arg) {
     }
 }
 
-u64 find_event(Scheduler* sched, SchedEventHandler f) {
+u64 find_event(Scheduler* sched, SchedulerCallback f) {
     FIFO_foreach(i, sched->event_queue) {
         if (sched->event_queue.d[i].handler == f) {
             return sched->event_queue.d[i].time;

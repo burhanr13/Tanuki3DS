@@ -15,11 +15,14 @@ log*
 *.fs
 *.toml
 *.wav
+*.ini
+portable.txt
 
 ctremu*
 *.app
 
 system*
+3ds
 config.txt
 
 perf*

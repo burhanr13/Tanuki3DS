@@ -6,7 +6,6 @@ DECL_PORT(frd) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         default:
-            // mk7 is really annoying
             linfo("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
                   cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
             cmdbuf[0] = IPCHDR(1, 0);

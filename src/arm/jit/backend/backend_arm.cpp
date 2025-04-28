@@ -2,7 +2,10 @@
 
 #include "backend_arm.h"
 
+#ifndef NOCAPSTONE
 #include <capstone/capstone.h>
+#endif
+#include <utility>
 #include <vector>
 #include <xbyak_aarch64/xbyak_aarch64.h>
 
@@ -88,11 +91,9 @@ struct Code : Xbyak_aarch64::CodeGenerator {
                 return savedBase + hr.index;
             case REG_STACK:
                 return 32 + hr.index;
-            default: // unreachable
-                return 0;
+            default:
+                std::unreachable();
         }
-        // also unreachable
-        return 0;
     }
 
     int getOp(int i) {
@@ -298,6 +299,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_VFP_DATA_PROC: {
+                lastflags = 0; // fcmp might trash flags
                 compileVFPDataProc(ArmInstr(inst.op1));
                 break;
             }
@@ -702,6 +704,17 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 csel(dst, w0, dst, GT);
                 break;
             }
+            case IR_SSAT: {
+                auto src = LOADOP2();
+                auto dst = DSTREG();
+                mov(w0, ~MASK(inst.op1));
+                cmp(src, w0);
+                csel(dst, w0, src, LT);
+                mov(w0, MASK(inst.op1));
+                cmp(src, w0);
+                csel(dst, w0, dst, GT);
+                break;
+            }
             case IR_MEDIA_UADD8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
@@ -897,9 +910,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 }
                 break;
             }
-            case IR_WFE: {
+            case IR_HALT: {
                 mov(w0, 1);
-                strb(w0, CPU(wfe));
+                strb(w0, CPU(halt));
                 break;
             }
             case IR_BEGIN: {
@@ -923,7 +936,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 lastflags = 0;
 
                 ldr(x0, CPU(cycles));
-                sub(x0, x0, ir->numinstr);
+                sub(x0, x0, inst.cycles);
                 str(x0, CPU(cycles));
 
                 if (inst.opcode == IR_END_LOOP) {
@@ -1215,7 +1228,7 @@ void Code::compileVFPDataProc(ArmInstr instr) {
                     // TODO: deal with rounding mode properly
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
-                        
+
                         LDDM();
                         if (instr.cp_data_proc.crn & 1) {
                             fcvtzs(w0, d1);
@@ -1424,6 +1437,7 @@ void backend_arm_free(void* backend) {
     delete ((Code*) backend);
 }
 
+#ifndef NOCAPSTONE
 void backend_arm_disassemble(void* backend) {
     Code* code = (Code*) backend;
     code->print_hostregs();
@@ -1440,6 +1454,7 @@ void backend_arm_disassemble(void* backend) {
     cs_free(insn, count);
     cs_close(&handle);
 }
+#endif
 }
 
 #endif

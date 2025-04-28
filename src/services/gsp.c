@@ -2,8 +2,8 @@
 
 #include "3ds.h"
 #include "kernel/kernel.h"
-#include "pica/gpu.h"
 #include "scheduler.h"
+#include "video/gpu.h"
 
 #define GSPMEM ((GSPSharedMem*) PPTR(s->services.gsp.sharedmem.paddr))
 
@@ -17,11 +17,15 @@ u32 vaddr_to_paddr(u32 vaddr) {
 DECL_PORT(gsp_gpu) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
-        case 0x0008:
+        case 0x0008: {
             linfo("FlushDataCache");
+            u32 addr = cmdbuf[1];
+            u32 size = cmdbuf[2];
+            gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addr), size);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        }
         case 0x000b:
             linfo("LCDForceBlank");
             cmdbuf[0] = IPCHDR(1, 0);
@@ -93,11 +97,15 @@ DECL_PORT(gsp_gpu) {
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
-        case 0x001f:
+        case 0x001f: {
             linfo("StoreDataCache");
+            u32 addr = cmdbuf[1];
+            u32 size = cmdbuf[2];
+            gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addr), size);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
+        }
         default:
             lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
                   cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5]);
@@ -122,20 +130,38 @@ void update_fbinfos(E3DS* s) {
                   fb->fbs[0].left_vaddr, fb->fbs[0].right_vaddr,
                   fb->fbs[1].left_vaddr, fb->fbs[1].right_vaddr);
 
-            FIFO_push(s->services.gsp.lcdfbs[i],
-                      fb->fbs[1 - fb->idx].left_vaddr);
+            auto fbent = &fb->fbs[1 - fb->idx];
+            LCDFBInfo lcdfb = {
+                .vaddr = fbent->left_vaddr,
+                .fmt = fbent->format,
+            };
+            FIFO_push(s->services.gsp.lcdfbs[i], lcdfb);
             fb->newdataflag = 0;
         }
     }
 }
 
-void gsp_handle_event(E3DS* s, u32 arg) {
-    if (arg == GSPEVENT_VBLANK0) {
-        add_event(&s->sched, gsp_handle_event, GSPEVENT_VBLANK0, CPU_CLK / FPS);
+void gsp_handle_event(E3DS* s, u32 id) {
+    if (id == GSPEVENT_VBLANK0) {
+        add_event(&s->sched, (SchedulerCallback) gsp_handle_event,
+                  (void*) GSPEVENT_VBLANK0, CPU_CLK / FPS);
 
         gsp_handle_event(s, GSPEVENT_VBLANK1);
 
         linfo("vblank");
+
+        for (int sc = 0; sc < 2; sc++) {
+            bool isSwRender = true;
+            for (int i = 0; i < 4; i++) {
+                if (s->services.gsp.lcdfbs[sc].d[i].wasDisplayTransferred)
+                    isSwRender = false;
+            }
+            if (!isSwRender) continue;
+            auto lastfb = &FIFO_back(s->services.gsp.lcdfbs[sc]);
+            if (!lastfb->vaddr) continue;
+            gpu_render_lcd_fb(&s->gpu, vaddr_to_paddr(lastfb->vaddr),
+                              lastfb->fmt, sc);
+        }
 
         update_fbinfos(s);
 
@@ -149,12 +175,12 @@ void gsp_handle_event(E3DS* s, u32 arg) {
     if (interrupts->count < 0x34) {
         u32 idx = interrupts->cur + interrupts->count;
         if (idx >= 0x34) idx -= 0x34;
-        interrupts->queue[idx] = arg;
+        interrupts->queue[idx] = id;
         interrupts->count++;
     }
 
     if (s->services.gsp.event) {
-        linfo("signaling gsp event %d", arg);
+        linfo("signaling gsp event %d", id);
         event_signal(s, s->services.gsp.event);
     }
 }
@@ -172,6 +198,7 @@ void gsp_handle_command(E3DS* s) {
             linfo("dma request from %08x to %08x of size 0x%x", src, dest,
                   size);
             memcpy(PTR(dest), PTR(src), size);
+            gpu_invalidate_range(&s->gpu, vaddr_to_paddr(dest), size);
             gsp_handle_event(s, GSPEVENT_DMA);
             break;
         }
@@ -180,6 +207,7 @@ void gsp_handle_command(E3DS* s) {
             u32 bufsize = cmds->d[cmds->cur].args[1];
             linfo("sending command list at %08x with size 0x%x", bufaddr,
                   bufsize);
+            gpu_reset_needs_rehesh(&s->gpu);
             gpu_run_command_list(&s->gpu, vaddr_to_paddr(bufaddr & ~7),
                                  bufsize);
             gsp_handle_event(s, GSPEVENT_P3D);
@@ -196,13 +224,13 @@ void gsp_handle_command(E3DS* s) {
                 u16 ctl[2];
             }* cmd = (void*) &cmds->d[cmds->cur];
             for (int i = 0; i < 2; i++) {
-                if (cmd->buf[i].st) {
-                    linfo("memory fill at fb %08x-%08x with %x", cmd->buf[i].st,
-                          cmd->buf[i].end, cmd->buf[i].val);
-                    gpu_clear_fb(&s->gpu, vaddr_to_paddr(cmd->buf[i].st),
-                                 cmd->buf[i].val);
-                    gsp_handle_event(s, GSPEVENT_PSC0 + i);
-                }
+                if (!cmd->buf[i].st) continue;
+                linfo("memory fill at fb %08x-%08x with %x", cmd->buf[i].st,
+                      cmd->buf[i].end, cmd->buf[i].val);
+                gpu_clear_fb(&s->gpu, vaddr_to_paddr(cmd->buf[i].st),
+                             vaddr_to_paddr(cmd->buf[i].end), cmd->buf[i].val,
+                             (cmd->ctl[i] >> 8) + 2);
+                gsp_handle_event(s, GSPEVENT_PSC0 + i);
             }
             break;
         }
@@ -221,6 +249,7 @@ void gsp_handle_command(E3DS* s) {
             u8 scalemode = (flags >> 24) & 3;
             bool scalex = scalemode >= 1;
             bool scaley = scalemode >= 2;
+            bool vflip = flags & 1; // need to handle yoff differently probably
 
             static int fmtBpp[8] = {4, 3, 2, 2, 2, 4, 4, 4};
 
@@ -232,11 +261,16 @@ void gsp_handle_command(E3DS* s) {
 
             for (int screen = 0; screen < 2; screen++) {
                 for (int i = 0; i < 4; i++) {
-                    int yoff = addrout - s->services.gsp.lcdfbs[screen].d[i];
+                    int yoff =
+                        addrout - s->services.gsp.lcdfbs[screen].d[i].vaddr;
                     yoff /= wout * fmtBpp[fmtout];
                     if (abs(yoff) < hout / 2) {
                         gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin),
-                                             yoff, scalex, scaley, screen);
+                                             yoff, scalex, scaley, vflip,
+                                             screen);
+                        s->services.gsp.lcdfbs[screen]
+                            .d[i]
+                            .wasDisplayTransferred = true;
                         break;
                     }
                 }
@@ -272,9 +306,23 @@ void gsp_handle_command(E3DS* s) {
             gsp_handle_event(s, GSPEVENT_PPF);
             break;
         }
-        case 0x05:
+        case 0x05: {
             linfo("flush cache regions");
+            struct {
+                u32 id;
+                struct {
+                    u32 addr;
+                    u32 size;
+                } buf[3];
+                u32 unused;
+            }* cmd = (void*) &cmds->d[cmds->cur];
+            for (int i = 0; i < 3; i++) {
+                if (cmd->buf[i].size == 0) break;
+                gpu_invalidate_range(&s->gpu, vaddr_to_paddr(cmd->buf[i].addr),
+                                     cmd->buf[i].size);
+            }
             break;
+        }
         default:
             lwarn("unknown gsp queue command 0x%02x", cmds->d[cmds->cur].id);
     }

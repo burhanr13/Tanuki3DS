@@ -2,9 +2,11 @@
 
 #include <string.h>
 
+#include "emulator.h"
 #include "kernel/memory.h"
 #include "kernel/svc.h"
 
+#include "font.h"
 #include "services.h"
 
 struct {
@@ -12,12 +14,12 @@ struct {
     PortRequestHandler handler;
 } srvhandlers[] = {
 #define SRV(portname, name) {portname, port_handle_##name}
-    SRV("APT:U", apt),     SRV("APT:A", apt),        SRV("APT:S", apt),
-    SRV("fs:USER", fs),    SRV("gsp::Gpu", gsp_gpu), SRV("hid:USER", hid),
-    SRV("hid:SPVR", hid),  SRV("dsp::DSP", dsp),     SRV("cfg:u", cfg),
-    SRV("cfg:s", cfg),     SRV("y2r:u", y2r),        SRV("cecd:u", cecd),
-    SRV("ldr:ro", ldr_ro), SRV("nwm::UDS", nwm_uds), SRV("ir:USER", ir),
-    SRV("frd:u", frd),
+    SRV("APT:U", apt),    SRV("APT:A", apt),        SRV("APT:S", apt),
+    SRV("fs:USER", fs),   SRV("gsp::Gpu", gsp_gpu), SRV("hid:USER", hid),
+    SRV("hid:SPVR", hid), SRV("dsp::DSP", dsp),     SRV("cfg:u", cfg),
+    SRV("cfg:s", cfg),    SRV("cfg:i", cfg),        SRV("y2r:u", y2r),
+    SRV("cecd:u", cecd),  SRV("ldr:ro", ldr_ro),    SRV("nwm::UDS", nwm_uds),
+    SRV("ir:USER", ir),   SRV("am:app", am),        SRV("frd:u", frd),
 #undef SRV
 };
 
@@ -42,13 +44,16 @@ u32 srvobj_make_handle(E3DS* s, KObject* o) {
 
 void services_init(E3DS* s) {
     srvobj_init(&s->services.notif_sem.hdr, KOT_SEMAPHORE);
+    s->services.notif_sem.count = 0;
+    s->services.notif_sem.max = 1;
 
     srvobj_init(&s->services.apt.lock.hdr, KOT_MUTEX);
     srvobj_init(&s->services.apt.notif_event.hdr, KOT_EVENT);
     s->services.apt.notif_event.sticky = true;
     srvobj_init(&s->services.apt.resume_event.hdr, KOT_EVENT);
+    s->services.apt.resume_event.sticky = true;
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
-    s->services.apt.shared_font.size = sizeof shared_font;
+    s->services.apt.shared_font.size = 0x80 + sizeof shared_font;
     sharedmem_alloc(s, &s->services.apt.shared_font);
     // the shared font is treated as part of the linear heap
     // so its paddr and vaddr must be related appropriately
@@ -60,7 +65,12 @@ void services_init(E3DS* s) {
     fontdest[2] = sizeof shared_font; // size
     // font is at offset 0x80 of the memory block
     memcpy((void*) fontdest + 0x80, shared_font, sizeof shared_font);
+    // now we need to relocate the pointers in the font too (games will do it
+    // themselves but homebrew needs it to be already done)
+    font_relocate((void*) fontdest + 0x80,
+                  s->services.apt.shared_font.mapaddr + 0x80);
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
+    // rgba framebuffers for bottom, top left, top right
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);
     sharedmem_alloc(s, &s->services.apt.capture_block);
 
@@ -83,7 +93,6 @@ void services_init(E3DS* s) {
     srvobj_init(&s->services.cecd.cecinfo.hdr, KOT_EVENT);
 
     srvobj_init(&s->services.y2r.transferend.hdr, KOT_EVENT);
-    s->services.y2r.transferend.sticky = true;
 
     srvobj_init(&s->services.ir.event.hdr, KOT_EVENT);
 }
@@ -137,10 +146,11 @@ DECL_PORT(srv) {
             }
             HANDLE_SET(handle, session);
             session->hdr.refcount = 1;
+            linfo("connected to service '%.8s' with handle %x", name, handle);
+
             cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
             cmdbuf[3] = handle;
-            linfo("connected to service '%.8s' with handle %x", name, handle);
             break;
         }
         case 0x0009:
@@ -185,7 +195,7 @@ DECL_PORT(errf) {
             lerror("fatal error type %d, result %08x, pc %08x, message: %s",
                    errinfo->type, errinfo->resultcode, errinfo->pc,
                    errinfo->message);
-            exit(1);
+            longjmp(ctremu.exceptionJmp, 1);
             break;
         }
         default:

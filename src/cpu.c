@@ -61,7 +61,7 @@ s64 cpu_run(E3DS* s, s64 cycles) {
 u32 cpu_read8(E3DS* s, u32 addr, bool sx) {
 #ifdef RWATCH
     if (RWATCH <= addr && addr < RWATCH + RWATCHLEN) {
-        printfln("read8 [%08x]", addr);
+        ldebug("read8 [%08x]", addr);
         cpu_print_state(&s->cpu);
     }
 #endif
@@ -71,7 +71,7 @@ u32 cpu_read8(E3DS* s, u32 addr, bool sx) {
 u32 cpu_read16(E3DS* s, u32 addr, bool sx) {
 #ifdef RWATCH
     if (RWATCH <= addr && addr < RWATCH + RWATCHLEN) {
-        printfln("read16 [%08x]", addr);
+        ldebug("read16 [%08x]", addr);
         cpu_print_state(&s->cpu);
     }
 #endif
@@ -81,7 +81,7 @@ u32 cpu_read16(E3DS* s, u32 addr, bool sx) {
 u32 cpu_read32(E3DS* s, u32 addr) {
 #ifdef RWATCH
     if (RWATCH <= addr && addr < RWATCH + RWATCHLEN) {
-        printfln("read32 [%08x]", addr);
+        ldebug("read32 [%08x]", addr);
         cpu_print_state(&s->cpu);
     }
 #endif
@@ -91,7 +91,7 @@ u32 cpu_read32(E3DS* s, u32 addr) {
 void cpu_write8(E3DS* s, u32 addr, u8 b) {
 #ifdef WATCH
     if (addr == WATCH) {
-        printfln("write8 [%08x] = %x", addr, b);
+        ldebug("write8 [%08x] = %x", addr, b);
         cpu_print_state(&s->cpu);
     }
 #endif
@@ -100,7 +100,7 @@ void cpu_write8(E3DS* s, u32 addr, u8 b) {
 void cpu_write16(E3DS* s, u32 addr, u16 h) {
 #ifdef WATCH
     if (addr == WATCH) {
-        printfln("write16 [%08x] = %x", addr, h);
+        ldebug("write16 [%08x] = %x", addr, h);
         cpu_print_state(&s->cpu);
     }
 #endif
@@ -109,7 +109,7 @@ void cpu_write16(E3DS* s, u32 addr, u16 h) {
 void cpu_write32(E3DS* s, u32 addr, u32 w) {
 #ifdef WATCH
     if (addr == WATCH) {
-        printfln("write32 [%08x] = %x", addr, w);
+        ldebug("write32 [%08x] = %x", addr, w);
         cpu_print_state(&s->cpu);
     }
 #endif
@@ -150,7 +150,7 @@ u32 cp15_read(E3DS* s, ArmInstr instr) {
                 case 0:
                     switch (instr.cp_reg_trans.cp) {
                         case 3:
-                            return GETTLS(CUR_THREAD);
+                            return CUR_THREAD->tls;
                     }
                     break;
             }

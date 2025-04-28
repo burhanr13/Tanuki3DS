@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "emulator.h"
 #include "services/srv.h"
 
 #include "svc_types.h"
@@ -75,11 +76,17 @@ DECL_SVC(QueryMemory) {
     R(5) = 0;
 }
 
+DECL_SVC(ExitProcess) {
+    lerror("process exiting");
+    longjmp(ctremu.exceptionJmp, 1);
+}
+
 DECL_SVC(CreateThread) {
     s32 priority = R(0);
     u32 entrypoint = R(1);
     u32 arg = R(2);
     u32 stacktop = R(3);
+    s32 processor = R(4);
 
     MAKE_HANDLE(handle);
 
@@ -89,15 +96,12 @@ DECL_SVC(CreateThread) {
     }
     stacktop &= ~7;
 
-    u32 newtid = thread_create(s, entrypoint, stacktop, priority, arg);
-    if (newtid == -1) {
-        R(0) = -1;
-        return;
-    }
+    KThread* t =
+        thread_create(s, entrypoint, stacktop, priority, arg, processor);
 
-    HANDLE_SET(handle, s->process.threads[newtid]);
-    s->process.threads[newtid]->hdr.refcount = 1;
-    linfo("created thread with handle %x", handle);
+    HANDLE_SET(handle, t);
+    t->hdr.refcount = 1;
+    linfo("created thread %d with handle %x", t->id, handle);
 
     thread_reschedule(s);
 
@@ -115,13 +119,14 @@ DECL_SVC(SleepThread) {
     s64 timeout = R(0) | (u64) R(1) << 32;
 
     if (timeout == 0) {
-        // timeout 0 will switch to a different thread without sleeping this
-        // thread
-        // since the scheduler always picks the thread with highest priority
-        // we need to temporarily sleep this one so it does not get picked
-        caller->state = THRD_SLEEP;
-        thread_reschedule(s);
-        caller->state = THRD_READY;
+        // this acts as thread yield, this thread will stay
+        // ready but let another thread run for now
+        // importantly if no other threads are ready we do nothing
+        if (s->readylist.next != &s->readylist) {
+            caller->state = THRD_SLEEP;
+            thread_reschedule(s);
+            thread_ready(s, caller);
+        }
     } else {
         thread_sleep(s, caller, timeout);
     }
@@ -137,6 +142,8 @@ DECL_SVC(GetThreadPriority) {
         return;
     }
 
+    linfo("thread %d has priority %#x", t->id, t->priority);
+
     R(0) = 0;
     R(1) = t->priority;
 }
@@ -150,7 +157,15 @@ DECL_SVC(SetThreadPriority) {
     }
 
     t->priority = R(1);
-    thread_reschedule(s);
+
+    if (t->state == THRD_READY) {
+        t->next->prev = t->prev;
+        t->prev->next = t->next;
+        thread_ready(s, t);
+        thread_reschedule(s);
+    }
+
+    linfo("thread %d has priority %#x", t->id, t->priority);
 
     R(0) = 0;
 }
@@ -159,7 +174,10 @@ DECL_SVC(CreateMutex) {
     MAKE_HANDLE(handle);
 
     KMutex* mtx = mutex_create();
-    if (R(1)) mtx->locker_thrd = caller;
+    if (R(1)) {
+        mtx->locker_thrd = caller;
+        klist_insert(&caller->owned_mutexes, &mtx->hdr);
+    }
     mtx->hdr.refcount = 1;
     HANDLE_SET(handle, mtx);
 
@@ -182,6 +200,35 @@ DECL_SVC(ReleaseMutex) {
     mutex_release(s, m);
 
     R(0) = 0;
+}
+
+DECL_SVC(CreateSemaphore) {
+    MAKE_HANDLE(handle);
+
+    KSemaphore* sem = semaphore_create(R(1), R(2));
+    sem->hdr.refcount = 1;
+    HANDLE_SET(handle, sem);
+
+    linfo("created semaphore with handle %x, init=%d, max=%d", handle, R(1),
+          R(2));
+
+    R(0) = 0;
+    R(1) = handle;
+}
+
+DECL_SVC(ReleaseSemaphore) {
+    KSemaphore* sem = HANDLE_GET_TYPED(R(1), KOT_SEMAPHORE);
+    if (!sem) {
+        lerror("not a semaphore");
+        R(0) = -1;
+        return;
+    }
+
+    R(0) = 0;
+    R(1) = sem->count;
+
+    linfo("releasing semaphore %x with count %d", R(0), R(2));
+    semaphore_release(s, sem, R(2));
 }
 
 DECL_SVC(CreateEvent) {
@@ -220,6 +267,65 @@ DECL_SVC(ClearEvent) {
         return;
     }
     e->signal = false;
+    R(0) = 0;
+}
+
+DECL_SVC(CreateTimer) {
+    MAKE_HANDLE(handle);
+
+    KTimer* timer = timer_create_(R(1) == RESET_STICKY, R(1) == RESET_PULSE);
+    timer->hdr.refcount = 1;
+    HANDLE_SET(handle, timer);
+
+    linfo("created timer with handle %x, resettype=%d", handle, R(1));
+
+    R(0) = 0;
+    R(1) = handle;
+}
+
+DECL_SVC(SetTimer) {
+    KTimer* t = HANDLE_GET_TYPED(R(0), KOT_TIMER);
+    if (!t) {
+        lerror("not a timer");
+        R(0) = -1;
+        return;
+    }
+
+    s64 delay = (u64) R(2) | (u64) R(3) << 32;
+    s64 interval = (u64) R(1) | (u64) R(4) << 32;
+
+    linfo("scheduling timer %x with delay=%d, interval=%d", R(0), delay,
+          interval);
+
+    t->interval = interval;
+    add_event(&s->sched, (SchedulerCallback) timer_signal, t, delay);
+
+    R(0) = 0;
+}
+
+DECL_SVC(CancelTimer) {
+    KTimer* t = HANDLE_GET_TYPED(R(0), KOT_TIMER);
+    if (!t) {
+        lerror("not a timer");
+        R(0) = -1;
+        return;
+    }
+
+    remove_event(&s->sched, (SchedulerCallback) timer_signal, t);
+
+    R(0) = 0;
+}
+
+DECL_SVC(ClearTimer) {
+    KTimer* t = HANDLE_GET_TYPED(R(0), KOT_TIMER);
+    if (!t) {
+        lerror("not a timer");
+        R(0) = -1;
+        return;
+    }
+
+    t->signal = false;
+
     R(0) = 0;
 }
 
@@ -269,6 +375,11 @@ DECL_SVC(MapMemoryBlock) {
 
     memory_virtmap(s, shmem->paddr, addr, shmem->size, perm, MEMST_SHARED);
 
+    R(0) = 0;
+}
+
+DECL_SVC(UnmapMemoryBlock) {
+    // stub
     R(0) = 0;
 }
 
@@ -347,6 +458,7 @@ DECL_SVC(ArbitrateAddress) {
                 klist_insert(&caller->waiting_objs, &arbiter->hdr);
                 caller->waiting_addr = addr;
                 linfo("waiting on address %08x", addr);
+                caller->wait_any = false;
                 if (type == ARBITRATE_WAIT_TIMEOUT ||
                     type == ARBITRATE_DEC_WAIT_TIMEOUT) {
                     thread_sleep(s, caller, timeout);
@@ -361,7 +473,7 @@ DECL_SVC(ArbitrateAddress) {
             break;
         default:
             R(0) = -1;
-            lwarn("unknown arbitration type");
+            lerror("unknown arbitration type");
     }
 }
 
@@ -398,6 +510,7 @@ DECL_SVC(WaitSynchronization1) {
     if (sync_wait(s, caller, obj)) {
         linfo("waiting on handle %x", handle);
         klist_insert(&caller->waiting_objs, obj);
+        caller->wait_any = false;
         thread_sleep(s, caller, timeout);
     } else {
         linfo("did not need to wait for handle %x", handle);
@@ -442,7 +555,7 @@ DECL_SVC(WaitSynchronizationN) {
         R(1) = wokeupi;
     } else {
         linfo("waiting on %d handles", count);
-        caller->wait_all = waitAll;
+        caller->wait_any = !waitAll;
         thread_sleep(s, caller, timeout);
     }
 }
@@ -459,12 +572,37 @@ DECL_SVC(DuplicateHandle) {
     HANDLE_SET(dup, o);
 
     R(0) = 0;
+    R(1) = dup;
 }
 
 DECL_SVC(GetSystemTick) {
     R(0) = s->sched.now;
     R(1) = s->sched.now >> 32;
     s->sched.now += 200; // make time advance so the next read happens later
+}
+
+DECL_SVC(GetSystemInfo) {
+    u32 type = R(1);
+    u32 param = R(2);
+
+    R(0) = 0;
+    switch (type) {
+        case 0:
+            switch (param) {
+                case 1:
+                    R(1) = s->process.used_memory;
+                    R(2) = 0;
+                    break;
+                default:
+                    R(0) = -1;
+                    lerror("unknown param");
+            }
+            break;
+        default:
+            R(0) = -1;
+            lerror("unknown system info type 0x%x", type);
+            break;
+    }
 }
 
 DECL_SVC(GetProcessInfo) {
@@ -521,12 +659,14 @@ DECL_SVC(SendSyncRequest) {
         return;
     }
     R(0) = 0;
-    u32 cmd_addr = GETTLS(caller) + IPC_CMD_OFF;
+    u32 cmd_addr = caller->tls + IPC_CMD_OFF;
     IPCHeader cmd = *(IPCHeader*) PTR(cmd_addr);
     session->handler(s, cmd, cmd_addr, session->arg);
 }
 
 DECL_SVC(GetProcessId) {
+    // rn we only emulate one process, also this only seems
+    // be used for errdisp anyway
     R(0) = 0;
     R(1) = 0;
 }
@@ -537,6 +677,8 @@ DECL_SVC(GetThreadId) {
         lerror("not a thread");
         R(0) = -1;
     }
+
+    linfo("handle %x thread %d", R(1), t->id);
 
     R(0) = 0;
     R(1) = t->id;
@@ -588,9 +730,14 @@ DECL_SVC(GetResourceLimitCurrentValues) {
     }
 }
 
+DECL_SVC(GetThreadContext) {
+    // supposedly this does nothing in the real kernel too
+    R(0) = 0;
+}
+
 DECL_SVC(Break) {
     lerror("at %08x (lr=%08x)", s->cpu.pc, s->cpu.lr);
-    exit(1);
+    longjmp(ctremu.exceptionJmp, 1);
 }
 
 DECL_SVC(OutputDebugString) {
