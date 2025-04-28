@@ -910,9 +910,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 }
                 break;
             }
-            case IR_WFE: {
+            case IR_HALT: {
                 mov(w0, 1);
-                strb(w0, CPU(wfe));
+                strb(w0, CPU(halt));
                 break;
             }
             case IR_BEGIN: {

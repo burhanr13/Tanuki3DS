@@ -3,6 +3,7 @@
 #include "3ds.h"
 
 void e3ds_restore_context(E3DS* s) {
+    if (!CUR_THREAD) return;
     memcpy(s->cpu.r, CUR_THREAD->ctx.r, sizeof s->cpu.r);
     memcpy(s->cpu.d, CUR_THREAD->ctx.d, sizeof s->cpu.d);
     s->cpu.cpsr.w = CUR_THREAD->ctx.cpsr;
@@ -10,6 +11,7 @@ void e3ds_restore_context(E3DS* s) {
 }
 
 void e3ds_save_context(E3DS* s) {
+    if (!CUR_THREAD) return;
     memcpy(CUR_THREAD->ctx.r, s->cpu.r, sizeof s->cpu.r);
     memcpy(CUR_THREAD->ctx.d, s->cpu.d, sizeof s->cpu.d);
     CUR_THREAD->ctx.cpsr = s->cpu.cpsr.w;
@@ -30,7 +32,12 @@ void thread_init(E3DS* s, u32 entrypoint) {
     s->process.handles[0] = &thd->hdr;
     s->process.handles[0]->refcount = 2;
 
-    thread_reschedule(s);
+    // manually schedule the main thread
+    thd->next->prev = thd->prev;
+    thd->prev->next = thd->next;
+    thd->next = nullptr;
+    thd->prev = nullptr;
+    thd->state = THRD_RUNNING;
 }
 
 KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
@@ -44,6 +51,7 @@ KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
     thrd->ctx.cpsr = M_USER;
     thrd->priority = priority;
     thrd->id = s->process.nexttid++;
+    thrd->state = THRD_SLEEP;
     if (processorID < 0) { // negative means the kernel picks a cpu
         thrd->cpu = 0;
     } else {
@@ -94,45 +102,88 @@ void thread_ready(E3DS* s, KThread* t) {
 }
 
 void thread_reschedule(E3DS* s) {
-    if (CUR_THREAD->state == THRD_RUNNING) thread_ready(s, CUR_THREAD);
+    KThread* cur = CUR_THREAD;
+    KThread* next;
 
-    if (s->readylist.next == &s->readylist) {
-        s->cpu.wfe = true;
-        linfo("all threads sleeping");
+    if (cur && cur->state == THRD_READY) {
+        lerror("cur thread should never be ready");
         return;
     }
-    s->cpu.wfe = false;
 
-    KThread* next = s->readylist.next;
-    next->next->prev = next->prev;
-    next->prev->next = next->next;
-    next->next = nullptr;
-    next->prev = nullptr;
-    next->state = THRD_RUNNING;
+    // find the next thread
+    if (cur && cur->state == THRD_RUNNING) {
+        if (s->readylist.next == &s->readylist) {
+            // no other threads are ready so dont switch
+            next = cur;
+        } else {
+            // only switch to a new thread if its priority is
+            // higher than the current thread
+            if (s->readylist.next->priority < CUR_THREAD->priority) {
+                next = s->readylist.next;
+            } else {
+                next = cur;
+            }
+        }
+    } else {
+        if (s->readylist.next == &s->readylist) {
+            // no more threads are ready right now
+            next = nullptr;
+        } else {
+            next = s->readylist.next;
+        }
+    }
 
     if (CUR_THREAD == next) {
         linfo("not switching threads");
+        return;
+    }
+
+    // put cur thread into ready list if necessary
+    if (cur && cur->state == THRD_RUNNING) thread_ready(s, CUR_THREAD);
+
+    if (next) {
+        // pop from the ready list
+        next->next->prev = next->prev;
+        next->prev->next = next->next;
+        next->next = nullptr;
+        next->prev = nullptr;
+        next->state = THRD_RUNNING;
+        s->cpu.halt = false;
     } else {
-        linfo("switching from thread %d to thread %d", CUR_THREAD->id,
-              next->id);
-        s->process.handles[0]->refcount--;
-        s->process.handles[0] = &next->hdr;
-        s->process.handles[0]->refcount++;
+        s->cpu.halt = true;
+    }
+
+    if (cur) s->process.handles[0]->refcount--;
+    s->process.handles[0] = &next->hdr;
+    if (next) s->process.handles[0]->refcount++;
+
+    if (cur && next) {
+        linfo("switching from thread %d to thread %d", cur->id, next->id);
+    } else if (next) {
+        linfo("switching from idle to thread %d", next->id);
+    } else {
+        linfo("switching from thread %d to idle", cur->id);
     }
 }
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
     linfo("sleeping thread %d with timeout %ld", t->id, timeout);
 
-    t->state = THRD_SLEEP;
-
     if (timeout == 0) {
         // instantly wakup the thread and set the return to timeout
         // without rescheduling
         // waitsync with timeout=0 is used to poll a sync object
-        thread_wakeup_timeout(s, t);
+        KListNode** cur = &t->waiting_objs;
+        if (*cur) t->ctx.r[0] = TIMEOUT;
+        while (*cur) {
+            sync_cancel(t, (*cur)->key);
+            klist_remove(cur);
+        }
         return;
-    } else if (timeout > 0) {
+    }
+
+    t->state = THRD_SLEEP;
+    if (timeout > 0) {
         add_event(&s->sched, (SchedulerCallback) thread_wakeup_timeout, t,
                   NS_TO_CYCLES(timeout));
     }

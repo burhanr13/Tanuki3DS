@@ -458,8 +458,8 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                         break;
                 }
                 break;
-            case IR_WFE:
-                cpu->wfe = true;
+            case IR_HALT:
+                cpu->halt = true;
                 break;
             case IR_BEGIN:
                 break;
@@ -675,8 +675,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
         case IR_EXCEPTION:
             DISASM(exception, 0, 1, 1);
             break;
-        case IR_WFE:
-            DISASM(wfe, 0, 0, 0);
+        case IR_HALT:
+            DISASM(halt, 0, 0, 0);
             break;
         case IR_BEGIN:
             DISASM(begin, 0, 0, 0);

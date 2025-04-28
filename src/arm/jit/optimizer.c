@@ -616,7 +616,7 @@ void optimize_waitloop(IRBlock* block) {
                 if (inst.op1 == 15 && inst.imm2 &&
                     inst.op2 == block->start_addr &&
                     block->code.d[i + 1].opcode == IR_NOP && !modified) {
-                    block->code.d[i + 1].opcode = IR_WFE;
+                    block->code.d[i + 1].opcode = IR_HALT;
                     return;
                 } else {
                     STORE(R(inst.op1));
@@ -710,7 +710,7 @@ void optimize_blocklinking(IRBlock* block, ArmCore* cpu) {
                 break;
             case IR_MODESWITCH:
             case IR_EXCEPTION:
-            case IR_WFE:
+            case IR_HALT:
             case IR_CP15_WRITE:
                 can_link = false;
                 break;

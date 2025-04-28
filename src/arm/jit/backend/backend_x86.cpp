@@ -1267,8 +1267,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 }
                 break;
             }
-            case IR_WFE: {
-                mov(byte[CPU(wfe)], 1);
+            case IR_HALT: {
+                mov(byte[CPU(halt)], 1);
                 break;
             }
             case IR_BEGIN: {

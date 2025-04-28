@@ -119,19 +119,19 @@ void e3ds_update_datetime(E3DS* s) {
 void e3ds_run_frame(E3DS* s) {
     while (!s->frame_complete) {
         e3ds_restore_context(s);
-        if (!s->cpu.wfe) {
+        if (!s->cpu.halt) {
             while (true) {
                 s64 cycles =
                     FIFO_peek(s->sched.event_queue).time - s->sched.now;
                 if (cycles <= 0) break;
                 s->sched.now += cpu_run(s, cycles);
-                if (s->cpu.wfe) break;
+                if (s->cpu.halt) break;
             }
         }
         e3ds_save_context(s);
         run_next_event(&s->sched);
         run_to_present(&s->sched);
-        while (s->cpu.wfe && !s->frame_complete) {
+        while (s->cpu.halt && !s->frame_complete) {
             run_next_event(&s->sched);
         }
         e3ds_update_datetime(s);
