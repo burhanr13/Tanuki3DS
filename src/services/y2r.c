@@ -2,6 +2,13 @@
 
 #include "3ds.h"
 
+void y2r_event(E3DS* s) {
+    s->services.y2r.busy = false;
+    if (s->services.y2r.enableInterrupt) {
+        event_signal(s, &s->services.y2r.transferend);
+    }
+}
+
 DECL_PORT(y2r) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
@@ -25,20 +32,22 @@ DECL_PORT(y2r) {
             cmdbuf[1] = 0;
             // todo: actually do the conversion
 
-            if (s->services.y2r.enableInterrupt) {
-                event_signal(s, &s->services.y2r.transferend);
-            }
+            s->services.y2r.busy = true;
+            // things break if this is instant
+            add_event(&s->sched, (SchedulerCallback) y2r_event, 0, 10000);
             break;
         case 0x0027:
             linfo("StopConversion");
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
+            remove_event(&s->sched, (SchedulerCallback) y2r_event, 0);
+            s->services.y2r.busy = false;
             break;
         case 0x0028:
             linfo("IsBusyConversion");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = 0; // not busy
+            cmdbuf[2] = s->services.y2r.busy;
             break;
         case 0x002a:
             linfo("PingProcess");
