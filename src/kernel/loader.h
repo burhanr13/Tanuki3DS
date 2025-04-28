@@ -169,7 +169,7 @@ typedef struct {
     u32 smdh_off;
     u32 romfs_off;
 
-    char name[64];
+    char name[128];
 } RomImage;
 
 u32 load_elf(E3DS* s, char* filename);
