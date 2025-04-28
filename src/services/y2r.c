@@ -34,7 +34,7 @@ DECL_PORT(y2r) {
 
             s->services.y2r.busy = true;
             // things break if this is instant
-            add_event(&s->sched, (SchedulerCallback) y2r_event, 0, 10000);
+            add_event(&s->sched, (SchedulerCallback) y2r_event, 0, 1'500'000);
             break;
         case 0x0027:
             linfo("StopConversion");
