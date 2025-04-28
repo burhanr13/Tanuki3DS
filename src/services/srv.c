@@ -23,8 +23,6 @@ struct {
 #undef SRV
 };
 
-#define SRVCOUNT (sizeof srvhandlers / sizeof srvhandlers[0])
-
 u8 shared_font[] = {
 #embed "font.bcfnt"
 };
@@ -130,7 +128,7 @@ DECL_PORT(srv) {
             name[cmdbuf[3]] = '\0';
 
             PortRequestHandler handler = nullptr;
-            for (int i = 0; i < SRVCOUNT; i++) {
+            for (int i = 0; i < lengthof(srvhandlers); i++) {
                 if (!strcmp(name, srvhandlers[i].name)) {
                     handler = srvhandlers[i].handler;
                     break;
