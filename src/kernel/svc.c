@@ -161,11 +161,15 @@ DECL_SVC(SetThreadPriority) {
     if (t->state == THRD_READY) {
         t->next->prev = t->prev;
         t->prev->next = t->next;
+        // need this so thread ready knows this wasnt already in readylist
+        t->state = THRD_SLEEP;
+        t->next = t->prev = nullptr;
         thread_ready(s, t);
-        thread_reschedule(s);
     }
 
     linfo("thread %d has priority %#x", t->id, t->priority);
+
+    thread_reschedule(s);
 
     R(0) = 0;
 }
