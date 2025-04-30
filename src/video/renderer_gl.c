@@ -357,6 +357,8 @@ static void update_cur_fb(GPU* gpu) {
                                GL_TEXTURE_2D, curfb->depth_tex, 0);
     }
 
+    curfb->dirty = true;
+
     gpu->curfb = curfb;
 }
 
@@ -914,7 +916,9 @@ static void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
 
     // handle simple render to texture cases, but better ...?
     FBInfo* fb = LRU_find(gpu->fbs, tex->paddr);
-    if (fb) {
+    if (fb && fb->dirty) {
+        // only read from a framebuffer if its been modified since the last time
+        fb->dirty = false;
         linfo("rtt at %08x", fb->color_paddr);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
         glBindTexture(GL_TEXTURE_2D, tex->tex);

@@ -11,8 +11,7 @@ void font_relocate(void* buf, u32 vaddr) {
 
     CMAP_s* cmap = buf + font->finf.pCmap;
     font->finf.pCmap += vaddr;
-    while (true) {
-        if (!cmap->pNext) break;
+    while (cmap->pNext) {
         CMAP_s* next = buf + cmap->pNext;
         cmap->pNext += vaddr;
         cmap = next;
@@ -20,8 +19,7 @@ void font_relocate(void* buf, u32 vaddr) {
 
     CWDH_s* cwdh = buf + font->finf.pCwdh;
     font->finf.pCwdh += vaddr;
-    while (true) {
-        if (!cwdh->pNext) break;
+    while (cwdh->pNext) {
         CWDH_s* next = buf + cwdh->pNext;
         cwdh->pNext += vaddr;
         cwdh = next;
