@@ -17,6 +17,7 @@ void emulator_init() {
     mkdir("3ds", S_IRWXU);
     mkdir("3ds/savedata", S_IRWXU);
     mkdir("3ds/extdata", S_IRWXU);
+    mkdir("3ds/sys_files", S_IRWXU);
     mkdir("3ds/sdmc", S_IRWXU);
     mkdir("3ds/sdmc/3ds", S_IRWXU);
     // homebrew needs this file to exist but the contents dont matter for hle

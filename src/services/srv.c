@@ -23,10 +23,6 @@ struct {
 #undef SRV
 };
 
-u8 shared_font[] = {
-#embed "font.bcfnt"
-};
-
 void srvobj_init(KObject* hdr, KObjType t) {
     hdr->type = t;
     hdr->refcount = 1;
@@ -51,22 +47,7 @@ void services_init(E3DS* s) {
     srvobj_init(&s->services.apt.resume_event.hdr, KOT_EVENT);
     s->services.apt.resume_event.sticky = true;
     srvobj_init(&s->services.apt.shared_font.hdr, KOT_SHAREDMEM);
-    s->services.apt.shared_font.size = 0x80 + sizeof shared_font;
-    sharedmem_alloc(s, &s->services.apt.shared_font);
-    // the shared font is treated as part of the linear heap
-    // so its paddr and vaddr must be related appropriately
-    s->services.apt.shared_font.mapaddr =
-        s->services.apt.shared_font.paddr - FCRAM_PBASE + LINEAR_HEAP_BASE;
-    u32* fontdest = PPTR(s->services.apt.shared_font.paddr);
-    fontdest[0] = 2;                  // 2 = font loaded
-    fontdest[1] = 1;                  // region
-    fontdest[2] = sizeof shared_font; // size
-    // font is at offset 0x80 of the memory block
-    memcpy((void*) fontdest + 0x80, shared_font, sizeof shared_font);
-    // now we need to relocate the pointers in the font too (games will do it
-    // themselves but homebrew needs it to be already done)
-    font_relocate((void*) fontdest + 0x80,
-                  s->services.apt.shared_font.mapaddr + 0x80);
+    font_load(s);
     srvobj_init(&s->services.apt.capture_block.hdr, KOT_SHAREDMEM);
     // rgba framebuffers for bottom, top left, top right
     s->services.apt.capture_block.size = 4 * (0x7000 + 2 * 0x19000);

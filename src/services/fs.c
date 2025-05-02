@@ -22,9 +22,11 @@ enum {
     SYSFILE_COUNTRYLIST = 3,
 };
 
-u8 mii_data[] = {
+u8 mii_data_replacement[] = {
 #embed "mii.app.romfs"
 };
+void* mii_data_custom;
+u64 mii_data_custom_size;
 u8 badwordlist[] = {
 #embed "badwords.app.romfs"
 };
@@ -520,11 +522,28 @@ DECL_PORT_ARG(fs_sysfile, file) {
     void* srcdata = nullptr;
     u64 srcsize = 0;
     switch (file) {
-        case SYSFILE_MIIDATA:
-            srcdata = mii_data;
-            srcsize = sizeof mii_data;
+        case SYSFILE_MIIDATA: {
+            if (mii_data_custom) {
+                srcdata = mii_data_custom;
+                srcsize = mii_data_custom_size;
+            } else {
+                // try to load a custom mii data file
+                FILE* fp = fopen("3ds/sys_files/mii.app.romfs", "rb");
+                if (fp) {
+                    fseek(fp, 0, SEEK_END);
+                    srcsize = mii_data_custom_size = ftell(fp);
+                    rewind(fp);
+                    srcdata = mii_data_custom = malloc(mii_data_custom_size);
+                    fread(mii_data_custom, mii_data_custom_size, 1, fp);
+                    fclose(fp);
+                } else {
+                    srcdata = mii_data_replacement;
+                    srcsize = sizeof mii_data_replacement;
+                }
+            }
             linfo("accessing mii data");
             break;
+        }
         case SYSFILE_BADWORDLIST:
             srcdata = badwordlist;
             srcsize = sizeof badwordlist;
@@ -1141,4 +1160,6 @@ void fs_close_all_files(E3DS* s) {
     for (int i = 0; i < FS_FILE_MAX; i++) {
         if (s->services.fs.dirs[i]) closedir(s->services.fs.dirs[i]);
     }
+
+    free(mii_data_custom);
 }
