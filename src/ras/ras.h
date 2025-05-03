@@ -355,7 +355,7 @@ static inline int rasGenerateFPImm(float fimm, u8* imm8) {
     return 1;
 }
 
-__RAS_EMIT_DECL(FPMovImm, u32 m, u32 s, u32 ftype, float fimm, u32 imm5,
+__RAS_EMIT_DECL(FPMoveImm, u32 m, u32 s, u32 ftype, float fimm, u32 imm5,
                 rasVReg rd) {
     u8 imm8;
     if (!rasGenerateFPImm(fimm, &imm8)) rasAssert(0, RAS_ERR_BAD_IMM);
@@ -392,6 +392,20 @@ __RAS_EMIT_DECL(FPConvertInt, u32 sf, u32 s, u32 ftype, u32 rmode, u32 opcode,
                 rasVReg rn, rasVReg rd) {
     rasEmitWord(ctx, rd.idx | rn.idx << 5 | opcode << 16 | rmode << 19 |
                          ftype << 22 | s << 29 | sf << 31 | 0x1e200000);
+}
+
+__RAS_EMIT_DECL(AdvSIMDCopy, u32 q, u32 op, u32 imm5, u32 imm4, rasVReg rn,
+                rasVReg rd) {
+    rasAssert(RAS_ISNBITSU(imm5, 5) && RAS_ISNBITSU(imm4, 4),
+              RAS_ERR_BAD_CONST);
+    rasEmitWord(ctx, rd.idx | rn.idx << 5 | imm4 << 11 | imm5 << 16 | op << 29 |
+                         q << 30 | 0x0e000400);
+}
+
+__RAS_EMIT_DECL(AdvSIMD3Same, u32 q, u32 u, u32 size, rasVReg rm, u32 opcode,
+                rasVReg rn, rasVReg rd) {
+    rasEmitWord(ctx, rd.idx | rn.idx << 5 | opcode << 11 | rm.idx << 16 |
+                         size << 22 | u << 29 | q << 30 | 0x0e200400);
 }
 
 #undef RAS_BIT
