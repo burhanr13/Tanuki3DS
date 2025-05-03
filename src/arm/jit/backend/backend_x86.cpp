@@ -1267,8 +1267,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 }
                 break;
             }
-            case IR_WFE: {
-                mov(byte[CPU(wfe)], 1);
+            case IR_HALT: {
+                mov(byte[CPU(halt)], 1);
                 break;
             }
             case IR_BEGIN: {
@@ -1862,6 +1862,7 @@ void backend_x86_disassemble(void* backend) {
     csh handle;
     cs_insn* insn;
     cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
+    cs_option(handle, CS_OPT_SKIPDATA, CS_OPT_ON);
     size_t count =
         cs_disasm(handle, code->getCode(), code->getSize(), 0, 0, &insn);
     printf("--------- JIT Disassembly at %p ------------\n", code->getCode());

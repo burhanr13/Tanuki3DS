@@ -1,6 +1,7 @@
 #ifndef FONT_H
 #define FONT_H
 
+#include "3ds.h"
 #include "common.h"
 
 // font structs from libctru
@@ -80,7 +81,7 @@ typedef struct {
     FINF_s finf;
 } CFNT_s;
 
-
+void font_load(E3DS* s);
 void font_relocate(void* buf, u32 vaddr);
 
 #endif

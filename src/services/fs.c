@@ -1,5 +1,6 @@
 #include "fs.h"
 
+#include <ctype.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -21,9 +22,11 @@ enum {
     SYSFILE_COUNTRYLIST = 3,
 };
 
-u8 mii_data[] = {
+u8 mii_data_replacement[] = {
 #embed "mii.app.romfs"
 };
+void* mii_data_custom;
+u64 mii_data_custom_size;
 u8 badwordlist[] = {
 #embed "badwords.app.romfs"
 };
@@ -31,33 +34,48 @@ u8 country_list[] = {
 #embed "countrylist.app.romfs"
 };
 
+void sanitize_filepath(char* s) {
+    // windows forbids a bunch of characters in filepaths
+    // so we replace them here
+    // on non-windows this isnt a problem so we do nothing
+#ifdef _WIN32
+    for (char* p = s; *p; p++) {
+        switch (*p) {
+            case '<':
+            case '>':
+            case ':':
+            case '"':
+            case '|':
+            case '?':
+            case '*':
+                *p = ' ';
+        }
+    }
+#endif
+}
+
 char* archive_basepath(E3DS* s, u64 archive) {
+    char* basepath;
     switch (archive & MASKL(32)) {
         case ARCHIVE_SAVEDATA:
-        case ARCHIVE_SYSTEMSAVEDATA: {
-            char* basepath;
+        case ARCHIVE_SYSTEMSAVEDATA:
             asprintf(&basepath, "3ds/savedata/%s", s->romimage.name);
-            return basepath;
-        }
-        case ARCHIVE_EXTSAVEDATA: {
-            char* basepath;
+            break;
+        case ARCHIVE_EXTSAVEDATA:
             asprintf(&basepath, "3ds/extdata/%s", s->romimage.name);
-            return basepath;
-        }
-        case ARCHIVE_SHAREDEXTDATA: {
-            char* basepath;
+            break;
+        case ARCHIVE_SHAREDEXTDATA:
             asprintf(&basepath, "3ds/extdata/shared");
-            return basepath;
-        }
-        case ARCHIVE_SDMC: {
-            char* basepath;
+            break;
+        case ARCHIVE_SDMC:
             asprintf(&basepath, "3ds/sdmc");
-            return basepath;
-        }
+            break;
         default:
             lerror("invalid archive");
             return nullptr;
     }
+    sanitize_filepath(basepath);
+    return basepath;
 }
 
 FILE* open_formatinfo(E3DS* s, u64 archive, bool write) {
@@ -84,15 +102,16 @@ char* create_text_path(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
         asprintf(&filepath, "%s%s", basepath, rawpath);
     } else if (pathtype == FSPATH_UTF16) {
         u16* path16 = rawpath;
-        u8 path[pathsize];
-        for (int i = 0; i < pathsize / 2; i++) {
-            path[i] = path16[i];
-        }
-        asprintf(&filepath, "%s%s", basepath, path);
+        char path[pathsize];
+        convert_utf16(path, pathsize, path16, pathsize / 2);
+        asprintf(&filepath, "%s/%s", basepath, path);
     } else {
         lerror("unknown text file path type");
         return nullptr;
     }
+
+    sanitize_filepath(filepath);
+
     free(basepath);
     return filepath;
 }
@@ -230,7 +249,18 @@ DECL_PORT(fs) {
             KSession* ses =
                 fs_open_dir(s, archivehandle, pathtype, path, pathsize);
             if (!ses) {
-                cmdbuf[1] = FSERR_OPEN;
+                // if the requested path is a regular file, the error code is
+                // different
+                ses =
+                    fs_open_file(s, archivehandle, pathtype, path, pathsize, 0);
+                if (ses) {
+                    fclose(s->services.fs.files[ses->arg]);
+                    s->services.fs.files[ses->arg] = nullptr;
+                    kobject_destroy(s, &ses->hdr);
+                    cmdbuf[1] = -1;
+                } else {
+                    cmdbuf[1] = FSERR_OPEN;
+                }
                 return;
             }
             HANDLE_SET(h, ses);
@@ -259,6 +289,7 @@ DECL_PORT(fs) {
                 handle == ARCHIVE_SYSTEMSAVEDATA) {
                 FILE* fp = open_formatinfo(s, handle, false);
                 if (!fp) {
+                    lwarn("opening unformatted archive");
                     cmdbuf[1] = FSERR_ARCHIVE;
                     break;
                 }
@@ -491,11 +522,28 @@ DECL_PORT_ARG(fs_sysfile, file) {
     void* srcdata = nullptr;
     u64 srcsize = 0;
     switch (file) {
-        case SYSFILE_MIIDATA:
-            srcdata = mii_data;
-            srcsize = sizeof mii_data;
+        case SYSFILE_MIIDATA: {
+            if (mii_data_custom) {
+                srcdata = mii_data_custom;
+                srcsize = mii_data_custom_size;
+            } else {
+                // try to load a custom mii data file
+                FILE* fp = fopen("3ds/sys_files/mii.app.romfs", "rb");
+                if (fp) {
+                    fseek(fp, 0, SEEK_END);
+                    srcsize = mii_data_custom_size = ftell(fp);
+                    rewind(fp);
+                    srcdata = mii_data_custom = malloc(mii_data_custom_size);
+                    fread(mii_data_custom, mii_data_custom_size, 1, fp);
+                    fclose(fp);
+                } else {
+                    srcdata = mii_data_replacement;
+                    srcsize = sizeof mii_data_replacement;
+                }
+            }
             linfo("accessing mii data");
             break;
+        }
         case SYSFILE_BADWORDLIST:
             srcdata = badwordlist;
             srcsize = sizeof badwordlist;
@@ -696,8 +744,7 @@ DECL_PORT_ARG(fs_dir, fd) {
                 ents[i].isarchive = 0;
                 ents[i].ishidden = ent->d_name[0] == '.';
 
-                linfo("entry %s (%s.%s)", ent->d_name, ents[i].shortname,
-                      ents[i].shortext);
+                linfo("entry %s %s", ent->d_name, ents[i].isdir ? "(dir)" : "");
             }
 
             cmdbuf[0] = IPCHDR(2, 0);
@@ -1113,4 +1160,6 @@ void fs_close_all_files(E3DS* s) {
     for (int i = 0; i < FS_FILE_MAX; i++) {
         if (s->services.fs.dirs[i]) closedir(s->services.fs.dirs[i]);
     }
+
+    free(mii_data_custom);
 }

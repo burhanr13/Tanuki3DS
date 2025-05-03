@@ -3,6 +3,7 @@
 #include "3ds.h"
 
 void e3ds_restore_context(E3DS* s) {
+    if (!CUR_THREAD) return;
     memcpy(s->cpu.r, CUR_THREAD->ctx.r, sizeof s->cpu.r);
     memcpy(s->cpu.d, CUR_THREAD->ctx.d, sizeof s->cpu.d);
     s->cpu.cpsr.w = CUR_THREAD->ctx.cpsr;
@@ -10,6 +11,7 @@ void e3ds_restore_context(E3DS* s) {
 }
 
 void e3ds_save_context(E3DS* s) {
+    if (!CUR_THREAD) return;
     memcpy(CUR_THREAD->ctx.r, s->cpu.r, sizeof s->cpu.r);
     memcpy(CUR_THREAD->ctx.d, s->cpu.d, sizeof s->cpu.d);
     CUR_THREAD->ctx.cpsr = s->cpu.cpsr.w;
@@ -18,22 +20,28 @@ void e3ds_save_context(E3DS* s) {
 
 void thread_init(E3DS* s, u32 entrypoint) {
     s->readylist.priority = 0;
+    s->readylist.id = 0;
     s->readylist.next = &s->readylist;
     s->readylist.prev = &s->readylist;
 
     s->process.nexttid = 0;
     s->process.allocTls = 0;
 
-    KThread* thd = thread_create(s, entrypoint, STACK_BASE, 0x30, 0);
+    KThread* thd = thread_create(s, entrypoint, STACK_BASE, 0x30, 0, 0);
 
     s->process.handles[0] = &thd->hdr;
     s->process.handles[0]->refcount = 2;
 
-    thread_reschedule(s);
+    // manually schedule the main thread
+    thd->next->prev = thd->prev;
+    thd->prev->next = thd->next;
+    thd->next = nullptr;
+    thd->prev = nullptr;
+    thd->state = THRD_RUNNING;
 }
 
 KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
-                       u32 arg) {
+                       u32 arg, s32 processorID) {
 
     KThread* thrd = calloc(1, sizeof *thrd);
     thrd->hdr.type = KOT_THREAD;
@@ -43,6 +51,15 @@ KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
     thrd->ctx.cpsr = M_USER;
     thrd->priority = priority;
     thrd->id = s->process.nexttid++;
+    thrd->state = THRD_SLEEP;
+    if (processorID < 0) { // negative means the kernel picks a cpu
+        thrd->cpu = 0;
+    } else {
+        thrd->cpu = processorID;
+        if (thrd->cpu > 0) {
+            lwarn("scheduling thread on core %d", thrd->cpu);
+        }
+    }
 
     for (int i = 0; i < 32; i++) {
         if (!(s->process.allocTls & BIT(i))) {
@@ -62,6 +79,10 @@ KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
 }
 
 void thread_ready(E3DS* s, KThread* t) {
+    if (t->state == THRD_READY || t->next || t->prev) {
+        lerror("thread already ready (this should never happen)");
+        return;
+    }
 
     t->state = THRD_READY;
 
@@ -81,53 +102,95 @@ void thread_ready(E3DS* s, KThread* t) {
 }
 
 void thread_reschedule(E3DS* s) {
-    if (CUR_THREAD->state == THRD_RUNNING) thread_ready(s, CUR_THREAD);
+    KThread* cur = CUR_THREAD;
+    KThread* next;
 
-    if (s->readylist.next == &s->readylist) {
-        s->cpu.wfe = true;
-        linfo("all threads sleeping");
+    if (cur && cur->state == THRD_READY) {
+        lerror("cur thread should never be ready");
         return;
     }
-    s->cpu.wfe = false;
 
-    KThread* next = s->readylist.next;
-    next->next->prev = next->prev;
-    next->prev->next = next->next;
-    next->next = nullptr;
-    next->prev = nullptr;
-    next->state = THRD_RUNNING;
+    // find the next thread
+    if (cur && cur->state == THRD_RUNNING) {
+        if (s->readylist.next == &s->readylist) {
+            // no other threads are ready so dont switch
+            next = cur;
+        } else {
+            // only switch to a new thread if its priority is
+            // higher than the current thread
+            if (s->readylist.next->priority < CUR_THREAD->priority) {
+                next = s->readylist.next;
+            } else {
+                next = cur;
+            }
+        }
+    } else {
+        if (s->readylist.next == &s->readylist) {
+            // no more threads are ready right now
+            next = nullptr;
+        } else {
+            next = s->readylist.next;
+        }
+    }
 
     if (CUR_THREAD == next) {
         linfo("not switching threads");
+        return;
+    }
+
+    // put cur thread into ready list if necessary
+    if (cur && cur->state == THRD_RUNNING) thread_ready(s, CUR_THREAD);
+
+    if (next) {
+        // pop from the ready list
+        next->next->prev = next->prev;
+        next->prev->next = next->next;
+        next->next = nullptr;
+        next->prev = nullptr;
+        next->state = THRD_RUNNING;
+        s->cpu.halt = false;
     } else {
-        linfo("switching from thread %d to thread %d", CUR_THREAD->id,
-              next->id);
-        s->process.handles[0]->refcount--;
-        s->process.handles[0] = &next->hdr;
-        s->process.handles[0]->refcount++;
+        s->cpu.halt = true;
+    }
+
+    if (cur) s->process.handles[0]->refcount--;
+    s->process.handles[0] = &next->hdr;
+    if (next) s->process.handles[0]->refcount++;
+
+    if (cur && next) {
+        linfo("switching from thread %d to thread %d", cur->id, next->id);
+    } else if (next) {
+        linfo("switching from idle to thread %d", next->id);
+    } else {
+        linfo("switching from thread %d to idle", cur->id);
     }
 }
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout) {
     linfo("sleeping thread %d with timeout %ld", t->id, timeout);
 
-    t->state = THRD_SLEEP;
-
     if (timeout == 0) {
         // instantly wakup the thread and set the return to timeout
+        // without rescheduling
         // waitsync with timeout=0 is used to poll a sync object
-        thread_wakeup_timeout(s, SEA_PTR(t));
+        KListNode** cur = &t->waiting_objs;
+        if (*cur) t->ctx.r[0] = TIMEOUT;
+        while (*cur) {
+            sync_cancel(t, (*cur)->key);
+            klist_remove(cur);
+        }
         return;
-    } else if (timeout > 0) {
-        t->state = THRD_SLEEP;
-        add_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t),
+    }
+
+    t->state = THRD_SLEEP;
+    if (timeout > 0) {
+        add_event(&s->sched, (SchedulerCallback) thread_wakeup_timeout, t,
                   NS_TO_CYCLES(timeout));
     }
     thread_reschedule(s);
 }
 
-void thread_wakeup_timeout(E3DS* s, SchedEventArg arg) {
-    KThread* t = arg.p;
+void thread_wakeup_timeout(E3DS* s, KThread* t) {
     if (t->state != THRD_SLEEP) {
         lerror("thread already awake (this should never happen)");
         return;
@@ -145,7 +208,10 @@ void thread_wakeup_timeout(E3DS* s, SchedEventArg arg) {
 }
 
 bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
-    if (t->state != THRD_SLEEP) return false;
+    if (t->state != THRD_SLEEP) {
+        lerror("thread already awake (this should never happen)");
+        return false;
+    }
     u32 val = klist_remove_key(&t->waiting_objs, reason);
     if (t->wait_any) t->ctx.r[1] = val;
     if (!t->waiting_objs || t->wait_any) {
@@ -155,7 +221,7 @@ bool thread_wakeup(E3DS* s, KThread* t, KObject* reason) {
             sync_cancel(t, (*cur)->key);
             klist_remove(cur);
         }
-        remove_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t));
+        remove_event(&s->sched, (SchedulerCallback) thread_wakeup_timeout, t);
         thread_ready(s, t);
         thread_reschedule(s);
         return true;
@@ -195,7 +261,7 @@ void thread_kill(E3DS* s, KThread* t) {
         klist_remove(cur);
     }
 
-    remove_event(&s->sched, thread_wakeup_timeout, SEA_PTR(t));
+    remove_event(&s->sched, (SchedulerCallback) thread_wakeup_timeout, t);
 
     thread_reschedule(s);
 }
@@ -248,8 +314,7 @@ KTimer* timer_create_(bool sticky, bool repeat) {
     return tmr;
 }
 
-void timer_signal(E3DS* s, SchedEventArg arg) {
-    KTimer* tmr = arg.p;
+void timer_signal(E3DS* s, KTimer* tmr) {
     if (tmr->sticky) {
         KListNode** cur = &tmr->waiting_thrds;
         while (*cur) {
@@ -263,7 +328,7 @@ void timer_signal(E3DS* s, SchedEventArg arg) {
     }
 
     if (tmr->repeat) {
-        add_event(&s->sched, timer_signal, SEA_PTR(tmr),
+        add_event(&s->sched, (SchedulerCallback) timer_signal, tmr,
                   NS_TO_CYCLES(tmr->interval));
     }
 }
@@ -275,19 +340,31 @@ KMutex* mutex_create() {
 }
 
 void mutex_release(E3DS* s, KMutex* mtx) {
-    if (mtx->locker_thrd) {
-        klist_remove_key(&mtx->locker_thrd->owned_mutexes, &mtx->hdr);
+    if (!mtx->locker_thrd) {
+        // this mutex was not locked already
+        return;
     }
 
+    if (mtx->recursive_lock_count > 0) {
+        // this mutex was recursively locked so decrement the count only
+        mtx->recursive_lock_count--;
+        return;
+    }
+
+    klist_remove_key(&mtx->locker_thrd->owned_mutexes, &mtx->hdr);
+
+    // no threads are waiting so this mutex is now free
     if (!mtx->waiting_thrds) {
         mtx->locker_thrd = nullptr;
         return;
     }
-    if (!mtx->locker_thrd) return;
 
+    // find the highest priority thread waiting on this mutex
+    // give it the lock and wake it up
     KThread* wakeupthread = remove_highest_prio(&mtx->waiting_thrds);
     thread_wakeup(s, wakeupthread, &mtx->hdr);
     mtx->locker_thrd = wakeupthread;
+    klist_insert(&wakeupthread->owned_mutexes, &mtx->hdr);
 }
 
 KSemaphore* semaphore_create(s32 init, s32 max) {
@@ -335,8 +412,15 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
                 klist_insert(&mtx->waiting_thrds, &t->hdr);
                 return true;
             }
-            mtx->locker_thrd = t;
-            klist_insert(&t->owned_mutexes, &mtx->hdr);
+            if (mtx->locker_thrd != t) {
+                mtx->locker_thrd = t;
+                klist_insert(&t->owned_mutexes, &mtx->hdr);
+            } else {
+                // this thread is locking the mutex more than once
+                // we need to record this since release mutex
+                // now needs to be called multiple times as well
+                mtx->recursive_lock_count++;
+            }
             return false;
         }
         case KOT_SEMAPHORE: {

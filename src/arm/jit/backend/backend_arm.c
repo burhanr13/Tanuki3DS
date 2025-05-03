@@ -879,9 +879,9 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 }
                 break;
             }
-            case IR_WFE: {
+            case IR_HALT: {
                 mov(r0, 1);
-                strb(r0, CPU(wfe));
+                strb(r0, CPU(halt));
                 break;
             }
             case IR_BEGIN: {

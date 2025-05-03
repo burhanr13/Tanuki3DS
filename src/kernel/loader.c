@@ -253,13 +253,11 @@ void parse_smdh(E3DS* s) {
         return;
     }
 
-    for (int i = 0; i < 64; i++) {
-        char c = smdh.titles[1].shortname[i];
-        // at some point properly convert from utf16
-        if (c && !isprint(c)) c = '?';
-        s->romimage.name[i] = c;
-    }
-    linfo("name from smdh: %s", s->romimage.name);
+    convert_utf16(s->romimage.name, 128, smdh.titles[1].longname, 128);
+    // remove stupid whitespace
+    for (int i = 0; i < 128; i++)
+        if (isspace(s->romimage.name[i])) s->romimage.name[i] = ' ';
+    ldebug("name from smdh: %s", s->romimage.name);
 }
 
 u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size) {

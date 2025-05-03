@@ -1,9 +1,8 @@
 SECT("General")
 BOOL("VerboseLog", g_infologs)
-CMT("0=timed wait, 1=vsync, 2=audio sync")
-INT("FrameSyncMode", ctremu.syncmode)
 
 SECT("Video")
+BOOL("VSync", ctremu.vsync)
 INT("VideoScale", ctremu.videoscale)
 INT("SwVshNumThreads", ctremu.vshthreads)
 BOOL("ShaderJIT", ctremu.shaderjit)
@@ -14,4 +13,5 @@ BOOL("Ubershader", ctremu.ubershader)
 BOOL("HashTextures", ctremu.hashTextures)
 
 SECT("Audio")
+BOOL("AudioSync", ctremu.audiosync)
 BOOL("StartMuted", ctremu.mute)

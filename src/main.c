@@ -41,7 +41,7 @@ bool g_pending_reset;
 #ifdef GLDEBUGCTX
 void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
                    GLsizei length, const char* message, const void* userParam) {
-    printfln("[GLDEBUG]%d %d %d %d %s", source, type, id, severity, message);
+    ldebug("[GLDEBUG]%d %d %d %d %s", source, type, id, severity, message);
 }
 #endif
 
@@ -96,7 +96,7 @@ void hotkey_press(SDL_Keycode key) {
             ctremu.pause = !ctremu.pause;
             break;
         case SDLK_TAB:
-            ctremu.uncap = !ctremu.uncap;
+            ctremu.fastforward = !ctremu.fastforward;
             break;
         case SDLK_F1:
             g_pending_reset = true;
@@ -262,7 +262,7 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
 }
 
 void audio_callback(s16 (*samples)[2], u32 count) {
-    if (ctremu.uncap || ctremu.mute) return;
+    if (ctremu.fastforward || ctremu.mute) return;
     SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
 }
 
@@ -347,7 +347,7 @@ int main(int argc, char** argv) {
         g_pending_reset = true;
     }
 
-    if (ctremu.syncmode == SYNC_VIDEO) {
+    if (ctremu.vsync) {
         if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
     } else {
         SDL_GL_SetSwapInterval(0);
@@ -355,16 +355,16 @@ int main(int argc, char** argv) {
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    Uint64 prev_time = SDL_GetTicksNS();
-    Uint64 prev_fps_update = prev_time;
+    Uint64 prev_frame_time = SDL_GetTicksNS();
+    Uint64 prev_fps_update = prev_frame_time;
     Uint64 prev_fps_frame = 0;
     const Uint64 frame_ticks = SDL_NS_PER_SECOND / FPS;
     Uint64 frame = 0;
+    double avg_frame_time = 0;
+    int avg_frame_time_ct = 0;
 
     ctremu.running = true;
     while (ctremu.running) {
-        Uint64 cur_time;
-        Uint64 elapsed;
 
         if (g_pending_reset) {
             g_pending_reset = false;
@@ -388,25 +388,6 @@ int main(int argc, char** argv) {
                 "Please see the log for details.",
                 g_window);
         }
-
-        if (!ctremu.pause) {
-            renderer_gl_setup_gpu(&ctremu.system.gpu.gl);
-
-            do {
-                e3ds_run_frame(&ctremu.system);
-                frame++;
-
-                cur_time = SDL_GetTicksNS();
-                elapsed = cur_time - prev_time;
-            } while (ctremu.uncap && elapsed < frame_ticks);
-        }
-
-        int w, h;
-        SDL_GetWindowSizeInPixels(g_window, &w, &h);
-
-        render_gl_main(&ctremu.system.gpu.gl, w, h);
-
-        SDL_GL_SwapWindow(g_window);
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -440,15 +421,60 @@ int main(int argc, char** argv) {
             }
         }
 
-        if (!ctremu.pause) update_input(&ctremu.system, g_gamepad, w, h);
+        if (!ctremu.pause) {
+            int w, h;
+            SDL_GetWindowSizeInPixels(g_window, &w, &h);
 
-        if (!ctremu.uncap) {
-            if (ctremu.syncmode == SYNC_AUDIO && !ctremu.mute) {
+            update_input(&ctremu.system, g_gamepad, w, h);
+
+            gpu_gl_start_frame(&ctremu.system.gpu);
+
+            Uint64 frame_start = SDL_GetTicksNS();
+            e3ds_run_frame(&ctremu.system);
+            frame++;
+            Uint64 frame_time = SDL_GetTicksNS() - frame_start;
+            avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
+            avg_frame_time_ct++;
+
+            render_gl_main(&ctremu.system.gpu.gl, w, h);
+
+            SDL_GL_SwapWindow(g_window);
+        }
+
+        Uint64 elapsed = SDL_GetTicksNS() - prev_fps_update;
+        if (!ctremu.pause && elapsed >= SDL_NS_PER_SECOND / 2) {
+            prev_fps_update = SDL_GetTicksNS();
+
+            double fps =
+                (double) SDL_NS_PER_SECOND * (frame - prev_fps_frame) / elapsed;
+
+            char* wintitle;
+            asprintf(&wintitle, "Tanuki3DS | %s | %.2lf FPS, %.3lf ms",
+                     ctremu.system.romimage.name, fps,
+                     avg_frame_time / avg_frame_time_ct);
+            SDL_SetWindowTitle(g_window, wintitle);
+            free(wintitle);
+            prev_fps_frame = frame;
+            avg_frame_time = 0;
+            avg_frame_time_ct = 0;
+        }
+
+        if (ctremu.fastforward && !ctremu.pause) {
+            gpu_gl_start_frame(&ctremu.system.gpu);
+            while (SDL_GetTicksNS() - prev_frame_time < frame_ticks) {
+                Uint64 frame_start = SDL_GetTicksNS();
+                e3ds_run_frame(&ctremu.system);
+                frame++;
+                Uint64 frame_time = SDL_GetTicksNS() - frame_start;
+                avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
+                avg_frame_time_ct++;
+            }
+        } else {
+            if (ctremu.audiosync && !ctremu.mute) {
                 while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
                     SDL_Delay(1);
-            } else if (ctremu.syncmode != SYNC_VIDEO) {
-                cur_time = SDL_GetTicksNS();
-                elapsed = cur_time - prev_time;
+            } else if (!ctremu.vsync) {
+                Uint64 elapsed = SDL_GetTicksNS() - prev_frame_time;
                 Sint64 wait = frame_ticks - elapsed;
                 if (wait > 0) {
                     SDL_DelayPrecise(wait);
@@ -456,21 +482,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        cur_time = SDL_GetTicksNS();
-        elapsed = cur_time - prev_fps_update;
-        if (!ctremu.pause && elapsed >= SDL_NS_PER_SECOND / 2) {
-            double fps =
-                (double) SDL_NS_PER_SECOND * (frame - prev_fps_frame) / elapsed;
-
-            char* wintitle;
-            asprintf(&wintitle, "Tanuki3DS | %s | %.2lf FPS",
-                     ctremu.system.romimage.name, fps);
-            SDL_SetWindowTitle(g_window, wintitle);
-            free(wintitle);
-            prev_fps_update = cur_time;
-            prev_fps_frame = frame;
-        }
-        prev_time = cur_time;
+        prev_frame_time = SDL_GetTicksNS();
     }
 
     SDL_DestroyAudioStream(g_audio);

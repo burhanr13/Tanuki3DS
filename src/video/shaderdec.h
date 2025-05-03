@@ -21,8 +21,6 @@ typedef struct _VSHCacheEntry {
     struct _VSHCacheEntry *next, *prev;
 } VSHCacheEntry;
 
-int shader_dec_get(GPU* gpu);
-
 char* shader_dec_vs(GPU* gpu);
 
 #endif

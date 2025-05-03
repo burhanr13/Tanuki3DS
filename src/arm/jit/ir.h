@@ -69,7 +69,7 @@ typedef enum {
     // special instructions
     IR_MODESWITCH, // -i-
     IR_EXCEPTION,  // -ii
-    IR_WFE,        // ---
+    IR_HALT,       // ---
 
     // special control instructions
     IR_BEGIN,    // ---, always the first instruction

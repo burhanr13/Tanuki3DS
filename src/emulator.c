@@ -17,6 +17,7 @@ void emulator_init() {
     mkdir("3ds", S_IRWXU);
     mkdir("3ds/savedata", S_IRWXU);
     mkdir("3ds/extdata", S_IRWXU);
+    mkdir("3ds/sys_files", S_IRWXU);
     mkdir("3ds/sdmc", S_IRWXU);
     mkdir("3ds/sdmc/3ds", S_IRWXU);
     // homebrew needs this file to exist but the contents dont matter for hle
@@ -24,7 +25,6 @@ void emulator_init() {
     FILE* fp;
     if ((fp = fopen("3ds/sdmc/3ds/dspfirm.cdc", "wx"))) fclose(fp);
 
-    ctremu.syncmode = SYNC_VIDEO;
     ctremu.videoscale = 1;
     ctremu.shaderjit = true;
     ctremu.hwvshaders = true;
@@ -33,8 +33,6 @@ void emulator_init() {
 
     load_config();
 
-    if (ctremu.syncmode < SYNC_SLEEP || ctremu.syncmode > SYNC_AUDIO)
-        ctremu.syncmode = SYNC_VIDEO;
     if (ctremu.videoscale < 1) ctremu.videoscale = 1;
     if (ctremu.vshthreads > MAX_VSH_THREADS)
         ctremu.vshthreads = MAX_VSH_THREADS;

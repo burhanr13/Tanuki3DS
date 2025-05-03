@@ -111,7 +111,7 @@ typedef struct _ArmCore {
 
     s64 cycles;
 
-    bool wfe;
+    bool halt;
 
     bool irq;
 

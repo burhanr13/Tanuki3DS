@@ -48,12 +48,12 @@ typedef struct _KThread {
 
     KListNode* owned_mutexes;
 
-    struct _KThread *next, *prev;
+    struct _KThread *next, *prev; // in the ready list
 
     u32 id;
     s32 priority;
     u32 state;
-
+    u32 cpu; // 0: appcore, 1: syscore, 2: new3ds appcore2
     u32 tls;
 } KThread;
 
@@ -93,6 +93,7 @@ typedef struct {
     KObject hdr;
 
     KThread* locker_thrd;
+    u32 recursive_lock_count;
 
     KListNode* waiting_thrds;
 } KMutex;
@@ -112,12 +113,12 @@ void e3ds_save_context(E3DS* s);
 
 void thread_init(E3DS* s, u32 entrypoint);
 KThread* thread_create(E3DS* s, u32 entrypoint, u32 stacktop, u32 priority,
-                       u32 arg);
+                       u32 arg, s32 processorID);
 void thread_ready(E3DS* s, KThread* t);
 void thread_reschedule(E3DS* s);
 
 void thread_sleep(E3DS* s, KThread* t, s64 timeout);
-void thread_wakeup_timeout(E3DS* s, SchedEventArg arg);
+void thread_wakeup_timeout(E3DS* s, KThread* t);
 bool thread_wakeup(E3DS* s, KThread* t, KObject* reason);
 
 void thread_kill(E3DS* s, KThread* t);
@@ -126,7 +127,7 @@ KEvent* event_create(bool sticky);
 void event_signal(E3DS* s, KEvent* ev);
 
 KTimer* timer_create_(bool sticky, bool repeat);
-void timer_signal(E3DS* s, SchedEventArg arg);
+void timer_signal(E3DS* s, KTimer* tmr);
 
 KMutex* mutex_create();
 void mutex_release(E3DS* s, KMutex* mtx);

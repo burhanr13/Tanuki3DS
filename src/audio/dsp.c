@@ -9,6 +9,13 @@
 
 u32 g_dsp_chn_disable;
 
+// there are other bits too but we don't care about them
+enum {
+    DIRTY_PARTIAL_RESET = BIT(4),
+    DIRTY_RESET = BIT(29),
+    DIRTY_EMBEDDED_BUFFER = BIT(30),
+};
+
 #define DSPMEM(b)                                                              \
     ((DSPMemory*) PTR(DSPRAM_PBASE + DSPRAM_DATA_OFF + b * DSPRAM_BANK_OFF))
 
@@ -91,9 +98,13 @@ void reset_chn(DSP* dsp, int ch, DSPInputStatus* stat) {
     FIFO_clear(dsp->bufQueues[ch]);
 }
 
+// buf id of out is set to 0 when no such buffer was found
+// otherwise it will be the bufid parameter
 void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
-    if (bufid == 0) out->id = 0;
+    out->id = 0;
     if (bufid == cfg->buf_id) {
+        if (!(cfg->dirty_flags & DIRTY_EMBEDDED_BUFFER)) return;
+        cfg->dirty_flags &= ~DIRTY_EMBEDDED_BUFFER;
         out->paddr = GETDSPU32(cfg->buf_addr);
         out->len = GETDSPU32(cfg->buf_len);
         // embedded buffer start position is specified
@@ -102,10 +113,13 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
         out->looping = cfg->flags.looping;
         out->adpcm_dirty = cfg->flags.adpcm_dirty;
         out->id = cfg->buf_id;
-        out->queuePos = -1;
     } else {
         for (int i = 0; i < 4; i++) {
             if (cfg->bufs[i].id != bufid) continue;
+            // do not queue up buffers that were not marked as dirty
+            // as these could contain old irrelevant data
+            if (!(cfg->bufs_dirty & BIT(i))) continue;
+            cfg->bufs_dirty &= ~BIT(i);
             out->paddr = GETDSPU32(cfg->bufs[i].addr);
             out->len = GETDSPU32(cfg->bufs[i].len);
             out->pos = 0;
@@ -113,10 +127,8 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
             out->looping = cfg->bufs[i].looping;
             out->adpcm_dirty = cfg->bufs[i].adpcm_dirty;
             out->id = cfg->bufs[i].id;
-            out->queuePos = i;
             return;
         }
-        out->id = 0;
     }
 }
 
@@ -129,14 +141,6 @@ void update_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
         get_buf(cfg, old->id, &new);
         // check if the buffer was found
         if (new.id != old->id) continue;
-        // check if the buffer data is actually dirty
-        if (new.queuePos >= 0) {
-            if (cfg->bufs_dirty & BIT(new.queuePos)) {
-                cfg->bufs_dirty &= ~BIT(new.queuePos);
-            } else {
-                continue;
-            }
-        }
         old->paddr = new.paddr;
         old->len = new.len;
         old->looping = new.looping;
@@ -158,15 +162,6 @@ void refill_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
         get_buf(cfg, curBufid++, &b);
         // the buffer was not found (end of queued data)
         if (b.id == 0) break;
-        // make sure to check the buffer dirty bit
-        // since we don't want to queue old buffer data
-        if (b.queuePos >= 0) {
-            if (cfg->bufs_dirty & BIT(b.queuePos)) {
-                cfg->bufs_dirty &= ~BIT(b.queuePos);
-            } else {
-                break;
-            }
-        }
         FIFO_push(dsp->bufQueues[ch], b);
     }
 }
@@ -179,39 +174,32 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
 
     u16 og_cur_buf = stat->cur_buf;
 
+    // clear all the bits we dont care about
+    cfg->dirty_flags &=
+        (DIRTY_RESET | DIRTY_PARTIAL_RESET | DIRTY_EMBEDDED_BUFFER);
+
     // these are supposedly reset and "partial reset" flags
     // i dont know what the difference is
-    if (cfg->dirty_flags & (BIT(29) | BIT(4))) {
+    if (cfg->dirty_flags & (DIRTY_RESET | DIRTY_PARTIAL_RESET)) {
+        cfg->dirty_flags &= ~(DIRTY_RESET | DIRTY_PARTIAL_RESET);
         linfo("ch%d reset", ch);
         reset_chn(dsp, ch, stat);
     }
 
     stat->active = cfg->active;
 
-    // bit 30 is embedded buffer dirty and is set when new data is in embedded
-    // buffer to start playing
-    // reset the channel if the buffer queue is empty and there
-    // are no dirty buffers
-    if (!dsp->bufQueues[ch].size && !(cfg->dirty_flags & BIT(30)) &&
-        !cfg->bufs_dirty) {
-        stat->active = false;
-    }
-
-    cfg->dirty_flags = 0;
-
-    if (!stat->active) {
-        stat->cur_buf_dirty = stat->cur_buf != og_cur_buf;
-        return;
-    }
-
-    update_bufs(dsp, ch, cfg);
-    refill_bufs(dsp, ch, cfg);
-
     u32 nSamples = FRAME_SAMPLES * cfg->rate;
 
     s16 lsamples[nSamples] = {};
     s16 rsamples[nSamples] = {};
     u32 curSample = 0;
+
+    if (!stat->active) goto dsp_ch_end;
+
+    update_bufs(dsp, ch, cfg);
+    refill_bufs(dsp, ch, cfg);
+
+    if (!dsp->bufQueues[ch].size) goto dsp_ch_end;
 
     u32 rem = nSamples;
     while (rem > 0) {
@@ -350,13 +338,11 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
         reset_chn(dsp, ch, stat);
     }
 
-    stat->cur_buf_dirty = stat->cur_buf != og_cur_buf;
-
     // interpolate samples or something
     // this is the most garbage interpolation ever
     // dsp does 4-channel mixing instead of just 2
 
-    if (g_dsp_chn_disable & BIT(ch)) return;
+    if (g_dsp_chn_disable & BIT(ch)) goto dsp_ch_end;
 
     for (int s = 0; s < FRAME_SAMPLES; s++) {
         mixer[s][0] +=
@@ -364,6 +350,10 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
         mixer[s][1] +=
             (s32) rsamples[s * nSamples / FRAME_SAMPLES] * cfg->mix[0][1];
     }
+
+dsp_ch_end:
+    // this bit is extremely important
+    stat->cur_buf_dirty = stat->cur_buf != og_cur_buf;
 }
 
 s16 clamp16(s32 in) {

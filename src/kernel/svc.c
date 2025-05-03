@@ -86,6 +86,7 @@ DECL_SVC(CreateThread) {
     u32 entrypoint = R(1);
     u32 arg = R(2);
     u32 stacktop = R(3);
+    s32 processor = R(4);
 
     MAKE_HANDLE(handle);
 
@@ -95,7 +96,8 @@ DECL_SVC(CreateThread) {
     }
     stacktop &= ~7;
 
-    KThread* t = thread_create(s, entrypoint, stacktop, priority, arg);
+    KThread* t =
+        thread_create(s, entrypoint, stacktop, priority, arg, processor);
 
     HANDLE_SET(handle, t);
     t->hdr.refcount = 1;
@@ -117,13 +119,14 @@ DECL_SVC(SleepThread) {
     s64 timeout = R(0) | (u64) R(1) << 32;
 
     if (timeout == 0) {
-        // timeout 0 will switch to a different thread without sleeping this
-        // thread
-        // since the scheduler always picks the thread with highest priority
-        // we need to temporarily sleep this one so it does not get picked
-        caller->state = THRD_SLEEP;
-        thread_reschedule(s);
-        thread_ready(s, caller);
+        // this acts as thread yield, this thread will stay
+        // ready but let another thread run for now
+        // importantly if no other threads are ready we do nothing
+        if (s->readylist.next != &s->readylist) {
+            caller->state = THRD_SLEEP;
+            thread_reschedule(s);
+            thread_ready(s, caller);
+        }
     } else {
         thread_sleep(s, caller, timeout);
     }
@@ -158,11 +161,15 @@ DECL_SVC(SetThreadPriority) {
     if (t->state == THRD_READY) {
         t->next->prev = t->prev;
         t->prev->next = t->next;
+        // need this so thread ready knows this wasnt already in readylist
+        t->state = THRD_SLEEP;
+        t->next = t->prev = nullptr;
         thread_ready(s, t);
-        thread_reschedule(s);
     }
 
     linfo("thread %d has priority %#x", t->id, t->priority);
+
+    thread_reschedule(s);
 
     R(0) = 0;
 }
@@ -171,7 +178,10 @@ DECL_SVC(CreateMutex) {
     MAKE_HANDLE(handle);
 
     KMutex* mtx = mutex_create();
-    if (R(1)) mtx->locker_thrd = caller;
+    if (R(1)) {
+        mtx->locker_thrd = caller;
+        klist_insert(&caller->owned_mutexes, &mtx->hdr);
+    }
     mtx->hdr.refcount = 1;
     HANDLE_SET(handle, mtx);
 
@@ -292,7 +302,7 @@ DECL_SVC(SetTimer) {
           interval);
 
     t->interval = interval;
-    add_event(&s->sched, timer_signal, SEA_PTR(t), delay);
+    add_event(&s->sched, (SchedulerCallback) timer_signal, t, delay);
 
     R(0) = 0;
 }
@@ -305,7 +315,7 @@ DECL_SVC(CancelTimer) {
         return;
     }
 
-    remove_event(&s->sched, timer_signal, SEA_PTR(t));
+    remove_event(&s->sched, (SchedulerCallback) timer_signal, t);
 
     R(0) = 0;
 }

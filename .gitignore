@@ -3,6 +3,7 @@
 *.bin
 *.bin.*
 *.elf
+*.smdh
 
 !src/sys_files/*
 

@@ -4,7 +4,7 @@
 
 #include "applets.h"
 
-void apt_resume_app(E3DS* s, SchedEventArg) {
+void apt_resume_app(E3DS* s) {
     s->services.apt.nextparam.appid = APPID_HOMEMENU;
     s->services.apt.nextparam.cmd = APTCMD_WAKEUP;
     event_signal(s, &s->services.apt.resume_event);
@@ -32,7 +32,8 @@ DECL_PORT(apt) {
             linfo("Initialize with notif event %x and resume event %x",
                   cmdbuf[3], cmdbuf[4]);
             // dont signal this immediately
-            add_event(&s->sched, apt_resume_app, SEA_NONE, CPU_CLK / FPS);
+            add_event(&s->sched, (SchedulerCallback) apt_resume_app, 0,
+                      CPU_CLK / FPS);
             break;
         case 0x0003:
             linfo("Enable");
@@ -154,7 +155,8 @@ DECL_PORT(apt) {
             linfo("CancelLibraryApplet");
             // i have no idea what this does but games seem to expect
             // the apt even to get signaled after it
-            add_event(&s->sched, apt_resume_app, SEA_NONE, CPU_CLK / FPS);
+            add_event(&s->sched, (SchedulerCallback) apt_resume_app, 0,
+                      CPU_CLK / FPS);
             break;
         }
         case 0x0043:
@@ -170,6 +172,11 @@ DECL_PORT(apt) {
             cmdbuf[4] = srvobj_make_handle(s, &s->services.apt.shared_font.hdr);
             break;
         }
+        case 0x0046:
+            linfo("Wrap"); // does some crypt stuff
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
         case 0x004b: {
             u32 utility = cmdbuf[1];
             u32 insize = cmdbuf[2];

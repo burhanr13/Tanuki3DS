@@ -28,7 +28,7 @@ enum {
 // games actually care about which filesystem errors we return
 enum {
     FSERR_CREATE = 0xc82044Be,
-    FSERR_OPEN = 0xc8804471,
+    FSERR_OPEN = 0xc8804478,
     FSERR_ARCHIVE = 0xc8f04560,
 };
 
