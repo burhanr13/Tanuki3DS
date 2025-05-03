@@ -713,46 +713,36 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 mov(dst, r0);
                 break;
             }
-                // case IR_MEDIA_UQADD8: {
-                //     auto src1 = LOADOP1();
-                //     auto src2 = LOADOP2();
-                //     auto dst = DSTREG();
-                //     mov(v0.s[0], src1);
-                //     mov(v1.s[0], src2);
-                //     uqadd(v0.b8, v0.b8, v1.b8);
-                //     mov(dst, v0.s[0]);
-                //     break;
-                // }
-            case IR_MEDIA_UQSUB8: {
+            case IR_MEDIA_UQADD8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                MOVOP2(r2);
-                movx(ip0, (uintptr_t) media_uqsub8);
-                blr(ip0);
-                mov(dst, r0);
+                movs(v0, 0, src1);
+                movs(v1, 0, src2);
+                uqadd8b(v0, v0, v1);
+                movs(dst, v0, 0);
                 break;
             }
-            // case IR_MEDIA_UQSUB8: {
-            //     auto src1 = LOADOP1();
-            //     auto src2 = LOADOP2();
-            //     auto dst = DSTREG();
-            //     mov(v0.s[0], src1);
-            //     mov(v1.s[0], src2);
-            //     uqsub(v0.b8, v0.b8, v1.b8);
-            //     mov(dst, v0.s[0]);
-            //     break;
-            // }
-            // case IR_MEDIA_UHADD8: {
-            //     auto src1 = LOADOP1();
-            //     auto src2 = LOADOP2();
-            //     auto dst = DSTREG();
-            //     mov(v0.s[0], src1);
-            //     mov(v1.s[0], src2);
-            //     uhadd(v0.b8, v0.b8, v1.b8);
-            //     mov(dst, v0.s[0]);
-            //     break;
-            // }
+            case IR_MEDIA_UQSUB8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                movs(v0, 0, src1);
+                movs(v1, 0, src2);
+                uqsub8b(v0, v0, v1);
+                movs(dst, v0, 0);
+                break;
+            }
+            case IR_MEDIA_UHADD8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                movs(v0, 0, src1);
+                movs(v1, 0, src2);
+                uhadd8b(v0, v0, v1);
+                movs(dst, v0, 0);
+                break;
+            }
             case IR_MEDIA_SSUB8: {
                 auto dst = DSTREG();
                 movx(r0, r29);
@@ -763,16 +753,16 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 mov(dst, r0);
                 break;
             }
-            // case IR_MEDIA_QSUB8: {
-            //     auto src1 = LOADOP1();
-            //     auto src2 = LOADOP2();
-            //     auto dst = DSTREG();
-            //     mov(v0.s[0], src1);
-            //     mov(v1.s[0], src2);
-            //     sqsub(v0.b8, v0.b8, v1.b8);
-            //     mov(dst, v0.s[0]);
-            //     break;
-            // }
+            case IR_MEDIA_QSUB8: {
+                auto src1 = LOADOP1();
+                auto src2 = LOADOP2();
+                auto dst = DSTREG();
+                movs(v0, 0, src1);
+                movs(v1, 0, src2);
+                sqsub8b(v0, v0, v1);
+                movs(dst, v0, 0);
+                break;
+            }
             case IR_MEDIA_SEL: {
                 auto dst = DSTREG();
                 movx(r0, r29);
@@ -1291,7 +1281,7 @@ void backend_arm_patch_links(JITBlock* block) {
         rasDefineLabelExternal(patch.lab, linkblock->code);
         Vec_push(linkblock->linkingblocks,
                  ((BlockLocation) {block->attrs, block->start_addr}));
-    }   
+    }
     rasReady(backend->code);
 }
 
