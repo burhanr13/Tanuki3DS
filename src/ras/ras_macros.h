@@ -62,10 +62,14 @@ extern void* _ras_invalid_argument_type;
 #define addsx(rd, rn, op2, ...) addsub(1, 0, 1, rd, rn, op2, __VA_ARGS__)
 #define subx(rd, rn, op2, ...) addsub(1, 1, 0, rd, rn, op2, __VA_ARGS__)
 #define subsx(rd, rn, op2, ...) addsub(1, 1, 1, rd, rn, op2, __VA_ARGS__)
-#define cmpw(rn, op2, ...) subs(zr, rn, op2, __VA_ARGS__)
-#define cmnw(rn, op2, ...) adds(zr, rn, op2, __VA_ARGS__)
+#define cmpw(rn, op2, ...) subsw(zr, rn, op2, __VA_ARGS__)
+#define cmnw(rn, op2, ...) addsw(zr, rn, op2, __VA_ARGS__)
+#define negw(rd, rn, ...) subw(rd, zr, rn, __VA_ARGS__)
+#define negsw(rd, rn, ...) subsw(rd, zr, rn, __VA_ARGS__)
 #define cmpx(rn, op2, ...) subsx(zr, rn, op2, __VA_ARGS__)
 #define cmnx(rn, op2, ...) addsx(zr, rn, op2, __VA_ARGS__)
+#define negx(rd, rn, ...) subx(rd, zr, rn, __VA_ARGS__)
+#define negsx(rd, rn, ...) subsx(rd, zr, rn, __VA_ARGS__)
 
 #define addsubcarry(sf, op, s, rd, rn, rm)                                     \
     __EMIT(AddSubCarry, sf, op, s, rm, rn, rd)
@@ -78,6 +82,10 @@ extern void* _ras_invalid_argument_type;
 #define sbcx(rd, rn, rm) addsubcarry(1, 1, 0, rd, rn, rm)
 #define adcsx(rd, rn, rm) addsubcarry(1, 0, 1, rd, rn, rm)
 #define sbcsx(rd, rn, rm) addsubcarry(1, 1, 1, rd, rn, rm)
+#define ngcw(rd, rn) sbcw(rd, zr, rn)
+#define ngcsw(rd, rn) sbcsw(rd, zr, rn)
+#define ngcx(rd, rn) sbcx(rd, zr, rn)
+#define ngcsx(rd, rn) sbcsx(rd, zr, rn)
 
 #define __CINV(n, v) ((n) ? ~(v) : (v))
 
@@ -551,9 +559,10 @@ extern void* _ras_invalid_argument_type;
 
 #define dup(q, sz, rd, rn, idx)                                                \
     _Generic(rn,                                                               \
-        rasVReg: advsimdcopy(q, 0, 1 << sz | idx << (sz + 1), 0, rd,           \
+        rasVReg: advsimdcopy(q, 0, 1 << (sz) | (idx) << ((sz) + 1), 0, rd,     \
                              __FORCE(rasVReg, rn)),                            \
-        rasReg: advsimdcopy(q, 0, 1 << sz, 1, rd, __R2V(__FORCE(rasReg, rn))))
+        rasReg: advsimdcopy(q, 0, 1 << (sz), 1, rd,                            \
+                            __R2V(__FORCE(rasReg, rn))))
 #define dup8b(rd, rn, ...) dup(0, 0, rd, rn, __VA_DFL(0, __VA_ARGS__))
 #define dup16b(rd, rn, ...) dup(1, 0, rd, rn, __VA_DFL(0, __VA_ARGS__))
 #define dup4h(rd, rn, ...) dup(0, 1, rd, rn, __VA_DFL(0, __VA_ARGS__))
@@ -563,7 +572,8 @@ extern void* _ras_invalid_argument_type;
 #define dup2d(rd, rn, ...) dup(1, 3, rd, rn, __VA_DFL(0, __VA_ARGS__))
 
 #define moveelem(sf, sz, u, rd, rn, idx)                                       \
-    advsimdcopy(sf, 0, 1 << sz | idx << (sz + 1), u ? 7 : 5, __R2V(rd), rn)
+    advsimdcopy(sf, 0, 1 << (sz) | (idx) << ((sz) + 1), u ? 7 : 5, __R2V(rd),  \
+                rn)
 #define smovbw(rd, rn, idx) moveelem(0, 0, 0, rd, rn, idx)
 #define umovbw(rd, rn, idx) moveelem(0, 0, 1, rd, rn, idx)
 #define smovhw(rd, rn, idx) moveelem(0, 1, 0, rd, rn, idx)
@@ -581,9 +591,9 @@ extern void* _ras_invalid_argument_type;
 
 #define ins(sz, rd, idx1, rn, idx2)                                            \
     _Generic(rn,                                                               \
-        rasVReg: advsimdcopy(1, 1, 1 << sz | idx1 << (sz + 1), idx2 << sz, rd, \
-                             __FORCE(rasVReg, rn)),                            \
-        rasReg: advsimdcopy(1, 0, 1 << sz | idx1 << (sz + 1), 3, rd,           \
+        rasVReg: advsimdcopy(1, 1, 1 << (sz) | (idx1) << ((sz) + 1),           \
+                             (idx2) << (sz), rd, __FORCE(rasVReg, rn)),        \
+        rasReg: advsimdcopy(1, 0, 1 << (sz) | (idx1) << ((sz) + 1), 3, rd,     \
                             __R2V(__FORCE(rasReg, rn))))
 #define insb(rd, idx1, rn, ...) ins(0, rd, idx1, rn, __VA_DFL(0, __VA_ARGS__))
 #define insh(rd, idx1, rn, ...) ins(1, rd, idx1, rn, __VA_DFL(0, __VA_ARGS__))
@@ -611,6 +621,36 @@ extern void* _ras_invalid_argument_type;
     _Generic(rd,                                                               \
         rasReg: _fixumov(umovd, rd, __VA_ARGS__),                              \
         rasVReg: _fixins(insd, rd, __VA_ARGS__))
+
+#define advsimdscalarpairwise(sz, u, opcode, rd, rn)                           \
+    __EMIT(AdvSIMDScalarPairwise, u, sz, opcode, rn, rd)
+
+#define faddps(rd, rn) advsimdscalarpairwise(0, 1, 13, rd, rn)
+#define faddpd(rd, rn) advsimdscalarpairwise(1, 1, 13, rd, rn)
+
+#define advsimdscalar2misc(sz, u, opcode, rd, rn)                              \
+    __EMIT(AdvSIMDScalar2Misc, u, sz, opcode, rn, rd)
+
+#define frecpes(rd, rn) advsimdscalar2misc(2, 0, 29, rd, rn)
+#define frecped(rd, rn) advsimdscalar2misc(3, 0, 29, rd, rn)
+#define frsqrtes(rd, rn) advsimdscalar2misc(2, 1, 29, rd, rn)
+#define frsqrted(rd, rn) advsimdscalar2misc(3, 1, 29, rd, rn)
+
+#define advsimd2misc(q, sz, u, opcode, rd, rn)                                 \
+    __EMIT(AdvSIMD2Misc, q, u, sz, opcode, rn, rd)
+
+#define frintm2s(rd, rn) advsimd2misc(0, 0, 0, 25, rd, rn)
+#define frintm4s(rd, rn) advsimd2misc(1, 0, 0, 25, rd, rn)
+#define frintm2d(rd, rn) advsimd2misc(1, 1, 0, 25, rd, rn)
+#define fcmeqz2s(rd, rn) advsimd2misc(0, 2, 0, 13, rd, rn)
+#define fcmeqz4s(rd, rn) advsimd2misc(1, 2, 0, 13, rd, rn)
+#define fcmeqz2d(rd, rn) advsimd2misc(1, 3, 0, 13, rd, rn)
+#define fcvtzs2s(rd, rn) advsimd2misc(0, 2, 0, 27, rd, rn)
+#define fcvtzs4s(rd, rn) advsimd2misc(1, 2, 0, 27, rd, rn)
+#define fcvtzs2d(rd, rn) advsimd2misc(1, 3, 0, 27, rd, rn)
+#define fneg2s(rd, rn) advsimd2misc(0, 2, 1, 15, rd, rn)
+#define fneg4s(rd, rn) advsimd2misc(1, 2, 1, 15, rd, rn)
+#define fneg2d(rd, rn) advsimd2misc(1, 3, 1, 15, rd, rn)
 
 #define advsimd3same(q, sz, u, opcode, rd, rn, rm)                             \
     __EMIT(AdvSIMD3Same, q, u, sz, rm, opcode, rn, rd)
@@ -1057,10 +1097,14 @@ extern void* _ras_invalid_argument_type;
 #define subs _(subs)
 #define cmp _(cmp)
 #define cmn _(cmn)
+#define neg _(neg)
+#define negs _(negs)
 #define adc _(adc)
 #define sbc _(sbc)
 #define adcs _(adcs)
 #define sbcs _(sbcs)
+#define ngc _(ngc)
+#define ngcs _(ngcs)
 #define and _(and)
 #define bic _(bic)
 #define orr _(orr)
@@ -1126,6 +1170,15 @@ extern void* _ras_invalid_argument_type;
 #define ldp _(ldp)
 #define cbz _(cbz)
 #define cbnz _(cbnz)
+
+#define scvtfs _(scvtfs)
+#define ucvtfs _(ucvtfs)
+#define scvtfd _(scvtfd)
+#define ucvtfd _(ucvtfd)
+#define fcvtzss _(fcvtzss)
+#define fcvtzus _(fcvtzus)
+#define fcvtzsd _(fcvtzsd)
+#define fcvtzud _(fcvtzud)
 
 #define umovb _(umovb)
 #define smovb _(smovb)

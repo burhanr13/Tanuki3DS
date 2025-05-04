@@ -51,13 +51,6 @@ ifeq ($(shell getconf PAGESIZE),4096)
 	CPPFLAGS += -DFASTMEM -DJIT_FASTMEM
 endif
 
-ifeq ($(shell uname -m),arm64)
-	STATIC_LIBS += -lxbyak_aarch64
-endif
-ifeq ($(shell uname -m),aarch64)
-	STATIC_LIBS += -lxbyak_aarch64
-endif
-
 LDFLAGS := $(LIBDIRS:%=-L%) $(LIBS)
 vpath %.a $(LIBDIRS)
 .LIBPATTERNS := lib%.a

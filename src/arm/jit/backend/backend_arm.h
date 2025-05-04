@@ -10,7 +10,7 @@
 typedef struct {
     rasLabel lab;
     u32 attrs, addr;
-} LinkPatch;
+} ArmLinkPatch;
 
 typedef struct {
     rasBlock* code;
@@ -19,8 +19,7 @@ typedef struct {
     HostRegAllocation hralloc;
     ArmCore* cpu;
 
-    LinkPatch links[MAX_BLOCK_INSTRS];
-    int nlinks;
+    Vector(ArmLinkPatch) links;
 } ArmCodeBackend;
 
 ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,

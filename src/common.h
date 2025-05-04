@@ -120,6 +120,12 @@ typedef float fvec4[4];
 #define Vec_assn(v1, v2)                                                       \
     ((v1).d = (v2).d, (v1).size = (v2).size, (v1).cap = (v2).cap)
 #define Vec_free(v) (free((v).d), Vec_init(v))
+#define Vec_resize(v, ncap)                                                     \
+    ({                                                                         \
+        (v).cap = (ncap);                                                         \
+        if ((v).size > (v).cap) (v).size = (v).cap;                            \
+        (v).d = (typeof((v).d)) realloc((v).d, (v).cap * sizeof *(v).d);       \
+    })
 #define Vec_grow(v)                                                            \
     ({                                                                         \
         if ((v).size == (v).cap) {                                             \

@@ -402,6 +402,24 @@ __RAS_EMIT_DECL(AdvSIMDCopy, u32 q, u32 op, u32 imm5, u32 imm4, rasVReg rn,
                          q << 30 | 0x0e000400);
 }
 
+__RAS_EMIT_DECL(AdvSIMDScalarPairwise, u32 u, u32 size, u32 opcode, rasVReg rn,
+                rasVReg rd) {
+    rasEmitWord(ctx, rd.idx | rn.idx << 5 | opcode << 12 | size << 22 |
+                         u << 29 | 0x5e300800);
+}
+
+__RAS_EMIT_DECL(AdvSIMDScalar2Misc, u32 u, u32 size, u32 opcode, rasVReg rn,
+                rasVReg rd) {
+    rasEmitWord(ctx, rd.idx | rn.idx << 5 | opcode << 12 | size << 22 |
+                         u << 29 | 0x5e200800);
+}
+
+__RAS_EMIT_DECL(AdvSIMD2Misc, u32 q, u32 u, u32 size, u32 opcode, rasVReg rn,
+                rasVReg rd) {
+    rasEmitWord(ctx, rd.idx | rn.idx << 5 | opcode << 12 | size << 22 |
+                         u << 29 | q << 30 | 0x0e200800);
+}
+
 __RAS_EMIT_DECL(AdvSIMD3Same, u32 q, u32 u, u32 size, rasVReg rm, u32 opcode,
                 rasVReg rn, rasVReg rd) {
     rasEmitWord(ctx, rd.idx | rn.idx << 5 | opcode << 11 | rm.idx << 16 |

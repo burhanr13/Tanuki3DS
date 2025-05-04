@@ -18,19 +18,10 @@
 #define SAVEDREGS_BASE 19
 #define SAVEDREGS_COUNT 10
 
-void ras_error_cb(rasError err) {
-    lerror("ras: %s", rasErrorStrings[err]);
-    exit(1);
-}
-
-[[gnu::constructor]] static void init_error() {
-    rasSetErrorCallback((rasErrorCallback) ras_error_cb, nullptr);
-}
-
 // returns:
 // 0-31 : reg index
 // 32+n : stack index
-int getOpForReg(HostRegAllocation* hralloc, int i) {
+static int getOpForReg(HostRegAllocation* hralloc, int i) {
     HostRegInfo hr = hralloc->hostreg_info[i];
     switch (hr.type) {
         case REG_TEMP:
@@ -44,7 +35,7 @@ int getOpForReg(HostRegAllocation* hralloc, int i) {
     }
 }
 
-void print_hostregs(HostRegAllocation* hralloc) {
+static void print_hostregs(HostRegAllocation* hralloc) {
     printf("Host Regs:");
     for (u32 i = 0; i < hralloc->nregs; i++) {
         printf(" $%d:", i);
@@ -61,23 +52,24 @@ void print_hostregs(HostRegAllocation* hralloc) {
 
 #define SPDISP() ((backend->hralloc.count[REG_STACK] * 4 + 15) & ~15)
 
-int getOp(ArmCodeBackend* backend, int i) {
+static int getOp(ArmCodeBackend* backend, int i) {
     int assn = backend->regalloc->reg_assn[i];
     if (assn == -1) return -1;
     else return getOpForReg(&backend->hralloc, assn);
 }
 
-void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr);
-void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
-                       rasLabel lldf32, rasLabel lldf64);
-void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
-                        rasLabel lstf32, rasLabel lstf64);
-void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasReg dst);
-void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr, rasReg src);
-void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr, rasReg dst,
-                      bool h);
-void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr, rasReg src,
-                       bool h);
+static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr);
+static void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr,
+                              rasReg addr, rasLabel lldf32, rasLabel lldf64);
+static void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr,
+                               rasReg addr, rasLabel lstf32, rasLabel lstf64);
+static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasReg dst);
+static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
+                            rasReg src);
+static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
+                             rasReg dst, bool h);
+static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
+                              rasReg src, bool h);
 
 #define GETOP(i) getOp(backend, i)
 
@@ -925,13 +917,13 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     Label(linkaddr);
                     cmpx(r0, 0);
                     ble(nolink);
-                    ldrlx(r16, linkaddr);
-                    br(r16);
+                    ldrlx(ip0, linkaddr);
+                    br(ip0);
                     align(8);
                     L(linkaddr);
                     Label(linklabel);
-                    backend->links[backend->nlinks++] =
-                        (LinkPatch) {linklabel, inst.op1, inst.op2};
+                    ArmLinkPatch p = {linklabel, inst.op1, inst.op2};
+                    Vec_push(backend->links, p);
                     dword(linklabel);
                     L(nolink);
                 }
@@ -971,7 +963,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
     return backend;
 }
 
-void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
+static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
     bool dp = instr.cp_data_proc.cpnum & 1;
     u32 vd = instr.cp_data_proc.crd;
     u32 vn = instr.cp_data_proc.crn;
@@ -1097,8 +1089,8 @@ void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
     }
 }
 
-void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
-                       rasLabel lldf32, rasLabel lldf64) {
+static void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr,
+                              rasReg addr, rasLabel lldf32, rasLabel lldf64) {
     u32 rcount;
     if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
         rcount = 1;
@@ -1142,8 +1134,8 @@ void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
     }
 }
 
-void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
-                        rasLabel lstf32, rasLabel lstf64) {
+static void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr,
+                               rasReg addr, rasLabel lstf32, rasLabel lstf64) {
     u32 rcount;
     if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
         rcount = 1;
@@ -1187,7 +1179,8 @@ void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr, rasReg addr,
     }
 }
 
-void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasReg dst) {
+static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr,
+                           rasReg dst) {
     if (instr.cp_reg_trans.cpopc == 7) {
         if (instr.cp_reg_trans.crn == 1) {
             ldr(dst, CPU(fpscr));
@@ -1205,7 +1198,8 @@ void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasReg dst) {
     ldr(dst, CPU(s[vn]));
 }
 
-void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr, rasReg src) {
+static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
+                            rasReg src) {
     if (instr.cp_reg_trans.cpopc == 7) {
         if (instr.cp_reg_trans.crn == 1) {
             str(src, CPU(fpscr));
@@ -1222,8 +1216,8 @@ void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr, rasReg src) {
     str(src, CPU(s[vn]));
 }
 
-void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr, rasReg dst,
-                      bool h) {
+static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
+                             rasReg dst, bool h) {
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
         if (h) {
@@ -1242,8 +1236,8 @@ void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr, rasReg dst,
     }
 }
 
-void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr, rasReg src,
-                       bool h) {
+static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
+                              rasReg src, bool h) {
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
         if (h) {
@@ -1264,6 +1258,7 @@ void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr, rasReg src,
 
 void backend_arm_free(ArmCodeBackend* backend) {
     hostregalloc_free(&backend->hralloc);
+    Vec_free(backend->links);
     rasDestroy(backend->code);
     free(backend);
 }
@@ -1274,8 +1269,8 @@ JITFunc backend_arm_get_code(ArmCodeBackend* backend) {
 
 void backend_arm_patch_links(JITBlock* block) {
     ArmCodeBackend* backend = block->backend;
-    for (int i = 0; i < backend->nlinks; i++) {
-        auto patch = backend->links[i];
+    for (int i = 0; i < backend->links.size; i++) {
+        auto patch = backend->links.d[i];
         JITBlock* linkblock =
             get_jitblock(backend->cpu, patch.attrs, patch.addr);
         rasDefineLabelExternal(patch.lab, linkblock->code);
@@ -1283,6 +1278,7 @@ void backend_arm_patch_links(JITBlock* block) {
                  ((BlockLocation) {block->attrs, block->start_addr}));
     }
     rasReady(backend->code);
+    Vec_free(backend->links);
 }
 
 #ifndef NOCAPSTONE
