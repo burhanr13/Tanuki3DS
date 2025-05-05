@@ -851,6 +851,7 @@ void shaderjit_arm_free(ArmShaderJitBackend* this) {
     free(this);
 }
 
+#ifndef NOCAPSTONE
 void shaderjit_arm_disassemble(ArmShaderJitBackend* this) {
     csh handle;
     cs_insn* insn;
@@ -866,5 +867,6 @@ void shaderjit_arm_disassemble(ArmShaderJitBackend* this) {
     cs_free(insn, count);
     cs_close(&handle);
 }
+#endif
 
 #endif
