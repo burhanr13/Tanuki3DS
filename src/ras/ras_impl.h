@@ -245,8 +245,16 @@ void rasApplyPatch(rasBlock* ctx, rasPatch p) {
             *patchinst |= reladdr << 5;
             break;
         }
+        case RAS_PATCH_REL14: {
+            rasAssert(ISLOWBITS0(reladdr, 2), RAS_ERR_BAD_LABEL);
+            reladdr >>= 2;
+            rasAssert(ISNBITSS64(reladdr, 14), RAS_ERR_BAD_LABEL);
+            reladdr &= MASK(14);
+            *patchinst |= reladdr << 5;
+            break;
+        }
         case RAS_PATCH_PGOFF12: {
-            *patchinst |= ((size_t) symaddr & MASK(12)) << 10;
+            *patchinst |= ((uintptr_t) symaddr & MASK(12)) << 10;
             break;
         }
     }
@@ -284,7 +292,7 @@ size_t rasGetSize(rasBlock* ctx) {
     return (ctx->curr - ctx->code) * 4;
 }
 
-void rasAssert(int condition, rasError err) {
+void rasAssert(bool condition, rasError err) {
 #ifndef RAS_NO_CHECKS
     if (!condition) {
         if (errorCallback) {
@@ -337,7 +345,7 @@ void rasAlign(rasBlock* ctx, size_t alignment) {
     for (int i = 0; i < aligned - cur; i++) word(0);
 }
 
-int rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n) {
+bool rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n) {
     if (!imm || !~imm) return false;
     u32 sz = sf ? 64 : 32;
 
@@ -398,6 +406,23 @@ int rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n) {
     *immr = rot;
 
     return true;
+}
+
+bool rasGenerateFPImm(float fimm, u8* imm8) {
+    u32 imm = ((union {
+                  float f;
+                  u32 u;
+              }) {fimm})
+                  .u;
+    u32 sgn = imm >> 31;
+    u32 exp = (imm >> 23) & 0xff;
+    u32 mant = imm & MASK(23);
+    if (!ISLOWBITS0(mant, 19)) return 0;
+    mant >>= 19;
+    if (!(exp >> 2 == 0x1f || exp >> 2 == 0x20)) return 0;
+    exp &= 7;
+    *imm8 = sgn << 7 | exp << 4 | mant;
+    return 1;
 }
 
 void rasEmitPseudoAddSubImm(rasBlock* ctx, u32 sf, u32 op, u32 s, rasReg rd,

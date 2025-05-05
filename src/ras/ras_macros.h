@@ -202,19 +202,19 @@ extern void* _ras_invalid_argument_type;
 #define sbfmx(rd, rn, immr, imms) bitfield(1, 0, 1, rd, rn, immr, imms)
 #define bfmx(rd, rn, immr, imms) bitfield(1, 1, 1, rd, rn, immr, imms)
 #define ubfmx(rd, rn, immr, imms) bitfield(1, 2, 1, rd, rn, immr, imms)
-#define sbfizw(rd, rn, lsb, width) sbfmw(rd, rn, 32 - (lsb), (width) - 1)
+#define sbfizw(rd, rn, lsb, width) sbfmw(rd, rn, -(lsb) & 31, (width) - 1)
 #define sbfxw(rd, rn, lsb, width) sbfmw(rd, rn, lsb, (lsb) + (width) - 1)
-#define bfiw(rd, rn, lsb, width) bfmw(rd, rn, 32 - (lsb), (width) - 1)
+#define bfiw(rd, rn, lsb, width) bfmw(rd, rn, -(lsb) & 31, (width) - 1)
 #define bfcw(rd, lsb, width) bfiw(rd, zr, lsb, width)
 #define bfxilw(rd, rn, lsb, width) bfmw(rd, rn, lsb, (lsb) + (width) - 1)
-#define ubfizw(rd, rn, lsb, width) ubfmw(rd, rn, 32 - (lsb), (width) - 1)
+#define ubfizw(rd, rn, lsb, width) ubfmw(rd, rn, -(lsb) & 31, (width) - 1)
 #define ubfxw(rd, rn, lsb, width) ubfmw(rd, rn, lsb, (lsb) + (width) - 1)
-#define sbfizx(rd, rn, lsb, width) sbfmx(rd, rn, 64 - (lsb), (width) - 1)
+#define sbfizx(rd, rn, lsb, width) sbfmx(rd, rn, -(lsb) & 63, (width) - 1)
 #define sbfxx(rd, rn, lsb, width) sbfmx(rd, rn, lsb, (lsb) + (width) - 1)
-#define bfix(rd, rn, lsb, width) bfmx(rd, rn, 64 - (lsb), (width) - 1)
+#define bfix(rd, rn, lsb, width) bfmx(rd, rn, -(lsb) & 63, (width) - 1)
 #define bfcx(rd, lsb, width) bfix(rd, zr, lsb, width)
 #define bfxilx(rd, rn, lsb, width) bfmx(rd, rn, lsb, (lsb) + (width) - 1)
-#define ubfizx(rd, rn, lsb, width) ubfmx(rd, rn, 64 - (lsb), (width) - 1)
+#define ubfizx(rd, rn, lsb, width) ubfmx(rd, rn, -(lsb) & 63, (width) - 1)
 #define ubfxx(rd, rn, lsb, width) ubfmx(rd, rn, lsb, (lsb) + (width) - 1)
 
 #define extract(sf, op21, n, o0, rd, rn, rm, imms)                             \
@@ -396,6 +396,11 @@ extern void* _ras_invalid_argument_type;
 #define cbzx(rt, l) branchcompimm(1, 0, rt, l)
 #define cbnzx(rt, l) branchcompimm(1, 1, rt, l)
 
+#define branchtestimm(op, rt, b, l) __EMIT(BranchTestImm, op, b, l, rt)
+
+#define tbz(rt, b, l) branchtestimm(0, rt, b, l)
+#define tbnz(rt, b, l) branchtestimm(1, rt, b, l)
+
 #define branchreg(opc, op2, op3, op4, rn)                                      \
     __EMIT(BranchReg, opc, op2, op3, rn, op4)
 
@@ -473,6 +478,7 @@ extern void* _ras_invalid_argument_type;
 #define fnegs(rd, rn) fpdataproc1source(0, 0, 0, 2, rd, rn)
 #define fsqrts(rd, rn) fpdataproc1source(0, 0, 0, 3, rd, rn)
 #define fcvtds(rd, rn) fpdataproc1source(0, 0, 0, 5, rd, rn)
+#define frintms(rd, rn) fpdataproc1source(0, 0, 0, 10, rd, rn)
 #define fabsd(rd, rn) fpdataproc1source(1, 0, 0, 1, rd, rn)
 #define fnegd(rd, rn) fpdataproc1source(1, 0, 0, 2, rd, rn)
 #define fsqrtd(rd, rn) fpdataproc1source(1, 0, 0, 3, rd, rn)
@@ -545,6 +551,7 @@ extern void* _ras_invalid_argument_type;
 #define scvtfdx(rd, rn) fpconvertintvr(1, 1, 0, 0, 2, rd, rn)
 #define ucvtfdx(rd, rn) fpconvertintvr(1, 1, 0, 0, 3, rd, rn)
 
+#define fcvtmssw(rd, rn) fpconvertintrv(0, 0, 0, 2, 0, rd, rn)
 #define fcvtzssw(rd, rn) fpconvertintrv(0, 0, 0, 3, 0, rd, rn)
 #define fcvtzusw(rd, rn) fpconvertintrv(0, 0, 0, 3, 1, rd, rn)
 #define fcvtzsdw(rd, rn) fpconvertintrv(0, 1, 0, 3, 0, rd, rn)
@@ -553,6 +560,12 @@ extern void* _ras_invalid_argument_type;
 #define fcvtzusx(rd, rn) fpconvertintrv(1, 0, 0, 3, 1, rd, rn)
 #define fcvtzsdx(rd, rn) fpconvertintrv(1, 1, 0, 3, 0, rd, rn)
 #define fcvtzudx(rd, rn) fpconvertintrv(1, 1, 0, 3, 1, rd, rn)
+
+#define fpcondselect(ftype, m, s, rd, rn, rm, cond)                            \
+    __EMIT(FPCondSelect, m, s, ftype, rm, cond, rn, rd)
+
+#define fcsels(rd, rn, rm, cond) fpcondselect(0, 0, 0, rd, rn, rm, cond)
+#define fcseld(rd, rn, rm, cond) fpcondselect(1, 0, 0, rd, rn, rm, cond)
 
 #define advsimdcopy(q, op, imm5, imm4, rd, rn)                                 \
     __EMIT(AdvSIMDCopy, q, op, imm5, imm4, rn, rd)
@@ -1007,6 +1020,13 @@ extern void* _ras_invalid_argument_type;
 #define bif16b(rd, rn, rm) advsimd3same(1, 3, 1, 3, rd, rn, rm)
 #define mov8b(rd, rn) orr8b(rd, rn, rn)
 #define mov16b(rd, rn) orr16b(rd, rn, rn)
+
+#define advsimdmodimmfloat(q, op, cmode, o2, rd, fimm)                         \
+    __EMIT(AdvSIMDModImmFloat, q, op, cmode, o2, fimm, rd)
+
+#define fmov2s(rd, fimm) advsimdmodimmfloat(0, 0, 15, 0, rd, fimm)
+#define fmov4s(rd, fimm) advsimdmodimmfloat(1, 0, 15, 0, rd, fimm)
+#define fmov2d(rd, fimm) advsimdmodimmfloat(1, 1, 15, 0, rd, fimm)
 
 #define Reg(n) ((rasReg) {n})
 

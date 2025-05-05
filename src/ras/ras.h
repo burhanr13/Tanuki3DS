@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define bool _Bool
 #define u8 uint8_t
 #define u16 uint16_t
 #define u32 uint32_t
@@ -30,6 +31,7 @@ typedef enum {
     RAS_PATCH_ABS64,
     RAS_PATCH_REL26,
     RAS_PATCH_REL19,
+    RAS_PATCH_REL14,
     RAS_PATCH_REL21,
     RAS_PATCH_PGREL21,
     RAS_PATCH_PGOFF12,
@@ -69,7 +71,7 @@ void rasUnready(rasBlock* ctx);
 void* rasGetCode(rasBlock* ctx);
 size_t rasGetSize(rasBlock* ctx);
 
-void rasAssert(int condition, rasError err);
+void rasAssert(bool condition, rasError err);
 
 rasLabel rasDeclareLabel(rasBlock* ctx);
 rasLabel rasDefineLabel(rasBlock* ctx, rasLabel l);
@@ -78,7 +80,8 @@ void* rasGetLabelAddr(rasBlock* ctx, rasLabel l);
 
 void rasAddPatch(rasBlock* ctx, rasPatchType type, rasLabel l);
 
-int rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n);
+bool rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n);
+bool rasGenerateFPImm(float fimm, u8* imm8);
 
 void rasEmitWord(rasBlock* ctx, u32 w);
 void rasEmitDword(rasBlock* ctx, u64 d);
@@ -155,9 +158,8 @@ __RAS_EMIT_DECL(LogicalImm, u32 sf, u32 opc, u64 imm, rasReg rn, rasReg rd) {
     RAS_CHECKR31(rd, opc != 3);
     RAS_CHECKR31(rn, 0);
     u32 immr, imms, n;
-    if (!rasGenerateLogicalImm(imm, sf, &immr, &imms, &n)) {
-        rasAssert(0, RAS_ERR_BAD_IMM);
-    }
+    rasAssert(rasGenerateLogicalImm(imm, sf, &immr, &imms, &n),
+              RAS_ERR_BAD_IMM);
     rasEmitWord(ctx, rd.idx | rn.idx << 5 | imms << 10 | immr << 16 | n << 22 |
                          opc << 29 | sf << 31 | 0x12000000);
 }
@@ -328,6 +330,12 @@ __RAS_EMIT_DECL(BranchCompImm, u32 sf, u32 op, rasLabel lab, rasReg rt) {
     rasEmitWord(ctx, rt.idx | op << 24 | sf << 31 | 0x34000000);
 }
 
+__RAS_EMIT_DECL(BranchTestImm, u32 op, u32 b, rasLabel lab, rasReg rt) {
+    rasAddPatch(ctx, RAS_PATCH_REL14, lab);
+    rasEmitWord(ctx, rt.idx | (b & 0x1f) << 19 | op << 24 | (b >> 5) << 31 |
+                         0x36000000);
+}
+
 __RAS_EMIT_DECL(BranchReg, u32 opc, u32 op2, u32 op3, rasReg rn, u32 op4) {
     RAS_CHECKR31(rn, 0);
     rasEmitWord(ctx, op4 | rn.idx << 5 | op3 << 10 | op2 << 16 | opc << 21 |
@@ -342,23 +350,10 @@ __RAS_EMIT_DECL(SystemRegMove, u32 l, u32 opc, rasReg rt) {
     rasEmitWord(ctx, rt.idx | opc << 5 | l << 21 | 0xd5100000);
 }
 
-static inline int rasGenerateFPImm(float fimm, u8* imm8) {
-    u32 imm = *(u32*) &fimm;
-    u32 sgn = imm >> 31;
-    u32 exp = (imm >> 23) & 0xff;
-    u32 mant = imm & RAS_MASK(23);
-    if (!RAS_ISLOWBITS0(mant, 19)) return 0;
-    mant >>= 19;
-    if (!(exp >> 2 == 0x1f || exp >> 2 == 0x20)) return 0;
-    exp &= 7;
-    *imm8 = sgn << 7 | exp << 4 | mant;
-    return 1;
-}
-
 __RAS_EMIT_DECL(FPMoveImm, u32 m, u32 s, u32 ftype, float fimm, u32 imm5,
                 rasVReg rd) {
     u8 imm8;
-    if (!rasGenerateFPImm(fimm, &imm8)) rasAssert(0, RAS_ERR_BAD_IMM);
+    rasAssert(rasGenerateFPImm(fimm, &imm8), RAS_ERR_BAD_IMM);
     rasEmitWord(ctx, rd.idx | imm5 << 5 | imm8 << 13 | ftype << 22 | s << 29 |
                          m << 31 | 0x1e201000);
 }
@@ -394,6 +389,12 @@ __RAS_EMIT_DECL(FPConvertInt, u32 sf, u32 s, u32 ftype, u32 rmode, u32 opcode,
                          ftype << 22 | s << 29 | sf << 31 | 0x1e200000);
 }
 
+__RAS_EMIT_DECL(FPCondSelect, u32 m, u32 s, u32 ftype, rasVReg rm, u32 cond,
+                rasVReg rn, rasVReg rd) {
+    rasEmitWord(ctx, rd.idx | rn.idx << 5 | cond << 12 | rm.idx << 16 |
+                         ftype << 22 | s << 29 | m << 31 | 0x1e200c00);
+}
+
 __RAS_EMIT_DECL(AdvSIMDCopy, u32 q, u32 op, u32 imm5, u32 imm4, rasVReg rn,
                 rasVReg rd) {
     rasAssert(RAS_ISNBITSU(imm5, 5) && RAS_ISNBITSU(imm4, 4),
@@ -426,6 +427,14 @@ __RAS_EMIT_DECL(AdvSIMD3Same, u32 q, u32 u, u32 size, rasVReg rm, u32 opcode,
                          size << 22 | u << 29 | q << 30 | 0x0e200400);
 }
 
+__RAS_EMIT_DECL(AdvSIMDModImmFloat, u32 q, u32 op, u32 cmode, u32 o2,
+                float fimm, rasVReg rd) {
+    u8 imm8;
+    rasAssert(rasGenerateFPImm(fimm, &imm8), RAS_ERR_BAD_IMM);
+    rasEmitWord(ctx, rd.idx | (imm8 & 0x1f) << 5 | o2 << 11 | cmode << 12 |
+                         (imm8 >> 5) << 16 | op << 29 | q << 30 | 0x0f000400);
+}
+
 #undef RAS_BIT
 #undef RAS_MASK
 #undef RAS_ISNBITSU
@@ -443,6 +452,7 @@ void rasEmitPseudoShiftImm(rasBlock* ctx, u32 sf, u32 type, rasReg rd,
                            rasReg rn, u32 imm);
 void rasEmitPseudoPCRelAddrLong(rasBlock* ctx, rasReg rd, rasLabel lab);
 
+#undef bool
 #undef u8
 #undef u16
 #undef u32

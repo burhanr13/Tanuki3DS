@@ -11,6 +11,8 @@
 #define RAS_CTX_VAR this->code
 #include <ras/ras.h>
 
+// #define JIT_DISASM
+
 #define reg_v r0
 #define reg_o r1
 #define reg_r 16 // v16-v31
@@ -340,7 +342,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 this->usingex2 = true;
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                movs(v0, src, 0);
+                fmovs(v0, src);
                 bl(this->ex2func);
                 dup4s(dst, v0, 0);
                 STRDST(1);
@@ -350,7 +352,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 this->usinglg2 = true;
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                movs(v0, src, 0);
+                fmovs(v0, src);
                 bl(this->lg2func);
                 dup4s(dst, v0, 0);
                 STRDST(1);
@@ -421,7 +423,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto dst = GETDST(1);
 
                 fcmge4s(dst, src1, src2);
-                fmov(v1.s4, 1.0f);
+                fmov4s(v1, 1.0f);
                 // sets to 1.0f if the condition was true
                 and16b(dst, dst, v1);
                 STRDST(1);
@@ -441,7 +443,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
 
                 // lt is just gt with operands reversed
                 fcmgt4s(dst, src2, src1);
-                fmov(v1.s4, 1.0f);
+                fmov4s(v1, 1.0f);
                 and16b(dst, dst, v1);
                 STRDST(1);
                 break;
@@ -483,17 +485,15 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             case PICA_CALLC:
             case PICA_CALLU: {
                 Label(lelse);
-                bool cond;
                 if (instr.opcode == PICA_CALLU) {
-                    tstw(reg_b, BIT(instr.fmt3.c));
-                    cond = true;
+                    tbz(reg_b, instr.fmt3.c, lelse);
                 } else if (instr.opcode == PICA_CALLC) {
-                    cond = condop(this, instr.fmt2.op, instr.fmt2.refx,
-                                  instr.fmt2.refy);
-                }
-                if (instr.opcode != PICA_CALL) {
-                    if (cond) beq(lelse);
-                    else bne(lelse);
+                    if (condop(this, instr.fmt2.op, instr.fmt2.refx,
+                               instr.fmt2.refy)) {
+                        beq(lelse);
+                    } else {
+                        bne(lelse);
+                    }
                 }
                 bl(this->jmplabels.d[instr.fmt2.dest]);
                 L(lelse);
@@ -515,16 +515,16 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             case PICA_IFC: {
                 Label(lelse);
                 Label(lendif);
-                bool cond;
                 if (instr.opcode == PICA_IFU) {
-                    tstw(reg_b, BIT(instr.fmt3.c));
-                    cond = true;
+                    tbz(reg_b, instr.fmt3.c, lelse);
                 } else {
-                    cond = condop(this, instr.fmt2.op, instr.fmt2.refx,
-                                  instr.fmt2.refy);
+                    if (condop(this, instr.fmt2.op, instr.fmt2.refx,
+                               instr.fmt2.refy)) {
+                        beq(lelse);
+                    } else {
+                        bne(lelse);
+                    }
                 }
-                if (cond) beq(lelse);
-                else bne(lelse);
 
                 compileBlock(this, shu, pc, instr.fmt2.dest - pc, false);
                 if (instr.fmt2.num) {
@@ -564,16 +564,22 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             }
             case PICA_JMPC:
             case PICA_JMPU: {
-                bool cond;
+                auto jmplab = this->jmplabels.d[instr.fmt3.dest];
                 if (instr.opcode == PICA_JMPU) {
                     tstw(reg_b, BIT(instr.fmt3.c));
-                    cond = !(instr.fmt2.num & 1);
+                    if (instr.fmt2.num & 1) {
+                        tbz(reg_b, instr.fmt3.c, jmplab);
+                    } else {
+                        tbnz(reg_b, instr.fmt3.c, jmplab);
+                    }
                 } else {
-                    cond = condop(this, instr.fmt2.op, instr.fmt2.refx,
-                                  instr.fmt2.refy);
+                    if (condop(this, instr.fmt2.op, instr.fmt2.refx,
+                               instr.fmt2.refy)) {
+                        bne(jmplab);
+                    } else {
+                        beq(jmplab);
+                    }
                 }
-                if (cond) bne(this->jmplabels.d[instr.fmt3.dest]);
-                else beq(this->jmplabels.d[instr.fmt3.dest]);
 
                 if (instr.fmt3.dest > farthestjmp)
                     farthestjmp = instr.fmt3.dest;
@@ -585,7 +591,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 fcmps(src1, src2);
                 compare(this, reg_cmpx, instr.fmt1c.cmpx);
                 movs(v0, 0, src1, 1);
-                movs(v1, 1, src2, 1);
+                movs(v1, 0, src2, 1);
                 fcmps(v0, v1);
                 compare(this, reg_cmpy, instr.fmt1c.cmpy);
                 break;
@@ -605,8 +611,9 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto dst = GETDST(5);
 
                 setupMul(this, src1, src2);
-                mov16b(dst, src3);
-                fmla4s(dst, src1, v1);
+                if (src3.idx != 2) mov16b(v2, src3);
+                fmla4s(v2, src1, v1);
+                mov16b(dst, v2);
                 STRDST(5);
                 break;
             }
@@ -620,7 +627,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
 static void compileEx2(ArmShaderJitBackend* this) {
     // takes x in s0 and return in s0
 
-    Label (end);
+    Label(end);
 
     // constants for getting good input to polynomials (found through testing)
     const float exthr = 0.535f;
@@ -636,8 +643,8 @@ static void compileEx2(ArmShaderJitBackend* this) {
     // x = n + r where n in Z, r in [0,1)
     // 2^x = 2^n * 2^r, 2^r will be in [1,2)
     // so it ends up just being a float
-    frintm(s1, s0);
-    fcvtms(w11, s0);
+    frintms(v1, v0);
+    fcvtmssw(r11, v0);
     fsubs(v0, v0, v1);
     // now n in w11 and r in s0
 
@@ -646,16 +653,16 @@ static void compileEx2(ArmShaderJitBackend* this) {
     fmovw(v1, r17);
     fcmps(v0, v1);
     fsubs(v1, v0, v7);
-    fcsel(s0, s1, s0, HS);
+    fcsels(v0, v1, v0, hs);
 
     // make n into float exponent
-    add(w11, w11, 127);
-    cmp(w11, 0);
-    csel(w11, wzr, w11, LT);
-    mov(w12, 0xff);
-    cmp(w11, w12);
-    csel(w11, w12, w11, GT);
-    lsl(w11, w11, 23);
+    addw(r11, r11, 127);
+    cmpw(r11, 0);
+    cselw(r11, zr, r11, lt);
+    movw(r12, 0xff);
+    cmpw(r11, r12);
+    cselw(r11, r12, r11, gt);
+    lslw(r11, r11, 23);
 
     // 2^r = e^(r * ln2)
     // e^x ~= ((1/6 * x + 1/2) * x + 1) * x + 1
@@ -665,20 +672,20 @@ static void compileEx2(ArmShaderJitBackend* this) {
     // c3 is just 1
     // now 2^x ~= ((c0 * x + c1) * x + c2) * x + c3
 
-    mov(w17, F2I(c0));
-    fmov(s1, w17);
-    mov(w17, F2I(c1));
-    fmov(s5, w17);
-    mov(w17, F2I(c2));
-    fmov(s6, w17);
-    fmadd(s1, s1, s0, s5);
-    fmadd(s1, s1, s0, s6);
-    fmadd(s1, s1, s0, s7);
+    movw(r17, F2I(c0));
+    fmovw(v1, r17);
+    movw(r17, F2I(c1));
+    fmovw(v5, r17);
+    movw(r17, F2I(c2));
+    fmovw(v6, r17);
+    fmadds(v1, v1, v0, v5);
+    fmadds(v1, v1, v0, v6);
+    fmadds(v1, v1, v0, v7);
 
     // extract the mantissa and insert into the result
-    fmov(w12, s1);
-    bfi(w11, w12, 0, 23);
-    fmov(s0, w11);
+    fmovw(r12, v1);
+    bfiw(r11, r12, 0, 23);
+    fmovw(v0, r11);
     L(end);
     ret();
 }
@@ -689,41 +696,42 @@ static void compileLg2(ArmShaderJitBackend* this) {
     // constants for getting good input to polynomials (found through testing)
     const float lgthr = 1.35f;
 
-    Label lnan, lminf;
+    Label(lnan);
+    Label(lninf);
 
-    L(lg2func);
+    L(this->lg2func);
     // check nan and 0
-    fcmp(s0, s0);
+    fcmps(v0, v0);
     bne(lnan);
-    fcmp(s0, 0);
-    beq(lminf);
+    fcmpzs(v0);
+    beq(lninf);
 
     // x = 2^n * r where n in Z and r in [1,2)
     // log2(x) = n + log2(r)
-    fmov(w11, s0);
+    fmovw(r11, v0);
     // check for negative number
-    tbnz(w11, 31, lnan);
+    tbnz(r11, 31, lnan);
 
-    ubfx(w12, w11, 23, 8);
-    sub(w12, w12, 127);
-    ubfx(w11, w11, 0, 23);
-    orr(w11, w11, 0x3f800000);
-    fmov(s0, w11);
+    ubfxw(r12, r11, 23, 8);
+    subw(r12, r12, 127);
+    ubfxw(r11, r11, 0, 23);
+    orrw(r11, r11, 0x3f800000);
+    fmovw(v0, r11);
     // now n in w12 and r in s0
 
     // translate from [1, 2) -> [lgthr/2, lgthr)
-    mov(w17, F2I(lgthr));
-    fmov(s1, w17);
-    fcmp(s0, s1);
-    fmov(s7, 0.5f);
-    fmul(s1, s0, s7);
-    fcsel(s0, s1, s0, HS);
-    cinc(w12, w12, HS);
+    movw(r17, F2I(lgthr));
+    fmovw(v1, r17);
+    fcmps(v0, v1);
+    fmovs(v7, 0.5f);
+    fmuls(v1, v0, v7);
+    fcsels(v0, v1, v0, hs);
+    cincw(r12, r12, hs);
 
     // log2(r) = ln(r)/ln2
     // log polynomial is for x-1
-    fmov(s7, 1.f);
-    fsub(s0, s0, s7);
+    fmovs(v7, 1.f);
+    fsubs(v0, v0, v7);
 
     // ln(x+1) ~= (((-1/4 * x + 1/3) * x - 1/2) * x + 1) * x
     const float c0 = -1 / (4 * M_LN2);
@@ -732,32 +740,32 @@ static void compileLg2(ArmShaderJitBackend* this) {
     const float c3 = 1 / M_LN2;
     // log2(x+1) ~= (((c0 * x + c1) * x + c2) * x + c3) * x
 
-    mov(w17, F2I(c0));
-    fmov(s1, w17);
-    mov(w17, F2I(c1));
-    fmov(s5, w17);
-    mov(w17, F2I(c2));
-    fmov(s6, w17);
-    mov(w17, F2I(c3));
-    fmov(s7, w17);
-    fmadd(s1, s1, s0, s5);
-    fmadd(s1, s1, s0, s6);
-    fmadd(s1, s1, s0, s7);
-    fmul(s1, s1, s0);
+    movw(r17, F2I(c0));
+    fmovw(v1, r17);
+    movw(r17, F2I(c1));
+    fmovw(v5, r17);
+    movw(r17, F2I(c2));
+    fmovw(v6, r17);
+    movw(r17, F2I(c3));
+    fmovw(v7, r17);
+    fmadds(v1, v1, v0, v5);
+    fmadds(v1, v1, v0, v6);
+    fmadds(v1, v1, v0, v7);
+    fmuls(v1, v1, v0);
 
     // res is n + log r
-    scvtf(s0, w12);
-    fadd(s0, s0, s1);
+    scvtfsw(v0, r12);
+    fadds(v0, v0, v1);
     ret();
 
     // degenerate cases
     L(lnan);
-    mov(w17, F2I(NAN));
-    fmov(s0, w17);
+    movw(r17, F2I(NAN));
+    fmovw(v0, r17);
     ret();
-    L(lminf);
-    mov(w17, F2I(-INFINITY));
-    fmov(s0, w17);
+    L(lninf);
+    movw(r17, F2I(-INFINITY));
+    fmovw(v0, r17);
     ret();
 }
 
@@ -800,7 +808,7 @@ ShaderJitFunc shaderjit_arm_get_code(ArmShaderJitBackend* this,
     }
     // couldn't find this entrypoint, so recompile
     ArmShaderEntrypoint e = {shu->entrypoint, nullptr};
-    Vec_push(this->entrypoints, e);
+    int i = Vec_push(this->entrypoints, e);
 
     if (this->code) rasDestroy(this->code);
     this->code = rasCreate(16384);
@@ -824,13 +832,18 @@ ShaderJitFunc shaderjit_arm_get_code(ArmShaderJitBackend* this,
     Vec_free(this->jmplabels);
     Vec_free(this->calls);
 
+    rasReady(this->code);
+
 #ifdef JIT_DISASM
     pica_shader_disasm(shu);
     shaderjit_arm_disassemble((void*) this);
 #endif
+
+    return rasGetLabelAddr(this->code, this->entrypoints.d[i].lab);
 }
 
 void shaderjit_arm_free(ArmShaderJitBackend* this) {
+    if (!this) return;
     Vec_free(this->jmplabels);
     Vec_free(this->calls);
     Vec_free(this->entrypoints);
@@ -838,6 +851,20 @@ void shaderjit_arm_free(ArmShaderJitBackend* this) {
     free(this);
 }
 
-void shaderjit_arm_disassemble(ArmShaderJitBackend* this) {}
+void shaderjit_arm_disassemble(ArmShaderJitBackend* this) {
+    csh handle;
+    cs_insn* insn;
+    cs_open(CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN, &handle);
+    size_t count = cs_disasm(handle, rasGetCode(this->code),
+                             rasGetSize(this->code), 0, 0, &insn);
+    printf("--------- Shader JIT Disassembly at %p ------------\n",
+           rasGetCode(this->code));
+    for (size_t i = 0; i < count; i++) {
+        printf("%04lx: %08x\t%s %s\n", insn[i].address, *(u32*) &insn[i].bytes,
+               insn[i].mnemonic, insn[i].op_str);
+    }
+    cs_free(insn, count);
+    cs_close(&handle);
+}
 
 #endif
