@@ -10,7 +10,8 @@ void ras_error_cb(rasError err) {
     abort();
 }
 
-[[gnu::constructor]] static void init_error() {
+[[gnu::constructor]]
+static void init_error() {
     rasSetErrorCallback((rasErrorCallback) ras_error_cb, nullptr);
 }
 

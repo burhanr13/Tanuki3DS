@@ -110,8 +110,8 @@ DECL_PORT(dsp) {
         }
         case 0x0011: {
             linfo("LoadComponent");
-            u32 size [[gnu::unused]] = cmdbuf[1];
-            void* buf [[gnu::unused]] = PTR(cmdbuf[5]);
+            [[maybe_unused]] u32 size = cmdbuf[1];
+            [[maybe_unused]] void* buf = PTR(cmdbuf[5]);
 
             // component is not directly used right now
             s->services.dsp.comp_loaded = true;

@@ -35,6 +35,7 @@ static int getOpForReg(HostRegAllocation* hralloc, int i) {
     }
 }
 
+[[maybe_unused]]
 static void print_hostregs(HostRegAllocation* hralloc) {
     printf("Host Regs:");
     for (u32 i = 0; i < hralloc->nregs; i++) {

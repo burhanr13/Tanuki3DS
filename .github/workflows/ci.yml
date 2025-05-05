@@ -28,9 +28,9 @@ jobs:
         mkdir build
         cd build
         cmake ..
-        sudo make install
+        sudo make install -j$(nproc)
     - name: build
-      run: make USER=1
+      run: make -j$(nproc) USER=1
     - name: create appimage
       run: |
         sudo apt install libfuse2
@@ -65,13 +65,9 @@ jobs:
         mkdir build
         cd build
         cmake ..
-        sudo make install
-        cd ../..
-        git clone https://github.com/fujitsu/xbyak_aarch64.git
-        cd xbyak_aarch64
-        sudo make install
+        sudo make install -j$(nproc)
     - name: build
-      run: make USER=1
+      run: make -j$(nproc) USER=1
     - name: create appimage
       run: |
         sudo apt install libfuse2
@@ -94,7 +90,7 @@ jobs:
         brew update
         brew install llvm sdl3 xxhash xbyak cglm fdk-aac
     - name: build
-      run: make USER=1
+      run: make -j$(nproc) USER=1
 
     # taken from panda3ds
     - name: create app bundle
@@ -117,11 +113,8 @@ jobs:
       run: |
         brew update
         brew install llvm sdl3 xxhash cglm fdk-aac
-        git clone https://github.com/fujitsu/xbyak_aarch64.git
-        cd xbyak_aarch64
-        sudo make install
     - name: build
-      run: make USER=1
+      run: make -j$(nproc) USER=1
 
     # taken from panda3ds
     - name: create app bundle
@@ -153,7 +146,7 @@ jobs:
         cd xbyak
         make install
     - name: build
-      run: make USER=1
+      run: make -j$(nproc) USER=1
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-windows

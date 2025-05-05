@@ -244,7 +244,7 @@ void gsp_handle_command(E3DS* s) {
             u16 wout = dimout & 0xffff;
             u16 hout = dimout >> 16;
             u32 flags = cmds->d[cmds->cur].args[4];
-            u8 fmtin [[gnu::unused]] = (flags >> 8) & 7;
+            [[maybe_unused]] u8 fmtin = (flags >> 8) & 7;
             u8 fmtout = (flags >> 12) & 7;
             u8 scalemode = (flags >> 24) & 3;
             bool scalex = scalemode >= 1;
