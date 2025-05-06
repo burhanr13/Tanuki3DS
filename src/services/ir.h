@@ -6,9 +6,9 @@
 #include "srv.h"
 
 typedef struct {
-    KEvent event;
+    KEvent connection_status;
 } IRData;
 
-DECL_PORT(ir);
+DECL_PORT(ir_user);
 
 #endif

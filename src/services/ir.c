@@ -2,11 +2,12 @@
 
 #include "3ds.h"
 
-DECL_PORT(ir) {
+DECL_PORT(ir_user) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {
         case 0x000c: {
-            u32 h = srvobj_make_handle(s, &s->services.ir.event.hdr);
+            u32 h =
+                srvobj_make_handle(s, &s->services.ir.connection_status.hdr);
             linfo("GetConnectionStatusEvent with handle %08x", h);
             cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
