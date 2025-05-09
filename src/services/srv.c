@@ -73,7 +73,7 @@ void services_init(E3DS* s) {
 
     srvobj_init(&s->services.y2r.transferend.hdr, KOT_EVENT);
 
-    srvobj_init(&s->services.ir.event.hdr, KOT_EVENT);
+    srvobj_init(&s->services.ir.connection_status.hdr, KOT_EVENT);
 }
 
 DECL_PORT_ARG(stub, name) {
