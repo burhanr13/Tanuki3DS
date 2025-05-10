@@ -37,7 +37,7 @@ void e3ds_handle_svc(E3DS* s, u32 num) {
 
 DECL_SVC(ControlMemory) {
     u32 memop = R(0) & MEMOP_MASK;
-    u32 memreg [[gnu::unused]] = R(0) & MEMOP_REGMASK;
+    [[maybe_unused]] u32 memreg = R(0) & MEMOP_REGMASK;
     bool linear = R(0) & MEMOP_LINEAR;
     u32 addr0 = R(1);
     u32 addr1 = R(2);
@@ -338,7 +338,7 @@ DECL_SVC(CreateMemoryBlock) {
 
     u32 addr = R(1);
     u32 size = R(2);
-    u32 perm [[gnu::unused]] = R(3);
+    [[maybe_unused]] u32 perm = R(3);
 
     KSharedMem* shm = calloc(1, sizeof *shm);
     shm->hdr.type = KOT_SHAREDMEM;

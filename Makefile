@@ -41,7 +41,7 @@ endif
 
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto
-	CPPFLAGS += -DREDIRECTSTDOUT -DNOCAPSTONE
+	CPPFLAGS += -DREDIRECTSTDOUT -DNOCAPSTONE -DRAS_NO_CHECKS
 else
 	CFLAGS_RELEASE += -g
 	LIBS += -lcapstone
@@ -49,13 +49,6 @@ endif
 
 ifeq ($(shell getconf PAGESIZE),4096)
 	CPPFLAGS += -DFASTMEM -DJIT_FASTMEM
-endif
-
-ifeq ($(shell uname -m),arm64)
-	STATIC_LIBS += -lxbyak_aarch64
-endif
-ifeq ($(shell uname -m),aarch64)
-	STATIC_LIBS += -lxbyak_aarch64
 endif
 
 LDFLAGS := $(LIBDIRS:%=-L%) $(LIBS)

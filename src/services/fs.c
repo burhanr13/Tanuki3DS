@@ -372,7 +372,7 @@ DECL_PORT(fs) {
         case 0x084c: {
             u32 archive = cmdbuf[1];
             u32 pathtype = cmdbuf[2];
-            u32 pathsize [[gnu::unused]] = cmdbuf[3];
+            [[maybe_unused]] u32 pathsize = cmdbuf[3];
             void* path = PTR(cmdbuf[11]);
             u32 numdirs = cmdbuf[5];
             u32 numfiles = cmdbuf[6];

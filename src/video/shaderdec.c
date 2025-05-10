@@ -96,7 +96,8 @@ void deccondop(DecCTX* ctx, u32 op, bool refx, bool refy) {
                     ds_printf(&ctx->s, "!all(cmp)");
                 }
             } else {
-                ds_printf(&ctx->s, "%scmp.x || %scmp.y", refx ? "" : "!", refy ? "" : "!");
+                ds_printf(&ctx->s, "%scmp.x || %scmp.y", refx ? "" : "!",
+                          refy ? "" : "!");
             }
             break;
         case 1:
@@ -107,7 +108,8 @@ void deccondop(DecCTX* ctx, u32 op, bool refx, bool refy) {
                     ds_printf(&ctx->s, "!any(cmp)");
                 }
             } else {
-                ds_printf(&ctx->s, "%scmp.x && %scmp.y", refx ? "" : "!", refy ? "" : "!");
+                ds_printf(&ctx->s, "%scmp.x && %scmp.y", refx ? "" : "!",
+                          refy ? "" : "!");
             }
             break;
         case 2:
@@ -189,7 +191,7 @@ void decdestend(DecCTX* ctx, u8 mask) {
 #define INDENT(n)                                                              \
     ({                                                                         \
         for (int i = 0; i < (n); i++) {                                        \
-            ds_printf(&ctx->s, "%4s", "");                                                 \
+            ds_printf(&ctx->s, "%4s", "");                                     \
         }                                                                      \
     })
 
@@ -389,9 +391,10 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
             if (instr.fmt1.dest == ctx->out_view) {
                 u32 rn = instr.fmt1.src1 - 0x10;
                 if (rn < 0x10) {
-                    ds_printf(&ctx->s, "if (freecam_enable) r[%d] = freecam_mtx * "
-                           "r[%d];\n",
-                           rn, rn);
+                    ds_printf(&ctx->s,
+                              "if (freecam_enable) r[%d] = freecam_mtx * "
+                              "r[%d];\n",
+                              rn, rn);
                     INDENT(ctx->depth);
                 }
             }
@@ -465,8 +468,10 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
         case PICA_LOOP: {
             ds_printf(&ctx->s, "aL = i[%d].y;\n", instr.fmt3.c);
             INDENT(ctx->depth);
-            ds_printf(&ctx->s, "for (uint l = 0u; l <= i[%d].x; l++, aL = (aL + i[%d].z) & 0xffu) {\n",
-                   instr.fmt3.c, instr.fmt3.c);
+            ds_printf(&ctx->s,
+                      "for (uint l = 0u; l <= i[%d].x; l++, aL = (aL + "
+                      "i[%d].z) & 0xffu) {\n",
+                      instr.fmt3.c, instr.fmt3.c);
             dec_block(ctx, pc, instr.fmt3.dest + 1 - pc);
             INDENT(ctx->depth);
             ds_printf(&ctx->s, "}\n");
@@ -500,7 +505,7 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
                               instr.fmt2.refy);
                 } else {
                     ds_printf(&ctx->s, "%sb(%d)", instr.fmt3.num & 1 ? "!" : "",
-                           instr.fmt3.c);
+                              instr.fmt3.c);
                 }
                 ds_printf(&ctx->s, ") {\n");
                 dec_block(ctx, dst, ctx->curfuncend - dst);
@@ -524,8 +529,8 @@ u32 dec_instr(DecCTX* ctx, u32 pc) {
                         deccondop(ctx, instr.fmt2.op, instr.fmt2.refx,
                                   instr.fmt2.refy);
                     } else {
-                        ds_printf(&ctx->s, "%sb(%d)", instr.fmt3.num & 1 ? "!" : "",
-                               instr.fmt3.c);
+                        ds_printf(&ctx->s, "%sb(%d)",
+                                  instr.fmt3.num & 1 ? "!" : "", instr.fmt3.c);
                     }
                     ds_printf(&ctx->s, ")) {\n");
                     dec_block(ctx, pc, dst - pc);
@@ -670,6 +675,7 @@ char* shader_dec_vs(GPU* gpu) {
         dec_block(&ctx, start, num);
         ds_printf(&ctx.s, "}\n\n");
     }
+    Vec_free(ctx.calls);
 
     ds_printf(&final, "\n%s", ctx.s.str);
     free(ctx.s.str);
@@ -703,23 +709,32 @@ char* shader_dec_vs(GPU* gpu) {
                   gpu->regs.raster.sh_outmap[o][2] << 8 |
                   gpu->regs.raster.sh_outmap[o][3];
         switch (all) {
-            case 0x00'01'02'03: ds_printf(&final, "pos = o[%d];\n", o); break;
-                case 0x04'05'06'07: ds_printf(&final, "normquat = o[%d];\n",
-                                                o);
+            case 0x00'01'02'03:
+                ds_printf(&final, "pos = o[%d];\n", o);
                 break;
-                case 0x08'09'0a'0b: ds_printf(&final, "color = o[%d];\n", o);
-                break; case 0x0c'0d'1f'1f: ds_printf(
-                    &final, "texcoord0 = o[%d].xy;\n", o);
-                break; case 0x0c'0d'10'1f: ds_printf(
-                    &final, "texcoord0 = o[%d].xy;\n", o);
-                ds_printf(&final, "texcoordw = o[%d].z;\n", o); break;
-                case 0x0e'0f'1f'1f: ds_printf(&final,
-                                                "texcoord1 = o[%d].xy;\n", o);
-                break; case 0x12'13'14'1f: ds_printf(
-                    &final, "view = o[%d].xyz;\n", o);
-                break; case 0x16'17'1f'1f: ds_printf(
-                    &final, "texcoord2 = o[%d].xy;\n", o);
-                break; default:
+            case 0x04'05'06'07:
+                ds_printf(&final, "normquat = o[%d];\n", o);
+                break;
+            case 0x08'09'0a'0b:
+                ds_printf(&final, "color = o[%d];\n", o);
+                break;
+            case 0x0c'0d'1f'1f:
+                ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                break;
+            case 0x0c'0d'10'1f:
+                ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                ds_printf(&final, "texcoordw = o[%d].z;\n", o);
+                break;
+            case 0x0e'0f'1f'1f:
+                ds_printf(&final, "texcoord1 = o[%d].xy;\n", o);
+                break;
+            case 0x12'13'14'1f:
+                ds_printf(&final, "view = o[%d].xyz;\n", o);
+                break;
+            case 0x16'17'1f'1f:
+                ds_printf(&final, "texcoord2 = o[%d].xy;\n", o);
+                break;
+            default:
                 for (int i = 0; i < 4; i++) {
                     int sem = gpu->regs.raster.sh_outmap[o][i];
                     if (sem < 0x18)

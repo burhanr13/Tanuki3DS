@@ -10,3 +10,4 @@ SortIncludes: true
 AccessModifierOffset: -4
 IndentCaseLabels: true
 ColumnLimit: 80
+BreakAfterAttributes: Leave

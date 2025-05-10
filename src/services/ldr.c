@@ -370,7 +370,7 @@ void ldr_unload_cro(E3DS* s, u32 vaddr) {
 
     CROSegment* segs = PTR(hdr->segmenttable.addr);
 
-    u32 onunresolved [[gnu::unused]] = SEGTAGADDR(segs, hdr->onunresolved);
+    [[maybe_unused]] u32 onunresolved = SEGTAGADDR(segs, hdr->onunresolved);
 
     // reset patches
     CROImportPatch* extrels = PTR(hdr->external_patches.addr);

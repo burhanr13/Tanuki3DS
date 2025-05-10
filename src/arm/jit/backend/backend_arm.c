@@ -5,137 +5,76 @@
 #ifndef NOCAPSTONE
 #include <capstone/capstone.h>
 #endif
-#include <utility>
-#include <vector>
-#include <xbyak_aarch64/xbyak_aarch64.h>
 
-using namespace Xbyak_aarch64;
+#include "arm/media.h"
 
-struct LinkPatch {
-    u32 jmp_offset;
-    u32 attrs;
-    u32 addr;
-};
+#define RAS_MACROS
+#define RAS_DEFAULT_SUFFIX w
+#define RAS_CTX_VAR backend->code
+#include <ras/ras.h>
 
-enum {
-    CB_LOAD8,
-    CB_LOAD16,
-    CB_LOAD32,
-    CB_STORE8,
-    CB_STORE16,
-    CB_STORE32,
+#define TEMPREGS_BASE 3
+#define TEMPREGS_COUNT 13
+#define SAVEDREGS_BASE 19
+#define SAVEDREGS_COUNT 10
 
-    CB_LOADF32,
-    CB_LOADF64,
-    CB_STOREF32,
-    CB_STOREF64,
-
-    CB_MAX
-};
-
-struct Code : Xbyak_aarch64::CodeGenerator {
-    RegAllocation* regalloc;
-    HostRegAllocation hralloc;
-    ArmCore* cpu;
-
-    // x0-x2 scratch
-    // x3-x15 temp
-    // x16-x17 scratch
-    // x19-x28 saved
-    // x29 cpu ptr
-
-    const int tempBase = 3;
-    const int tempMax = 13;
-    const int savedBase = 19;
-    const int savedMax = 10;
-
-    std::vector<LinkPatch> links;
-
-    Label cblabels[CB_MAX] = {};
-    bool usingcb[CB_MAX] = {};
-
-    Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
-
-    ~Code() {
-        hostregalloc_free(&hralloc);
+// returns:
+// 0-31 : reg index
+// 32+n : stack index
+static int getOpForReg(HostRegAllocation* hralloc, int i) {
+    HostRegInfo hr = hralloc->hostreg_info[i];
+    switch (hr.type) {
+        case REG_TEMP:
+            return TEMPREGS_BASE + hr.index;
+        case REG_SAVED:
+            return SAVEDREGS_BASE + hr.index;
+        case REG_STACK:
+            return 32 + hr.index;
+        default:
+            unreachable();
     }
+}
 
-    void print_hostregs() {
-        printf("Host Regs:");
-        for (u32 i = 0; i < hralloc.nregs; i++) {
-            printf(" $%d:", i);
-            int operand = getOpForReg(i);
-            if (operand >= 32) {
-                operand -= 32;
-                printf("[sp, #0x%x]", 4 * operand);
-            } else {
-                printf("w%d", operand);
-            }
-        }
-        printf("\n");
-    }
-
-    int getSPDisp() {
-        return (hralloc.count[REG_STACK] * 4 + 15) & ~15;
-    }
-
-    // returns:
-    // 0-31 : reg index
-    // 32+n : stack index
-    int getOpForReg(int i) {
-        HostRegInfo hr = hralloc.hostreg_info[i];
-        switch (hr.type) {
-            case REG_TEMP:
-                return tempBase + hr.index;
-            case REG_SAVED:
-                return savedBase + hr.index;
-            case REG_STACK:
-                return 32 + hr.index;
-            default:
-                std::unreachable();
+[[maybe_unused]]
+static void print_hostregs(HostRegAllocation* hralloc) {
+    printf("Host Regs:");
+    for (u32 i = 0; i < hralloc->nregs; i++) {
+        printf(" $%d:", i);
+        int operand = getOpForReg(hralloc, i);
+        if (operand >= 32) {
+            operand -= 32;
+            printf("[sp, #0x%x]", 4 * operand);
+        } else {
+            printf("w%d", operand);
         }
     }
+    printf("\n");
+}
 
-    int getOp(int i) {
-        int assn = regalloc->reg_assn[i];
-        if (assn == -1) return -1;
-        else return getOpForReg(assn);
-    }
+#define SPDISP() ((backend->hralloc.count[REG_STACK] * 4 + 15) & ~15)
 
-    void compileCBCall(int cb) {
-        usingcb[cb] = true;
-        ldr(x16, cblabels[cb]);
-        blr(x16);
-    }
+static int getOp(ArmCodeBackend* backend, int i) {
+    int assn = backend->regalloc->reg_assn[i];
+    if (assn == -1) return -1;
+    else return getOpForReg(&backend->hralloc, assn);
+}
 
-    void placeCBLiterals() {
-        u64 cbptrs[CB_MAX] = {
-            (u64) cpu->read8,    (u64) cpu->read16,  (u64) cpu->read32,
-            (u64) cpu->write8,   (u64) cpu->write16, (u64) cpu->write32,
-            (u64) cpu->readf32,  (u64) cpu->readf64, (u64) cpu->writef32,
-            (u64) cpu->writef64,
-        };
-        align(8);
-        for (int i = 0; i < CB_MAX; i++) {
-            if (usingcb[i]) {
-                L(cblabels[i]);
-                dd(cbptrs[i]);
-                dd(cbptrs[i] >> 32);
-            }
-        }
-    }
+static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr);
+static void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr,
+                              rasReg addr, rasLabel lldf32, rasLabel lldf64);
+static void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr,
+                               rasReg addr, rasLabel lstf32, rasLabel lstf64);
+static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasReg dst);
+static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
+                            rasReg src);
+static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
+                             rasReg dst, bool h);
+static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
+                              rasReg src, bool h);
 
-    void compileVFPDataProc(ArmInstr instr);
-    void compileVFPLoadMem(ArmInstr instr, WReg addr);
-    void compileVFPStoreMem(ArmInstr instr, WReg addr);
-    void compileVFPRead(ArmInstr instr, WReg dst);
-    void compileVFPWrite(ArmInstr instr, WReg src);
-    void compileVFPRead64(ArmInstr instr, WReg dst, bool hi);
-    void compileVFPWrite64(ArmInstr instr, WReg src, bool hi);
-};
+#define GETOP(i) getOp(backend, i)
 
-#define CPU(m, ...)                                                            \
-    (ptr(x29, (u32) offsetof(ArmCore, m) __VA_OPT__(+) __VA_ARGS__))
+#define CPU(m, ...) (r29, offsetof(ArmCore, m) __VA_OPT__(+) __VA_ARGS__)
 
 #define LOADOP(i, flbk)                                                        \
     ({                                                                         \
@@ -143,62 +82,81 @@ struct Code : Xbyak_aarch64::CodeGenerator {
         if (inst.imm##i) {                                                     \
             mov(dst, inst.op##i);                                              \
         } else {                                                               \
-            int op = getOp(inst.op##i);                                        \
+            int op = GETOP(inst.op##i);                                        \
             if (op >= 32) {                                                    \
                 op -= 32;                                                      \
-                ldr(dst, ptr(sp, 4 * op));                                     \
+                ldr(dst, (sp, 4 * op));                                        \
             } else {                                                           \
-                dst = WReg(op);                                                \
+                dst = Reg(op);                                                 \
             }                                                                  \
         }                                                                      \
         dst;                                                                   \
     })
-#define LOADOP1() LOADOP(1, w16)
-#define LOADOP2() LOADOP(2, w17)
+#define LOADOP1() LOADOP(1, ip0)
+#define LOADOP2() LOADOP(2, ip1)
 
 #define MOVOP(i, dst)                                                          \
     ({                                                                         \
         auto src = LOADOP(i, dst);                                             \
-        if (src.getIdx() != dst.getIdx()) mov(dst, src);                       \
+        if (src.idx != dst.idx) mov(dst, src);                                 \
     })
 #define MOVOP1(dst) MOVOP(1, dst)
 #define MOVOP2(dst) MOVOP(2, dst)
 
 #define DSTREG()                                                               \
     ({                                                                         \
-        int op = getOp(i);                                                     \
-        (op >= 32) ? w16 : WReg(op);                                           \
+        int op = GETOP(i);                                                     \
+        (op >= 32) ? ip0 : Reg(op);                                            \
     })
 #define STOREDST()                                                             \
     ({                                                                         \
-        int op = getOp(i);                                                     \
+        int op = GETOP(i);                                                     \
         if (op >= 32) {                                                        \
             op -= 32;                                                          \
-            str(w16, ptr(sp, 4 * op));                                         \
+            str(ip0, (sp, 4 * op));                                            \
         }                                                                      \
     })
 
-Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
-    : Xbyak_aarch64::CodeGenerator(4096, Xbyak_aarch64::AutoGrow),
-      regalloc(regalloc), cpu(cpu) {
+ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
+                                          ArmCore* cpu) {
+    ArmCodeBackend* backend = calloc(1, sizeof *backend);
+    backend->code = rasCreate(16384);
+    backend->cpu = cpu;
+    backend->regalloc = regalloc;
 
-    hralloc = allocate_host_registers(regalloc, tempMax, savedMax);
+    backend->hralloc =
+        allocate_host_registers(regalloc, TEMPREGS_COUNT, SAVEDREGS_COUNT);
 
     u32 flags_mask = 0; // mask for which flags to store
     u32 lastflags = 0;  // last var for which flags were set
 
     u32 jmptarget = -1;
 
-    Label looplabel;
+    // callback address literal pool
+    Label(lld8);
+    Label(lld16);
+    Label(lld32);
+    Label(lst8);
+    Label(lst16);
+    Label(lst32);
+    Label(lldf32);
+    Label(lldf64);
+    Label(lstf32);
+    Label(lstf64);
 
-    std::vector<Label> labels;
+    // label for END_LOOP (jump to the same the block)
+    Label(looplabel);
+
+    // labels for jump instructions
+    rasLabel labels[MAX_BLOCK_INSTRS];
+    int nlabel = 0;
 
     for (u32 i = 0; i < ir->code.size; i++) {
         while (i < ir->code.size && ir->code.d[i].opcode == IR_NOP) i++;
         if (i == ir->code.size) break;
         IRInstr inst = ir->code.d[i];
         if (i >= jmptarget && inst.opcode != IR_JELSE) {
-            L(labels.back());
+            L(labels[nlabel - 1]);
             jmptarget = -1;
             lastflags = 0;
         }
@@ -247,21 +205,21 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_STORE_FLAG: {
                 if (ir->code.d[i - 2].opcode != IR_STORE_FLAG) {
-                    mov(w0, 0);
+                    mov(r0, 0);
                     flags_mask = 0;
                 }
                 if (inst.imm2) {
-                    if (inst.op2) orr(w0, w0, BIT(31 - inst.op1));
+                    if (inst.op2) orr(r0, r0, BIT(31 - inst.op1));
                 } else {
                     auto src = LOADOP2();
-                    bfi(w0, src, 31 - inst.op1, 1);
+                    bfi(r0, src, 31 - inst.op1, 1);
                 }
                 flags_mask |= BIT(31 - inst.op1);
                 if (ir->code.d[i + 2].opcode != IR_STORE_FLAG) {
-                    ldr(w1, CPU(cpsr));
-                    and_imm(w1, w1, ~flags_mask, w2);
-                    orr(w1, w1, w0);
-                    str(w1, CPU(cpsr));
+                    ldr(r1, CPU(cpsr));
+                    and(r1, r1, ~flags_mask, r2);
+                    orr(r1, r1, r0);
+                    str(r1, CPU(cpsr));
                 }
                 break;
             }
@@ -293,137 +251,147 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_STORE_THUMB: {
                 auto src = LOADOP2();
-                ldr(w0, CPU(cpsr));
-                bfi(w0, src, 5, 1);
-                str(w0, CPU(cpsr));
+                ldr(r0, CPU(cpsr));
+                bfi(r0, src, 5, 1);
+                str(r0, CPU(cpsr));
                 break;
             }
             case IR_VFP_DATA_PROC: {
-                lastflags = 0; // fcmp might trash flags
-                compileVFPDataProc(ArmInstr(inst.op1));
+                lastflags = 0;
+                compileVFPDataProc(backend, (ArmInstr) {inst.op1});
                 break;
             }
             case IR_VFP_LOAD_MEM: {
                 auto addr = LOADOP2();
-                compileVFPLoadMem(ArmInstr(inst.op1), addr);
+                compileVFPLoadMem(backend, (ArmInstr) {inst.op1}, addr, lldf32,
+                                  lldf64);
                 break;
             }
             case IR_VFP_STORE_MEM: {
                 auto addr = LOADOP2();
-                compileVFPStoreMem(ArmInstr(inst.op1), addr);
+                compileVFPStoreMem(backend, (ArmInstr) {inst.op1}, addr, lstf32,
+                                   lstf64);
                 break;
             }
             case IR_VFP_READ: {
                 auto dst = DSTREG();
-                compileVFPRead(ArmInstr(inst.op1), dst);
+                compileVFPRead(backend, (ArmInstr) {inst.op1}, dst);
                 break;
             }
             case IR_VFP_WRITE: {
                 auto src = LOADOP2();
-                compileVFPWrite(ArmInstr(inst.op1), src);
+                compileVFPWrite(backend, (ArmInstr) {inst.op1}, src);
                 break;
             }
             case IR_VFP_READ64L: {
                 auto dst = DSTREG();
-                compileVFPRead64(ArmInstr(inst.op1), dst, false);
+                compileVFPRead64(backend, (ArmInstr) {inst.op1}, dst, false);
                 break;
             }
             case IR_VFP_READ64H: {
                 auto dst = DSTREG();
-                compileVFPRead64(ArmInstr(inst.op1), dst, true);
+                compileVFPRead64(backend, (ArmInstr) {inst.op1}, dst, true);
                 break;
             }
             case IR_VFP_WRITE64L: {
                 auto src = LOADOP2();
-                compileVFPWrite64(ArmInstr(inst.op1), src, false);
+                compileVFPWrite64(backend, (ArmInstr) {inst.op1}, src, false);
                 break;
             }
             case IR_VFP_WRITE64H: {
                 auto src = LOADOP2();
-                compileVFPWrite64(ArmInstr(inst.op1), src, true);
+                compileVFPWrite64(backend, (ArmInstr) {inst.op1}, src, true);
                 break;
             }
             case IR_CP15_READ: {
                 auto dst = DSTREG();
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                mov(x16, (u64) cpu->cp15_read);
-                blr(x16);
-                mov(dst, w0);
+                movx(r0, r29);
+                mov(r1, inst.op1);
+                movx(ip0, (uintptr_t) cpu->cp15_read);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_CP15_WRITE: {
                 auto src = LOADOP2();
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                mov(w2, src);
-                mov(x16, (u64) cpu->cp15_write);
-                blr(x16);
+                movx(r0, r29);
+                mov(r1, inst.op1);
+                mov(r2, src);
+                movx(ip0, (uintptr_t) cpu->cp15_write);
+                blr(ip0);
                 break;
             }
             case IR_LOAD_MEM8: {
                 auto dst = DSTREG();
-                mov(x0, x29);
-                MOVOP1(w1);
-                mov(w2, 0);
-                compileCBCall(CB_LOAD8);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                mov(r2, 0);
+                ldrlx(ip0, lld8);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_LOAD_MEMS8: {
                 auto dst = DSTREG();
-                mov(x0, x29);
-                MOVOP1(w1);
-                mov(w2, 1);
-                compileCBCall(CB_LOAD8);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                mov(r2, 1);
+                ldrlx(ip0, lld8);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_LOAD_MEM16: {
                 auto dst = DSTREG();
-                mov(x0, x29);
-                MOVOP1(w1);
-                mov(w2, 0);
-                compileCBCall(CB_LOAD16);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                mov(r2, 0);
+                ldrlx(ip0, lld16);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_LOAD_MEMS16: {
                 auto dst = DSTREG();
-                mov(x0, x29);
-                MOVOP1(w1);
-                mov(w2, 1);
-                compileCBCall(CB_LOAD16);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                mov(r2, 1);
+                ldrlx(ip0, lld16);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_LOAD_MEM32: {
                 auto dst = DSTREG();
-                mov(x0, x29);
-                MOVOP1(w1);
-                compileCBCall(CB_LOAD32);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                ldrlx(ip0, lld32);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_STORE_MEM8: {
-                mov(x0, x29);
-                MOVOP1(w1);
-                MOVOP2(w2);
-                compileCBCall(CB_STORE8);
+                movx(r0, r29);
+                MOVOP1(r1);
+                MOVOP2(r2);
+                ldrlx(ip0, lst8);
+                blr(ip0);
                 break;
             }
             case IR_STORE_MEM16: {
-                mov(x0, x29);
-                MOVOP1(w1);
-                MOVOP2(w2);
-                compileCBCall(CB_STORE16);
+                movx(r0, r29);
+                MOVOP1(r1);
+                MOVOP2(r2);
+                ldrlx(ip0, lst16);
+                blr(ip0);
                 break;
             }
             case IR_STORE_MEM32: {
-                mov(x0, x29);
-                MOVOP1(w1);
-                MOVOP2(w2);
-                compileCBCall(CB_STORE32);
+                movx(r0, r29);
+                MOVOP1(r1);
+                MOVOP2(r2);
+                ldrlx(ip0, lst32);
+                blr(ip0);
                 break;
             }
             case IR_MOV: {
@@ -436,11 +404,11 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    ands_imm(dst, src1, inst.op2, w17);
+                    ands(dst, src1, inst.op2, ip1);
                 } else if (inst.imm1) {
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    ands_imm(dst, src2, inst.op1, w16);
+                    ands(dst, src2, inst.op1, ip0);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
@@ -454,11 +422,11 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    orr_imm(dst, src1, inst.op2, w17);
+                    orr(dst, src1, inst.op2, ip1);
                 } else if (inst.imm1) {
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    orr_imm(dst, src2, inst.op1, w16);
+                    orr(dst, src2, inst.op1, ip0);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
@@ -471,11 +439,11 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    eor_imm(dst, src1, inst.op2, w17);
+                    eor(dst, src1, inst.op2, ip1);
                 } else if (inst.imm1) {
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    eor_imm(dst, src2, inst.op1, w16);
+                    eor(dst, src2, inst.op1, ip0);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
@@ -501,7 +469,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                 } else {
                     auto shift = LOADOP2();
-                    Label lelse, lendif;
+                    Label(lelse);
+                    Label(lendif);
                     cmp(shift, 32);
                     bhs(lelse);
                     lsl(dst, src, shift);
@@ -525,7 +494,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                 } else {
                     auto shift = LOADOP2();
-                    Label lelse, lendif;
+                    Label(lelse);
+                    Label(lendif);
                     cmp(shift, 32);
                     bhs(lelse);
                     lsr(dst, src, shift);
@@ -549,7 +519,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                 } else {
                     auto shift = LOADOP2();
-                    Label lelse, lendif;
+                    Label(lelse);
+                    Label(lendif);
                     cmp(shift, 32);
                     bhs(lelse);
                     asr(dst, src, shift);
@@ -577,19 +548,19 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_RRC: {
                 auto src = LOADOP1();
                 auto dst = DSTREG();
-                cset(w0, CS);
-                extr(dst, w0, src, 1);
+                cset(r0, cs);
+                extr(dst, r0, src, 1);
                 break;
             }
             case IR_ADD: {
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    adds_imm(dst, src1, inst.op2, w17);
+                    adds(dst, src1, inst.op2, ip1);
                 } else if (inst.imm1) {
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    adds_imm(dst, src2, inst.op1, w16);
+                    adds(dst, src2, inst.op1, ip0);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
@@ -603,7 +574,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    subs_imm(dst, src1, inst.op2, w17);
+                    subs(dst, src1, inst.op2, ip1);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
@@ -636,14 +607,14 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
                     if (hinst.opcode == IR_SMULH) {
-                        smull(XReg(dst.getIdx()), src1, src2);
+                        smull(dst, src1, src2);
                     } else {
-                        umull(XReg(dst.getIdx()), src1, src2);
+                        umull(dst, src1, src2);
                     }
                     STOREDST();
                     i++;
                     auto dsth = DSTREG();
-                    lsr(XReg(dsth.getIdx()), XReg(dst.getIdx()), 32);
+                    lsrx(dsth, dst, 32);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
@@ -656,24 +627,24 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                smull(XReg(dst.getIdx()), src1, src2);
-                lsr(XReg(dst.getIdx()), XReg(dst.getIdx()), 32);
+                smull(dst, src1, src2);
+                lsrx(dst, dst, 32);
                 break;
             }
             case IR_UMULH: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                umull(XReg(dst.getIdx()), src1, src2);
-                lsr(XReg(dst.getIdx()), XReg(dst.getIdx()), 32);
+                umull(dst, src1, src2);
+                lsrx(dst, dst, 32);
                 break;
             }
             case IR_SMULW: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                smull(XReg(dst.getIdx()), src1, src2);
-                lsr(XReg(dst.getIdx()), XReg(dst.getIdx()), 16);
+                smull(dst, src1, src2);
+                lsrx(dst, dst, 16);
                 break;
             }
             case IR_CLZ: {
@@ -698,109 +669,101 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 auto src = LOADOP2();
                 auto dst = DSTREG();
                 cmp(src, 0);
-                csel(dst, wzr, src, LT);
-                mov(w0, MASK(inst.op1));
-                cmp(src, w0);
-                csel(dst, w0, dst, GT);
+                csel(dst, zr, src, lt);
+                mov(r0, MASK(inst.op1));
+                cmp(src, r0);
+                cmov(dst, r0, gt);
                 break;
             }
             case IR_SSAT: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                mov(w0, ~MASK(inst.op1));
-                cmp(src, w0);
-                csel(dst, w0, src, LT);
-                mov(w0, MASK(inst.op1));
-                cmp(src, w0);
-                csel(dst, w0, dst, GT);
+                mov(r0, ~MASK(inst.op1));
+                cmp(src, r0);
+                csel(dst, r0, src, lt);
+                mov(r0, MASK(inst.op1));
+                cmp(src, r0);
+                cmov(dst, r0, gt);
                 break;
             }
             case IR_MEDIA_UADD8: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(x0, x29);
-                mov(w1, src1);
-                mov(w2, src2);
-                mov(x16, (u64) media_uadd8);
-                blr(x16);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                MOVOP2(r2);
+                movx(ip0, (uintptr_t) media_uadd8);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_MEDIA_USUB8: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(x0, x29);
-                mov(w1, src1);
-                mov(w2, src2);
-                mov(x16, (u64) media_usub8);
-                blr(x16);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                MOVOP2(r2);
+                movx(ip0, (uintptr_t) media_usub8);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_MEDIA_UQADD8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(v0.s[0], src1);
-                mov(v1.s[0], src2);
-                uqadd(v0.b8, v0.b8, v1.b8);
-                mov(dst, v0.s[0]);
+                movs(v0, 0, src1);
+                movs(v1, 0, src2);
+                uqadd8b(v0, v0, v1);
+                movs(dst, v0, 0);
                 break;
             }
             case IR_MEDIA_UQSUB8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(v0.s[0], src1);
-                mov(v1.s[0], src2);
-                uqsub(v0.b8, v0.b8, v1.b8);
-                mov(dst, v0.s[0]);
+                movs(v0, 0, src1);
+                movs(v1, 0, src2);
+                uqsub8b(v0, v0, v1);
+                movs(dst, v0, 0);
                 break;
             }
             case IR_MEDIA_UHADD8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(v0.s[0], src1);
-                mov(v1.s[0], src2);
-                uhadd(v0.b8, v0.b8, v1.b8);
-                mov(dst, v0.s[0]);
+                movs(v0, 0, src1);
+                movs(v1, 0, src2);
+                uhadd8b(v0, v0, v1);
+                movs(dst, v0, 0);
                 break;
             }
             case IR_MEDIA_SSUB8: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(x0, x29);
-                mov(w1, src1);
-                mov(w2, src2);
-                mov(x16, (u64) media_ssub8);
-                blr(x16);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                MOVOP2(r2);
+                movx(ip0, (uintptr_t) media_ssub8);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_MEDIA_QSUB8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(v0.s[0], src1);
-                mov(v1.s[0], src2);
-                sqsub(v0.b8, v0.b8, v1.b8);
-                mov(dst, v0.s[0]);
+                movs(v0, 0, src1);
+                movs(v1, 0, src2);
+                sqsub8b(v0, v0, v1);
+                movs(dst, v0, 0);
                 break;
             }
             case IR_MEDIA_SEL: {
-                auto src1 = LOADOP1();
-                auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                mov(x0, x29);
-                mov(w1, src1);
-                mov(w2, src2);
-                mov(x16, (u64) media_sel);
-                blr(x16);
-                mov(dst, w0);
+                movx(r0, r29);
+                MOVOP1(r1);
+                MOVOP2(r2);
+                movx(ip0, (uintptr_t) media_sel);
+                blr(ip0);
+                mov(dst, r0);
                 break;
             }
             case IR_GETN: {
@@ -813,7 +776,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                         tst(src, src);
                         lastflags = inst.op2;
                     }
-                    cset(dst, MI);
+                    cset(dst, mi);
                 }
                 break;
             }
@@ -827,13 +790,13 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                         tst(src, src);
                         lastflags = inst.op2;
                     }
-                    cset(dst, EQ);
+                    cset(dst, eq);
                 }
                 break;
             }
             case IR_GETC: {
                 auto dst = DSTREG();
-                cset(dst, CS);
+                cset(dst, cs);
                 break;
             }
             case IR_SETC: {
@@ -846,15 +809,15 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 auto cond = LOADOP1();
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                cset(w0, CS);
+                cset(r0, cs);
                 tst(cond, cond);
-                csel(dst, w0, src, EQ);
+                csel(dst, r0, src, eq);
                 lastflags = 0;
                 break;
             }
             case IR_GETV: {
                 auto dst = DSTREG();
-                cset(dst, VS);
+                cset(dst, vs);
                 break;
             }
             case IR_PCMASK: {
@@ -866,66 +829,64 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_JZ: {
                 jmptarget = inst.op2;
-                labels.push_back(Label());
+                labels[nlabel++] = Lnew();
                 auto cond = LOADOP1();
-                cbz(cond, labels.back());
+                cbz(cond, labels[nlabel - 1]);
                 break;
             }
             case IR_JNZ: {
                 jmptarget = inst.op2;
-                labels.push_back(Label());
+                labels[nlabel++] = Lnew();
                 auto cond = LOADOP1();
-                cbnz(cond, labels.back());
+                cbnz(cond, labels[nlabel - 1]);
                 break;
             }
             case IR_JELSE: {
                 jmptarget = inst.op2;
-                auto elselbl = labels.back();
-                labels.push_back(Label());
-                b(labels.back());
-                L(elselbl);
+                labels[nlabel++] = Lnew();
+                b(labels[nlabel - 1]);
+                L(labels[nlabel - 2]);
                 break;
             }
             case IR_MODESWITCH: {
-                mov(x0, x29);
-                mov(w1, inst.op1);
-                mov(x16, (u64) cpu_update_mode);
-                blr(x16);
+                movx(r0, r29);
+                mov(r1, inst.op1);
+                movx(ip0, (uintptr_t) cpu_update_mode);
+                blr(ip0);
                 break;
             }
             case IR_EXCEPTION: {
                 switch (inst.op1) {
                     case E_SWI:
-                        mov(x0, x29);
-                        mov(w1, (ArmInstr) {inst.op2}.sw_intr.arg);
-                        mov(x16, (u64) cpu->handle_svc);
-                        blr(x16);
+                        movx(r0, r29);
+                        mov(r1, (ArmInstr) {inst.op2}.sw_intr.arg);
+                        movx(ip0, (uintptr_t) cpu->handle_svc);
+                        blr(ip0);
                         break;
                     case E_UND:
-                        mov(x0, x29);
-                        mov(w1, inst.op2);
-                        mov(x16, (u64) cpu_undefined_fail);
-                        blr(x16);
+                        movx(r0, r29);
+                        mov(r1, inst.op2);
+                        movx(ip0, (uintptr_t) cpu_undefined_fail);
+                        blr(ip0);
                         break;
                 }
                 break;
             }
             case IR_HALT: {
-                mov(w0, 1);
-                strb(w0, CPU(halt));
+                mov(r0, 1);
+                strb(r0, CPU(halt));
                 break;
             }
             case IR_BEGIN: {
 
-                stp(x29, x30, pre_ptr(sp, -0x10));
-                for (int i = 0; i < hralloc.count[REG_SAVED]; i += 2) {
-                    stp(XReg(savedBase + i), XReg(savedBase + i + 1),
-                        pre_ptr(sp, -0x10));
+                push(fp, lr);
+                for (int i = 0; i < backend->hralloc.count[REG_SAVED]; i += 2) {
+                    push(Reg(SAVEDREGS_BASE + i), Reg(SAVEDREGS_BASE + i + 1));
                 }
-                int spdisp = getSPDisp();
-                if (spdisp) sub(sp, sp, spdisp);
+                int spdisp = SPDISP();
+                if (spdisp) subx(sp, sp, spdisp);
 
-                mov(x29, (u64) cpu);
+                movx(r29, (uintptr_t) cpu);
                 L(looplabel);
 
                 break;
@@ -935,36 +896,36 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             case IR_END_LOOP: {
                 lastflags = 0;
 
-                ldr(x0, CPU(cycles));
-                sub(x0, x0, inst.cycles);
-                str(x0, CPU(cycles));
+                ldrx(r0, CPU(cycles));
+                subx(r0, r0, inst.cycles);
+                strx(r0, CPU(cycles));
 
                 if (inst.opcode == IR_END_LOOP) {
-                    cmp(x0, 0);
+                    cmpx(r0, 0);
                     bgt(looplabel);
                 }
 
-                int spdisp = getSPDisp();
-                if (spdisp) add(sp, sp, spdisp);
-                for (int i = (hralloc.count[REG_SAVED] - 1) & ~1; i >= 0;
-                     i -= 2) {
-                    ldp(XReg(savedBase + i), XReg(savedBase + i + 1),
-                        post_ptr(sp, 0x10));
+                int spdisp = SPDISP();
+                if (spdisp) addx(sp, sp, spdisp);
+                for (int i = (backend->hralloc.count[REG_SAVED] - 1) & ~1;
+                     i >= 0; i -= 2) {
+                    pop(Reg(SAVEDREGS_BASE + i), Reg(SAVEDREGS_BASE + i + 1));
                 }
-                ldp(x29, x30, post_ptr(sp, 0x10));
+                pop(fp, lr);
 
                 if (inst.opcode == IR_END_LINK) {
-                    Label nolink, linkaddr;
-                    cmp(x0, 0);
+                    Label(nolink);
+                    Label(linkaddr);
+                    cmpx(r0, 0);
                     ble(nolink);
-                    ldr(x16, linkaddr);
-                    br(x16);
+                    ldrlx(ip0, linkaddr);
+                    br(ip0);
                     align(8);
                     L(linkaddr);
-                    links.push_back((LinkPatch) {(u32) (getCurr() - getCode()),
-                                                 inst.op1, inst.op2});
-                    dd(0);
-                    dd(0);
+                    Label(linklabel);
+                    ArmLinkPatch p = {linklabel, inst.op1, inst.op2};
+                    Vec_push(backend->links, p);
+                    dword(linklabel);
                     L(nolink);
                 }
 
@@ -972,43 +933,38 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             default:
+                lerror("unimpl ir instr %d", inst.opcode);
                 break;
         }
         STOREDST();
     }
 
-    placeCBLiterals();
+    align(8);
+    L(lld8);
+    dword(Lnew(cpu->read8));
+    L(lld16);
+    dword(Lnew(cpu->read16));
+    L(lld32);
+    dword(Lnew(cpu->read32));
+    L(lst8);
+    dword(Lnew(cpu->write8));
+    L(lst16);
+    dword(Lnew(cpu->write16));
+    L(lst32);
+    dword(Lnew(cpu->write32));
+    L(lldf32);
+    dword(Lnew(cpu->readf32));
+    L(lldf64);
+    dword(Lnew(cpu->readf64));
+    L(lstf32);
+    dword(Lnew(cpu->writef32));
+    L(lstf64);
+    dword(Lnew(cpu->writef64));
+
+    return backend;
 }
 
-#define LDSN() ldr(s0, CPU(s[vn]))
-#define LDSM() ldr(s1, CPU(s[vm]))
-#define LDSD() ldr(s2, CPU(s[vd]))
-#define LDSNM()                                                                \
-    LDSN();                                                                    \
-    LDSM()
-#define LDSDM()                                                                \
-    LDSD();                                                                    \
-    LDSM()
-#define LDSNMD()                                                               \
-    LDSNM();                                                                   \
-    LDSD()
-#define STSD() str(s0, CPU(s[vd]))
-
-#define LDDN() ldr(d0, CPU(d[vn]))
-#define LDDM() ldr(d1, CPU(d[vm]))
-#define LDDD() ldr(d2, CPU(d[vd]))
-#define LDDNM()                                                                \
-    LDDN();                                                                    \
-    LDDM()
-#define LDDDM()                                                                \
-    LDDD();                                                                    \
-    LDDM()
-#define LDDNMD()                                                               \
-    LDDNM();                                                                   \
-    LDDD()
-#define STDD() str(d0, CPU(d[vd]))
-
-void Code::compileVFPDataProc(ArmInstr instr) {
+static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
     bool dp = instr.cp_data_proc.cpnum & 1;
     u32 vd = instr.cp_data_proc.crd;
     u32 vn = instr.cp_data_proc.crn;
@@ -1018,233 +974,115 @@ void Code::compileVFPDataProc(ArmInstr instr) {
         vn = vn << 1 | (instr.cp_data_proc.cp >> 2);
         vm = vm << 1 | (instr.cp_data_proc.cp & 1);
     }
+
+    u32 cpopc = instr.cp_data_proc.cpopc & 0b1011;
     bool op = instr.cp_data_proc.cp & 2;
 
-    switch (instr.cp_data_proc.cpopc & 0b1011) {
+    switch (cpopc) {
         case 0:
-            if (op) {
-                if (dp) {
-                    LDDNMD();
-                    fmsub(d0, d0, d1, d2);
-                    STDD();
-                } else {
-                    LDSNMD();
-                    fmsub(s0, s0, s1, s2);
-                    STSD();
-                }
-            } else {
-                if (dp) {
-                    LDDNMD();
-                    fmadd(d0, d0, d1, d2);
-                    STDD();
-                } else {
-                    LDSNMD();
-                    fmadd(s0, s0, s1, s2);
-                    STSD();
-                }
-            }
-            break;
         case 1:
-            if (op) {
-                if (dp) {
-                    LDDNMD();
-                    fnmadd(d0, d0, d1, d2);
-                    STDD();
-                } else {
-                    LDSNMD();
-                    fnmadd(s0, s0, s1, s2);
-                    STSD();
-                }
+            if (dp) {
+                ldrd(v0, CPU(d[vd]));
+                ldrd(v1, CPU(d[vn]));
+                ldrd(v2, CPU(d[vm]));
             } else {
-                if (dp) {
-                    LDDNMD();
-                    fnmsub(d0, d0, d1, d2);
-                    STDD();
-                } else {
-                    LDSNMD();
-                    fnmsub(s0, s0, s1, s2);
-                    STSD();
-                }
+                ldrs(v0, CPU(s[vd]));
+                ldrs(v1, CPU(s[vn]));
+                ldrs(v2, CPU(s[vm]));
+            }
+            fpdataproc3source(dp, 0, 0, cpopc, cpopc ^ op, v0, v1, v2, v0);
+            if (dp) {
+                strd(v0, CPU(d[vd]));
+            } else {
+                strs(v0, CPU(s[vd]));
             }
             break;
         case 2:
-            if (dp) {
-                LDDNM();
-                if (op) fnmul(d0, d0, d1);
-                else fmul(d0, d0, d1);
-                STDD();
-            } else {
-                LDSNM();
-                if (op) fnmul(s0, s0, s1);
-                else fmul(s0, s0, s1);
-                STSD();
-            }
-            break;
         case 3:
-            if (op) {
-                if (dp) {
-                    LDDNM();
-                    fsub(d0, d0, d1);
-                    STDD();
-                } else {
-                    LDSNM();
-                    fsub(s0, s0, s1);
-                    STSD();
-                }
-            } else {
-                if (dp) {
-                    LDDNM();
-                    fadd(d0, d0, d1);
-                    STDD();
-                } else {
-                    LDSNM();
-                    fadd(s0, s0, s1);
-                    STSD();
-                }
-            }
-            break;
-        case 8:
+        case 8: {
             if (dp) {
-                LDDNM();
-                fdiv(d0, d0, d1);
-                STDD();
+                ldrd(v1, CPU(d[vn]));
+                ldrd(v2, CPU(d[vm]));
             } else {
-                LDSNM();
-                fdiv(s0, s0, s1);
-                STSD();
+                ldrs(v1, CPU(s[vn]));
+                ldrs(v2, CPU(s[vm]));
+            }
+            u32 opcode = cpopc == 8 ? 1 : cpopc == 2 ? op * 8 : 2 + op;
+            fpdataproc2source(dp, 0, 0, opcode, v0, v1, v2);
+            if (dp) {
+                strd(v0, CPU(d[vd]));
+            } else {
+                strs(v0, CPU(s[vd]));
             }
             break;
+        }
         case 11: {
             op = instr.cp_data_proc.cp & 4;
-            switch (instr.cp_data_proc.crn) {
+            u32 crn = instr.cp_data_proc.crn;
+            switch (crn) {
                 case 0:
-                    if (op) {
-                        if (dp) {
-                            LDDM();
-                            fabs(d0, d1);
-                            STDD();
-                        } else {
-                            LDSM();
-                            fabs(s0, s1);
-                            STSD();
-                        }
-                    } else {
-                        if (dp) {
-                            LDDM();
-                            fmov(d0, d1);
-                            STDD();
-                        } else {
-                            LDSM();
-                            fmov(s0, s1);
-                            STSD();
-                        }
-                    }
-                    break;
                 case 1:
-                    if (op) {
-                        if (dp) {
-                            LDDM();
-                            fsqrt(d0, d1);
-                            STDD();
-                        } else {
-                            LDSM();
-                            fsqrt(s0, s1);
-                            STSD();
-                        }
+                    if (dp) {
+                        ldrd(v2, CPU(d[vm]));
                     } else {
-                        if (dp) {
-                            LDDM();
-                            fneg(d0, d1);
-                            STDD();
-                        } else {
-                            LDSM();
-                            fneg(s0, s1);
-                            STSD();
-                        }
+                        ldrs(v2, CPU(s[vm]));
+                    }
+                    fpdataproc1source(dp, 0, 0, crn << 1 | op, v0, v2);
+                    if (dp) {
+                        strd(v0, CPU(d[vd]));
+                    } else {
+                        strs(v0, CPU(s[vd]));
                     }
                     break;
                 case 4:
                 case 5:
                     if (dp) {
-                        if (instr.cp_data_proc.crn & 1) {
-                            LDDD();
-                            fcmp(d2, 0);
-                        } else {
-                            LDDDM();
-                            fcmp(d2, d1);
-                        }
+                        ldrd(v0, CPU(d[vd]));
+                        ldrd(v2, CPU(d[vm]));
                     } else {
-                        if (instr.cp_data_proc.crn & 1) {
-                            LDSD();
-                            fcmp(s2, 0);
-                        } else {
-                            LDSDM();
-                            fcmp(s2, s1);
-                        }
+                        ldrs(v0, CPU(s[vd]));
+                        ldrs(v2, CPU(s[vm]));
                     }
-                    mrs(x0, 3, 3, 4, 2, 0); // mrs x0, nzcv
-                    // arm32 flags should be the same as arm64 flags
-                    ldr(w1, CPU(fpscr));
-                    ubfx(w0, w0, 28, 4);
-                    bfi(w1, w0, 28, 4);
-                    str(w1, CPU(fpscr));
+                    fpcompare(dp, 0, 0, 0, (crn & 1) * 8, v0, v2);
+                    mrs(r0, nzcv);
+                    ldr(r1, CPU(fpscr));
+                    ubfx(r0, r0, 28, 4);
+                    bfi(r1, r0, 28, 4);
+                    str(r1, CPU(fpscr));
                     break;
                 case 7:
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
-                        LDDM();
-                        fcvt(s0, d1);
-                        STSD();
+                        ldrd(v0, CPU(d[vm]));
+                        fcvtsd(v0, v0);
+                        strs(v0, CPU(s[vd]));
                     } else {
                         vd = vd >> 1;
-                        LDSM();
-                        fcvt(d0, s1);
-                        STDD();
+                        ldrs(v0, CPU(s[vm]));
+                        fcvtds(v0, v0);
+                        strd(v0, CPU(d[vd]));
                     }
                     break;
                 case 8:
+                    if (dp) vm = vm << 1 | (instr.cp_data_proc.cp & 1);
+                    ldr(r0, CPU(s[vm]));
+                    fpconvertintvr(0, dp, 0, 0, 2 + !op, v0, r0);
                     if (dp) {
-                        vm = vm << 1 | (instr.cp_data_proc.cp & 1);
-
-                        ldr(w0, CPU(s[vm]));
-                        if (op) {
-                            scvtf(d0, w0);
-                        } else {
-                            ucvtf(d0, w0);
-                        }
-                        STDD();
+                        strd(v0, CPU(d[vd]));
                     } else {
-                        ldr(w0, CPU(s[vm]));
-                        if (op) {
-                            scvtf(s0, w0);
-                        } else {
-                            ucvtf(s0, w0);
-                        }
-                        STSD();
+                        strs(v0, CPU(s[vd]));
                     }
                     break;
                 case 12:
                 case 13:
-                    // TODO: deal with rounding mode properly
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
-
-                        LDDM();
-                        if (instr.cp_data_proc.crn & 1) {
-                            fcvtzs(w0, d1);
-                        } else {
-                            fcvtzu(w0, d1);
-                        }
-                        str(w0, CPU(s[vd]));
+                        ldrd(v0, CPU(d[vm]));
                     } else {
-                        LDSM();
-                        if (instr.cp_data_proc.crn & 1) {
-                            fcvtzs(w0, s1);
-                        } else {
-                            fcvtzu(w0, s1);
-                        }
-                        str(w0, CPU(s[vd]));
+                        ldrs(v0, CPU(s[vm]));
                     }
+                    fpconvertintrv(0, dp, 0, 3, !(crn & 1), r0, v0);
+                    str(r0, CPU(s[vd]));
                     break;
             }
             break;
@@ -1252,7 +1090,98 @@ void Code::compileVFPDataProc(ArmInstr instr) {
     }
 }
 
-void Code::compileVFPRead(ArmInstr instr, WReg dst) {
+static void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr,
+                              rasReg addr, rasLabel lldf32, rasLabel lldf64) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    if (rcount > 1) {
+        push(r19, zr);
+        mov(r19, addr);
+        addr = r19;
+    }
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+            movx(r0, r29);
+            mov(r1, addr);
+            ldrlx(ip0, lldf64);
+            blr(ip0);
+            strd(v0, CPU(d[(vd + i) & 15]));
+            if (i < rcount - 1) add(addr, addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+            movx(r0, r29);
+            mov(r1, addr);
+            ldrlx(ip0, lldf32);
+            blr(ip0);
+            strs(v0, CPU(s[(vd + i) & 31]));
+            if (i < rcount - 1) add(addr, addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        pop(r19, zr);
+    }
+}
+
+static void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr,
+                               rasReg addr, rasLabel lstf32, rasLabel lstf64) {
+    u32 rcount;
+    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
+        rcount = 1;
+    } else {
+        rcount = instr.cp_data_trans.offset;
+        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
+    }
+
+    u32 vd = instr.cp_data_trans.crd;
+
+    if (rcount > 1) {
+        push(r19, zr);
+        mov(r19, addr);
+        addr = r19;
+    }
+
+    if (instr.cp_data_trans.cpnum & 1) {
+        for (int i = 0; i < rcount; i++) {
+            movx(r0, r29);
+            mov(r1, addr);
+            ldrd(v0, CPU(d[(vd + i) & 15]));
+            ldrlx(ip0, lstf64);
+            blr(ip0);
+            if (i < rcount - 1) add(addr, addr, 8);
+        }
+    } else {
+        vd = vd << 1 | instr.cp_data_trans.n;
+
+        for (int i = 0; i < rcount; i++) {
+            movx(r0, r29);
+            mov(r1, addr);
+            ldrs(v0, CPU(s[(vd + i) & 31]));
+            ldrlx(ip0, lstf32);
+            blr(ip0);
+            if (i < rcount - 1) add(addr, addr, 4);
+        }
+    }
+
+    if (rcount > 1) {
+        pop(r19, zr);
+    }
+}
+
+static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr,
+                           rasReg dst) {
     if (instr.cp_reg_trans.cpopc == 7) {
         if (instr.cp_reg_trans.crn == 1) {
             ldr(dst, CPU(fpscr));
@@ -1270,7 +1199,8 @@ void Code::compileVFPRead(ArmInstr instr, WReg dst) {
     ldr(dst, CPU(s[vn]));
 }
 
-void Code::compileVFPWrite(ArmInstr instr, WReg src) {
+static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
+                            rasReg src) {
     if (instr.cp_reg_trans.cpopc == 7) {
         if (instr.cp_reg_trans.crn == 1) {
             str(src, CPU(fpscr));
@@ -1287,10 +1217,11 @@ void Code::compileVFPWrite(ArmInstr instr, WReg src) {
     str(src, CPU(s[vn]));
 }
 
-void Code::compileVFPRead64(ArmInstr instr, WReg dst, bool hi) {
+static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
+                             rasReg dst, bool h) {
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
-        if (hi) {
+        if (h) {
             ldr(dst, CPU(d[vm], 4));
         } else {
             ldr(dst, CPU(d[vm]));
@@ -1298,7 +1229,7 @@ void Code::compileVFPRead64(ArmInstr instr, WReg dst, bool hi) {
     } else {
         u32 vm = instr.cp_double_reg_trans.crm << 1 |
                  ((instr.cp_double_reg_trans.cp >> 1) & 1);
-        if (hi) {
+        if (h) {
             ldr(dst, CPU(s[vm + 1]));
         } else {
             ldr(dst, CPU(s[vm]));
@@ -1306,10 +1237,11 @@ void Code::compileVFPRead64(ArmInstr instr, WReg dst, bool hi) {
     }
 }
 
-void Code::compileVFPWrite64(ArmInstr instr, WReg src, bool hi) {
+static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
+                              rasReg src, bool h) {
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
-        if (hi) {
+        if (h) {
             str(src, CPU(d[vm], 4));
         } else {
             str(src, CPU(d[vm]));
@@ -1317,7 +1249,7 @@ void Code::compileVFPWrite64(ArmInstr instr, WReg src, bool hi) {
     } else {
         u32 vm = instr.cp_double_reg_trans.crm << 1 |
                  ((instr.cp_double_reg_trans.cp >> 1) & 1);
-        if (hi) {
+        if (h) {
             if (vm < 31) str(src, CPU(s[vm + 1]));
         } else {
             str(src, CPU(s[vm]));
@@ -1325,129 +1257,42 @@ void Code::compileVFPWrite64(ArmInstr instr, WReg src, bool hi) {
     }
 }
 
-void Code::compileVFPLoadMem(ArmInstr instr, WReg addr) {
-    u32 rcount;
-    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
-        rcount = 1;
-    } else {
-        rcount = instr.cp_data_trans.offset;
-        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
-    }
-
-    u32 vd = instr.cp_data_trans.crd;
-
-    if (rcount > 1) {
-        str(x19, pre_ptr(sp, -16));
-        mov(w19, addr);
-        addr = w19;
-    }
-
-    if (instr.cp_data_trans.cpnum & 1) {
-        for (int i = 0; i < rcount; i++) {
-            mov(x0, x29);
-            mov(w1, addr);
-            compileCBCall(CB_LOADF64);
-            str(d0, CPU(d[(vd + i) & 15]));
-            if (i < rcount - 1) add(addr, addr, 8);
-        }
-    } else {
-        vd = vd << 1 | instr.cp_data_trans.n;
-
-        for (int i = 0; i < rcount; i++) {
-            mov(x0, x29);
-            mov(w1, addr);
-            compileCBCall(CB_LOADF32);
-            str(s0, CPU(s[(vd + i) & 31]));
-            if (i < rcount - 1) add(addr, addr, 4);
-        }
-    }
-
-    if (rcount > 1) {
-        ldr(x19, post_ptr(sp, 16));
-    }
+void backend_arm_free(ArmCodeBackend* backend) {
+    hostregalloc_free(&backend->hralloc);
+    Vec_free(backend->links);
+    rasDestroy(backend->code);
+    free(backend);
 }
 
-void Code::compileVFPStoreMem(ArmInstr instr, WReg addr) {
-    u32 rcount;
-    if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
-        rcount = 1;
-    } else {
-        rcount = instr.cp_data_trans.offset;
-        if (instr.cp_data_trans.cpnum & 1) rcount >>= 1;
-    }
-
-    u32 vd = instr.cp_data_trans.crd;
-
-    if (rcount > 1) {
-        str(x19, pre_ptr(sp, -16));
-        mov(w19, addr);
-        addr = w19;
-    }
-
-    if (instr.cp_data_trans.cpnum & 1) {
-        for (int i = 0; i < rcount; i++) {
-            mov(x0, x29);
-            mov(w1, addr);
-            ldr(d0, CPU(d[(vd + i) & 15]));
-            compileCBCall(CB_STOREF64);
-            if (i < rcount - 1) add(addr, addr, 8);
-        }
-    } else {
-        vd = vd << 1 | instr.cp_data_trans.n;
-
-        for (int i = 0; i < rcount; i++) {
-            mov(x0, x29);
-            mov(w1, addr);
-            ldr(s0, CPU(s[(vd + i) & 31]));
-            compileCBCall(CB_STOREF32);
-            if (i < rcount - 1) add(addr, addr, 4);
-        }
-    }
-
-    if (rcount > 1) {
-        ldr(x19, post_ptr(sp, 16));
-    }
-}
-
-extern "C" {
-
-void* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
-                                ArmCore* cpu) {
-    return new Code(ir, regalloc, cpu);
-}
-
-JITFunc backend_arm_get_code(void* backend) {
-    return (JITFunc) ((Code*) backend)->getCode();
+JITFunc backend_arm_get_code(ArmCodeBackend* backend) {
+    return rasGetCode(backend->code);
 }
 
 void backend_arm_patch_links(JITBlock* block) {
-    Code* code = (Code*) block->backend;
-    for (auto [offset, attrs, addr] : code->links) {
-        char* linkaddr = (char*) code->getCode() + offset;
-        JITBlock* linkblock = get_jitblock(code->cpu, attrs, addr);
-        *(u64*) linkaddr = (u64) linkblock->code;
+    ArmCodeBackend* backend = block->backend;
+    for (int i = 0; i < backend->links.size; i++) {
+        auto patch = backend->links.d[i];
+        JITBlock* linkblock =
+            get_jitblock(backend->cpu, patch.attrs, patch.addr);
+        rasDefineLabelExternal(patch.lab, linkblock->code);
         Vec_push(linkblock->linkingblocks,
                  ((BlockLocation) {block->attrs, block->start_addr}));
     }
-
-    code->ready();
-}
-
-void backend_arm_free(void* backend) {
-    delete ((Code*) backend);
+    rasReady(backend->code);
+    Vec_free(backend->links);
 }
 
 #ifndef NOCAPSTONE
-void backend_arm_disassemble(void* backend) {
-    Code* code = (Code*) backend;
-    code->print_hostregs();
+void backend_arm_disassemble(ArmCodeBackend* backend) {
+    print_hostregs(&backend->hralloc);
     csh handle;
     cs_insn* insn;
     cs_open(CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN, &handle);
     cs_option(handle, CS_OPT_SKIPDATA, CS_OPT_ON);
-    size_t count =
-        cs_disasm(handle, code->getCode(), code->getSize(), 0, 0, &insn);
-    printf("--------- JIT Disassembly at %p ------------\n", code->getCode());
+    size_t count = cs_disasm(handle, rasGetCode(backend->code),
+                             rasGetSize(backend->code), 0, 0, &insn);
+    printf("--------- JIT Disassembly at %p ------------\n",
+           rasGetCode(backend->code));
     for (size_t i = 0; i < count; i++) {
         printf("%04lx: %08x\t%s %s\n", insn[i].address, *(u32*) &insn[i].bytes,
                insn[i].mnemonic, insn[i].op_str);
@@ -1456,6 +1301,5 @@ void backend_arm_disassemble(void* backend) {
     cs_close(&handle);
 }
 #endif
-}
 
 #endif
