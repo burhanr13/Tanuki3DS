@@ -285,10 +285,7 @@ int main(int argc, char** argv) {
     }
 
 #ifdef REDIRECTSTDOUT
-    int logfd =
-        open("ctremu.log", O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
-    dup2(logfd, STDOUT_FILENO);
-    close(logfd);
+    freopen("ctremu.log", "w", stdout);
 #endif
 
     emulator_init();
