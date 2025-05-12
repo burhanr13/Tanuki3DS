@@ -964,6 +964,9 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                     break;
             }
             if (flags & BIT(2)) mode |= O_CREAT;
+#ifdef _WIN32
+            mode |= O_BINARY;
+#endif
 
             int hostfd = open(filepath, mode, S_IRUSR | S_IWUSR);
             if (hostfd < 0) {
