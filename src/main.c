@@ -330,6 +330,8 @@ int main(int argc, char** argv) {
                           GL_TRUE);
 #endif
 
+    glClear(GL_COLOR_BUFFER_BIT);
+
     SDL_AudioSpec as = {
         .format = SDL_AUDIO_S16, .channels = 2, .freq = SAMPLE_RATE};
     g_audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &as,
@@ -349,8 +351,6 @@ int main(int argc, char** argv) {
     } else {
         SDL_GL_SetSwapInterval(0);
     }
-
-    glClear(GL_COLOR_BUFFER_BIT);
 
     Uint64 prev_frame_time = SDL_GetTicksNS();
     Uint64 prev_fps_update = prev_frame_time;

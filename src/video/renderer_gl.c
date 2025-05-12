@@ -357,8 +357,6 @@ static void update_cur_fb(GPU* gpu) {
                                GL_TEXTURE_2D, curfb->depth_tex, 0);
     }
 
-    curfb->dirty = true;
-
     gpu->curfb = curfb;
 }
 
@@ -556,6 +554,7 @@ void gpu_gl_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
         if (gpu->fbs.d[i].color_paddr == paddr) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             gpu->curfb = &gpu->fbs.d[i];
+            gpu->curfb->dirty = true;
 
             float r = 0, g = 0, b = 0, a = 1;
             switch (gpu->curfb->color_fmt) {
@@ -600,6 +599,7 @@ void gpu_gl_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
             LRU_use(gpu->fbs, &gpu->fbs.d[i]);
             gpu->curfb = &gpu->fbs.d[i];
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
+            // todo handle depth formats
             glClearDepth((value & MASK(24)) / (float) BIT(24));
             glClearStencil(value >> 24);
             glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -1065,6 +1065,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
           nverts, primMode);
 
     update_cur_fb(gpu);
+    gpu->curfb->dirty = true;
 
     // ensure unused entries are 0 so the hashing is consistent
     UberUniforms ubuf = {};
