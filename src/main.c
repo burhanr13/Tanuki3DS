@@ -330,10 +330,20 @@ int main(int argc, char** argv) {
                           GL_TRUE);
 #endif
 
+    if (ctremu.vsync) {
+        if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
+    } else {
+        SDL_GL_SetSwapInterval(0);
+    }
+
     glClear(GL_COLOR_BUFFER_BIT);
+    SDL_GL_SwapWindow(g_window);
 
     SDL_AudioSpec as = {
-        .format = SDL_AUDIO_S16, .channels = 2, .freq = SAMPLE_RATE};
+        .format = SDL_AUDIO_S16,
+        .channels = 2,
+        .freq = SAMPLE_RATE,
+    };
     g_audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &as,
                                         nullptr, nullptr);
 
@@ -344,12 +354,6 @@ int main(int argc, char** argv) {
         load_rom_dialog();
     } else {
         g_pending_reset = true;
-    }
-
-    if (ctremu.vsync) {
-        if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
-    } else {
-        SDL_GL_SetSwapInterval(0);
     }
 
     Uint64 prev_frame_time = SDL_GetTicksNS();

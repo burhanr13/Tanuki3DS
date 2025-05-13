@@ -47,6 +47,10 @@ else
 	LIBS += -lcapstone
 endif
 
+ifeq ($(GPROF), 1)
+	CFLAGS += -g -pg
+endif
+
 ifeq ($(shell getconf PAGESIZE),4096)
 	CPPFLAGS += -DFASTMEM -DJIT_FASTMEM
 endif

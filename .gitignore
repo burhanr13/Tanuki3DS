@@ -26,6 +26,7 @@ system*
 config.txt
 
 perf*
+gmon.out
 *.trace
 *.rdc
 
