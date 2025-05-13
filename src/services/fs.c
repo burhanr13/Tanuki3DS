@@ -116,6 +116,9 @@ char* create_text_path(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
 
 DECL_PORT(fs) {
     u32* cmdbuf = PTR(cmd_addr);
+
+    *delay = 1000000;
+
     switch (cmd.command) {
         case 0x0801:
             linfo("Initialize");
@@ -611,6 +614,8 @@ DECL_PORT_ARG(fs_file, fd) {
     }
 
     linfo("fd is %d", fd);
+
+    *delay = 1000000;
 
     switch (cmd.command) {
         case 0x0802: {

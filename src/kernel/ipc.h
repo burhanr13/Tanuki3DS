@@ -21,9 +21,10 @@ typedef union {
                   .paramsize_translate = translate}                            \
          .w)
 
-typedef void (*PortRequestHandler)(E3DS* s, IPCHeader cmd, u32 cmd_addr);
+typedef void (*PortRequestHandler)(E3DS* s, IPCHeader cmd, u32 cmd_addr,
+                                   u64* delay);
 typedef void (*PortRequestHandlerArg)(E3DS* s, IPCHeader cmd, u32 cmd_addr,
-                                      u64 arg);
+                                      u64* delay, u64 arg);
 
 typedef struct {
     KObject hdr;
@@ -36,9 +37,10 @@ KSession* session_create(PortRequestHandler f);
 KSession* session_create_arg(PortRequestHandlerArg f, u64 arg);
 
 #define DECL_PORT(name)                                                        \
-    void port_handle_##name(E3DS* s, IPCHeader cmd, u32 cmd_addr)
+    void port_handle_##name(E3DS* s, IPCHeader cmd, u32 cmd_addr, u64* delay)
 
 #define DECL_PORT_ARG(name, arg)                                               \
-    void port_handle_##name(E3DS* s, IPCHeader cmd, u32 cmd_addr, u64 arg)
+    void port_handle_##name(E3DS* s, IPCHeader cmd, u32 cmd_addr, u64* delay,  \
+                            u64 arg)
 
 #endif

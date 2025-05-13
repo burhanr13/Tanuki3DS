@@ -663,9 +663,22 @@ DECL_SVC(SendSyncRequest) {
         return;
     }
     R(0) = 0;
+
+    // certain sync requests take a nontrivial amount of time
+    // and we need to emulate this because games have race conditions relying
+    // on this, mainly for FS services
+    // thie delay variable can be written by a handler to let us know it should
+    // take more time
+    u64 delay = 0;
+
     u32 cmd_addr = caller->tls + IPC_CMD_OFF;
     IPCHeader cmd = *(IPCHeader*) PTR(cmd_addr);
-    session->handler(s, cmd, cmd_addr, session->arg);
+    session->handler(s, cmd, cmd_addr, &delay, session->arg);
+
+    if (delay != 0) {
+        // if this was supposed to take time, block the thread until its "done"
+        thread_sleep(s, caller, delay);
+    }
 }
 
 DECL_SVC(GetProcessId) {
