@@ -47,6 +47,9 @@ typedef struct {
 typedef struct {
     FILE* files[FS_FILE_MAX];
     DIR* dirs[FS_FILE_MAX];
+#ifdef _WIN32
+    char* dirpaths[FS_FILE_MAX];
+#endif
 
     u32 priority;
 } FSData;

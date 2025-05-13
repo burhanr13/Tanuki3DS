@@ -1,13 +1,11 @@
 #include "fs.h"
 
-#include <ctype.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include "3ds.h"
-#include "emulator.h"
 #include "kernel/loader.h"
 
 #ifdef _WIN32
@@ -730,21 +728,23 @@ DECL_PORT_ARG(fs_dir, fd) {
 
                 ents[i]._21a[0] = 1;
 
-#ifndef _WIN32
                 struct stat st;
+#ifdef _WIN32
+                char* p;
+                asprintf(&p, "%s/%s", s->services.fs.dirpaths[fd], ent->d_name);
+                stat(p, &st);
+                free(p);
+#else
                 fstatat(dirfd(dp), ent->d_name, &st, 0);
+#endif
                 ents[i].isdir = S_ISDIR(st.st_mode);
                 ents[i].isreadonly = (st.st_mode & S_IWUSR) == 0;
                 ents[i].size = st.st_size;
-#else
-                ents[i].isdir = 0;
-                ents[i].isreadonly = 0;
-                ents[i].size = 0;
-#endif
-                ents[i].isarchive = 0;
+
                 ents[i].ishidden = ent->d_name[0] == '.';
 
-                linfo("entry %s %s", ent->d_name, ents[i].isdir ? "(dir)" : "");
+                linfo("entry %s %s sz=%lld", ent->d_name,
+                      ents[i].isdir ? "(dir)" : "", ents[i].size);
             }
 
             cmdbuf[0] = IPCHDR(2, 0);
@@ -756,6 +756,8 @@ DECL_PORT_ARG(fs_dir, fd) {
             linfo("closing dir");
             closedir(dp);
             s->services.fs.dirs[fd] = nullptr;
+            free(s->services.fs.dirpaths[fd]);
+            s->services.fs.dirpaths[fd] = nullptr;
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -862,7 +864,7 @@ u64 fs_open_archive(E3DS* s, u32 id, u32 pathtype, void* path) {
                         linfo("opening country list archive");
                         return (u64) 0x2345678a | (u64) SYSFILE_COUNTRYLIST
                                                       << 32;
-                    default:
+                        default:
                         lwarn("unknown ncch archive %016lx", *lowpath);
                         return -1;
                 }
@@ -1113,6 +1115,9 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                 return nullptr;
             }
             s->services.fs.dirs[fd] = dp;
+#ifdef _WIN32
+            s->services.fs.dirpaths[fd] = strdup(filepath);
+#endif
 
             KSession* ses = session_create_arg(port_handle_fs_dir, fd);
             linfo("opened directory %s with fd %d", filepath, fd);
@@ -1161,7 +1166,12 @@ void fs_close_all_files(E3DS* s) {
         if (s->services.fs.files[i]) fclose(s->services.fs.files[i]);
     }
     for (int i = 0; i < FS_FILE_MAX; i++) {
-        if (s->services.fs.dirs[i]) closedir(s->services.fs.dirs[i]);
+        if (s->services.fs.dirs[i]) {
+            closedir(s->services.fs.dirs[i]);
+#ifdef _WIN32
+            free(s->services.fs.dirpaths[i]);
+#endif
+        }
     }
 
     free(mii_data_custom);
