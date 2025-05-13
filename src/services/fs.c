@@ -756,8 +756,10 @@ DECL_PORT_ARG(fs_dir, fd) {
             linfo("closing dir");
             closedir(dp);
             s->services.fs.dirs[fd] = nullptr;
+#ifdef _WIN32
             free(s->services.fs.dirpaths[fd]);
             s->services.fs.dirpaths[fd] = nullptr;
+#endif
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -864,7 +866,7 @@ u64 fs_open_archive(E3DS* s, u32 id, u32 pathtype, void* path) {
                         linfo("opening country list archive");
                         return (u64) 0x2345678a | (u64) SYSFILE_COUNTRYLIST
                                                       << 32;
-                        default:
+                    default:
                         lwarn("unknown ncch archive %016lx", *lowpath);
                         return -1;
                 }
