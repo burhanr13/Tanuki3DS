@@ -64,10 +64,10 @@ lprimary.rgb += diffuselevel * light[%d].diffuse;
 
 lprimary.rgb = min(lprimary.rgb, 1);
 
-//float speclevel = pow(max(h.z, 0), 3);
-//lsecondary.rgb += speclevel * light[%d].specular0;
+float speclevel = pow(max(h.z, 0), 3);
+lsecondary.rgb += speclevel * light[%d].specular0;
 
-//lsecondary.rgb = min(lsecondary.rgb, 1);
+lsecondary.rgb = min(lsecondary.rgb, 1);
 }
 )";
 
