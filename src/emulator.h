@@ -13,6 +13,18 @@
 
 typedef void (*EmuAudioCallback)(s16 (*samples)[2], u32 num);
 
+typedef enum {
+    LAYOUT_DEFAULT,
+    LAYOUT_HORIZONTAL,
+    LAYOUT_LARGETOP,
+
+    LAYOUT_MAX
+} ViewLayout;
+
+typedef struct {
+    int x, y, w, h;
+} Rect;
+
 typedef struct {
     char* romfile;
     char* romfilenodir;
@@ -34,6 +46,12 @@ typedef struct {
     bool ubershader;
     bool hashTextures;
 
+    ViewLayout viewlayout;
+    Rect screens[2];
+    int windowW, windowH;
+
+    int volume;
+
     mat4 freecam_mtx;
     bool freecam_enable;
 
@@ -53,5 +71,7 @@ void emulator_init();
 void emulator_quit();
 
 bool emulator_reset();
+
+void emulator_calc_viewports();
 
 #endif

@@ -78,7 +78,7 @@ void save_config() {
     }
 
 #define SECT(s) fprintf(fp, "\n[" s "]\n");
-#define CMT(s) fprintf(fp, "# " s "\n");
+#define CMT(s, ...) fprintf(fp, "# " s "\n" __VA_OPT__(,) __VA_ARGS__);
 #define BOOL(s, b) fprintf(fp, s " = %s\n", b ? "true" : "false");
 #define INT(s, i) fprintf(fp, s " = %d\n", i);
 #include "config.inc"

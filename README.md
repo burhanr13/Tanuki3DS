@@ -4,7 +4,7 @@
 
 <img src=images/logo.png width=100>
 
-Tanuki3DS is a 3DS emulator for MacOS, Linux and Windows written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games with reasonable graphics and audio at full speed. It also supports some nice features like controller input, fast-forward, video upscaling, and free camera.
+Tanuki3DS is a 3DS emulator for MacOS, Linux, and Windows written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games with reasonable graphics and audio at full speed. It also supports some nice features like controller input, fast-forward, video upscaling, and free camera.
 
 If you want to ask questions or discuss the emulator, join our discord:
 
@@ -56,6 +56,7 @@ The keyboard controls are as follows:
 | Reset | `F1` |
 | Switch game | `F2` |
 | Toggle freecam | `F7` |
+| Change Screen Layout | `F10` |
 
 The touch screen can be used with the mouse.
 

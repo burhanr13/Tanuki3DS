@@ -61,7 +61,7 @@ void renderer_gl_init(GLState* state, GPU* gpu);
 void renderer_gl_destroy(GLState* state, GPU* gpu);
 
 void gpu_gl_start_frame(GPU* gpu);
-void render_gl_main(GLState* state, int view_w, int view_h);
+void render_gl_main(GLState* state);
 void renderer_gl_update_freecam(GLState* state);
 
 void gpu_gl_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,

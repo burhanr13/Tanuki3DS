@@ -115,6 +115,9 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_F6:
             ctremu.mute = !ctremu.mute;
             break;
+        case SDLK_F10:
+            ctremu.viewlayout = (ctremu.viewlayout + 1) % LAYOUT_MAX;
+            break;
 #ifdef AUDIO_DEBUG
         case SDLK_0 ... SDLK_9:
             g_dsp_chn_disable ^= BIT(key - SDLK_0);
@@ -125,7 +128,7 @@ void hotkey_press(SDL_Keycode key) {
     }
 }
 
-void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
+void update_input(E3DS* s, SDL_Gamepad* controller) {
     const bool* keys = SDL_GetKeyboardState(nullptr);
 
     PadState btn = {};
@@ -246,11 +249,10 @@ void update_input(E3DS* s, SDL_Gamepad* controller, int view_w, int view_h) {
     int x = xf, y = yf;
 
     if (pressed) {
-        x -= view_w * (SCREEN_WIDTH_TOP - SCREEN_WIDTH_BOT) /
-             (2 * SCREEN_WIDTH_TOP);
-        x = x * SCREEN_WIDTH_TOP / view_w;
-        y -= view_h / 2;
-        y = y * 2 * SCREEN_HEIGHT / view_h;
+        x -= ctremu.screens[SCREEN_BOT].x;
+        x = x * SCREEN_WIDTH_TOP / ctremu.screens[SCREEN_BOT].w;
+        y -= ctremu.screens[SCREEN_BOT].y;
+        y = y * SCREEN_HEIGHT / ctremu.screens[SCREEN_BOT].h;
         if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
             hid_update_touch(s, 0, 0, false);
         } else {
@@ -306,10 +308,8 @@ int main(int argc, char** argv) {
 #ifdef GLDEBUGCTX
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
-    g_window =
-        SDL_CreateWindow("Tanuki3DS", SCREEN_WIDTH_TOP * ctremu.videoscale,
-                         2 * SCREEN_HEIGHT * ctremu.videoscale,
-                         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    g_window = SDL_CreateWindow("Tanuki3DS", ctremu.windowW, ctremu.windowH,
+                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     SDL_SetWindowPosition(g_window, SDL_WINDOWPOS_CENTERED,
                           SDL_WINDOWPOS_CENTERED);
 
@@ -416,19 +416,15 @@ int main(int argc, char** argv) {
                     emulator_set_rom(e.drop.data);
                     g_pending_reset = true;
                     break;
-                case SDL_EVENT_WINDOW_RESIZED:
-                    const float aspect =
-                        (float) SCREEN_WIDTH_TOP / (2 * SCREEN_HEIGHT);
-                    SDL_SetWindowAspectRatio(g_window, aspect, aspect);
-                    break;
             }
         }
 
-        if (!ctremu.pause) {
-            int w, h;
-            SDL_GetWindowSizeInPixels(g_window, &w, &h);
+        SDL_GetWindowSizeInPixels(g_window, &ctremu.windowW, &ctremu.windowH);
+        emulator_calc_viewports();
 
-            update_input(&ctremu.system, g_gamepad, w, h);
+        if (!ctremu.pause) {
+
+            update_input(&ctremu.system, g_gamepad);
 
             gpu_gl_start_frame(&ctremu.system.gpu);
 
@@ -439,7 +435,7 @@ int main(int argc, char** argv) {
             avg_frame_time += (double) frame_time / SDL_NS_PER_MS;
             avg_frame_time_ct++;
 
-            render_gl_main(&ctremu.system.gpu.gl, w, h);
+            render_gl_main(&ctremu.system.gpu.gl);
 
             SDL_GL_SwapWindow(g_window);
         }

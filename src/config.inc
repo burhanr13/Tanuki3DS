@@ -1,5 +1,9 @@
 SECT("General")
 BOOL("VerboseLog", g_infologs)
+CMT("0=default, 1=side by side, 2=large top screen")
+INT("ViewLayout", ctremu.viewlayout)
+INT("WindowWidth", ctremu.windowW)
+INT("WindowHeight", ctremu.windowH)
 
 SECT("Video")
 BOOL("VSync", ctremu.vsync)
@@ -14,4 +18,5 @@ BOOL("HashTextures", ctremu.hashTextures)
 
 SECT("Audio")
 BOOL("AudioSync", ctremu.audiosync)
-BOOL("StartMuted", ctremu.mute)
+CMT("0%% - 200%%")
+INT("Volume", ctremu.volume)

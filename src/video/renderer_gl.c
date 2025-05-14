@@ -207,7 +207,7 @@ void gpu_gl_start_frame(GPU* gpu) {
 // call at end of frame
 // leaves framebuffer 0 bound at the end because on mac
 // swap buffers wont work if it is not
-void render_gl_main(GLState* state, int view_w, int view_h) {
+void render_gl_main(GLState* state) {
     // reset gl for drawing the main window
     glUseProgram(state->main_program);
     glBindVertexArray(state->main_vao);
@@ -225,15 +225,13 @@ void render_gl_main(GLState* state, int view_w, int view_h) {
 
     glActiveTexture(GL_TEXTURE0);
 
-    glViewport(0, view_h / 2, view_w, view_h / 2);
-    glBindTexture(GL_TEXTURE_2D, state->screentex[SCREEN_TOP]);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    glViewport(view_w * (SCREEN_WIDTH_TOP - SCREEN_WIDTH_BOT) /
-                   (2 * SCREEN_WIDTH_TOP),
-               0, view_w * SCREEN_WIDTH_BOT / SCREEN_WIDTH_TOP, view_h / 2);
-    glBindTexture(GL_TEXTURE_2D, state->screentex[SCREEN_BOT]);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    for (int i = 0; i < 2; i++) {
+        glViewport(ctremu.screens[i].x,
+                   ctremu.windowH - ctremu.screens[i].y - ctremu.screens[i].h,
+                   ctremu.screens[i].w, ctremu.screens[i].h);
+        glBindTexture(GL_TEXTURE_2D, state->screentex[i]);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
 }
 
 void renderer_gl_update_freecam(GLState* state) {

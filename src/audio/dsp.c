@@ -379,8 +379,10 @@ void dsp_process_frame(DSP* dsp) {
 
     s16 final[FRAME_SAMPLES][2];
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        final[s][0] = clamp16(mixer[s][0] * m->master_cfg.master_vol);
-        final[s][1] = clamp16(mixer[s][1] * m->master_cfg.master_vol);
+        final[s][0] = clamp16(mixer[s][0] * m->master_cfg.master_vol *
+                              ctremu.volume / 100.f);
+        final[s][1] = clamp16(mixer[s][1] * m->master_cfg.master_vol *
+                              ctremu.volume / 100.f);
     }
 
     if (ctremu.audio_cb) ctremu.audio_cb(final, FRAME_SAMPLES);
