@@ -364,6 +364,8 @@ int main(int argc, char** argv) {
     double avg_frame_time = 0;
     int avg_frame_time_ct = 0;
 
+    ldebug("Tanuki3DS %s", EMUVERSION);
+
     ctremu.running = true;
     while (ctremu.running) {
 
@@ -450,8 +452,8 @@ int main(int argc, char** argv) {
                 (double) SDL_NS_PER_SECOND * (frame - prev_fps_frame) / elapsed;
 
             char* wintitle;
-            asprintf(&wintitle, "Tanuki3DS | %s | %.2lf FPS, %.3lf ms",
-                     ctremu.system.romimage.name, fps,
+            asprintf(&wintitle, "Tanuki3DS %s | %s | %.2lf FPS, %.3lf ms",
+                     EMUVERSION, ctremu.system.romimage.name, fps,
                      avg_frame_time / avg_frame_time_ct);
             SDL_SetWindowTitle(g_window, wintitle);
             free(wintitle);
