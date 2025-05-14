@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - run: git fetch --prune --unshallow
     - name: install dependencies
       run: |
         sudo apt update
@@ -48,6 +49,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
     - uses: actions/checkout@v4
+    - run: git fetch --prune --unshallow
     - name: install dependencies
       run: |
         sudo apt update
@@ -85,10 +87,11 @@ jobs:
     runs-on: macos-13
     steps:
     - uses: actions/checkout@v4
+    - run: git fetch --prune --unshallow
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 xxhash xbyak cglm fdk-aac
+        brew install coreutils llvm sdl3 xxhash xbyak cglm fdk-aac
     - name: build
       run: make -j$(nproc) USER=1
 
@@ -109,10 +112,11 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
+    - run: git fetch --prune --unshallow
     - name: install dependencies
       run: |
         brew update
-        brew install llvm sdl3 xxhash cglm fdk-aac
+        brew install coreutils llvm sdl3 xxhash cglm fdk-aac
     - name: build
       run: make -j$(nproc) USER=1
 
@@ -137,10 +141,13 @@ jobs:
     steps:
     - uses: msys2/setup-msys2@v2
     - uses: actions/checkout@v4
+    - run: |
+        pacman --noconfirm -S git  
+        git fetch --prune --unshallow
     - name: install dependencies
       run: |
         pacman -Sy
-        pacman --noconfirm -S git make \
+        pacman --noconfirm -S make \
         mingw-w64-x86_64-{clang,lld,sdl3,xxhash,cglm,fdk-aac}
         git clone https://github.com/herumi/xbyak.git
         cd xbyak
