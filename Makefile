@@ -25,7 +25,7 @@ CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE -isystem /usr/local/include -Isrc --embed-dir=sys_files
 
-CPPFLAGS += -DEMUVERSION=\"$(shell git describe --tags --dirty)\"
+CPPFLAGS += -DEMUVERSION=\"$(shell git describe --tags)\"
 
 LIBDIRS := /usr/local/lib
 
