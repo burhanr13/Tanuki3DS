@@ -142,7 +142,7 @@ void emulator_calc_viewports() {
             int ht = ctremu.windowH;
             int wt = ht * SCREEN_WIDTH_TOP / SCREEN_HEIGHT;
             if (wt >= 4 * ctremu.windowW / 5) {
-                wt = 4 * ctremu.windowH / 5;
+                wt = 4 * ctremu.windowW / 5;
                 ht = wt * SCREEN_HEIGHT / SCREEN_WIDTH_TOP;
             }
             int wb = ctremu.windowW - wt;
