@@ -149,10 +149,10 @@ jobs:
       run: make -j$(nproc) USER=1
     - name: add icon
       run: |
-        pacman -S mingw-w64-x86_64-imagemagick
+        pacman --noconfirm -S mingw-w64-x86_64-imagemagick
         convert images/logo.png logo.ico
         wget https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
-        ./rcedit ctremu.exe --set-icon logo.ico
+        ./rcedit-x64 ctremu.exe --set-icon logo.ico
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-windows
