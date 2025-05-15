@@ -10,8 +10,7 @@ If you want to ask questions or discuss the emulator, join our discord:
 
 [![](https://discord.com/api/guilds/1309172325203054612/widget.png?style=banner2)](https://discord.gg/6ya65fvD3g)
 
-<img src=images/oot3d.png width=200>
-<img src=images/mk7.png width=400>
+<img src=images/oot3d.png width=200><img src=images/mk7.png width=400>
 <img src=images/pokemon.png width=400>
 
 ## Download
