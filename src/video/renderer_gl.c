@@ -1063,7 +1063,6 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
           nverts, primMode);
 
     update_cur_fb(gpu);
-    gpu->curfb->dirty = true;
 
     // ensure unused entries are 0 so the hashing is consistent
     UberUniforms ubuf = {};
@@ -1385,4 +1384,6 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     } else {
         glDrawArrays(prim_mode[primMode], 0, nverts);
     }
+
+    gpu->curfb->dirty = true;
 }
