@@ -493,14 +493,14 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                              dsttex->width * ctremu.videoscale,
                              dsttex->height * ctremu.videoscale, 0);
         } else {
-            linfo("unhandled texture copy case");
+            lwarnonce("unhandled texture copy case");
         }
 
         return;
     }
 
     if (srcfb) {
-        linfo("reading back fb into memory");
+        lwarnonce("reading back fb into memory");
         // this case requires us to read the framebuffer back to ram
         // it is very slow
         return;
@@ -1140,7 +1140,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // blending/logic ops
     if (gpu->regs.fb.color_op.frag_mode != 0) {
         // gas or shadows, not implemented
-        linfo("unknown frag mode %d", gpu->regs.fb.color_op.frag_mode);
+        lwarnonce("unknown frag mode %d", gpu->regs.fb.color_op.frag_mode);
         return;
     }
     if (gpu->regs.fb.color_op.blend_mode) {

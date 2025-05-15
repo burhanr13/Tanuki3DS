@@ -18,14 +18,20 @@ extern bool g_infologs;
     (g_infologs ? printf("\e[32m[INFO](%s) " format "\e[0m\n",                 \
                          __func__ __VA_OPT__(, ) __VA_ARGS__)                  \
                 : (void) 0)
-
 #define ldebug(format, ...)                                                    \
     printf("\e[96m[DEBUG](%s) " format "\e[0m\n",                              \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
-
 #define lwarn(format, ...)                                                     \
     printf("\e[33m[WARNING](%s) " format "\e[0m\n",                            \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
+#define lwarnonce(format, ...)                                                 \
+    ({                                                                         \
+        static bool hit = false;                                               \
+        if (!hit) {                                                            \
+            hit = true;                                                        \
+            lwarn(format __VA_OPT__(, ) __VA_ARGS__);                          \
+        }                                                                      \
+    })
 #define lerror(format, ...)                                                    \
     printf("\e[31m[ERROR](%s) " format "\e[0m\n",                              \
            __func__ __VA_OPT__(, ) __VA_ARGS__)
@@ -120,9 +126,9 @@ typedef float fvec4[4];
 #define Vec_assn(v1, v2)                                                       \
     ((v1).d = (v2).d, (v1).size = (v2).size, (v1).cap = (v2).cap)
 #define Vec_free(v) (free((v).d), Vec_init(v))
-#define Vec_resize(v, ncap)                                                     \
+#define Vec_resize(v, ncap)                                                    \
     ({                                                                         \
-        (v).cap = (ncap);                                                         \
+        (v).cap = (ncap);                                                      \
         if ((v).size > (v).cap) (v).size = (v).cap;                            \
         (v).d = (typeof((v).d)) realloc((v).d, (v).cap * sizeof *(v).d);       \
     })
