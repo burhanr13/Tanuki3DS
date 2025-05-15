@@ -139,9 +139,9 @@ void emulator_calc_viewports() {
         }
         case LAYOUT_LARGETOP: {
 
-            int wt = ctremu.windowW * 3 / 4;
+            int ht = ctremu.windowH;
+            int wt = ht * SCREEN_WIDTH_TOP / SCREEN_HEIGHT;
             int wb = ctremu.windowW - wt;
-            int ht = wt * SCREEN_HEIGHT / SCREEN_WIDTH_TOP;
             int hb = wb * SCREEN_HEIGHT / SCREEN_WIDTH_BOT;
             int yt = (ctremu.windowH - ht) / 2;
             int yb = yt + ht - hb;

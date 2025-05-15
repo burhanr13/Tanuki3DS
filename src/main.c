@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3/SDL_video.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -240,6 +241,7 @@ void update_input(E3DS* s, SDL_Gamepad* controller) {
     float xf, yf;
     bool pressed =
         SDL_GetMouseState(&xf, &yf) & SDL_BUTTON_MASK(SDL_BUTTON_LEFT);
+
     if (controller) {
         if (SDL_GetGamepadButton(controller,
                                  SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
@@ -250,7 +252,7 @@ void update_input(E3DS* s, SDL_Gamepad* controller) {
 
     if (pressed) {
         x -= ctremu.screens[SCREEN_BOT].x;
-        x = x * SCREEN_WIDTH_TOP / ctremu.screens[SCREEN_BOT].w;
+        x = x * SCREEN_WIDTH_BOT / ctremu.screens[SCREEN_BOT].w;
         y -= ctremu.screens[SCREEN_BOT].y;
         y = y * SCREEN_HEIGHT / ctremu.screens[SCREEN_BOT].h;
         if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
