@@ -34,9 +34,9 @@ ifeq ($(shell uname),Darwin)
 	CPPFLAGS += -isystem $(shell brew --prefix)/include
 	LIBDIRS := $(shell brew --prefix)/lib $(LIBDIRS)
 else ifeq ($(OS),Windows_NT)
-	LIBDIRS += /mingw32/lib /mingw64/lib
+	LIBDIRS += /mingw64/lib
 	# we need all this garbage to static link on windows
-	LIBS += -lntdll -lkernel32 -lmsvcrt -ladvapi32 -lbcrypt -lrpcrt4 -lgdi32 -lucrtbase -luser32 -limm32 -lole32 -loleaut32 -lsetupapi -lshell32 -lversion -lwinmm -lcfgmgr32 -lcryptbase -lbcryptprimitives -luuid
+	LIBS += -lmsvcrt -limm32 -lole32 -loleaut32 -lsetupapi -lversion -lwinmm -luuid
 endif
 
 ifeq ($(USER), 1)
