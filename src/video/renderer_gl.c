@@ -465,7 +465,8 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
     auto srcfb = gpu_fbcache_find_within(gpu, srcpaddr);
     auto dsttex = gpu_texcache_find_within(gpu, dstpaddr);
 
-    linfo("texture copy from %x to %x size=%d", srcpaddr, dstpaddr, size);
+    linfo("texture copy from %x to %x size=%d sp=%d sg=%d dp=%d dg=%d",
+          srcpaddr, dstpaddr, size, srcpitch, srcgap, dstpitch, dstgap);
 
     if (srcfb && dsttex) {
         // do a hardware copy
@@ -475,15 +476,13 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
 
         // need to handle more general cases at some point
 
-        if (srcgap == 0 && dstgap == 0) {
+        if (srcgap == 0 || srcgap == dstgap) {
             int yoff = srcpaddr - srcfb->color_paddr + dsttex->paddr - dstpaddr;
             yoff /= (int) (srcfb->width * srcfb->color_Bpp);
-            // this can be larger than dst tex height so don't use it
-            int transferheight = size / srcfb->width;
 
-            linfo("hardware texture copy sh=%d sw=%d yof=%d th=%d dh=%d dw=%d",
-                  srcfb->height, srcfb->width, yoff, transferheight,
-                  dsttex->height, dsttex->width);
+            linfo("hardware texture copy sh=%d sw=%d yof=%d dh=%d dw=%d",
+                  srcfb->height, srcfb->width, yoff, dsttex->height,
+                  dsttex->width);
 
             glBindFramebuffer(GL_READ_FRAMEBUFFER, srcfb->fbo);
             glBindTexture(GL_TEXTURE_2D, dsttex->tex);
@@ -493,7 +492,8 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
                              dsttex->width * ctremu.videoscale,
                              dsttex->height * ctremu.videoscale, 0);
         } else {
-            lwarnonce("unhandled texture copy case");
+            lwarnonce("unhandled texture copy case sp=%d sg=%d dp=%d dg=%d",
+                      srcpitch, srcgap, dstpitch, dstgap);
         }
 
         return;

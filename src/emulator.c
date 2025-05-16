@@ -33,7 +33,7 @@ void emulator_init() {
     ctremu.hwvshaders = true;
     ctremu.safeShaderMul = true;
     ctremu.hashTextures = true;
-
+    ctremu.audiosync = true;
     ctremu.volume = 100;
 
     load_config();

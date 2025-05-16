@@ -389,11 +389,15 @@ char* shader_gen_fs(UberUniforms* ubuf) {
 
     for (int i = 0; i < 6; i++) {
         CHECKSRC(ubuf->tev[i].rgb.src0);
-        CHECKSRC(ubuf->tev[i].rgb.src1);
-        CHECKSRC(ubuf->tev[i].rgb.src2);
+        if (ubuf->tev[i].rgb.combiner != 0) CHECKSRC(ubuf->tev[i].rgb.src1);
+        if (ubuf->tev[i].rgb.combiner == 4 || ubuf->tev[i].rgb.combiner == 8 ||
+            ubuf->tev[i].rgb.combiner == 9)
+            CHECKSRC(ubuf->tev[i].rgb.src2);
         CHECKSRC(ubuf->tev[i].a.src0);
-        CHECKSRC(ubuf->tev[i].a.src1);
-        CHECKSRC(ubuf->tev[i].a.src2);
+        if (ubuf->tev[i].a.combiner != 0) CHECKSRC(ubuf->tev[i].a.src1);
+        if (ubuf->tev[i].a.combiner == 4 || ubuf->tev[i].a.combiner == 8 ||
+            ubuf->tev[i].a.combiner == 9)
+            CHECKSRC(ubuf->tev[i].a.src2);
     }
 
     ds_printf(&s, fs_header);
