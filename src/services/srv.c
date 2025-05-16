@@ -138,7 +138,7 @@ DECL_PORT(srv) {
             cmdbuf[1] = 0;
             break;
         case 0x000b:
-            linfo("RecieveNotiifcation");
+            linfo("ReceiveNotification");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;

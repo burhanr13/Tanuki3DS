@@ -856,7 +856,7 @@ static void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     // since null is empty for the caches we need to handle
     // null address before searching any cache
     if (regs->addr == 0) {
-        linfo("null texture");
+        lwarnonce("null texture");
         glBindTexture(GL_TEXTURE_2D, gpu->gl.blanktex);
         return;
     }
@@ -902,7 +902,7 @@ static void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     } else {
         // just add this to the cache but dont actually send it image data ig
         // we only care because you can still rtt to this .......
-        linfo("out of bounds texture");
+        lwarnonce("out of bounds texture");
         tex->paddr = regs->addr << 3;
         tex->width = regs->width;
         tex->height = regs->height;
