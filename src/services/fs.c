@@ -333,13 +333,13 @@ DECL_PORT(fs) {
             cmdbuf[1] = 0;
             cmdbuf[2] = true;
             break;
-        case 0x821:
+        case 0x0821:
             linfo("CardSlotIsInserted");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
             cmdbuf[2] = true;
             break;
-        case 0x845: {
+        case 0x0845: {
             u32 archive = cmdbuf[1];
             u32 pathtype = cmdbuf[2];
             void* path = PTR(cmdbuf[5]);
@@ -394,6 +394,7 @@ DECL_PORT(fs) {
             cmdbuf[1] = 0;
             break;
         }
+        case 0x0830:
         case 0x0851: {
             u32 numdirs = cmdbuf[5];
             u32 numfiles = cmdbuf[6];

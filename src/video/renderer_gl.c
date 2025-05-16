@@ -333,7 +333,8 @@ static void update_cur_fb(GPU* gpu) {
         curfb->width = w;
         curfb->height = h;
 
-        linfo("creating new fb at %08x", curfb->color_paddr);
+        linfo("creating new fb at %08x with w=%d, h=%d", curfb->color_paddr,
+              curfb->width, curfb->height);
 
         glBindTexture(GL_TEXTURE_2D, curfb->color_tex);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
@@ -472,7 +473,7 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
         // do a hardware copy
 
         linfo("copying from fb at %x to texture at %x", srcfb->color_paddr,
-              dsttex->paddr);
+               dsttex->paddr);
 
         // need to handle more general cases at some point
 
