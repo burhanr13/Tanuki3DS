@@ -703,6 +703,8 @@ char* shader_dec_vs(GPU* gpu) {
         dstidx++;
     }
 
+    // handle semantics multiple times
+    u32 written = 0;
     for (int o = 0; o < 7; o++) {
         u32 all = gpu->regs.raster.sh_outmap[o][0] << 24 |
                   gpu->regs.raster.sh_outmap[o][1] << 16 |
@@ -710,36 +712,45 @@ char* shader_dec_vs(GPU* gpu) {
                   gpu->regs.raster.sh_outmap[o][3];
         switch (all) {
             case 0x00'01'02'03:
-                ds_printf(&final, "pos = o[%d];\n", o);
+                if (!(written & 0xf)) ds_printf(&final, "pos = o[%d];\n", o);
+                written |= 0xf;
                 break;
             case 0x04'05'06'07:
-                ds_printf(&final, "normquat = o[%d];\n", o);
+                if (!(written & (0xf << 4))) ds_printf(&final, "normquat = o[%d];\n", o);
+                written |= 0xf << 4;
                 break;
             case 0x08'09'0a'0b:
-                ds_printf(&final, "color = o[%d];\n", o);
+                if (!(written & (0xf << 8))) ds_printf(&final, "color = o[%d];\n", o);
+                written |= 0xf << 8;
                 break;
             case 0x0c'0d'1f'1f:
-                ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                if (!(written & (3 << 12))) ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                written |= 3 << 12;
                 break;
             case 0x0c'0d'10'1f:
-                ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
-                ds_printf(&final, "texcoordw = o[%d].z;\n", o);
+                if (!(written & (3 << 12))) ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                if (!(written & (1 << 16))) ds_printf(&final, "texcoordw = o[%d].z;\n", o);
+                written |= 3 << 12 | 1 << 16;
                 break;
             case 0x0e'0f'1f'1f:
-                ds_printf(&final, "texcoord1 = o[%d].xy;\n", o);
+                if (!(written & (3 << 14))) ds_printf(&final, "texcoord1 = o[%d].xy;\n", o);
+                written |= 3 << 14;
                 break;
             case 0x12'13'14'1f:
-                ds_printf(&final, "view = o[%d].xyz;\n", o);
+                if (!(written & (7 << 18))) ds_printf(&final, "view = o[%d].xyz;\n", o);
+                written |= 7 << 18;
                 break;
             case 0x16'17'1f'1f:
-                ds_printf(&final, "texcoord2 = o[%d].xy;\n", o);
+                if (!(written & (3 << 22))) ds_printf(&final, "texcoord2 = o[%d].xy;\n", o);
+                written |= 3 << 22;
                 break;
             default:
                 for (int i = 0; i < 4; i++) {
                     int sem = gpu->regs.raster.sh_outmap[o][i];
-                    if (sem < 0x18)
+                    if (sem < 0x18 && !(written & BIT(sem)))
                         ds_printf(&final, "%s = o[%d].%c;\n", outmapnames[sem],
                                   o, coordnames[i]);
+                    written |= BIT(sem);
                 }
         }
     }

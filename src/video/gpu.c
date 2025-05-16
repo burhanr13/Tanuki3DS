@@ -477,10 +477,15 @@ void load_vtx(GPU* gpu, AttrConfig cfg, int i, fvec4* dst) {
 }
 
 void gpu_write_outmap_vtx(GPU* gpu, Vertex* dst, fvec4* src) {
+    // if a semantic is specified multiple times in the outmap we only pick the
+    // first one
+    u32 written = 0;
     for (int o = 0; o < 7; o++) {
         for (int j = 0; j < 4; j++) {
             u8 sem = gpu->regs.raster.sh_outmap[o][j];
-            if (sem < 0x18) dst->semantics[sem] = src[o][j];
+            if (sem < 0x18 && !(written & BIT(sem)))
+                dst->semantics[sem] = src[o][j];
+            written |= BIT(sem);
         }
     }
 }

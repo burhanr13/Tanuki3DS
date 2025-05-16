@@ -312,9 +312,13 @@ void shader_run(ShaderUnit* shu) {
                 fvec4 a;
                 SRC1(a, 1);
                 if (desc.destmask & BIT(3 - 0)) {
+                    if (a[0] < -128) a[0] = -128;
+                    if (a[0] > 127) a[0] = 127;
                     shu->a[0] = a[0];
                 }
                 if (desc.destmask & BIT(3 - 1)) {
+                    if (a[1] < -128) a[1] = -128;
+                    if (a[1] > 127) a[1] = 127;
                     shu->a[1] = a[1];
                 }
                 break;
