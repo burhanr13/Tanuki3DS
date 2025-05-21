@@ -354,6 +354,15 @@ static void update_cur_fb(GPU* gpu) {
                                GL_TEXTURE_2D, curfb->color_tex, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
                                GL_TEXTURE_2D, curfb->depth_tex, 0);
+
+        // ensure new framebuffers are cleared with reasonable values
+        // because sometimes the game clears them before creating the fb
+        // this is a bit of a hack
+        glClearColor(0, 0, 0, 0);
+        glClearDepth(1);
+        glClearStencil(0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
+                GL_STENCIL_BUFFER_BIT);
     }
 
     gpu->curfb = curfb;
@@ -473,7 +482,7 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
         // do a hardware copy
 
         linfo("copying from fb at %x to texture at %x", srcfb->color_paddr,
-               dsttex->paddr);
+              dsttex->paddr);
 
         // need to handle more general cases at some point
 
@@ -1072,7 +1081,6 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // cull mode
     switch (gpu->regs.raster.cullmode) {
         case 0:
-        case 3:
             glDisable(GL_CULL_FACE);
             break;
         case 1:
@@ -1082,6 +1090,10 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         case 2:
             glEnable(GL_CULL_FACE);
             glCullFace(GL_BACK);
+            break;
+        case 3:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT_AND_BACK);
             break;
     }
 
@@ -1112,6 +1124,8 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         glDepthRange(offset - scale, offset);
     } else {
         // default depth range maps -1 -> 1 and 0 -> 0
+        // supposedly this actually uses "w buffering" instead
+        // and does something with offset/scale
         glDepthRange(1, 0);
     }
 

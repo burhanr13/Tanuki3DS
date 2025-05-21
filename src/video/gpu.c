@@ -280,6 +280,7 @@ TexInfo* gpu_texcache_find_within(GPU* gpu, u32 paddr) {
             break;
         }
     }
+    if (tex) LRU_use(gpu->textures, tex);
     return tex;
 }
 
