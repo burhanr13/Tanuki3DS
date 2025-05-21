@@ -471,32 +471,37 @@ DECL_ARM_COMPILE(multiply_long) {
     u32 op2 = EMIT_LOAD_REG(instr.multiply_long.rs);
     u32 vreslo = EMITVV(MUL, op1, op2);
     u32 vreshi;
-    if (instr.multiply_long.u) {
-        vreshi = EMITVV(SMULH, op1, op2);
-    } else {
+    if (!instr.multiply_long.aa) {
         vreshi = EMITVV(UMULH, op1, op2);
-    }
-    if (instr.multiply_long.a) {
+
         u32 aclo = EMIT_LOAD_REG(instr.multiply_long.rdlo);
         u32 achi = EMIT_LOAD_REG(instr.multiply_long.rdhi);
 
-        if (instr.multiply_long.aa) {
+        vreslo = EMITVV(ADD, vreslo, aclo);
+        vreshi = EMITVI(ADC, vreshi, 0);
+        vreslo = EMITVV(ADD, vreslo, achi);
+        vreshi = EMITVI(ADC, vreshi, 0);
+    } else {
+        if (instr.multiply_long.u) {
+            vreshi = EMITVV(SMULH, op1, op2);
+        } else {
+            vreshi = EMITVV(UMULH, op1, op2);
+        }
+        if (instr.multiply_long.a) {
+            u32 aclo = EMIT_LOAD_REG(instr.multiply_long.rdlo);
+            u32 achi = EMIT_LOAD_REG(instr.multiply_long.rdhi);
+
             vreslo = EMITVV(ADD, vreslo, aclo);
             vreshi = EMITVV(ADC, vreshi, achi);
-        } else {
-            vreslo = EMITVV(ADD, vreslo, aclo);
-            vreshi = EMITVI(ADC, vreshi, 0);
-            vreslo = EMITVV(ADD, vreslo, achi);
-            vreshi = EMITVI(ADC, vreshi, 0);
         }
-    }
-    if (instr.multiply_long.s) {
-        u32 zlo = EMIT0V(GETZ, vreslo);
-        EMIT0V(GETZ, vreshi);
-        EMITVV(AND, zlo, LASTV);
-        EMITIV(STORE_FLAG, ZF, LASTV);
-        EMIT0V(GETN, vreshi);
-        EMITIV(STORE_FLAG, NF, LASTV);
+        if (instr.multiply_long.s) {
+            u32 zlo = EMIT0V(GETZ, vreslo);
+            EMIT0V(GETZ, vreshi);
+            EMITVV(AND, zlo, LASTV);
+            EMITIV(STORE_FLAG, ZF, LASTV);
+            EMIT0V(GETN, vreshi);
+            EMITIV(STORE_FLAG, NF, LASTV);
+        }
     }
     EMITV_STORE_REG(instr.multiply_long.rdlo, vreslo);
     EMITV_STORE_REG(instr.multiply_long.rdhi, vreshi);
