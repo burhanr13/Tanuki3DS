@@ -378,7 +378,10 @@ void gpu_gl_display_transfer(GPU* gpu, u32 paddr, int yoffdst, bool scalex,
                              bool scaley, bool vflip, int screenid) {
 
     FBInfo* fb = gpu_fbcache_find_within(gpu, paddr);
-    if (!fb) return;
+    if (!fb) {
+        lwarnonce("could not find source fb at %08x", paddr);
+        return;
+    }
     int yoffsrc = (paddr - fb->color_paddr) / (fb->color_Bpp * fb->width);
 
     linfo("display transfer fb at %x to %s", paddr,

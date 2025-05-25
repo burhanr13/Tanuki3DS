@@ -249,7 +249,9 @@ void gsp_handle_command(E3DS* s) {
             u8 scalemode = (flags >> 24) & 3;
             bool scalex = scalemode >= 1;
             bool scaley = scalemode >= 2;
-            bool vflip = flags & 1; // need to handle yoff differently probably
+            bool vflip =
+                flags & BIT(0); // need to handle yoff differently probably
+            bool lineartotiled = flags & BIT(1);
 
             static int fmtBpp[8] = {4, 3, 2, 2, 2, 4, 4, 4};
 
@@ -259,6 +261,7 @@ void gsp_handle_command(E3DS* s) {
 
             update_fbinfos(s);
 
+            bool found = false;
             for (int screen = 0; screen < 2; screen++) {
                 for (int i = 0; i < 4; i++) {
                     u32 yoff =
@@ -271,8 +274,27 @@ void gsp_handle_command(E3DS* s) {
                         s->services.gsp.lcdfbs[screen]
                             .d[i]
                             .wasDisplayTransferred = true;
+                        found = true;
                         break;
                     }
+                }
+            }
+
+            if (!found) {
+                // scuffed sw display transfer for virtual console
+                if (lineartotiled) {
+                    lwarnonce("linear to tiled display transfer fmt %d",
+                              fmtout);
+                    u16* data = PTR(addrout);
+                    u16* pixels = PTR(addrin);
+                    for (int y = 0; y < hout; y++) {
+                        for (int x = 0; x < wout; x++) {
+                            data[morton_swizzle(wout, x, y)] =
+                                pixels[y * wout + x];
+                        }
+                    }
+                    gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addrout),
+                                         wout * hout * fmtBpp[fmtout]);
                 }
             }
 
