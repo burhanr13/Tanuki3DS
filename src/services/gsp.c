@@ -261,10 +261,10 @@ void gsp_handle_command(E3DS* s) {
 
             for (int screen = 0; screen < 2; screen++) {
                 for (int i = 0; i < 4; i++) {
-                    int yoff =
-                        addrout - s->services.gsp.lcdfbs[screen].d[i].vaddr;
+                    u32 yoff =
+                        s->services.gsp.lcdfbs[screen].d[i].vaddr - addrout;
                     yoff /= wout * fmtBpp[fmtout];
-                    if (abs(yoff) < hout / 2) {
+                    if (yoff < hout) {
                         gpu_display_transfer(&s->gpu, vaddr_to_paddr(addrin),
                                              yoff, scalex, scaley, vflip,
                                              screen);

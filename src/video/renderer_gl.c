@@ -374,24 +374,12 @@ static void update_cur_fb(GPU* gpu) {
         dst[2] = (float) (src.b & 0xff) / 255;                                 \
     })
 
-void gpu_gl_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
+void gpu_gl_display_transfer(GPU* gpu, u32 paddr, int yoffdst, bool scalex,
                              bool scaley, bool vflip, int screenid) {
 
-    // the source can be offset into or before an existing framebuffer, so we
-    // need to account for this
-    FBInfo* fb = nullptr;
-    int yoffsrc;
-    for (int i = 0; i < FB_MAX; i++) {
-        if (gpu->fbs.d[i].width == 0) continue;
-        yoffsrc = gpu->fbs.d[i].color_paddr - paddr;
-        yoffsrc /= (int) (gpu->fbs.d[i].color_Bpp * gpu->fbs.d[i].width);
-        if (abs(yoffsrc) < gpu->fbs.d[i].height / 2) {
-            fb = &gpu->fbs.d[i];
-            break;
-        }
-    }
+    FBInfo* fb = gpu_fbcache_find_within(gpu, paddr);
     if (!fb) return;
-    LRU_use(gpu->fbs, fb);
+    int yoffsrc = (paddr - fb->color_paddr) / (fb->color_Bpp * fb->width);
 
     linfo("display transfer fb at %x to %s", paddr,
           screenid == SCREEN_TOP ? "top" : "bot");
@@ -403,12 +391,13 @@ void gpu_gl_display_transfer(GPU* gpu, u32 paddr, int yoff, bool scalex,
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gpu->gl.screenfbo[screenid]);
 
+    int yoff = yoffsrc + yoffdst;
+
     int srcX0 = 0;
-    int srcY0 =
-        (fb->height - (SCREEN_WIDTH(screenid) << scaley) + yoff + yoffsrc) *
-        ctremu.videoscale;
+    int srcY0 = (fb->height - (SCREEN_WIDTH(screenid) << scaley) - yoff) *
+                ctremu.videoscale;
     int srcX1 = (SCREEN_HEIGHT << scalex) * ctremu.videoscale;
-    int srcY1 = (fb->height + yoff + yoffsrc) * ctremu.videoscale;
+    int srcY1 = (fb->height - yoff) * ctremu.videoscale;
     int dstX0 = 0;
     int dstY0 = vflip ? SCREEN_WIDTH(screenid) * ctremu.videoscale : 0;
     int dstX1 = SCREEN_HEIGHT * ctremu.videoscale;
@@ -1091,15 +1080,16 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // viewport and scissor
     // since the framebuffer texture may be taller than the current framebuffer,
     // we need to offset the Y value
-    int yoff = gpu->curfb->height - gpu->regs.fb.dim.height;
+    int vyoff = gpu->curfb->height - (gpu->regs.fb.dim.height + 1);
     glViewport(gpu->regs.raster.view_x * ctremu.videoscale,
-               (gpu->regs.raster.view_y + yoff) * ctremu.videoscale,
+               (gpu->regs.raster.view_y + vyoff) * ctremu.videoscale,
                2 * cvtf24(gpu->regs.raster.view_w) * ctremu.videoscale,
                2 * cvtf24(gpu->regs.raster.view_h) * ctremu.videoscale);
     if (gpu->regs.raster.scisssortest.enable) {
         glEnable(GL_SCISSOR_TEST);
         glScissor(gpu->regs.raster.scisssortest.x1 * ctremu.videoscale,
-                  (gpu->regs.raster.scisssortest.y1 + yoff) * ctremu.videoscale,
+                  (gpu->regs.raster.scisssortest.y1 + vyoff) *
+                      ctremu.videoscale,
                   (gpu->regs.raster.scisssortest.x2 + 1 -
                    gpu->regs.raster.scisssortest.x1) *
                       ctremu.videoscale,
