@@ -292,9 +292,9 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
 static void update_cur_fb(GPU* gpu) {
     u32 w = gpu->regs.fb.dim.width;
     u32 h = gpu->regs.fb.dim.height + 1;
-    // using the same fb
+    // using the same fb (height does not matter if its big enough)
     if (gpu->curfb->color_paddr == (gpu->regs.fb.colorbuf_loc << 3) &&
-        gpu->curfb->width == w && gpu->curfb->height == h)
+        gpu->curfb->width == w && gpu->curfb->height <= h)
         return;
 
     if (gpu->regs.fb.colorbuf_loc == 0) {
@@ -329,7 +329,7 @@ static void update_cur_fb(GPU* gpu) {
 
     glBindFramebuffer(GL_FRAMEBUFFER, curfb->fbo);
 
-    if (w != curfb->width || h != curfb->height) {
+    if (w != curfb->width || h > curfb->height) {
         curfb->width = w;
         curfb->height = h;
 
@@ -354,15 +354,6 @@ static void update_cur_fb(GPU* gpu) {
                                GL_TEXTURE_2D, curfb->color_tex, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
                                GL_TEXTURE_2D, curfb->depth_tex, 0);
-
-        // ensure new framebuffers are cleared with reasonable values
-        // because sometimes the game clears them before creating the fb
-        // this is a bit of a hack
-        glClearColor(0, 0, 0, 0);
-        glClearDepth(1);
-        glClearStencil(0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
-                GL_STENCIL_BUFFER_BIT);
     }
 
     gpu->curfb = curfb;
@@ -1098,14 +1089,17 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     }
 
     // viewport and scissor
+    // since the framebuffer texture may be taller than the current framebuffer,
+    // we need to offset the Y value
+    int yoff = gpu->curfb->height - gpu->regs.fb.dim.height;
     glViewport(gpu->regs.raster.view_x * ctremu.videoscale,
-               gpu->regs.raster.view_y * ctremu.videoscale,
+               (gpu->regs.raster.view_y + yoff) * ctremu.videoscale,
                2 * cvtf24(gpu->regs.raster.view_w) * ctremu.videoscale,
                2 * cvtf24(gpu->regs.raster.view_h) * ctremu.videoscale);
     if (gpu->regs.raster.scisssortest.enable) {
         glEnable(GL_SCISSOR_TEST);
         glScissor(gpu->regs.raster.scisssortest.x1 * ctremu.videoscale,
-                  gpu->regs.raster.scisssortest.y1 * ctremu.videoscale,
+                  (gpu->regs.raster.scisssortest.y1 + yoff) * ctremu.videoscale,
                   (gpu->regs.raster.scisssortest.x2 + 1 -
                    gpu->regs.raster.scisssortest.x1) *
                       ctremu.videoscale,
