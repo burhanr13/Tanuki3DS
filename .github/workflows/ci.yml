@@ -95,6 +95,7 @@ jobs:
     - name: install dependencies
       run: |
         brew update
+        brew install python || brew link --overwrite python
         brew install coreutils llvm sdl3 xxhash xbyak cglm fdk-aac
     - name: build
       run: |
@@ -124,7 +125,9 @@ jobs:
         brew update
         brew install coreutils llvm sdl3 xxhash cglm fdk-aac
     - name: build
-      run: make -j$(nproc) USER=1
+      run: |
+        ./configure.sh CC=/opt/homebrew/opt/llvm/bin/clang CXX=/opt/homebrew/opt/llvm/bin/clang++
+        make -j$(nproc) USER=1
 
     # taken from panda3ds
     - name: create app bundle

@@ -33,10 +33,10 @@ endif
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto
 	CPPFLAGS += -DREDIRECTSTDOUT -DNOCAPSTONE -DRAS_NO_CHECKS
-	CPPFLAGS += -DVERSION=\"$(shell git describe --tags)\"
+	CPPFLAGS += -DEMUVERSION=\"$(shell git describe --tags)\"
 else
 	CFLAGS_RELEASE += -g
-	CPPFLAGS += -DVERSION=\"dev\"
+	CPPFLAGS += -DEMUVERSION=\"dev\"
 	LIBS += -lcapstone
 endif
 

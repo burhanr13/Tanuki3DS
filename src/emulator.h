@@ -7,8 +7,8 @@
 #include "3ds.h"
 #include "common.h"
 
-#ifndef VERSION
-#define VERSION ""
+#ifndef EMUVERSION
+#define EMUVERSION ""
 #endif
 
 typedef void (*EmuAudioCallback)(s16 (*samples)[2], u32 num);
