@@ -26,7 +26,7 @@ mkdir Tanuki3DS.app/Contents/Resources
 
 
 # Copy binary into App
-cp ./ctremu Tanuki3DS.app/Contents/MacOS/ctremu
+cp ./build/ctremu Tanuki3DS.app/Contents/MacOS/ctremu
 chmod a+x Tanuki3DS.app/Contents/MacOS/ctremu
 
 # Copy icons into App

@@ -8,4 +8,4 @@ chmod a+x linuxdeploy-${ARCH}.AppImage
 
 cp images/logo.png tanuki3ds.png
 # Build AppImage
-./linuxdeploy-${ARCH}.AppImage --appdir AppDir -d ./.github/Tanuki3DS.desktop  -e ./ctremu -i ./tanuki3ds.png --output appimage 
+./linuxdeploy-${ARCH}.AppImage --appdir AppDir -d ./.github/Tanuki3DS.desktop  -e ./build/ctremu -i ./tanuki3ds.png --output appimage 
