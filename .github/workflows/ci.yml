@@ -39,7 +39,7 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-linux-binary
-        path: ./ctremu
+        path: ./build/ctremu
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-linux-appimage
@@ -77,7 +77,7 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-linux-arm-binary
-        path: ./ctremu
+        path: ./build/ctremu
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-linux-arm-appimage
@@ -163,4 +163,4 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: Tanuki3DS-windows
-        path: ./ctremu.exe
+        path: ./build/ctremu.exe

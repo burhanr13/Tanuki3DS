@@ -17,6 +17,7 @@ log*
 *.toml
 *.ini
 portable.txt
+config.mk
 
 ctremu*
 *.app
