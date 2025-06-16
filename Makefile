@@ -82,7 +82,7 @@ $(BUILD_ROOT)/$(TARGET_EXEC): $(OBJS) $(STATIC_LIBS)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	@echo $<
-	$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
