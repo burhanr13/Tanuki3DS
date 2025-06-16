@@ -31,7 +31,9 @@ jobs:
         cmake ..
         sudo make install -j$(nproc)
     - name: build
-      run: make -j$(nproc) USER=1
+      run: |
+        ./configure.sh CC=clang-19 CXX=clang++-19
+        make -j$(nproc) USER=1
     - name: create appimage
       run: |
         sudo apt install libfuse2
@@ -69,7 +71,9 @@ jobs:
         cmake ..
         sudo make install -j$(nproc)
     - name: build
-      run: make -j$(nproc) USER=1
+      run: |
+        ./configure.sh CC=clang-19 CXX=clang++-19
+        make -j$(nproc) USER=1
     - name: create appimage
       run: |
         sudo apt install libfuse2
@@ -93,7 +97,9 @@ jobs:
         brew update
         brew install coreutils llvm sdl3 xxhash xbyak cglm fdk-aac
     - name: build
-      run: make -j$(nproc) USER=1
+      run: |
+        ./configure.sh CC=/usr/local/opt/llvm/bin/clang CXX=/usr/local/opt/llvm/bin/clang++
+        make -j$(nproc) USER=1
 
     # taken from panda3ds
     - name: create app bundle
