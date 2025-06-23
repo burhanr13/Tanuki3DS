@@ -293,7 +293,9 @@ int main(int argc, char** argv) {
 
     emulator_init();
 
+    bool log_old = g_infologs;
     if (log_arg) g_infologs = true;
+    int scale_old = ctremu.videoscale;
     if (scale_arg) ctremu.videoscale = scale_arg;
     if (romfile_arg) {
         emulator_set_rom(romfile_arg);
@@ -492,6 +494,9 @@ int main(int argc, char** argv) {
     SDL_CloseGamepad(g_gamepad);
 
     SDL_Quit();
+
+    g_infologs = log_old;
+    ctremu.videoscale = scale_old;
 
     emulator_quit();
 

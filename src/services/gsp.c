@@ -290,7 +290,7 @@ void gsp_handle_command(E3DS* s) {
                     for (int y = 0; y < hout; y++) {
                         for (int x = 0; x < wout; x++) {
                             data[morton_swizzle(wout, x, y)] =
-                                pixels[y * wout + x];
+                                pixels[(vflip ? hout - 1 - y : y) * wout + x];
                         }
                     }
                     gpu_invalidate_range(&s->gpu, vaddr_to_paddr(addrout),

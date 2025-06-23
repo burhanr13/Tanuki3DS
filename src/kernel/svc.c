@@ -585,6 +585,28 @@ DECL_SVC(GetSystemTick) {
     s->sched.now += 200; // make time advance so the next read happens later
 }
 
+DECL_SVC(GetHandleInfo) {
+    u32 handle = R(1);
+    u32 type = R(2);
+
+    R(0) = 0;
+    switch (type) {
+        case 0:
+            // this is the ticks since process creation, which for us is
+            // just total ticks
+            if (handle != 0xffff8001) {
+                lwarn("not the process handle");
+            }
+            R(1) = s->sched.now;
+            R(2) = s->sched.now >> 32;
+            break;
+        default:
+            lerror("unknown handle info type %d", type);
+            R(0) = -1;
+            break;
+    }
+}
+
 DECL_SVC(GetSystemInfo) {
     u32 type = R(1);
     u32 param = R(2);
