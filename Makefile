@@ -56,10 +56,8 @@ ifeq ($(OS),Windows_NT)
 	LDFLAGS += -mwindows -static -Wl,--stack,8388608 -fuse-ld=lld
 endif
 
-SRCS := $(shell find $(SRC_DIR) -name '*.c') 
-SRCSCPP := $(shell find $(SRC_DIR) -name '*.cpp')
+SRCS := $(shell find $(SRC_DIR) -name '*.c' -or -name '*.cpp') 
 SRCS := $(SRCS:$(SRC_DIR)/%=%)
-SRCSCPP := $(SRCSCPP:$(SRC_DIR)/%=%)
 
 BUILD_ROOT := $(BUILD_DIR)
 ifeq ($(DEBUG), 1)
@@ -71,7 +69,7 @@ else
 	CFLAGS += $(CFLAGS_RELEASE)
 endif
 
-OBJS := $(SRCS:%.c=$(BUILD_DIR)/%.o)  $(SRCSCPP:%.cpp=$(BUILD_DIR)/%.o)
+OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
 $(BUILD_ROOT)/$(TARGET_EXEC): $(OBJS) $(STATIC_LIBS)
@@ -79,12 +77,12 @@ $(BUILD_ROOT)/$(TARGET_EXEC): $(OBJS) $(STATIC_LIBS)
 	@$(CXX) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
 	@echo done
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+$(BUILD_DIR)/%.c.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	@echo $<
 	@$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+$(BUILD_DIR)/%.cpp.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	@echo $<
 	@$(CXX) $(CPPFLAGS) $(CXXSTD) $(CFLAGS) -c $< -o $@
