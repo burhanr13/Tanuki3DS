@@ -1,21 +1,12 @@
 TARGET_EXEC := ctremu
 
+CC := clang
+CXX := clang++
+
+-include config.mk
+
 BUILD_DIR := build
 SRC_DIR := src
-
-ifeq ($(OS),Windows_NT)
-	CC := clang
-	CXX := clang++
-else ifeq ($(shell uname),Darwin)
-	CC := $(shell brew --prefix)/opt/llvm/bin/clang
-	CXX := $(shell brew --prefix)/opt/llvm/bin/clang++
-else ifeq ($(shell uname),Linux)
-	CC := clang-19
-	CXX := clang++-19
-else
-	CC := clang
-	CXX := clang++
-endif
 
 CSTD := -std=gnu23
 CXXSTD := -std=gnu++23
@@ -24,8 +15,6 @@ CFLAGS_RELEASE := -O3
 CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD -D_GNU_SOURCE -isystem /usr/local/include -Isrc --embed-dir=sys_files
-
-CPPFLAGS += -DEMUVERSION=\"$(shell git describe --tags)\"
 
 LIBDIRS := /usr/local/lib
 
@@ -44,8 +33,10 @@ endif
 ifeq ($(USER), 1)
 	CFLAGS_RELEASE += -flto
 	CPPFLAGS += -DREDIRECTSTDOUT -DNOCAPSTONE -DRAS_NO_CHECKS
+	CPPFLAGS += -DEMUVERSION=\"$(shell git describe --tags)\"
 else
 	CFLAGS_RELEASE += -g
+	CPPFLAGS += -DEMUVERSION=\"dev\"
 	LIBS += -lcapstone
 endif
 
@@ -65,12 +56,9 @@ ifeq ($(OS),Windows_NT)
 	LDFLAGS += -mwindows -static -Wl,--stack,8388608 -fuse-ld=lld
 endif
 
-SRCS := $(shell find $(SRC_DIR) -name '*.c') 
-SRCSCPP := $(shell find $(SRC_DIR) -name '*.cpp')
+SRCS := $(shell find $(SRC_DIR) -name '*.c' -or -name '*.cpp') 
 SRCS := $(SRCS:$(SRC_DIR)/%=%)
-SRCSCPP := $(SRCSCPP:$(SRC_DIR)/%=%)
 
-# need to save this for clean
 BUILD_ROOT := $(BUILD_DIR)
 ifeq ($(DEBUG), 1)
 	BUILD_DIR := $(BUILD_DIR)/debug
@@ -81,21 +69,20 @@ else
 	CFLAGS += $(CFLAGS_RELEASE)
 endif
 
-OBJS := $(SRCS:%.c=$(BUILD_DIR)/%.o)  $(SRCSCPP:%.cpp=$(BUILD_DIR)/%.o)
+OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
-$(BUILD_DIR)/$(TARGET_EXEC): $(OBJS) $(STATIC_LIBS)
+$(BUILD_ROOT)/$(TARGET_EXEC): $(OBJS) $(STATIC_LIBS)
 	@echo linking $@...
 	@$(CXX) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
-	@cp $@ $(TARGET_EXEC)
 	@echo done
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+$(BUILD_DIR)/%.c.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	@echo $<
 	@$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+$(BUILD_DIR)/%.cpp.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	@echo $<
 	@$(CXX) $(CPPFLAGS) $(CXXSTD) $(CFLAGS) -c $< -o $@
@@ -103,6 +90,6 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 .PHONY: clean
 clean:
 	@echo clean...
-	@rm -rf $(BUILD_ROOT) $(TARGET_EXEC) $(TARGET_EXEC)d
+	@rm -rf $(BUILD_ROOT)
 
 -include $(DEPS)
