@@ -727,6 +727,7 @@ DECL_PORT_ARG(fs_dir, fd) {
                 }
                 strncpy(ents[i].shortname, ent->d_name,
                         sizeof ents[i].shortname);
+                if (d) *d = '.';
 
                 ents[i]._21a[0] = 1;
 
@@ -745,9 +746,9 @@ DECL_PORT_ARG(fs_dir, fd) {
 
                 ents[i].ishidden = ent->d_name[0] == '.';
 
-                ldebug("entry %s %s sz=%lld (%s.%s)", ent->d_name,
-                       ents[i].isdir ? "(dir)" : "", ents[i].size,
-                       ents[i].shortname, ents[i].shortext);
+                linfo("entry %s %s sz=%lld (%s.%s)", ent->d_name,
+                      ents[i].isdir ? "(dir)" : "", ents[i].size,
+                      ents[i].shortname, ents[i].shortext);
             }
 
             cmdbuf[0] = IPCHDR(2, 0);
