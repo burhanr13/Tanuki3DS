@@ -15,6 +15,12 @@
 #define realpath(a, b) _fullpath(b, a, 4096)
 #endif
 
+#ifdef __linux__
+#define OPEN_CMD "xdg-open"
+#else
+#define OPEN_CMD "open"
+#endif
+
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #define CIMGUI_USE_SDL3
 #define CIMGUI_USE_OPENGL3
@@ -52,7 +58,10 @@ bool g_pending_reset;
 bool g_fullscreen;
 
 bool g_show_menu_bar = true;
-bool g_show_settings = false;
+bool g_show_settings;
+bool g_show_inputsettings;
+
+int* g_waiting_key;
 
 #define FREECAM_SPEED 5.0
 #define FREECAM_ROTATE_SPEED 0.02
@@ -158,6 +167,41 @@ void hotkey_press(SDL_Keycode key) {
     }
 }
 
+void load_default_inputmap() {
+    ctremu.inputmap.kb.a = SDL_SCANCODE_L;
+    ctremu.inputmap.kb.b = SDL_SCANCODE_K;
+    ctremu.inputmap.kb.x = SDL_SCANCODE_O;
+    ctremu.inputmap.kb.y = SDL_SCANCODE_I;
+    ctremu.inputmap.kb.l = SDL_SCANCODE_Q;
+    ctremu.inputmap.kb.r = SDL_SCANCODE_P;
+    ctremu.inputmap.kb.start = SDL_SCANCODE_RETURN;
+    ctremu.inputmap.kb.select = SDL_SCANCODE_RSHIFT;
+    ctremu.inputmap.kb.du = SDL_SCANCODE_UP;
+    ctremu.inputmap.kb.dd = SDL_SCANCODE_DOWN;
+    ctremu.inputmap.kb.dl = SDL_SCANCODE_LEFT;
+    ctremu.inputmap.kb.dr = SDL_SCANCODE_RIGHT;
+    ctremu.inputmap.kb.cu = SDL_SCANCODE_W;
+    ctremu.inputmap.kb.cd = SDL_SCANCODE_S;
+    ctremu.inputmap.kb.cl = SDL_SCANCODE_A;
+    ctremu.inputmap.kb.cr = SDL_SCANCODE_D;
+    ctremu.inputmap.kb.cmod = SDL_SCANCODE_LSHIFT;
+
+    ctremu.inputmap.freecam.ml = SDL_SCANCODE_A;
+    ctremu.inputmap.freecam.mr = SDL_SCANCODE_D;
+    ctremu.inputmap.freecam.mf = SDL_SCANCODE_W;
+    ctremu.inputmap.freecam.mb = SDL_SCANCODE_S;
+    ctremu.inputmap.freecam.mu = SDL_SCANCODE_R;
+    ctremu.inputmap.freecam.md = SDL_SCANCODE_F;
+    ctremu.inputmap.freecam.lu = SDL_SCANCODE_UP;
+    ctremu.inputmap.freecam.ld = SDL_SCANCODE_DOWN;
+    ctremu.inputmap.freecam.ll = SDL_SCANCODE_LEFT;
+    ctremu.inputmap.freecam.lr = SDL_SCANCODE_RIGHT;
+    ctremu.inputmap.freecam.rl = SDL_SCANCODE_Q;
+    ctremu.inputmap.freecam.rr = SDL_SCANCODE_E;
+    ctremu.inputmap.freecam.slow_mod = SDL_SCANCODE_LSHIFT;
+    ctremu.inputmap.freecam.fast_mod = SDL_SCANCODE_RSHIFT;
+}
+
 void update_input(E3DS* s, SDL_Gamepad* controller) {
     if (igGetIO()->WantCaptureKeyboard || igGetIO()->WantCaptureMouse) return;
 
@@ -168,63 +212,69 @@ void update_input(E3DS* s, SDL_Gamepad* controller) {
     int cy = 0;
 
     if (!ctremu.freecam_enable) {
-        btn.a = keys[SDL_SCANCODE_L];
-        btn.b = keys[SDL_SCANCODE_K];
-        btn.x = keys[SDL_SCANCODE_O];
-        btn.y = keys[SDL_SCANCODE_I];
-        btn.l = keys[SDL_SCANCODE_Q];
-        btn.r = keys[SDL_SCANCODE_P];
-        btn.start = keys[SDL_SCANCODE_RETURN];
-        btn.select = keys[SDL_SCANCODE_RSHIFT];
-        btn.up = keys[SDL_SCANCODE_UP];
-        btn.down = keys[SDL_SCANCODE_DOWN];
-        btn.left = keys[SDL_SCANCODE_LEFT];
-        btn.right = keys[SDL_SCANCODE_RIGHT];
+        btn.a = keys[ctremu.inputmap.kb.a];
+        btn.b = keys[ctremu.inputmap.kb.b];
+        btn.x = keys[ctremu.inputmap.kb.x];
+        btn.y = keys[ctremu.inputmap.kb.y];
+        btn.l = keys[ctremu.inputmap.kb.l];
+        btn.r = keys[ctremu.inputmap.kb.r];
+        btn.start = keys[ctremu.inputmap.kb.start];
+        btn.select = keys[ctremu.inputmap.kb.select];
+        btn.up = keys[ctremu.inputmap.kb.du];
+        btn.down = keys[ctremu.inputmap.kb.dd];
+        btn.left = keys[ctremu.inputmap.kb.dl];
+        btn.right = keys[ctremu.inputmap.kb.dr];
 
-        cx = (keys[SDL_SCANCODE_D] - keys[SDL_SCANCODE_A]) * INT16_MAX;
-        cy = (keys[SDL_SCANCODE_W] - keys[SDL_SCANCODE_S]) * INT16_MAX;
+        cx = (keys[ctremu.inputmap.kb.cr] - keys[ctremu.inputmap.kb.cl]) *
+             INT16_MAX;
+        cy = (keys[ctremu.inputmap.kb.cu] - keys[ctremu.inputmap.kb.cd]) *
+             INT16_MAX;
+        if (keys[ctremu.inputmap.kb.cmod]) {
+            cx /= 4;
+            cy /= 4;
+        }
     } else {
         float speed = FREECAM_SPEED;
-        if (keys[SDL_SCANCODE_LSHIFT]) speed /= 20;
-        if (keys[SDL_SCANCODE_RSHIFT]) speed *= 20;
+        if (keys[ctremu.inputmap.freecam.slow_mod]) speed /= 20;
+        if (keys[ctremu.inputmap.freecam.fast_mod]) speed *= 20;
 
         vec3 t = {};
-        if (keys[SDL_SCANCODE_A]) {
+        if (keys[ctremu.inputmap.freecam.ml]) {
             t[0] = speed;
         }
-        if (keys[SDL_SCANCODE_D]) {
+        if (keys[ctremu.inputmap.freecam.mr]) {
             t[0] = -speed;
         }
-        if (keys[SDL_SCANCODE_F]) {
+        if (keys[ctremu.inputmap.freecam.md]) {
             t[1] = speed;
         }
-        if (keys[SDL_SCANCODE_R]) {
+        if (keys[ctremu.inputmap.freecam.mu]) {
             t[1] = -speed;
         }
-        if (keys[SDL_SCANCODE_W]) {
+        if (keys[ctremu.inputmap.freecam.mf]) {
             t[2] = speed;
         }
-        if (keys[SDL_SCANCODE_S]) {
+        if (keys[ctremu.inputmap.freecam.mb]) {
             t[2] = -speed;
         }
 
         mat4 r = GLM_MAT4_IDENTITY_INIT;
-        if (keys[SDL_SCANCODE_DOWN]) {
+        if (keys[ctremu.inputmap.freecam.ld]) {
             glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_XUP);
         }
-        if (keys[SDL_SCANCODE_UP]) {
+        if (keys[ctremu.inputmap.freecam.lu]) {
             glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_XUP);
         }
-        if (keys[SDL_SCANCODE_LEFT]) {
+        if (keys[ctremu.inputmap.freecam.ll]) {
             glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_YUP);
         }
-        if (keys[SDL_SCANCODE_RIGHT]) {
+        if (keys[ctremu.inputmap.freecam.lr]) {
             glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_YUP);
         }
-        if (keys[SDL_SCANCODE_Q]) {
+        if (keys[ctremu.inputmap.freecam.rl]) {
             glm_rotate_make(r, FREECAM_ROTATE_SPEED, GLM_ZUP);
         }
-        if (keys[SDL_SCANCODE_E]) {
+        if (keys[ctremu.inputmap.freecam.rr]) {
             glm_rotate_make(r, -FREECAM_ROTATE_SPEED, GLM_ZUP);
         }
 
@@ -324,7 +374,7 @@ void draw_menubar() {
             if (igMenuItem("Open App Directory", nullptr, false, true)) {
                 char* cwd = getcwd(nullptr, 0);
                 char* cmd;
-                asprintf(&cmd, "open '%s'", cwd);
+                asprintf(&cmd, OPEN_CMD " '%s'", cwd);
                 system(cmd);
                 free(cwd);
                 free(cmd);
@@ -385,6 +435,9 @@ void draw_menubar() {
             if (igMenuItem("Settings", "F3", false, true)) {
                 g_show_settings = true;
             }
+            if (igMenuItem("Input Config", nullptr, false, true)) {
+                g_show_inputsettings = true;
+            }
 
             igEndMenu();
         }
@@ -413,6 +466,7 @@ void draw_menubar() {
         if (igBeginMenu("About", true)) {
             igTextLinkOpenURL("GitHub",
                               "https://github.com/burhanr13/Tanuki3DS");
+            igTextLinkOpenURL("Discord", "https://discord.gg/6ya65fvD3g");
             igEndMenu();
         }
 
@@ -442,7 +496,8 @@ void draw_settings() {
     if (!g_show_settings) return;
 
     igBegin("Settings", &g_show_settings,
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize |
+                ImGuiWindowFlags_NoTitleBar);
 
     igSeparatorText("System");
     igInputText("Username", ctremu.username, sizeof ctremu.username, 0, nullptr,
@@ -494,6 +549,95 @@ void draw_settings() {
     igEnd();
 }
 
+void config_input(char* name, int* val) {
+    igTableNextRow(0, 0);
+    igTableNextColumn();
+    igText(name);
+    igTableNextColumn();
+    if (g_waiting_key == val) {
+        igBeginDisabled(true);
+        igButton("Press Key...", (ImVec2) {150, 0});
+        igEndDisabled();
+    } else {
+        char buf[100];
+        snprintf(buf, sizeof buf, "%s##%s", SDL_GetScancodeName(*val), name);
+        if (igButton(buf, (ImVec2) {150, 0})) {
+            g_waiting_key = val;
+        }
+    }
+}
+
+void draw_inputsettings() {
+    if (!g_show_inputsettings) {
+        g_waiting_key = nullptr;
+        return;
+    }
+
+    igBegin("Input Configuration", &g_show_inputsettings,
+            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
+
+    if (igBeginTabBar("input tabs", 0)) {
+        if (igBeginTabItem("Keyboard Input", nullptr, 0)) {
+            igBeginTable("input config", 2, 0, (ImVec2) {}, 0);
+            config_input("A", &ctremu.inputmap.kb.a);
+            config_input("B", &ctremu.inputmap.kb.b);
+            config_input("X", &ctremu.inputmap.kb.x);
+            config_input("Y", &ctremu.inputmap.kb.y);
+            config_input("L", &ctremu.inputmap.kb.l);
+            config_input("R", &ctremu.inputmap.kb.r);
+            config_input("Start", &ctremu.inputmap.kb.start);
+            config_input("Select", &ctremu.inputmap.kb.select);
+            igTableNextRow(0, 0);
+            config_input("D-Pad Left", &ctremu.inputmap.kb.dl);
+            config_input("D-Pad Right", &ctremu.inputmap.kb.dr);
+            config_input("D-Pad Up", &ctremu.inputmap.kb.du);
+            config_input("D-Pad Down", &ctremu.inputmap.kb.dd);
+            igTableNextRow(0, 0);
+            config_input("Circle Pad Left", &ctremu.inputmap.kb.cl);
+            config_input("Circle Pad Right", &ctremu.inputmap.kb.cr);
+            config_input("Circle Pad Up", &ctremu.inputmap.kb.cu);
+            config_input("Circle Pad Down", &ctremu.inputmap.kb.cd);
+            config_input("Circle Pad Modifier", &ctremu.inputmap.kb.cmod);
+            igEndTable();
+
+            igEndTabItem();
+        }
+
+        if (igBeginTabItem("Freecam", nullptr, ImGuiTabItemFlags_None)) {
+            igBeginTable("freecam config", 2, 0, (ImVec2) {}, 0);
+            config_input("Move Forward", &ctremu.inputmap.freecam.mf);
+            config_input("Move Backward", &ctremu.inputmap.freecam.mb);
+            config_input("Move Left", &ctremu.inputmap.freecam.ml);
+            config_input("Move Right", &ctremu.inputmap.freecam.mr);
+            config_input("Move Up", &ctremu.inputmap.freecam.mu);
+            config_input("Move Down", &ctremu.inputmap.freecam.md);
+            igTableNextRow(0, 0);
+            config_input("Look Up", &ctremu.inputmap.freecam.lu);
+            config_input("Look Down", &ctremu.inputmap.freecam.ld);
+            config_input("Look Left", &ctremu.inputmap.freecam.ll);
+            config_input("Look Right", &ctremu.inputmap.freecam.lr);
+            config_input("Roll Left", &ctremu.inputmap.freecam.rl);
+            config_input("Roll Right", &ctremu.inputmap.freecam.rr);
+            igTableNextRow(0, 0);
+            config_input("Slow Modifier", &ctremu.inputmap.freecam.slow_mod);
+            config_input("Fast Modifier", &ctremu.inputmap.freecam.fast_mod);
+            igEndTable();
+
+            igEndTabItem();
+        }
+
+        igEndTabBar();
+    }
+
+    igSeparator();
+
+    if (igButton("Close", (ImVec2) {})) {
+        g_show_inputsettings = false;
+    }
+
+    igEnd();
+}
+
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
@@ -516,6 +660,7 @@ int main(int argc, char** argv) {
     freopen("ctremu.log", "w", stdout);
 #endif
 
+    load_default_inputmap();
     emulator_init();
 
     bool log_old = g_infologs;
@@ -579,8 +724,29 @@ int main(int argc, char** argv) {
     ctremu.audio_cb = audio_callback;
 
     igCreateContext(nullptr);
-    igGetIO()->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    igGetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    igGetIO()->ConfigFlags |=
+        ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+    igGetIO()->ConfigViewportsNoDecoration = false;
+    igGetIO()->ConfigViewportsNoAutoMerge = true;
+
+    igGetStyle()->FontSizeBase = 15;
+    ImFontAtlas_AddFontDefaultVector(igGetIO()->Fonts, nullptr);
+
+    igGetStyle()->FrameBorderSize = 1;
+    igGetStyle()->FramePadding = (ImVec2) {5, 5};
+    igGetStyle()->FrameRounding = 5;
+    igGetStyle()->GrabRounding = 5;
+    igGetStyle()->ItemSpacing = (ImVec2) {5, 5};
+    igGetStyle()->PopupRounding = 5;
+    igGetStyle()->PopupBorderSize = 1;
+    igGetStyle()->SeparatorTextPadding = (ImVec2) {0, 10};
+    igGetStyle()->SeparatorTextAlign = (ImVec2) {0.5, 0.5};
+    igGetStyle()->WindowPadding = (ImVec2) {10, 10};
+    igGetStyle()->WindowRounding = 5;
+    igGetStyle()->WindowBorderSize = 1;
+
+    igStyleColorsDark(nullptr);
+
     ImGui_ImplSDL3_InitForOpenGL(g_window, glcontext);
     ImGui_ImplOpenGL3_Init(nullptr);
 
@@ -603,6 +769,16 @@ int main(int argc, char** argv) {
     ctremu.running = true;
     while (ctremu.running) {
 
+        if (setjmp(ctremu.exceptionJmp)) {
+            emulator_set_rom(nullptr);
+            g_pending_reset = true;
+            SDL_ShowSimpleMessageBox(
+                SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
+                "A fatal error has occurred or the application has exited. "
+                "Please see the log for details.",
+                g_window);
+        }
+
         if (g_pending_reset) {
             g_pending_reset = false;
             if (emulator_reset()) {
@@ -618,16 +794,6 @@ int main(int argc, char** argv) {
             SDL_ClearAudioStream(g_audio);
         }
 
-        if (setjmp(ctremu.exceptionJmp)) {
-            emulator_reset();
-            ctremu.pause = true;
-            SDL_ShowSimpleMessageBox(
-                SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
-                "A fatal error has occurred or the application has exited. "
-                "Please see the log for details.",
-                g_window);
-        }
-
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -636,7 +802,12 @@ int main(int argc, char** argv) {
                     ctremu.running = false;
                     break;
                 case SDL_EVENT_KEY_DOWN:
-                    hotkey_press(e.key.key);
+                    if (g_waiting_key) {
+                        *g_waiting_key = e.key.scancode;
+                        g_waiting_key = nullptr;
+                    } else {
+                        hotkey_press(e.key.key);
+                    }
                     break;
                 case SDL_EVENT_GAMEPAD_ADDED:
                     if (!g_gamepad) {
@@ -688,6 +859,7 @@ int main(int argc, char** argv) {
         draw_menubar();
 
         draw_settings();
+        draw_inputsettings();
 
         draw_swkbd();
 

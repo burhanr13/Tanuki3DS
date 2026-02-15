@@ -63,6 +63,20 @@ typedef struct {
     int language;
     int region;
 
+    struct {
+        struct {
+            int a, b, x, y, l, r, start, select;
+            int cl, cr, cu, cd;
+            int cmod;
+            int dl, dr, du, dd;
+        } kb;
+        struct {
+            int ml, mr, mf, mb, mu, md;
+            int lu, ld, ll, lr, rl, rr;
+            int slow_mod, fast_mod;
+        } freecam;
+    } inputmap;
+
     EmuAudioCallback audio_cb;
 
     jmp_buf exceptionJmp;

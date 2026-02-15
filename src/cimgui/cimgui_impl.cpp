@@ -7,27 +7,23 @@
 
 
 #ifdef CIMGUI_USE_GLFW
-#include "./imgui/imgui_impl_glfw.h"
+#include "imgui_impl_glfw.h"
 #endif
 
 #ifdef CIMGUI_USE_OPENGL3
-#include "./imgui/imgui_impl_opengl3.h"
+#include "imgui_impl_opengl3.h"
 #endif
 
 #ifdef CIMGUI_USE_OPENGL2
-#include "./imgui/imgui_impl_opengl2.h"
+#include "imgui_impl_opengl2.h"
 #endif
 
 #ifdef CIMGUI_USE_SDL2
-#include "./imgui/imgui_impl_sdl2.h"
+#include "imgui_impl_sdl2.h"
 #endif
 
 #ifdef CIMGUI_USE_SDL3
-#include "./imgui/imgui_impl_sdl3.h"
-#endif
-
-#ifdef CIMGUI_USE_VULKAN
-#include "./imgui/imgui_impl_vulkan.h"
+#include "imgui_impl_sdl3.h"
 #endif
 
 #include "cimgui_impl.h"
