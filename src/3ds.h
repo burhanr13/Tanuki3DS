@@ -88,6 +88,4 @@ void e3ds_update_datetime(E3DS* s);
 
 void e3ds_run_frame(E3DS* s);
 
-void convert_utf16(char* dst, size_t dstlen, u16* src, size_t srclen);
-
 #endif

@@ -6,6 +6,7 @@
 
 #include "3ds.h"
 #include "emulator.h"
+#include "unicode.h"
 
 #include "svc_types.h"
 

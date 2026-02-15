@@ -13,6 +13,8 @@
 
 typedef void (*EmuAudioCallback)(s16 (*samples)[2], u32 num);
 
+#define HISTORYLEN 10
+
 typedef enum {
     LAYOUT_DEFAULT,
     LAYOUT_HORIZONTAL,
@@ -29,6 +31,8 @@ typedef struct {
     char* romfile;
     char* romfilenodir;
     char* romfilenoext;
+
+    char* history[HISTORYLEN];
 
     bool initialized;
     bool running;
@@ -58,6 +62,8 @@ typedef struct {
     EmuAudioCallback audio_cb;
 
     jmp_buf exceptionJmp;
+
+    bool needs_swkbd;
 
     E3DS system;
 

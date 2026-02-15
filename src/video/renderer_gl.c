@@ -23,6 +23,8 @@ const char gpufragsource[] = {
 #embed "hostshaders/gpu.frag"
     , '\0'};
 
+bool g_wireframe;
+
 void renderer_gl_init(GLState* state, GPU* gpu) {
     auto mainvs = glCreateShader(GL_VERTEX_SHADER);
     auto mainfs = glCreateShader(GL_FRAGMENT_SHADER);
@@ -202,6 +204,7 @@ void renderer_gl_destroy(GLState* state, GPU* gpu) {
 void gpu_gl_start_frame(GPU* gpu) {
     glUseProgram(LRU_mru(gpu->gl.progcache)->prog);
     glBindFramebuffer(GL_FRAMEBUFFER, gpu->curfb->fbo);
+    if (g_wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 }
 
 // call at end of frame
@@ -212,6 +215,7 @@ void render_gl_main(GLState* state) {
     glUseProgram(state->main_program);
     glBindVertexArray(state->main_vao);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glColorMask(true, true, true, true);
     glDisable(GL_BLEND);
     glDisable(GL_COLOR_LOGIC_OP);

@@ -7,6 +7,7 @@
 
 #include "3ds.h"
 #include "kernel/loader.h"
+#include "unicode.h"
 
 #ifdef _WIN32
 #define mkdir(path, ...) mkdir(path)
@@ -717,20 +718,15 @@ DECL_PORT_ARG(fs_dir, fd) {
 
                 memset(&ents[i], 0, sizeof ents[i]);
 
-                int namelen = strlen(ent->d_name);
-                if (namelen > 0x105) namelen = 0x105;
-                int dotpos = -1;
-                for (int j = 0; j < namelen; j++) {
-                    ents[i].name[j] = ent->d_name[j];
-
-                    if (ent->d_name[j] == '.') dotpos = j;
-                    if (dotpos < 0 && j < 8) {
-                        ents[i].shortname[j] = ent->d_name[j];
-                    }
-                    if (dotpos >= 0 && j > dotpos && j - (dotpos + 1) < 3) {
-                        ents[i].shortext[j - (dotpos + 1)] = ent->d_name[j];
-                    }
+                convert_to_utf16(ents[i].name, sizeof ents[i].name / 2,
+                                 ent->d_name);
+                char* d = strrchr(ent->d_name, '.');
+                if (d) {
+                    *d = '\0';
+                    strncpy(ents[i].shortext, d + 1, sizeof ents[i].shortext);
                 }
+                strncpy(ents[i].shortname, ent->d_name,
+                        sizeof ents[i].shortname);
 
                 ents[i]._21a[0] = 1;
 
@@ -749,8 +745,9 @@ DECL_PORT_ARG(fs_dir, fd) {
 
                 ents[i].ishidden = ent->d_name[0] == '.';
 
-                linfo("entry %s %s sz=%lld", ent->d_name,
-                      ents[i].isdir ? "(dir)" : "", ents[i].size);
+                ldebug("entry %s %s sz=%lld (%s.%s)", ent->d_name,
+                       ents[i].isdir ? "(dir)" : "", ents[i].size,
+                       ents[i].shortname, ents[i].shortext);
             }
 
             cmdbuf[0] = IPCHDR(2, 0);

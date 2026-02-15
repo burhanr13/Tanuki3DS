@@ -1,6 +1,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
-#include <fcntl.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -8,11 +8,22 @@
 #include "3ds.h"
 #include "cpu.h"
 #include "emulator.h"
+#include "services/applets.h"
 #include "video/renderer_gl.h"
 
 #ifdef _WIN32
 #define realpath(a, b) _fullpath(b, a, 4096)
 #endif
+
+#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#define CIMGUI_USE_SDL3
+#define CIMGUI_USE_OPENGL3
+#include <cimgui/cimgui.h>
+#include <cimgui/cimgui_impl.h>
+
+#define igGetIO igGetIO_Nil
+#define igMenuItem igMenuItem_Bool
+#define igMenuItemP igMenuItem_BoolPtr
 
 const char usage[] =
     R"(ctremu [options] [romfile]
@@ -34,6 +45,11 @@ SDL_Gamepad* g_gamepad;
 SDL_AudioStream* g_audio;
 
 bool g_pending_reset;
+
+bool g_fullscreen;
+
+bool g_show_menu_bar = true;
+bool g_show_settings = false;
 
 #define FREECAM_SPEED 5.0
 #define FREECAM_ROTATE_SPEED 0.02
@@ -91,6 +107,7 @@ void load_rom_dialog() {
 }
 
 void hotkey_press(SDL_Keycode key) {
+    if (igGetIO()->WantCaptureKeyboard) return;
     switch (key) {
         case SDLK_F5:
             ctremu.pause = !ctremu.pause;
@@ -118,6 +135,13 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_F10:
             ctremu.viewlayout = (ctremu.viewlayout + 1) % LAYOUT_MAX;
             break;
+        case SDLK_F11:
+            g_fullscreen = !g_fullscreen;
+            SDL_SetWindowFullscreen(g_window, g_fullscreen);
+            break;
+        case SDLK_ESCAPE:
+            g_show_menu_bar = !g_show_menu_bar;
+            break;
 #ifdef AUDIO_DEBUG
         case SDLK_0 ... SDLK_9:
             g_dsp_chn_disable ^= BIT(key - SDLK_0);
@@ -129,6 +153,8 @@ void hotkey_press(SDL_Keycode key) {
 }
 
 void update_input(E3DS* s, SDL_Gamepad* controller) {
+    if (igGetIO()->WantCaptureKeyboard || igGetIO()->WantCaptureMouse) return;
+
     const bool* keys = SDL_GetKeyboardState(nullptr);
 
     PadState btn = {};
@@ -269,6 +295,148 @@ void audio_callback(s16 (*samples)[2], u32 count) {
     SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
 }
 
+void draw_menubar() {
+    if (!g_show_menu_bar) return;
+
+    if (igBeginMainMenuBar()) {
+        if (igBeginMenu("File", true)) {
+            if (igMenuItem("Open", "F2", false, true)) {
+                load_rom_dialog();
+            }
+            if (igBeginMenu("Open Recent", ctremu.history[0])) {
+                for (int i = 0; i < HISTORYLEN; i++) {
+                    if (!ctremu.history[i]) break;
+                    if (igMenuItem(ctremu.history[i], nullptr, false, true)) {
+                        emulator_set_rom(ctremu.history[i]);
+                        g_pending_reset = true;
+                    }
+                }
+                igEndMenu();
+            }
+            igSeparator();
+
+            if (igMenuItem("Open App Directory", nullptr, false, true)) {
+                char* cwd = getcwd(nullptr, 0);
+                char* cmd;
+                asprintf(&cmd, "open '%s'", cwd);
+                system(cmd);
+                free(cwd);
+                free(cmd);
+            }
+
+            igSeparator();
+            if (igMenuItem("Exit", nullptr, false, true)) {
+                ctremu.running = false;
+            }
+            igEndMenu();
+        }
+        if (igBeginMenu("Emulation", ctremu.initialized)) {
+            if (igMenuItem("Reset", "F1", false, true)) {
+                g_pending_reset = true;
+            }
+            igMenuItemP("Pause", "F5", &ctremu.pause, true);
+            if (igMenuItem("Stop", nullptr, false, true)) {
+                emulator_set_rom(nullptr);
+                g_pending_reset = true;
+            }
+            igSeparator();
+
+            igMenuItemP("Fast Forward", "Tab", &ctremu.fastforward, true);
+            igMenuItemP("Mute", "F6", &ctremu.mute, true);
+
+            igSeparator();
+
+            if (igMenuItemP("Free Camera", "F7", &ctremu.freecam_enable,
+                            true)) {
+                glm_mat4_identity(ctremu.freecam_mtx);
+                renderer_gl_update_freecam(&ctremu.system.gpu.gl);
+            }
+
+            igEndMenu();
+        }
+
+        if (igBeginMenu("View", true)) {
+            if (igMenuItemP("Fullscreen", "F11", &g_fullscreen, true)) {
+                SDL_SetWindowFullscreen(g_window, g_fullscreen);
+            }
+            if (igBeginMenu("Screen Layout", true)) {
+                if (igMenuItem("Vertical", nullptr,
+                               ctremu.viewlayout == LAYOUT_DEFAULT, true)) {
+                    ctremu.viewlayout = LAYOUT_DEFAULT;
+                }
+                if (igMenuItem("Horizontal", nullptr,
+                               ctremu.viewlayout == LAYOUT_HORIZONTAL, true)) {
+                    ctremu.viewlayout = LAYOUT_HORIZONTAL;
+                }
+                if (igMenuItem("Large Top Screen", nullptr,
+                               ctremu.viewlayout == LAYOUT_LARGETOP, true)) {
+                    ctremu.viewlayout = LAYOUT_LARGETOP;
+                }
+                igEndMenu();
+            }
+            igSeparator();
+
+            if (igMenuItem("Settings", nullptr, false, true)) {
+                g_show_settings = true;
+            }
+
+            igEndMenu();
+        }
+
+        if (igBeginMenu("Debug", ctremu.initialized)) {
+            igMenuItemP("Verbose Log", nullptr, &g_infologs, true);
+            igMenuItemP("CPU Trace Log", nullptr, &g_cpulog, true);
+            igSeparator();
+            igMenuItemP("Wireframe", nullptr, &g_wireframe, true);
+            if (igBeginMenu("DSP Audio Channels", true)) {
+                for (int i = 0; i < DSP_CHANNELS; i++) {
+                    char buf[100];
+                    snprintf(buf, sizeof buf, "Channel %d", i);
+                    bool ena = !(g_dsp_chn_disable & BIT(i));
+                    g_dsp_chn_disable &= ~BIT(i);
+                    igMenuItemP(buf, nullptr, &ena, true);
+                    g_dsp_chn_disable |= !ena << i;
+                }
+                igEndMenu();
+            }
+            igEndMenu();
+        }
+
+        if (igBeginMenu("About", true)) {
+            igTextLinkOpenURL("GitHub",
+                              "https://github.com/burhanr13/Tanuki3DS");
+            igEndMenu();
+        }
+
+        igSpacing();
+        igTextDisabled("Esc to toggle menu bar");
+
+        igEndMainMenuBar();
+    }
+}
+
+void draw_swkbd() {
+    if (ctremu.needs_swkbd) igOpenPopup_Str("Input Text", 0);
+
+    if (igBeginPopupModal("Input Text", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        static char buf[100];
+        igInputText("##", buf, sizeof buf, 0, nullptr, nullptr);
+        if (igButton("Ok", (ImVec2_c) {})) {
+            swkbd_resp(&ctremu.system, buf);
+            igCloseCurrentPopup();
+        }
+        igEndPopup();
+    }
+}
+
+void draw_settings() {
+    if (!g_show_settings) return;
+
+    igBegin("Settings", &g_show_settings, 0);
+
+    igEnd();
+}
+
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
@@ -353,10 +521,16 @@ int main(int argc, char** argv) {
     SDL_ResumeAudioStreamDevice(g_audio);
     ctremu.audio_cb = audio_callback;
 
-    if (!ctremu.romfile) {
-        load_rom_dialog();
-    } else {
+    igCreateContext(nullptr);
+    igGetIO()->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    igGetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    ImGui_ImplSDL3_InitForOpenGL(g_window, glcontext);
+    ImGui_ImplOpenGL3_Init(nullptr);
+
+    if (ctremu.romfile) {
         g_pending_reset = true;
+    } else {
+        ctremu.pause = true;
     }
 
     Uint64 prev_frame_time = SDL_GetTicksNS();
@@ -376,10 +550,12 @@ int main(int argc, char** argv) {
             g_pending_reset = false;
             if (emulator_reset()) {
                 ctremu.pause = false;
+                g_show_menu_bar = !ctremu.initialized;
             } else {
                 SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
                                          "ROM loading failed", g_window);
                 ctremu.pause = true;
+                g_show_menu_bar = true;
             }
             SDL_RaiseWindow(g_window);
             SDL_ClearAudioStream(g_audio);
@@ -397,6 +573,7 @@ int main(int argc, char** argv) {
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
+            ImGui_ImplSDL3_ProcessEvent(&e);
             switch (e.type) {
                 case SDL_EVENT_QUIT:
                     ctremu.running = false;
@@ -422,11 +599,12 @@ int main(int argc, char** argv) {
             }
         }
 
+        if (!ctremu.initialized) ctremu.pause = true;
+
         SDL_GetWindowSizeInPixels(g_window, &ctremu.windowW, &ctremu.windowH);
         emulator_calc_viewports();
 
         if (!ctremu.pause) {
-
             update_input(&ctremu.system, g_gamepad);
 
             gpu_gl_start_frame(&ctremu.system.gpu);
@@ -439,9 +617,33 @@ int main(int argc, char** argv) {
             avg_frame_time_ct++;
 
             render_gl_main(&ctremu.system.gpu.gl);
-
-            SDL_GL_SwapWindow(g_window);
         }
+        if (ctremu.initialized) {
+            render_gl_main(&ctremu.system.gpu.gl);
+        } else {
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        igNewFrame();
+
+        draw_menubar();
+
+        draw_settings();
+
+        draw_swkbd();
+
+        igRender();
+        ImGui_ImplOpenGL3_RenderDrawData(igGetDrawData());
+
+        if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            igUpdatePlatformWindows();
+            igRenderPlatformWindowsDefault(nullptr, nullptr);
+            SDL_GL_MakeCurrent(g_window, glcontext);
+        }
+
+        SDL_GL_SwapWindow(g_window);
 
         Uint64 elapsed = SDL_GetTicksNS() - prev_fps_update;
         if (!ctremu.pause && elapsed >= SDL_NS_PER_SECOND / 2) {
@@ -486,6 +688,10 @@ int main(int argc, char** argv) {
 
         prev_frame_time = SDL_GetTicksNS();
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    igDestroyContext(nullptr);
 
     SDL_DestroyAudioStream(g_audio);
 

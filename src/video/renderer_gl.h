@@ -57,6 +57,8 @@ typedef struct {
 
 } GLState;
 
+extern bool g_wireframe;
+
 void renderer_gl_init(GLState* state, GPU* gpu);
 void renderer_gl_destroy(GLState* state, GPU* gpu);
 

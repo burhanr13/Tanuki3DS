@@ -139,24 +139,3 @@ void e3ds_run_frame(E3DS* s) {
     s->frame_complete = false;
 }
 
-// lengths are size of buffer, including null terminator
-void convert_utf16(char* dst, size_t dstlen, u16* src, size_t srclen) {
-    int dsti = 0;
-    for (int i = 0; i < srclen; i++) {
-        u16 c = src[i];
-        if (c < BIT(7)) {
-            if (dsti + 1 > dstlen) break;
-            dst[dsti++] = c;
-        } else if (c < BIT(11)) {
-            if (dsti + 2 > dstlen) break;
-            dst[dsti++] = 0xc0 | (c >> 6);
-            dst[dsti++] = 0x80 | (c & MASK(6));
-        } else {
-            if (dsti + 3 > dstlen) break;
-            dst[dsti++] = 0xe0 | (c >> 12);
-            dst[dsti++] = 0x80 | (c >> 6 & MASK(6));
-            dst[dsti++] = 0x80 | (c & MASK(6));
-        }
-    }
-    dst[dstlen - 1] = '\0';
-}

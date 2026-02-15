@@ -1,6 +1,7 @@
 #include "cfg.h"
 
 #include "3ds.h"
+#include "unicode.h"
 
 DECL_PORT(cfg) {
     u32* cmdbuf = PTR(cmd_addr);

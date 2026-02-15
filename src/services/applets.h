@@ -64,5 +64,6 @@ typedef struct {
 } SwkbdState;
 
 void swkbd_run(E3DS* s, u32 paramsvaddr, u32 shmemvaddr);
+void swkbd_resp(E3DS* s, char* text);
 
 #endif

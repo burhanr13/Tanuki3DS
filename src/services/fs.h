@@ -34,8 +34,8 @@ enum {
 
 typedef struct {
     u16 name[0x106];
-    u8 shortname[10];
-    u8 shortext[4];
+    char shortname[10];
+    char shortext[4];
     u8 _21a[2];
     u8 isdir;
     u8 ishidden;

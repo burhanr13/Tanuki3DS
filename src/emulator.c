@@ -78,6 +78,15 @@ void emulator_set_rom(const char* filename) {
 
     ctremu.romfile = strdup(filename);
 
+    int i;
+    for (i = 0; i < HISTORYLEN; i++) {
+        if (ctremu.history[i] && !strcmp(ctremu.history[i], filename)) break;
+    }
+    if (i == HISTORYLEN) i = HISTORYLEN - 1;
+    free(ctremu.history[i]);
+    memmove(&ctremu.history[1], &ctremu.history[0], i * sizeof(char*));
+    ctremu.history[0] = strdup(ctremu.romfile);
+
     ctremu.romfilenodir = strrchr(ctremu.romfile, '/');
 #ifdef _WIN32
     if (!ctremu.romfilenodir) {

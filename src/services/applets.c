@@ -1,10 +1,22 @@
 #include "applets.h"
 
+#include "emulator.h"
+#include "unicode.h"
+
 void swkbd_run(E3DS* s, u32 paramsvaddr, u32 shmemvaddr) {
 
     linfo("running swkbd");
 
-    SwkbdState* in = PTR(paramsvaddr);
+    s->services.apt.swkbd.paramsvaddr = paramsvaddr;
+    s->services.apt.swkbd.shmemvaddr = shmemvaddr;
+    ctremu.needs_swkbd = true;
+}
+
+void swkbd_resp(E3DS* s, char* text) {
+    linfo("got response text: %s", text);
+    ctremu.needs_swkbd = false;
+
+    SwkbdState* in = PTR(s->services.apt.swkbd.paramsvaddr);
     SwkbdState* out = (SwkbdState*) &s->services.apt.nextparam.param;
 
     memset(out, 0, sizeof *out);
@@ -25,15 +37,10 @@ void swkbd_run(E3DS* s, u32 paramsvaddr, u32 shmemvaddr) {
 
     out->result = result;
 
-    u16* outtxt = PTR(shmemvaddr);
-
-    char text[] = "ctremu";
+    u16* outtxt = PTR(s->services.apt.swkbd.shmemvaddr);
 
     out->text_offset = 0;
-    out->text_length = sizeof text;
-    for (int i = 0; i < sizeof text; i++) {
-        outtxt[i] = text[i];
-    }
+    out->text_length = convert_to_utf16(outtxt, 1024, text);
 
     s->services.apt.nextparam.appid = APPID_SWKBD;
     s->services.apt.nextparam.cmd = APTCMD_WAKEUP;

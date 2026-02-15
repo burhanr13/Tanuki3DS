@@ -31,6 +31,11 @@ typedef struct {
     int application_cpu_time_limit;
 
     struct {
+        u32 paramsvaddr;
+        u32 shmemvaddr;
+    } swkbd;
+
+    struct {
         u32 appid;
         u32 cmd;
         u32 paramsize;

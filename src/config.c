@@ -49,20 +49,22 @@ void load_config() {
         rtrim(val);
 
         if (false) {
-#define SECT(s)                                                                \
+#define SECT(k)                                                                \
     }                                                                          \
-    else if (!strcmp(section, s)) {                                            \
+    else if (!strcmp(section, k)) {                                            \
         if (false) {}
-#define CMT(s)
-#define MATCH(s) else if (!strcmp(key, s))
-#define BOOL(s, v) MATCH(s) v = !strcmp(val, "true");
-#define INT(s, v) MATCH(s) v = atoi(val);
+#define CMT(k)
+#define MATCH(k) else if (!strcmp(key, k))
+#define BOOL(k, v) MATCH(k) v = !strcmp(val, "true");
+#define INT(k, v) MATCH(k) v = atoi(val);
+#define STR(k, v) MATCH(k) free(v), v = val[0] ? strdup(val) : nullptr;
 #include "config.inc"
 #undef SECT
 #undef CMT
 #undef MATCH
 #undef BOOL
 #undef INT
+#undef STR
         }
     }
 
@@ -76,15 +78,17 @@ void save_config() {
         return;
     }
 
-#define SECT(s) fprintf(fp, "\n[" s "]\n");
-#define CMT(s, ...) fprintf(fp, "# " s "\n" __VA_OPT__(, ) __VA_ARGS__);
-#define BOOL(s, b) fprintf(fp, s " = %s\n", b ? "true" : "false");
-#define INT(s, i) fprintf(fp, s " = %d\n", i);
+#define SECT(k) fprintf(fp, "\n[" k "]\n");
+#define CMT(k, ...) fprintf(fp, "# " k "\n" __VA_OPT__(, ) __VA_ARGS__);
+#define BOOL(k, b) fprintf(fp, k " = %s\n", b ? "true" : "false");
+#define INT(k, i) fprintf(fp, k " = %d\n", i);
+#define STR(k, s) fprintf(fp, k " = %s\n", s ? s : "");
 #include "config.inc"
 #undef SECT
 #undef CMT
 #undef BOOL
 #undef INT
+#undef STR
 
     fclose(fp);
 }
