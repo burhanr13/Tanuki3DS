@@ -1,5 +1,6 @@
 #include "emulator.h"
 
+#include <SDL3/SDL_scancode.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -13,6 +14,58 @@
 bool g_infologs = false;
 EmulatorState ctremu;
 
+void emulator_load_default_settings() {
+    ctremu.windowW = 800;
+    ctremu.windowH = 600;
+    ctremu.vsync = false;
+    ctremu.videoscale = 1;
+    ctremu.vshthreads = 0;
+    ctremu.shaderjit = true;
+    ctremu.hwvshaders = true;
+    ctremu.safeShaderMul = true;
+    ctremu.ubershader = false;
+    ctremu.hashTextures = true;
+    ctremu.audiosync = true;
+    ctremu.volume = 100;
+    strcpy(ctremu.username, "ctremu");
+    ctremu.language = 1;
+    ctremu.region = 1;
+
+    ctremu.inputmap.kb.a = SDL_SCANCODE_L;
+    ctremu.inputmap.kb.b = SDL_SCANCODE_K;
+    ctremu.inputmap.kb.x = SDL_SCANCODE_O;
+    ctremu.inputmap.kb.y = SDL_SCANCODE_I;
+    ctremu.inputmap.kb.l = SDL_SCANCODE_Q;
+    ctremu.inputmap.kb.r = SDL_SCANCODE_P;
+    ctremu.inputmap.kb.start = SDL_SCANCODE_RETURN;
+    ctremu.inputmap.kb.select = SDL_SCANCODE_RSHIFT;
+    ctremu.inputmap.kb.du = SDL_SCANCODE_UP;
+    ctremu.inputmap.kb.dd = SDL_SCANCODE_DOWN;
+    ctremu.inputmap.kb.dl = SDL_SCANCODE_LEFT;
+    ctremu.inputmap.kb.dr = SDL_SCANCODE_RIGHT;
+    ctremu.inputmap.kb.cu = SDL_SCANCODE_W;
+    ctremu.inputmap.kb.cd = SDL_SCANCODE_S;
+    ctremu.inputmap.kb.cl = SDL_SCANCODE_A;
+    ctremu.inputmap.kb.cr = SDL_SCANCODE_D;
+    ctremu.inputmap.kb.cmod = SDL_SCANCODE_LSHIFT;
+    ctremu.inputmap.kb.cmodscale = 0.5f;
+
+    ctremu.inputmap.freecam.ml = SDL_SCANCODE_A;
+    ctremu.inputmap.freecam.mr = SDL_SCANCODE_D;
+    ctremu.inputmap.freecam.mf = SDL_SCANCODE_W;
+    ctremu.inputmap.freecam.mb = SDL_SCANCODE_S;
+    ctremu.inputmap.freecam.mu = SDL_SCANCODE_R;
+    ctremu.inputmap.freecam.md = SDL_SCANCODE_F;
+    ctremu.inputmap.freecam.lu = SDL_SCANCODE_UP;
+    ctremu.inputmap.freecam.ld = SDL_SCANCODE_DOWN;
+    ctremu.inputmap.freecam.ll = SDL_SCANCODE_LEFT;
+    ctremu.inputmap.freecam.lr = SDL_SCANCODE_RIGHT;
+    ctremu.inputmap.freecam.rl = SDL_SCANCODE_Q;
+    ctremu.inputmap.freecam.rr = SDL_SCANCODE_E;
+    ctremu.inputmap.freecam.slow_mod = SDL_SCANCODE_LSHIFT;
+    ctremu.inputmap.freecam.fast_mod = SDL_SCANCODE_RSHIFT;
+}
+
 void emulator_init() {
     mkdir("3ds", S_IRWXU);
     mkdir("3ds/savedata", S_IRWXU);
@@ -25,19 +78,7 @@ void emulator_init() {
     FILE* fp;
     if ((fp = fopen("3ds/sdmc/3ds/dspfirm.cdc", "wx"))) fclose(fp);
 
-    ctremu.windowW = 800;
-    ctremu.windowH = 600;
-
-    ctremu.videoscale = 1;
-    ctremu.shaderjit = true;
-    ctremu.hwvshaders = true;
-    ctremu.safeShaderMul = true;
-    ctremu.hashTextures = true;
-    ctremu.audiosync = true;
-    ctremu.volume = 100;
-    strcpy(ctremu.username, "ctremu");
-    ctremu.language = 1;
-    ctremu.region = 1;
+    emulator_load_default_settings();
 
     load_config();
 

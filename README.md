@@ -24,7 +24,7 @@ You can download a stable release from the releases tab, or the latest build bel
 | Windows | [Executable](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-windows.zip) |
 
 ## Usage
-Launching the app should give you a prompt to select the game file. You can also start a game by dropping its file onto the window. The supported formats are:
+On launching the app you can use the UI to open a game or drop its file onto the window. The supported formats are:
 
 - .cci/.3ds
 - .cxi/.app
@@ -33,11 +33,11 @@ Launching the app should give you a prompt to select the game file. You can also
 
 All games must be decrypted.
 
-You can modify emulator settings in the generated `ctremu.ini` file. The settings and save data are stored by default in the application data path of your OS, but you can optionally create a file called `portable.txt` in the same directory as the executable to have them be created there.
+You can modify emulator settings by opening the settings menu or by manually editing the generated `ctremu.ini` file. The settings and save data are stored by default in the application data path of your OS, but you can optionally create a file called `portable.txt` in the same directory as the executable to have them be created there. You can open the directory containing the settings and savedata using the UI.
 
 You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 
-The keyboard controls are as follows:
+Default keyboard controls are as follows:
 
 | Control | Key |
 | --- | --- |
@@ -73,6 +73,8 @@ Freecam controls (regular keyboard input is disabled):
 - Left Shift (hold): move slower
 - Right Shift (hold): move faster
 
+Both keyboard input and freecam input can be remapped in the input settings menu.
+
 ## Building
 You need the following dependencies installed to build:
 - sdl3
@@ -82,13 +84,12 @@ You need the following dependencies installed to build:
 - capstone
 - xbyak (x86_64 only)
 
-To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23. You can configure compilers by running `./configure.sh CC=... CXX=...` before running `make`. To compile on Windows, you need to install Msys2 and mingw-w64 and compile within the mingw64 shell.
+To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23. You can configure compilers by running `./configure.sh CC=... CXX=...` before running `make`. To compile on Windows, you need to install Msys2 and mingw-w64 and compile within the mingw-w64 shell.
 
 
 ## Compatibility
 
-Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed. When reporting an issue, please always include the generated `ctremu.log` file which is located
-in the application data folder of your system.
+Many games work, but many will suffer from a range of bugs from graphical glitches to crashes. We are always looking to improve the emulator and would appreciate any bugs to reported as a github issue so they can be fixed. When reporting an issue, please always include the generated `ctremu.log` file which is located in the application data folder of your system.
 
 ## Acknowledgements
 

@@ -167,41 +167,6 @@ void hotkey_press(SDL_Keycode key) {
     }
 }
 
-void load_default_inputmap() {
-    ctremu.inputmap.kb.a = SDL_SCANCODE_L;
-    ctremu.inputmap.kb.b = SDL_SCANCODE_K;
-    ctremu.inputmap.kb.x = SDL_SCANCODE_O;
-    ctremu.inputmap.kb.y = SDL_SCANCODE_I;
-    ctremu.inputmap.kb.l = SDL_SCANCODE_Q;
-    ctremu.inputmap.kb.r = SDL_SCANCODE_P;
-    ctremu.inputmap.kb.start = SDL_SCANCODE_RETURN;
-    ctremu.inputmap.kb.select = SDL_SCANCODE_RSHIFT;
-    ctremu.inputmap.kb.du = SDL_SCANCODE_UP;
-    ctremu.inputmap.kb.dd = SDL_SCANCODE_DOWN;
-    ctremu.inputmap.kb.dl = SDL_SCANCODE_LEFT;
-    ctremu.inputmap.kb.dr = SDL_SCANCODE_RIGHT;
-    ctremu.inputmap.kb.cu = SDL_SCANCODE_W;
-    ctremu.inputmap.kb.cd = SDL_SCANCODE_S;
-    ctremu.inputmap.kb.cl = SDL_SCANCODE_A;
-    ctremu.inputmap.kb.cr = SDL_SCANCODE_D;
-    ctremu.inputmap.kb.cmod = SDL_SCANCODE_LSHIFT;
-
-    ctremu.inputmap.freecam.ml = SDL_SCANCODE_A;
-    ctremu.inputmap.freecam.mr = SDL_SCANCODE_D;
-    ctremu.inputmap.freecam.mf = SDL_SCANCODE_W;
-    ctremu.inputmap.freecam.mb = SDL_SCANCODE_S;
-    ctremu.inputmap.freecam.mu = SDL_SCANCODE_R;
-    ctremu.inputmap.freecam.md = SDL_SCANCODE_F;
-    ctremu.inputmap.freecam.lu = SDL_SCANCODE_UP;
-    ctremu.inputmap.freecam.ld = SDL_SCANCODE_DOWN;
-    ctremu.inputmap.freecam.ll = SDL_SCANCODE_LEFT;
-    ctremu.inputmap.freecam.lr = SDL_SCANCODE_RIGHT;
-    ctremu.inputmap.freecam.rl = SDL_SCANCODE_Q;
-    ctremu.inputmap.freecam.rr = SDL_SCANCODE_E;
-    ctremu.inputmap.freecam.slow_mod = SDL_SCANCODE_LSHIFT;
-    ctremu.inputmap.freecam.fast_mod = SDL_SCANCODE_RSHIFT;
-}
-
 void update_input(E3DS* s, SDL_Gamepad* controller) {
     if (igGetIO()->WantCaptureKeyboard || igGetIO()->WantCaptureMouse) return;
 
@@ -230,8 +195,8 @@ void update_input(E3DS* s, SDL_Gamepad* controller) {
         cy = (keys[ctremu.inputmap.kb.cu] - keys[ctremu.inputmap.kb.cd]) *
              INT16_MAX;
         if (keys[ctremu.inputmap.kb.cmod]) {
-            cx /= 4;
-            cy /= 4;
+            cx *= ctremu.inputmap.kb.cmodscale;
+            cy /= ctremu.inputmap.kb.cmodscale;
         }
     } else {
         float speed = FREECAM_SPEED;
@@ -599,6 +564,8 @@ void draw_inputsettings() {
             config_input("Circle Pad Down", &ctremu.inputmap.kb.cd);
             config_input("Circle Pad Modifier", &ctremu.inputmap.kb.cmod);
             igEndTable();
+            igSliderFloat("Circle Pad Modifier Scale",
+                          &ctremu.inputmap.kb.cmodscale, 0, 1, nullptr, 0);
 
             igEndTabItem();
         }
@@ -660,7 +627,6 @@ int main(int argc, char** argv) {
     freopen("ctremu.log", "w", stdout);
 #endif
 
-    load_default_inputmap();
     emulator_init();
 
     bool log_old = g_infologs;

@@ -69,6 +69,7 @@ typedef struct {
             int cl, cr, cu, cd;
             int cmod;
             int dl, dr, du, dd;
+            float cmodscale;
         } kb;
         struct {
             int ml, mr, mf, mb, mu, md;
