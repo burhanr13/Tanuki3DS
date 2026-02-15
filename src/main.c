@@ -124,6 +124,9 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_F2:
             load_rom_dialog();
             break;
+        case SDLK_F3:
+            g_show_settings = true;
+            break;
         case SDLK_F4:
             g_cpulog = !g_cpulog;
             break;
@@ -379,7 +382,7 @@ void draw_menubar() {
             }
             igSeparator();
 
-            if (igMenuItem("Settings", nullptr, false, true)) {
+            if (igMenuItem("Settings", "F3", false, true)) {
                 g_show_settings = true;
             }
 
