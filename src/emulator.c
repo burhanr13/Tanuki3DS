@@ -35,6 +35,9 @@ void emulator_init() {
     ctremu.hashTextures = true;
     ctremu.audiosync = true;
     ctremu.volume = 100;
+    strcpy(ctremu.username, "ctremu");
+    ctremu.language = 1;
+    ctremu.region = 1;
 
     load_config();
 

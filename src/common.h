@@ -80,7 +80,7 @@ typedef float fvec4[4];
 #define _INVBIT32(n) _INVBIT(16, n))
 #define INVBIT(n) _INVBIT32(n)
 
-#define lengthof(a) (sizeof a / sizeof *a)
+#define countof(a) (sizeof a / sizeof *a)
 
 // N must be a power of 2
 #define FIFO(T, N)                                                             \
@@ -91,7 +91,7 @@ typedef float fvec4[4];
         u32 size;                                                              \
     }
 
-#define FIFO_MAX(f) lengthof((f).d)
+#define FIFO_MAX(f) countof((f).d)
 #define FIFO_push(f, v) ((f).d[(f).tail++] = v, (f).size++)
 #define FIFO_pop(f, v) (v = (f).d[(f).head++], (f).size--)
 #define FIFO_peek(f) ((f).d[(f).head])
@@ -107,7 +107,7 @@ typedef float fvec4[4];
         size_t size;                                                           \
     }
 
-#define SVec_MAX(v) lengthof((v).d)
+#define SVec_MAX(v) countof((v).d)
 #define SVec_push(v, e)                                                        \
     ({                                                                         \
         (v).d[(v).size++] = (e);                                               \
@@ -174,7 +174,7 @@ typedef float fvec4[4];
         BitVec(N) occupied;                                                    \
     }
 
-#define LRU_MAX(c) lengthof((c).d)
+#define LRU_MAX(c) countof((c).d)
 
 #define LRU_init(c) ((c).root.next = (c).root.prev = &(c).root, (c).size = 0)
 

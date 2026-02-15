@@ -109,7 +109,7 @@ DECL_PORT(srv) {
             name[cmdbuf[3]] = '\0';
 
             PortRequestHandler handler = nullptr;
-            for (int i = 0; i < lengthof(srvhandlers); i++) {
+            for (int i = 0; i < countof(srvhandlers); i++) {
                 if (!strcmp(name, srvhandlers[i].name)) {
                     handler = srvhandlers[i].handler;
                     break;

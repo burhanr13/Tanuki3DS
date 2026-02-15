@@ -54,10 +54,14 @@ typedef struct {
     Rect screens[2];
     int windowW, windowH;
 
-    int volume;
+    float volume;
 
     mat4 freecam_mtx;
     bool freecam_enable;
+
+    char username[0x1c];
+    int language;
+    int region;
 
     EmuAudioCallback audio_cb;
 

@@ -24,6 +24,7 @@
 #define igGetIO igGetIO_Nil
 #define igMenuItem igMenuItem_Bool
 #define igMenuItemP igMenuItem_BoolPtr
+#define igCombo igCombo_Str_arr
 
 const char usage[] =
     R"(ctremu [options] [romfile]
@@ -34,7 +35,9 @@ const char usage[] =
 
 // we need to read cmdline before initing emu
 bool log_arg;
+bool log_modified_ui;
 int scale_arg;
+bool scale_modified_ui;
 char* romfile_arg;
 
 SDL_Window* g_window;
@@ -384,7 +387,9 @@ void draw_menubar() {
         }
 
         if (igBeginMenu("Debug", ctremu.initialized)) {
-            igMenuItemP("Verbose Log", nullptr, &g_infologs, true);
+            if (igMenuItemP("Verbose Log", nullptr, &g_infologs, true)) {
+                log_modified_ui = true;
+            }
             igMenuItemP("CPU Trace Log", nullptr, &g_cpulog, true);
             igSeparator();
             igMenuItemP("Wireframe", nullptr, &g_wireframe, true);
@@ -418,10 +423,11 @@ void draw_menubar() {
 void draw_swkbd() {
     if (ctremu.needs_swkbd) igOpenPopup_Str("Input Text", 0);
 
-    if (igBeginPopupModal("Input Text", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (igBeginPopupModal("Input Text", nullptr,
+                          ImGuiWindowFlags_AlwaysAutoResize)) {
         static char buf[100];
         igInputText("##", buf, sizeof buf, 0, nullptr, nullptr);
-        if (igButton("Ok", (ImVec2_c) {})) {
+        if (igButton("Ok", (ImVec2) {})) {
             swkbd_resp(&ctremu.system, buf);
             igCloseCurrentPopup();
         }
@@ -432,7 +438,55 @@ void draw_swkbd() {
 void draw_settings() {
     if (!g_show_settings) return;
 
-    igBegin("Settings", &g_show_settings, 0);
+    igBegin("Settings", &g_show_settings,
+            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+
+    igSeparatorText("System");
+    igInputText("Username", ctremu.username, sizeof ctremu.username, 0, nullptr,
+                nullptr);
+    static const char* languages[] = {
+        "Japanese", "English", "French", "German",     "Italian", "Spanish",
+        "Chinese",  "Korean",  "Dutch",  "Portuguese", "Russian", "Taiwanese",
+    };
+    igCombo("Game Language", &ctremu.language, languages, countof(languages),
+            0);
+
+    static const char* regions[] = {
+        "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
+    };
+    igCombo("Game Region", &ctremu.region, regions, countof(regions), 0);
+
+    igSeparatorText("Video");
+    if (igCheckbox("VSync", &ctremu.vsync)) {
+        if (ctremu.vsync) {
+            if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
+        } else {
+            SDL_GL_SetSwapInterval(0);
+        }
+    }
+    igBeginDisabled(ctremu.initialized);
+    if (igDragInt("Video Scale", &ctremu.videoscale, 0.1, 1, 10, nullptr, 0)) {
+        scale_modified_ui = true;
+    }
+    igDragInt("Software Vertex Shader Threads", &ctremu.vshthreads, 0.1, 0,
+              MAX_VSH_THREADS, nullptr, 0);
+    igEndDisabled();
+    igCheckbox("Shader JIT", &ctremu.shaderjit);
+    igCheckbox("Hardware Vertex Shaders", &ctremu.hwvshaders);
+    igBeginDisabled(!ctremu.hwvshaders);
+    igCheckbox("Safe Multiplication", &ctremu.safeShaderMul);
+    igEndDisabled();
+    igCheckbox("Use Ubershader", &ctremu.ubershader);
+    igCheckbox("Hash Textures", &ctremu.hashTextures);
+
+    igSeparatorText("Audio");
+    igCheckbox("Audio Sync", &ctremu.audiosync);
+    igSliderFloat("Volume", &ctremu.volume, 0, 200, nullptr, 0);
+
+    igSeparator();
+    if (igButton("Close", (ImVec2) {})) {
+        g_show_settings = false;
+    }
 
     igEnd();
 }
@@ -661,6 +715,11 @@ int main(int argc, char** argv) {
             prev_fps_frame = frame;
             avg_frame_time = 0;
             avg_frame_time_ct = 0;
+        } else if (!ctremu.initialized) {
+            char* wintitle;
+            asprintf(&wintitle, "Tanuki3DS %s", EMUVERSION);
+            SDL_SetWindowTitle(g_window, wintitle);
+            free(wintitle);
         }
 
         if (ctremu.fastforward && !ctremu.pause) {
@@ -701,8 +760,8 @@ int main(int argc, char** argv) {
 
     SDL_Quit();
 
-    g_infologs = log_old;
-    ctremu.videoscale = scale_old;
+    if (!log_modified_ui) g_infologs = log_old;
+    if (!scale_modified_ui) ctremu.videoscale = scale_old;
 
     emulator_quit();
 
