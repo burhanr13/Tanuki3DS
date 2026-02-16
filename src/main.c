@@ -30,7 +30,10 @@
 #define igGetIO igGetIO_Nil
 #define igMenuItem igMenuItem_Bool
 #define igMenuItemP igMenuItem_BoolPtr
+#define igSelectable igSelectable_Bool
+#define igSelectableP igSelectable_BoolPtr
 #define igCombo igCombo_Str_arr
+#define igBeginChild igBeginChild_Str
 
 const char usage[] =
     R"(ctremu [options] [romfile]
@@ -59,7 +62,6 @@ bool g_fullscreen;
 
 bool g_show_menu_bar = true;
 bool g_show_settings;
-bool g_show_inputsettings;
 
 int* g_waiting_key;
 
@@ -400,9 +402,6 @@ void draw_menubar() {
             if (igMenuItem("Settings", "F3", false, true)) {
                 g_show_settings = true;
             }
-            if (igMenuItem("Input Config", nullptr, false, true)) {
-                g_show_inputsettings = true;
-            }
 
             igEndMenu();
         }
@@ -448,70 +447,13 @@ void draw_swkbd() {
     if (igBeginPopupModal("Input Text", nullptr,
                           ImGuiWindowFlags_AlwaysAutoResize)) {
         static char buf[100];
-        igInputText("##", buf, sizeof buf, 0, nullptr, nullptr);
+        igInputText("##swkbd input", buf, sizeof buf, 0, nullptr, nullptr);
         if (igButton("Ok", (ImVec2) {})) {
             swkbd_resp(&ctremu.system, buf);
             igCloseCurrentPopup();
         }
         igEndPopup();
     }
-}
-
-void draw_settings() {
-    if (!g_show_settings) return;
-
-    igBegin("Settings", &g_show_settings,
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize |
-                ImGuiWindowFlags_NoTitleBar);
-
-    igSeparatorText("System");
-    igInputText("Username", ctremu.username, sizeof ctremu.username, 0, nullptr,
-                nullptr);
-    static const char* languages[] = {
-        "Japanese", "English", "French", "German",     "Italian", "Spanish",
-        "Chinese",  "Korean",  "Dutch",  "Portuguese", "Russian", "Taiwanese",
-    };
-    igCombo("Game Language", &ctremu.language, languages, countof(languages),
-            0);
-
-    static const char* regions[] = {
-        "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
-    };
-    igCombo("Game Region", &ctremu.region, regions, countof(regions), 0);
-
-    igSeparatorText("Video");
-    if (igCheckbox("VSync", &ctremu.vsync)) {
-        if (ctremu.vsync) {
-            if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
-        } else {
-            SDL_GL_SetSwapInterval(0);
-        }
-    }
-    igBeginDisabled(ctremu.initialized);
-    if (igDragInt("Video Scale", &ctremu.videoscale, 0.1, 1, 10, nullptr, 0)) {
-        scale_modified_ui = true;
-    }
-    igDragInt("Software Vertex Shader Threads", &ctremu.vshthreads, 0.1, 0,
-              MAX_VSH_THREADS, nullptr, 0);
-    igEndDisabled();
-    igCheckbox("Shader JIT", &ctremu.shaderjit);
-    igCheckbox("Hardware Vertex Shaders", &ctremu.hwvshaders);
-    igBeginDisabled(!ctremu.hwvshaders);
-    igCheckbox("Safe Multiplication", &ctremu.safeShaderMul);
-    igEndDisabled();
-    igCheckbox("Use Ubershader", &ctremu.ubershader);
-    igCheckbox("Hash Textures", &ctremu.hashTextures);
-
-    igSeparatorText("Audio");
-    igCheckbox("Audio Sync", &ctremu.audiosync);
-    igSliderFloat("Volume", &ctremu.volume, 0, 200, nullptr, 0);
-
-    igSeparator();
-    if (igButton("Close", (ImVec2) {})) {
-        g_show_settings = false;
-    }
-
-    igEnd();
 }
 
 void config_input(char* name, int* val) {
@@ -532,75 +474,180 @@ void config_input(char* name, int* val) {
     }
 }
 
-void draw_inputsettings() {
-    if (!g_show_inputsettings) {
-        g_waiting_key = nullptr;
-        return;
+void draw_settings() {
+    if (!g_show_settings) return;
+
+    static enum {
+        PANE_SYSTEM,
+        PANE_VIDEO,
+        PANE_AUDIO,
+        PANE_INPUT,
+        PANE_MAX
+    } curPane = PANE_SYSTEM;
+
+    static const char* pane_names[] = {"System", "Video", "Audio", "Input"};
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        flags |= ImGuiWindowFlags_NoTitleBar;
     }
 
-    igBegin("Input Configuration", &g_show_inputsettings,
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
+    igSetNextWindowSize((ImVec2) {500, 400}, ImGuiCond_FirstUseEver);
 
-    if (igBeginTabBar("input tabs", 0)) {
-        if (igBeginTabItem("Keyboard Input", nullptr, 0)) {
-            igBeginTable("input config", 2, 0, (ImVec2) {}, 0);
-            config_input("A", &ctremu.inputmap.kb.a);
-            config_input("B", &ctremu.inputmap.kb.b);
-            config_input("X", &ctremu.inputmap.kb.x);
-            config_input("Y", &ctremu.inputmap.kb.y);
-            config_input("L", &ctremu.inputmap.kb.l);
-            config_input("R", &ctremu.inputmap.kb.r);
-            config_input("Start", &ctremu.inputmap.kb.start);
-            config_input("Select", &ctremu.inputmap.kb.select);
-            igTableNextRow(0, 0);
-            config_input("D-Pad Left", &ctremu.inputmap.kb.dl);
-            config_input("D-Pad Right", &ctremu.inputmap.kb.dr);
-            config_input("D-Pad Up", &ctremu.inputmap.kb.du);
-            config_input("D-Pad Down", &ctremu.inputmap.kb.dd);
-            igTableNextRow(0, 0);
-            config_input("Circle Pad Left", &ctremu.inputmap.kb.cl);
-            config_input("Circle Pad Right", &ctremu.inputmap.kb.cr);
-            config_input("Circle Pad Up", &ctremu.inputmap.kb.cu);
-            config_input("Circle Pad Down", &ctremu.inputmap.kb.cd);
-            config_input("Circle Pad Modifier", &ctremu.inputmap.kb.cmod);
-            igEndTable();
-            igSliderFloat("Circle Pad Modifier Scale",
-                          &ctremu.inputmap.kb.cmodscale, 0, 1, nullptr, 0);
+    igBegin("Settings", &g_show_settings, flags);
 
-            igEndTabItem();
+    igBeginChild("sidebar", (ImVec2) {100, 0}, 0, 0);
+    for (int i = 0; i < PANE_MAX; i++) {
+        if (igSelectable(pane_names[i], curPane == i, 0, (ImVec2) {})) {
+            curPane = i;
         }
-
-        if (igBeginTabItem("Freecam", nullptr, ImGuiTabItemFlags_None)) {
-            igBeginTable("freecam config", 2, 0, (ImVec2) {}, 0);
-            config_input("Move Forward", &ctremu.inputmap.freecam.mf);
-            config_input("Move Backward", &ctremu.inputmap.freecam.mb);
-            config_input("Move Left", &ctremu.inputmap.freecam.ml);
-            config_input("Move Right", &ctremu.inputmap.freecam.mr);
-            config_input("Move Up", &ctremu.inputmap.freecam.mu);
-            config_input("Move Down", &ctremu.inputmap.freecam.md);
-            igTableNextRow(0, 0);
-            config_input("Look Up", &ctremu.inputmap.freecam.lu);
-            config_input("Look Down", &ctremu.inputmap.freecam.ld);
-            config_input("Look Left", &ctremu.inputmap.freecam.ll);
-            config_input("Look Right", &ctremu.inputmap.freecam.lr);
-            config_input("Roll Left", &ctremu.inputmap.freecam.rl);
-            config_input("Roll Right", &ctremu.inputmap.freecam.rr);
-            igTableNextRow(0, 0);
-            config_input("Slow Modifier", &ctremu.inputmap.freecam.slow_mod);
-            config_input("Fast Modifier", &ctremu.inputmap.freecam.fast_mod);
-            igEndTable();
-
-            igEndTabItem();
-        }
-
-        igEndTabBar();
     }
+    igEndChild();
+
+    igSameLine(0, 5);
+
+    igBeginChild("settings", (ImVec2) {}, 0, 0);
+    igBeginChild("settings pane", (ImVec2) {0, -40}, 0, 0);
+
+    switch (curPane) {
+        case PANE_SYSTEM: {
+            igSeparatorText("System");
+            igInputText("Username", ctremu.username, sizeof ctremu.username, 0,
+                        nullptr, nullptr);
+            static const char* languages[] = {
+                "Japanese", "English",    "French",  "German",
+                "Italian",  "Spanish",    "Chinese", "Korean",
+                "Dutch",    "Portuguese", "Russian", "Taiwanese",
+            };
+            igCombo("System Language", &ctremu.language, languages,
+                    countof(languages), 0);
+
+            static const char* regions[] = {
+                "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
+            };
+            igCombo("System Region", &ctremu.region, regions, countof(regions),
+                    0);
+
+            break;
+        }
+        case PANE_VIDEO: {
+            igSeparatorText("Video");
+            if (igCheckbox("VSync", &ctremu.vsync)) {
+                if (ctremu.vsync) {
+                    if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
+                } else {
+                    SDL_GL_SetSwapInterval(0);
+                }
+            }
+            igBeginDisabled(ctremu.initialized);
+            if (igDragInt("Video Scale", &ctremu.videoscale, 0.1, 1, 10,
+                          nullptr, 0)) {
+                scale_modified_ui = true;
+            }
+            igSetNextItemWidth(200);
+            igDragInt("Software Vertex Shader Threads", &ctremu.vshthreads, 0.1,
+                      0, MAX_VSH_THREADS, nullptr, 0);
+            igEndDisabled();
+            igCheckbox("Shader JIT", &ctremu.shaderjit);
+            igCheckbox("Hardware Vertex Shaders", &ctremu.hwvshaders);
+            igBeginDisabled(!ctremu.hwvshaders);
+            igCheckbox("Safe Multiplication", &ctremu.safeShaderMul);
+            igEndDisabled();
+            igCheckbox("Use Ubershader", &ctremu.ubershader);
+            igCheckbox("Hash Textures", &ctremu.hashTextures);
+            break;
+        }
+        case PANE_AUDIO: {
+            igSeparatorText("Audio");
+            igCheckbox("Audio Sync", &ctremu.audiosync);
+            igSliderFloat("Volume", &ctremu.volume, 0, 200, nullptr, 0);
+            break;
+        }
+        case PANE_INPUT: {
+            if (igBeginTabBar("input tabs", 0)) {
+                if (igBeginTabItem("Keyboard Input", nullptr, 0)) {
+                    igBeginChild("keyboard input panel", (ImVec2) {}, 0, 0);
+                    igBeginTable("input config", 2, 0, (ImVec2) {}, 0);
+                    config_input("A", &ctremu.inputmap.kb.a);
+                    config_input("B", &ctremu.inputmap.kb.b);
+                    config_input("X", &ctremu.inputmap.kb.x);
+                    config_input("Y", &ctremu.inputmap.kb.y);
+                    config_input("L", &ctremu.inputmap.kb.l);
+                    config_input("R", &ctremu.inputmap.kb.r);
+                    config_input("Start", &ctremu.inputmap.kb.start);
+                    config_input("Select", &ctremu.inputmap.kb.select);
+                    igTableNextRow(0, 0);
+                    config_input("D-Pad Left", &ctremu.inputmap.kb.dl);
+                    config_input("D-Pad Right", &ctremu.inputmap.kb.dr);
+                    config_input("D-Pad Up", &ctremu.inputmap.kb.du);
+                    config_input("D-Pad Down", &ctremu.inputmap.kb.dd);
+                    igTableNextRow(0, 0);
+                    config_input("Circle Pad Left", &ctremu.inputmap.kb.cl);
+                    config_input("Circle Pad Right", &ctremu.inputmap.kb.cr);
+                    config_input("Circle Pad Up", &ctremu.inputmap.kb.cu);
+                    config_input("Circle Pad Down", &ctremu.inputmap.kb.cd);
+                    config_input("Circle Pad Modifier",
+                                 &ctremu.inputmap.kb.cmod);
+                    igEndTable();
+                    igSetNextItemWidth(200);
+                    igSliderFloat("Circle Pad Modifier Scale",
+                                  &ctremu.inputmap.kb.cmodscale, 0, 1, nullptr,
+                                  0);
+                    igEndChild();
+                    igEndTabItem();
+                }
+
+                if (igBeginTabItem("Freecam", nullptr,
+                                   ImGuiTabItemFlags_None)) {
+                    igBeginChild("freecam input panel", (ImVec2) {}, 0, 0);
+                    igBeginTable("freecam config", 2, 0, (ImVec2) {}, 0);
+                    config_input("Move Forward", &ctremu.inputmap.freecam.mf);
+                    config_input("Move Backward", &ctremu.inputmap.freecam.mb);
+                    config_input("Move Left", &ctremu.inputmap.freecam.ml);
+                    config_input("Move Right", &ctremu.inputmap.freecam.mr);
+                    config_input("Move Up", &ctremu.inputmap.freecam.mu);
+                    config_input("Move Down", &ctremu.inputmap.freecam.md);
+                    igTableNextRow(0, 0);
+                    config_input("Look Up", &ctremu.inputmap.freecam.lu);
+                    config_input("Look Down", &ctremu.inputmap.freecam.ld);
+                    config_input("Look Left", &ctremu.inputmap.freecam.ll);
+                    config_input("Look Right", &ctremu.inputmap.freecam.lr);
+                    config_input("Roll Left", &ctremu.inputmap.freecam.rl);
+                    config_input("Roll Right", &ctremu.inputmap.freecam.rr);
+                    igTableNextRow(0, 0);
+                    config_input("Slow Modifier",
+                                 &ctremu.inputmap.freecam.slow_mod);
+                    config_input("Fast Modifier",
+                                 &ctremu.inputmap.freecam.fast_mod);
+                    igEndTable();
+                    igEndChild();
+                    igEndTabItem();
+                }
+
+                igEndTabBar();
+            }
+            break;
+        }
+        case PANE_MAX:
+            break;
+    }
+    igEndChild();
 
     igSeparator();
 
-    if (igButton("Close", (ImVec2) {})) {
-        g_show_inputsettings = false;
+    igBeginDisabled(ctremu.initialized);
+    if (igButton("Reset All", (ImVec2) {})) {
+        emulator_load_default_settings();
     }
+    igEndDisabled();
+
+    igSameLine(0, 5);
+
+    if (igButton("Close", (ImVec2) {})) {
+        g_show_settings = false;
+    }
+
+    igEndChild();
 
     igEnd();
 }
@@ -690,8 +737,7 @@ int main(int argc, char** argv) {
     ctremu.audio_cb = audio_callback;
 
     igCreateContext(nullptr);
-    igGetIO()->ConfigFlags |=
-        ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+    igGetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     igGetIO()->ConfigViewportsNoDecoration = false;
     igGetIO()->ConfigViewportsNoAutoMerge = true;
 
@@ -703,9 +749,9 @@ int main(int argc, char** argv) {
     igGetStyle()->FrameRounding = 5;
     igGetStyle()->GrabRounding = 5;
     igGetStyle()->ItemSpacing = (ImVec2) {5, 5};
+    igGetStyle()->ItemInnerSpacing = (ImVec2) {5, 5};
     igGetStyle()->PopupRounding = 5;
     igGetStyle()->PopupBorderSize = 1;
-    igGetStyle()->SeparatorTextPadding = (ImVec2) {0, 10};
     igGetStyle()->SeparatorTextAlign = (ImVec2) {0.5, 0.5};
     igGetStyle()->WindowPadding = (ImVec2) {10, 10};
     igGetStyle()->WindowRounding = 5;
@@ -825,7 +871,6 @@ int main(int argc, char** argv) {
         draw_menubar();
 
         draw_settings();
-        draw_inputsettings();
 
         draw_swkbd();
 

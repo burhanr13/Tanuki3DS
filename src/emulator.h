@@ -99,4 +99,6 @@ bool emulator_reset();
 
 void emulator_calc_viewports();
 
+void emulator_load_default_settings();
+
 #endif
