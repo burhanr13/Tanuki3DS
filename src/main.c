@@ -447,7 +447,13 @@ void draw_swkbd() {
     if (igBeginPopupModal("Input Text", nullptr,
                           ImGuiWindowFlags_AlwaysAutoResize)) {
         static char buf[100];
+        if (igIsWindowAppearing()) {
+            memset(buf, 0, sizeof buf);
+            igSetKeyboardFocusHere(0);
+        }
+
         igInputText("##swkbd input", buf, sizeof buf, 0, nullptr, nullptr);
+
         if (igButton("Ok", (ImVec2) {})) {
             swkbd_resp(&ctremu.system, buf);
             igCloseCurrentPopup();
@@ -492,17 +498,25 @@ void draw_settings() {
         flags |= ImGuiWindowFlags_NoTitleBar;
     }
 
+    igSetNextWindowClass(&(ImGuiWindowClass) {
+        .ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge});
+
     igSetNextWindowSize((ImVec2) {500, 400}, ImGuiCond_FirstUseEver);
 
     igBegin("Settings", &g_show_settings, flags);
 
+    igPushStyleColor_Vec4(ImGuiCol_ChildBg,
+                          *igGetStyleColorVec4(ImGuiCol_FrameBg));
     igBeginChild("sidebar", (ImVec2) {100, 0}, 0, 0);
+    igSeparator();
     for (int i = 0; i < PANE_MAX; i++) {
         if (igSelectable(pane_names[i], curPane == i, 0, (ImVec2) {})) {
             curPane = i;
         }
+        igSeparator();
     }
     igEndChild();
+    igPopStyleColor(1);
 
     igSameLine(0, 5);
 
@@ -739,7 +753,6 @@ int main(int argc, char** argv) {
     igCreateContext(nullptr);
     igGetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     igGetIO()->ConfigViewportsNoDecoration = false;
-    igGetIO()->ConfigViewportsNoAutoMerge = true;
 
     igGetStyle()->FontSizeBase = 15;
     ImFontAtlas_AddFontDefaultVector(igGetIO()->Fonts, nullptr);
@@ -756,6 +769,8 @@ int main(int argc, char** argv) {
     igGetStyle()->WindowPadding = (ImVec2) {10, 10};
     igGetStyle()->WindowRounding = 5;
     igGetStyle()->WindowBorderSize = 1;
+    igGetStyle()->ChildRounding = 5;
+    igGetStyle()->SelectableTextAlign = (ImVec2) {0.5, 0.5};
 
     igStyleColorsDark(nullptr);
 
