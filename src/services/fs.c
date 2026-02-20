@@ -1181,4 +1181,6 @@ void fs_close_all_files(E3DS* s) {
     }
 
     free(mii_data_custom);
+    mii_data_custom = nullptr;
+    mii_data_custom_size = 0;
 }
