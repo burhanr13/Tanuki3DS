@@ -231,6 +231,7 @@ void draw_settings() {
 }
 
 int samplenum = 2000;
+float samplerange = 0.25f;
 
 void plot_samples(DSPSampHist* wave) {
     float samples[FIFO_MAX(wave[0])];
@@ -241,7 +242,7 @@ void plot_samples(DSPSampHist* wave) {
             samples[it.i] = (float) *it.p / BIT(16);
         }
         igPlotLines_FloatPtr("##", samples + countof(samples) - samplenum,
-                             samplenum, 0, nullptr, -0.5, 0.5,
+                             samplenum, 0, nullptr, -samplerange, samplerange,
                              (ImVec2) {200, 50}, 4);
         igPopID();
     }
@@ -264,6 +265,8 @@ void draw_audioview() {
 
     igSliderInt("Sample Length", &samplenum, 0, FIFO_MAX(g_dsp_chn_hist[0][0]),
                 nullptr, 0);
+
+    igSliderFloat("Amplitude Range", &samplerange, 0, 1, nullptr, 0);
 
     igBeginChild("audioviewchild", (ImVec2) {0, -40}, 0, 0);
 

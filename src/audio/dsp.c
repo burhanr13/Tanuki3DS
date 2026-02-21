@@ -196,8 +196,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     s16 rsamples[nSamples] = {};
     u32 curSample = 0;
 
-    s16 lsamplesinterp[FRAME_SAMPLES] = {};
-    s16 rsamplesinterp[FRAME_SAMPLES] = {};
+    s32 lsamplesinterp[FRAME_SAMPLES] = {};
+    s32 rsamplesinterp[FRAME_SAMPLES] = {};
 
     if (!stat->active) goto dsp_ch_end;
 
@@ -370,11 +370,16 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
 
     // dsp does 4-channel mixing instead of just 2
 
+    for (int s = 0; s < FRAME_SAMPLES; s++) {
+        lsamplesinterp[s] *= cfg->mix[0][0];
+        rsamplesinterp[s] *= cfg->mix[0][1];
+    }
+
     if (g_dsp_chn_disable & BIT(ch)) goto dsp_ch_end;
 
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        mixer[s][0] += (s32) lsamplesinterp[s] * cfg->mix[0][0];
-        mixer[s][1] += (s32) rsamplesinterp[s] * cfg->mix[0][1];
+        mixer[s][0] += lsamplesinterp[s];
+        mixer[s][1] += rsamplesinterp[s];
     }
 
 dsp_ch_end:
@@ -408,14 +413,18 @@ void dsp_process_frame(DSP* dsp) {
 
     // presumably we are supposed to do things here too
 
+    for (int s = 0; s < FRAME_SAMPLES; s++) {
+        mixer[s][0] *= m->master_cfg.master_vol;
+        mixer[s][1] *= m->master_cfg.master_vol;
+
+        FIFO_push(g_dsp_hist[0], mixer[s][0]);
+        FIFO_push(g_dsp_hist[1], mixer[s][1]);
+    }
+
     s16 final[FRAME_SAMPLES][2];
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        final[s][0] = clamp16(mixer[s][0] * m->master_cfg.master_vol *
-                              ctremu.volume / 100.f);
-        final[s][1] = clamp16(mixer[s][1] * m->master_cfg.master_vol *
-                              ctremu.volume / 100.f);
-        FIFO_push(g_dsp_hist[0], final[s][0]);
-        FIFO_push(g_dsp_hist[1], final[s][1]);
+        final[s][0] = clamp16(mixer[s][0] * ctremu.volume / 100.f);
+        final[s][1] = clamp16(mixer[s][1] * ctremu.volume / 100.f);
     }
 
     if (ctremu.audio_cb) ctremu.audio_cb(final, FRAME_SAMPLES);
