@@ -8,6 +8,7 @@
 #include "3ds.h"
 #include "cpu.h"
 #include "emulator.h"
+#include "gui.h"
 #include "services/applets.h"
 #include "video/renderer_gl.h"
 
@@ -21,33 +22,12 @@
 #define OPEN_CMD "open"
 #endif
 
-#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-#define CIMGUI_USE_SDL3
-#define CIMGUI_USE_OPENGL3
-#include <cimgui/cimgui.h>
-#include <cimgui/cimgui_impl.h>
-
-#define igGetIO igGetIO_Nil
-#define igMenuItem igMenuItem_Bool
-#define igMenuItemP igMenuItem_BoolPtr
-#define igSelectable igSelectable_Bool
-#define igSelectableP igSelectable_BoolPtr
-#define igCombo igCombo_Str_arr
-#define igBeginChild igBeginChild_Str
-
 const char usage[] =
     R"(ctremu [options] [romfile]
 -h -- print help
 -l -- enable info logging
 -sN -- upscale by N
 )";
-
-// we need to read cmdline before initing emu
-bool log_arg;
-bool log_modified_ui;
-int scale_arg;
-bool scale_modified_ui;
-char* romfile_arg;
 
 SDL_Window* g_window;
 
@@ -60,10 +40,7 @@ bool g_pending_reset;
 
 bool g_fullscreen;
 
-bool g_show_menu_bar = true;
-bool g_show_settings;
-
-int* g_waiting_key;
+char* romfile_arg;
 
 #define FREECAM_SPEED 5.0
 #define FREECAM_ROTATE_SPEED 0.02
@@ -77,17 +54,11 @@ void glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
 
 void read_args(int argc, char** argv) {
     char c;
-    while ((c = getopt(argc, argv, "hlvs:")) != (char) -1) {
+    while ((c = getopt(argc, argv, "hl")) != (char) -1) {
         switch (c) {
             case 'l':
-                log_arg = true;
+                g_infologs = true;
                 break;
-            case 's': {
-                int scale = atoi(optarg);
-                if (scale <= 0) eprintf("invalid scale factor");
-                else scale_arg = scale;
-                break;
-            }
             case '?':
             case 'h':
             default:
@@ -136,7 +107,7 @@ void hotkey_press(SDL_Keycode key) {
             load_rom_dialog();
             break;
         case SDLK_F3:
-            g_show_settings = true;
+            uistate.settings = true;
             break;
         case SDLK_F4:
             g_cpulog = !g_cpulog;
@@ -157,7 +128,7 @@ void hotkey_press(SDL_Keycode key) {
             SDL_SetWindowFullscreen(g_window, g_fullscreen);
             break;
         case SDLK_ESCAPE:
-            g_show_menu_bar = !g_show_menu_bar;
+            uistate.menubar = !uistate.menubar;
             break;
 #ifdef AUDIO_DEBUG
         case SDLK_0 ... SDLK_9:
@@ -319,7 +290,7 @@ void audio_callback(s16 (*samples)[2], u32 count) {
 }
 
 void draw_menubar() {
-    if (!g_show_menu_bar) return;
+    if (!uistate.menubar) return;
 
     if (igBeginMainMenuBar()) {
         if (igBeginMenu("File", true)) {
@@ -400,16 +371,14 @@ void draw_menubar() {
             igSeparator();
 
             if (igMenuItem("Settings", "F3", false, true)) {
-                g_show_settings = true;
+                uistate.settings = true;
             }
 
             igEndMenu();
         }
 
         if (igBeginMenu("Debug", ctremu.initialized)) {
-            if (igMenuItemP("Verbose Log", nullptr, &g_infologs, true)) {
-                log_modified_ui = true;
-            }
+            igMenuItemP("Verbose Log", nullptr, &g_infologs, true);
             igMenuItemP("CPU Trace Log", nullptr, &g_cpulog, true);
             igSeparator();
             igMenuItemP("Wireframe", nullptr, &g_wireframe, true);
@@ -441,231 +410,6 @@ void draw_menubar() {
     }
 }
 
-void draw_swkbd() {
-    if (ctremu.needs_swkbd) igOpenPopup_Str("Input Text", 0);
-
-    if (igBeginPopupModal("Input Text", nullptr,
-                          ImGuiWindowFlags_AlwaysAutoResize)) {
-        static char buf[100];
-        if (igIsWindowAppearing()) {
-            memset(buf, 0, sizeof buf);
-            igSetKeyboardFocusHere(0);
-        }
-
-        igInputText("##swkbd input", buf, sizeof buf, 0, nullptr, nullptr);
-
-        if (igButton("Ok", (ImVec2) {})) {
-            swkbd_resp(&ctremu.system, buf);
-            igCloseCurrentPopup();
-        }
-        igEndPopup();
-    }
-}
-
-void config_input(char* name, int* val) {
-    igTableNextRow(0, 0);
-    igTableNextColumn();
-    igText(name);
-    igTableNextColumn();
-    if (g_waiting_key == val) {
-        igBeginDisabled(true);
-        igButton("Press Key...", (ImVec2) {150, 0});
-        igEndDisabled();
-    } else {
-        char buf[100];
-        snprintf(buf, sizeof buf, "%s##%s", SDL_GetScancodeName(*val), name);
-        if (igButton(buf, (ImVec2) {150, 0})) {
-            g_waiting_key = val;
-        }
-    }
-}
-
-void draw_settings() {
-    if (!g_show_settings) return;
-
-    static enum {
-        PANE_SYSTEM,
-        PANE_VIDEO,
-        PANE_AUDIO,
-        PANE_INPUT,
-        PANE_MAX
-    } curPane = PANE_SYSTEM;
-
-    static const char* pane_names[] = {"System", "Video", "Audio", "Input"};
-
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
-    if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        flags |= ImGuiWindowFlags_NoTitleBar;
-    }
-
-    igSetNextWindowClass(&(ImGuiWindowClass) {
-        .ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge});
-
-    igSetNextWindowSize((ImVec2) {500, 400}, ImGuiCond_FirstUseEver);
-
-    igBegin("Settings", &g_show_settings, flags);
-
-    igPushStyleColor_Vec4(ImGuiCol_ChildBg,
-                          *igGetStyleColorVec4(ImGuiCol_FrameBg));
-    igBeginChild("sidebar", (ImVec2) {100, 0}, 0, 0);
-    igSeparator();
-    for (int i = 0; i < PANE_MAX; i++) {
-        if (igSelectable(pane_names[i], curPane == i, 0, (ImVec2) {})) {
-            curPane = i;
-        }
-        igSeparator();
-    }
-    igEndChild();
-    igPopStyleColor(1);
-
-    igSameLine(0, 5);
-
-    igBeginChild("settings", (ImVec2) {}, 0, 0);
-    igBeginChild("settings pane", (ImVec2) {0, -40}, 0, 0);
-
-    switch (curPane) {
-        case PANE_SYSTEM: {
-            igSeparatorText("System");
-            igInputText("Username", ctremu.username, sizeof ctremu.username, 0,
-                        nullptr, nullptr);
-            static const char* languages[] = {
-                "Japanese", "English",    "French",  "German",
-                "Italian",  "Spanish",    "Chinese", "Korean",
-                "Dutch",    "Portuguese", "Russian", "Taiwanese",
-            };
-            igCombo("System Language", &ctremu.language, languages,
-                    countof(languages), 0);
-
-            static const char* regions[] = {
-                "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
-            };
-            igCombo("System Region", &ctremu.region, regions, countof(regions),
-                    0);
-
-            break;
-        }
-        case PANE_VIDEO: {
-            igSeparatorText("Video");
-            if (igCheckbox("VSync", &ctremu.vsync)) {
-                if (ctremu.vsync) {
-                    if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
-                } else {
-                    SDL_GL_SetSwapInterval(0);
-                }
-            }
-            igBeginDisabled(ctremu.initialized);
-            if (igDragInt("Video Scale", &ctremu.videoscale, 0.1, 1, 10,
-                          nullptr, 0)) {
-                scale_modified_ui = true;
-            }
-            igSetNextItemWidth(200);
-            igDragInt("Software Vertex Shader Threads", &ctremu.vshthreads, 0.1,
-                      0, MAX_VSH_THREADS, nullptr, 0);
-            igEndDisabled();
-            igCheckbox("Shader JIT", &ctremu.shaderjit);
-            igCheckbox("Hardware Vertex Shaders", &ctremu.hwvshaders);
-            igBeginDisabled(!ctremu.hwvshaders);
-            igCheckbox("Safe Multiplication", &ctremu.safeShaderMul);
-            igEndDisabled();
-            igCheckbox("Use Ubershader", &ctremu.ubershader);
-            igCheckbox("Hash Textures", &ctremu.hashTextures);
-            break;
-        }
-        case PANE_AUDIO: {
-            igSeparatorText("Audio");
-            igCheckbox("Audio Sync", &ctremu.audiosync);
-            igSliderFloat("Volume", &ctremu.volume, 0, 200, nullptr, 0);
-            break;
-        }
-        case PANE_INPUT: {
-            if (igBeginTabBar("input tabs", 0)) {
-                if (igBeginTabItem("Keyboard Input", nullptr, 0)) {
-                    igBeginChild("keyboard input panel", (ImVec2) {}, 0, 0);
-                    igBeginTable("input config", 2, 0, (ImVec2) {}, 0);
-                    config_input("A", &ctremu.inputmap.kb.a);
-                    config_input("B", &ctremu.inputmap.kb.b);
-                    config_input("X", &ctremu.inputmap.kb.x);
-                    config_input("Y", &ctremu.inputmap.kb.y);
-                    config_input("L", &ctremu.inputmap.kb.l);
-                    config_input("R", &ctremu.inputmap.kb.r);
-                    config_input("Start", &ctremu.inputmap.kb.start);
-                    config_input("Select", &ctremu.inputmap.kb.select);
-                    igTableNextRow(0, 0);
-                    config_input("D-Pad Left", &ctremu.inputmap.kb.dl);
-                    config_input("D-Pad Right", &ctremu.inputmap.kb.dr);
-                    config_input("D-Pad Up", &ctremu.inputmap.kb.du);
-                    config_input("D-Pad Down", &ctremu.inputmap.kb.dd);
-                    igTableNextRow(0, 0);
-                    config_input("Circle Pad Left", &ctremu.inputmap.kb.cl);
-                    config_input("Circle Pad Right", &ctremu.inputmap.kb.cr);
-                    config_input("Circle Pad Up", &ctremu.inputmap.kb.cu);
-                    config_input("Circle Pad Down", &ctremu.inputmap.kb.cd);
-                    config_input("Circle Pad Modifier",
-                                 &ctremu.inputmap.kb.cmod);
-                    igEndTable();
-                    igSetNextItemWidth(200);
-                    igSliderFloat("Circle Pad Modifier Scale",
-                                  &ctremu.inputmap.kb.cmodscale, 0, 1, nullptr,
-                                  0);
-                    igEndChild();
-                    igEndTabItem();
-                }
-
-                if (igBeginTabItem("Freecam", nullptr,
-                                   ImGuiTabItemFlags_None)) {
-                    igBeginChild("freecam input panel", (ImVec2) {}, 0, 0);
-                    igBeginTable("freecam config", 2, 0, (ImVec2) {}, 0);
-                    config_input("Move Forward", &ctremu.inputmap.freecam.mf);
-                    config_input("Move Backward", &ctremu.inputmap.freecam.mb);
-                    config_input("Move Left", &ctremu.inputmap.freecam.ml);
-                    config_input("Move Right", &ctremu.inputmap.freecam.mr);
-                    config_input("Move Up", &ctremu.inputmap.freecam.mu);
-                    config_input("Move Down", &ctremu.inputmap.freecam.md);
-                    igTableNextRow(0, 0);
-                    config_input("Look Up", &ctremu.inputmap.freecam.lu);
-                    config_input("Look Down", &ctremu.inputmap.freecam.ld);
-                    config_input("Look Left", &ctremu.inputmap.freecam.ll);
-                    config_input("Look Right", &ctremu.inputmap.freecam.lr);
-                    config_input("Roll Left", &ctremu.inputmap.freecam.rl);
-                    config_input("Roll Right", &ctremu.inputmap.freecam.rr);
-                    igTableNextRow(0, 0);
-                    config_input("Slow Modifier",
-                                 &ctremu.inputmap.freecam.slow_mod);
-                    config_input("Fast Modifier",
-                                 &ctremu.inputmap.freecam.fast_mod);
-                    igEndTable();
-                    igEndChild();
-                    igEndTabItem();
-                }
-
-                igEndTabBar();
-            }
-            break;
-        }
-        case PANE_MAX:
-            break;
-    }
-    igEndChild();
-
-    igSeparator();
-
-    igBeginDisabled(ctremu.initialized);
-    if (igButton("Reset All", (ImVec2) {})) {
-        emulator_load_default_settings();
-    }
-    igEndDisabled();
-
-    igSameLine(0, 5);
-
-    if (igButton("Close", (ImVec2) {})) {
-        g_show_settings = false;
-    }
-
-    igEndChild();
-
-    igEnd();
-}
-
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
@@ -690,10 +434,6 @@ int main(int argc, char** argv) {
 
     emulator_init();
 
-    bool log_old = g_infologs;
-    if (log_arg) g_infologs = true;
-    int scale_old = ctremu.videoscale;
-    if (scale_arg) ctremu.videoscale = scale_arg;
     if (romfile_arg) {
         emulator_set_rom(romfile_arg);
         free(romfile_arg);
@@ -810,12 +550,12 @@ int main(int argc, char** argv) {
             g_pending_reset = false;
             if (emulator_reset()) {
                 ctremu.pause = false;
-                g_show_menu_bar = !ctremu.initialized;
+                uistate.menubar = !ctremu.initialized;
             } else {
                 SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
                                          "ROM loading failed", g_window);
                 ctremu.pause = true;
-                g_show_menu_bar = true;
+                uistate.menubar = true;
             }
             SDL_RaiseWindow(g_window);
             SDL_ClearAudioStream(g_audio);
@@ -829,9 +569,9 @@ int main(int argc, char** argv) {
                     ctremu.running = false;
                     break;
                 case SDL_EVENT_KEY_DOWN:
-                    if (g_waiting_key) {
-                        *g_waiting_key = e.key.scancode;
-                        g_waiting_key = nullptr;
+                    if (uistate.waiting_key) {
+                        *uistate.waiting_key = e.key.scancode;
+                        uistate.waiting_key = nullptr;
                     } else {
                         hotkey_press(e.key.key);
                     }
@@ -960,9 +700,6 @@ int main(int argc, char** argv) {
     SDL_CloseGamepad(g_gamepad);
 
     SDL_Quit();
-
-    if (!log_modified_ui) g_infologs = log_old;
-    if (!scale_modified_ui) ctremu.videoscale = scale_old;
 
     emulator_quit();
 

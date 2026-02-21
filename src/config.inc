@@ -1,5 +1,4 @@
 SECT("General")
-BOOL("VerboseLog", g_infologs)
 CMT("0=default, 1=side by side, 2=large top screen")
 INT("ViewLayout", ctremu.viewlayout)
 INT("WindowWidth", ctremu.windowW)

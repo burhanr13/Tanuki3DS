@@ -338,17 +338,41 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
         reset_chn(dsp, ch, stat);
     }
 
-    // interpolate samples or something
-    // this is the most garbage interpolation ever
+    // attempt to interpolate samples
+
+    s16 lsamplesinterp[FRAME_SAMPLES];
+    s16 rsamplesinterp[FRAME_SAMPLES];
+
+    for (int s = 0; s < FRAME_SAMPLES; s++) {
+        float pos = (float) s * nSamples / FRAME_SAMPLES;
+        if (pos < 0) pos = 0;
+        if (pos > nSamples - 1) pos = nSamples - 1;
+        switch (cfg->interp_mode) {
+            case DSPINTRP_NEAREST:
+                lsamplesinterp[s] = lsamples[(int) pos];
+                rsamplesinterp[s] = rsamples[(int) pos];
+                break;
+            case DSPINTRP_LINEAR:
+            case DSPINTRP_POLYPHASE: {
+                float frac = pos - (int) pos;
+                int pos0 = (int) pos;
+                int pos1 = (int) pos + 1;
+                lsamplesinterp[s] =
+                    lsamples[pos0] * (1 - frac) + lsamples[pos1] * frac;
+                rsamplesinterp[s] =
+                    rsamples[pos0] * (1 - frac) + rsamples[pos1] * frac;
+                break;
+            }
+        }
+    }
+
     // dsp does 4-channel mixing instead of just 2
 
     if (g_dsp_chn_disable & BIT(ch)) goto dsp_ch_end;
 
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        mixer[s][0] +=
-            (s32) lsamples[s * nSamples / FRAME_SAMPLES] * cfg->mix[0][0];
-        mixer[s][1] +=
-            (s32) rsamples[s * nSamples / FRAME_SAMPLES] * cfg->mix[0][1];
+        mixer[s][0] += (s32) lsamplesinterp[s] * cfg->mix[0][0];
+        mixer[s][1] += (s32) rsamplesinterp[s] * cfg->mix[0][1];
     }
 
 dsp_ch_end:

@@ -5,6 +5,7 @@
 #include "dsp.h"
 
 enum { DSPFMT_PCM8, DSPFMT_PCM16, DSPFMT_ADPCM };
+enum { DSPINTRP_POLYPHASE, DSPINTRP_LINEAR, DSPINTRP_NEAREST };
 
 // u32 are stored in mixed endian
 typedef struct {
