@@ -68,26 +68,13 @@ typedef float fvec4[4];
 #define MASK(n) (BIT(n) - 1)
 #define MASKL(n) (BITL(n) - 1)
 
-// by not including the closing parenthesis in this first macro
-// we can delay the expansion and allow recursion
-#define _INVBIT(w, n)                                                          \
-    ((n) & MASK(w) ? 0 : w) + _INVBIT##w((n) & MASK(w) ? (n) : (n) >> w
-#define _INVBIT1(n) 0
-#define _INVBIT2(n) _INVBIT(1, n))
-#define _INVBIT4(n) _INVBIT(2, n))
-#define _INVBIT8(n) _INVBIT(4, n))
-#define _INVBIT16(n) _INVBIT(8, n))
-#define _INVBIT32(n) _INVBIT(16, n))
-#define INVBIT(n) _INVBIT32(n)
-
 #define countof(a) (sizeof a / sizeof *a)
 
 // N must be a power of 2
 #define FIFO(T, N)                                                             \
     struct {                                                                   \
         typeof(T) d[N];                                                        \
-        ubit(INVBIT(N)) head;                                                  \
-        ubit(INVBIT(N)) tail;                                                  \
+        ubit(__builtin_ctz(N)) head, tail;                                     \
         u32 size;                                                              \
     }
 
@@ -96,9 +83,22 @@ typedef float fvec4[4];
 #define FIFO_pop(f, v) (v = (f).d[(f).head++], (f).size--)
 #define FIFO_peek(f) ((f).d[(f).head])
 #define FIFO_back(f) ((f).d[(f).tail - 1uwb])
-#define FIFO_foreach(i, f)                                                     \
-    for (u32 _i = 0, i = (f).head; _i < (f).size;                              \
-         _i++, i = (typeof((f).head)) ((f).head + _i))
+#define FIFO_foreach(it, f)                                                    \
+    for (                                                                      \
+        struct {                                                               \
+            u32 i;                                                            \
+            typeof((f).head) _i;                                                \
+            typeof((f).d[0])* p;                                               \
+        } it = {0, (f).head, &(f).d[(f).head]};                                \
+        it.i < (f).size; it._i++, it.i++, it.p = &(f).d[it._i])
+#define FIFO_foreach_ring(it, f)                                               \
+    for (                                                                      \
+        struct {                                                               \
+            u32 i;                                                            \
+            typeof((f).head) _i;                                                \
+            typeof((f).d[0])* p;                                               \
+        } it = {0, (f).tail, &(f).d[(f).tail]};                                \
+        it.i < FIFO_MAX(f); it._i++, it.i++, it.p = &(f).d[it._i])
 #define FIFO_clear(f) ((f).head = (f).tail = (f).size = 0)
 
 #define StaticVector(T, N)                                                     \

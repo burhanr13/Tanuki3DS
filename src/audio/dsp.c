@@ -7,6 +7,8 @@
 
 #include "dspptr.inc"
 
+DSPSampHist g_dsp_chn_hist[24][2];
+DSPSampHist g_dsp_hist[2];
 u32 g_dsp_chn_disable;
 
 // there are other bits too but we don't care about them
@@ -135,8 +137,8 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
 // update any internally stored buffers that were modified
 // externally
 void update_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
-    FIFO_foreach(i, dsp->bufQueues[ch]) {
-        auto old = &dsp->bufQueues[ch].d[i];
+    FIFO_foreach(it, dsp->bufQueues[ch]) {
+        auto old = it.p;
         BufInfo new;
         get_buf(cfg, old->id, &new);
         // check if the buffer was found
@@ -193,6 +195,9 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     s16 lsamples[nSamples] = {};
     s16 rsamples[nSamples] = {};
     u32 curSample = 0;
+
+    s16 lsamplesinterp[FRAME_SAMPLES] = {};
+    s16 rsamplesinterp[FRAME_SAMPLES] = {};
 
     if (!stat->active) goto dsp_ch_end;
 
@@ -340,9 +345,6 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
 
     // attempt to interpolate samples
 
-    s16 lsamplesinterp[FRAME_SAMPLES];
-    s16 rsamplesinterp[FRAME_SAMPLES];
-
     for (int s = 0; s < FRAME_SAMPLES; s++) {
         float pos = (float) s * nSamples / FRAME_SAMPLES;
         if (pos < 0) pos = 0;
@@ -376,6 +378,11 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     }
 
 dsp_ch_end:
+    for (int s = 0; s < FRAME_SAMPLES; s++) {
+        FIFO_push(g_dsp_chn_hist[ch][0], lsamplesinterp[s]);
+        FIFO_push(g_dsp_chn_hist[ch][1], rsamplesinterp[s]);
+    }
+
     // this bit is extremely important
     stat->cur_buf_dirty = stat->cur_buf != og_cur_buf;
 }
@@ -407,6 +414,8 @@ void dsp_process_frame(DSP* dsp) {
                               ctremu.volume / 100.f);
         final[s][1] = clamp16(mixer[s][1] * m->master_cfg.master_vol *
                               ctremu.volume / 100.f);
+        FIFO_push(g_dsp_hist[0], final[s][0]);
+        FIFO_push(g_dsp_hist[1], final[s][1]);
     }
 
     if (ctremu.audio_cb) ctremu.audio_cb(final, FRAME_SAMPLES);

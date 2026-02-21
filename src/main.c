@@ -374,6 +374,12 @@ void draw_menubar() {
                 uistate.settings = true;
             }
 
+            igSeparator();
+
+            if (igMenuItem("Audio Channels", nullptr, false, ctremu.initialized)) {
+                uistate.audioview = true;
+            }
+
             igEndMenu();
         }
 
@@ -382,17 +388,6 @@ void draw_menubar() {
             igMenuItemP("CPU Trace Log", nullptr, &g_cpulog, true);
             igSeparator();
             igMenuItemP("Wireframe", nullptr, &g_wireframe, true);
-            if (igBeginMenu("DSP Audio Channels", true)) {
-                for (int i = 0; i < DSP_CHANNELS; i++) {
-                    char buf[100];
-                    snprintf(buf, sizeof buf, "Channel %d", i);
-                    bool ena = !(g_dsp_chn_disable & BIT(i));
-                    g_dsp_chn_disable &= ~BIT(i);
-                    igMenuItemP(buf, nullptr, &ena, true);
-                    g_dsp_chn_disable |= !ena << i;
-                }
-                igEndMenu();
-            }
             igEndMenu();
         }
 
@@ -625,9 +620,7 @@ int main(int argc, char** argv) {
 
         draw_menubar();
 
-        draw_settings();
-
-        draw_swkbd();
+        draw_gui();
 
         igRender();
         ImGui_ImplOpenGL3_RenderDrawData(igGetDrawData());

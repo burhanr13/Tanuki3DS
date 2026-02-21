@@ -58,6 +58,10 @@ typedef struct {
 
 } DSP;
 
+typedef FIFO(s16, 32768) DSPSampHist;
+
+extern DSPSampHist g_dsp_chn_hist[DSP_CHANNELS][2];
+extern DSPSampHist g_dsp_hist[2];
 extern u32 g_dsp_chn_disable;
 
 // pipe 2

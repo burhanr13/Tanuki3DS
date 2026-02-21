@@ -52,12 +52,11 @@ void add_event(Scheduler* sched, SchedulerCallback f, void* event_arg,
 }
 
 void remove_event(Scheduler* sched, SchedulerCallback f, void* event_arg) {
-    FIFO_foreach(i, sched->event_queue) {
-        if (sched->event_queue.d[i].handler == f &&
-            sched->event_queue.d[i].arg == event_arg) {
+    FIFO_foreach(it, sched->event_queue) {
+        if (it.p->handler == f && it.p->arg == event_arg) {
             sched->event_queue.size--;
             sched->event_queue.tail = (sched->event_queue.tail - 1) % EVENT_MAX;
-            for (u32 j = i; j != sched->event_queue.tail;
+            for (u32 j = it.i; j != sched->event_queue.tail;
                  j = (j + 1) % EVENT_MAX) {
                 sched->event_queue.d[j] =
                     sched->event_queue.d[(j + 1) % EVENT_MAX];
@@ -68,9 +67,9 @@ void remove_event(Scheduler* sched, SchedulerCallback f, void* event_arg) {
 }
 
 u64 find_event(Scheduler* sched, SchedulerCallback f) {
-    FIFO_foreach(i, sched->event_queue) {
-        if (sched->event_queue.d[i].handler == f) {
-            return sched->event_queue.d[i].time;
+    FIFO_foreach(it, sched->event_queue) {
+        if (it.p->handler == f) {
+            return it.p->time;
         }
     }
     return -1;

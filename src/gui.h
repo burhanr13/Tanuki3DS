@@ -19,10 +19,11 @@ extern struct UIState {
     bool menubar;
     bool settings;
 
+    bool audioview;
+
     int* waiting_key;
 } uistate;
 
-void draw_swkbd();
-void draw_settings();
+void draw_gui();
 
 #endif

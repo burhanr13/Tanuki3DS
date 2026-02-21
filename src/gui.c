@@ -229,3 +229,95 @@ void draw_settings() {
 
     igEnd();
 }
+
+int samplenum = 2000;
+
+void plot_samples(DSPSampHist* wave) {
+    float samples[FIFO_MAX(wave[0])];
+    for (int i = 0; i < 2; i++) {
+        igPushID_Int(i);
+        igTableNextColumn();
+        FIFO_foreach_ring(it, wave[i]) {
+            samples[it.i] = (float) *it.p / BIT(16);
+        }
+        igPlotLines_FloatPtr("##", samples + countof(samples) - samplenum,
+                             samplenum, 0, nullptr, -0.5, 0.5,
+                             (ImVec2) {200, 50}, 4);
+        igPopID();
+    }
+}
+
+void draw_audioview() {
+    if (!uistate.audioview) return;
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        flags |= ImGuiWindowFlags_NoTitleBar;
+    }
+
+    igSetNextWindowClass(&(ImGuiWindowClass) {
+        .ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge});
+
+    igSetNextWindowSize((ImVec2) {650, 400}, ImGuiCond_FirstUseEver);
+
+    igBegin("DSP Audio Channels", &uistate.audioview, flags);
+
+    igSliderInt("Sample Length", &samplenum, 0, FIFO_MAX(g_dsp_chn_hist[0][0]),
+                nullptr, 0);
+
+    igBeginChild("audioviewchild", (ImVec2) {0, -40}, 0, 0);
+
+    igBeginTable("##audioview", 4, ImGuiTableFlags_SizingFixedFit, (ImVec2) {},
+                 0);
+
+    igTableNextRow(ImGuiTableRowFlags_Headers, 0);
+    igTableNextColumn();
+    igTableNextColumn();
+    igText("Left");
+    igTableNextColumn();
+    igText("Right");
+    igTableNextColumn();
+    igText("Disabled");
+
+    igTableNextRow(0, 0);
+    igTableNextColumn();
+    igText("Final Output");
+    igPushID_Int(-1);
+    plot_samples(g_dsp_hist);
+    igPopID();
+    igTableNextColumn();
+
+    igTableNextRow(0, 0);
+
+    for (int i = 0; i < DSP_CHANNELS; i++) {
+        igPushID_Int(i);
+        igTableNextRow(0, 0);
+        igTableNextColumn();
+        igText("Channel %d", i);
+        plot_samples(g_dsp_chn_hist[i]);
+        igTableNextColumn();
+        bool dis = g_dsp_chn_disable & BIT(i);
+        g_dsp_chn_disable &= ~BIT(i);
+        igCheckbox("##", &dis);
+        g_dsp_chn_disable |= dis << i;
+        igPopID();
+    }
+
+    igEndTable();
+
+    igEndChild();
+
+    igSeparator();
+
+    if (igButton("Close", (ImVec2) {})) {
+        uistate.audioview = false;
+    }
+
+    igEnd();
+}
+
+void draw_gui() {
+    draw_swkbd();
+    draw_settings();
+    draw_audioview();
+}
