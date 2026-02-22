@@ -196,8 +196,8 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     s16 rsamples[nSamples] = {};
     u32 curSample = 0;
 
-    s32 lsamplesinterp[FRAME_SAMPLES] = {};
-    s32 rsamplesinterp[FRAME_SAMPLES] = {};
+    s32 lframe[FRAME_SAMPLES] = {};
+    s32 rframe[FRAME_SAMPLES] = {};
 
     if (!stat->active) goto dsp_ch_end;
 
@@ -348,21 +348,20 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     for (int s = 0; s < FRAME_SAMPLES; s++) {
         float pos = (float) s * nSamples / FRAME_SAMPLES;
         if (pos < 0) pos = 0;
-        if (pos > nSamples - 1) pos = nSamples - 1;
+        if (pos >= nSamples) pos = nSamples - 1;
         switch (cfg->interp_mode) {
             case DSPINTRP_NEAREST:
-                lsamplesinterp[s] = lsamples[(int) pos];
-                rsamplesinterp[s] = rsamples[(int) pos];
+                lframe[s] = lsamples[(int) pos];
+                rframe[s] = rsamples[(int) pos];
                 break;
             case DSPINTRP_LINEAR:
             case DSPINTRP_POLYPHASE: {
                 float frac = pos - (int) pos;
                 int pos0 = (int) pos;
                 int pos1 = (int) pos + 1;
-                lsamplesinterp[s] =
-                    lsamples[pos0] * (1 - frac) + lsamples[pos1] * frac;
-                rsamplesinterp[s] =
-                    rsamples[pos0] * (1 - frac) + rsamples[pos1] * frac;
+                if (pos1 >= nSamples) pos1 = nSamples - 1;
+                lframe[s] = lsamples[pos0] * (1 - frac) + lsamples[pos1] * frac;
+                rframe[s] = rsamples[pos0] * (1 - frac) + rsamples[pos1] * frac;
                 break;
             }
         }
@@ -371,21 +370,21 @@ void dsp_process_chn(DSP* dsp, DSPMemory* m, int ch, s32 (*mixer)[2]) {
     // dsp does 4-channel mixing instead of just 2
 
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        lsamplesinterp[s] *= cfg->mix[0][0];
-        rsamplesinterp[s] *= cfg->mix[0][1];
+        lframe[s] *= cfg->mix[0][0];
+        rframe[s] *= cfg->mix[0][1];
     }
 
     if (g_dsp_chn_disable & BIT(ch)) goto dsp_ch_end;
 
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        mixer[s][0] += lsamplesinterp[s];
-        mixer[s][1] += rsamplesinterp[s];
+        mixer[s][0] += lframe[s];
+        mixer[s][1] += rframe[s];
     }
 
 dsp_ch_end:
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        FIFO_push(g_dsp_chn_hist[ch][0], lsamplesinterp[s]);
-        FIFO_push(g_dsp_chn_hist[ch][1], rsamplesinterp[s]);
+        FIFO_push(g_dsp_chn_hist[ch][0], lframe[s]);
+        FIFO_push(g_dsp_chn_hist[ch][1], rframe[s]);
     }
 
     // this bit is extremely important
@@ -423,8 +422,8 @@ void dsp_process_frame(DSP* dsp) {
 
     s16 final[FRAME_SAMPLES][2];
     for (int s = 0; s < FRAME_SAMPLES; s++) {
-        final[s][0] = clamp16(mixer[s][0] * ctremu.volume / 100.f);
-        final[s][1] = clamp16(mixer[s][1] * ctremu.volume / 100.f);
+        final[s][0] = clamp16(mixer[s][0] * (ctremu.volume / 100.f));
+        final[s][1] = clamp16(mixer[s][1] * (ctremu.volume / 100.f));
     }
 
     if (ctremu.audio_cb) ctremu.audio_cb(final, FRAME_SAMPLES);

@@ -145,7 +145,8 @@ void draw_settings() {
             if (igBeginTabBar("input tabs", 0)) {
                 if (igBeginTabItem("Keyboard Input", nullptr, 0)) {
                     igBeginChild("keyboard input panel", (ImVec2) {}, 0, 0);
-                    igBeginTable("input config", 2, 0, (ImVec2) {}, 0);
+                    igBeginTable("input config", 2,
+                                 ImGuiTableFlags_BordersOuterV, (ImVec2) {}, 0);
                     config_input("A", &ctremu.inputmap.kb.a);
                     config_input("B", &ctremu.inputmap.kb.b);
                     config_input("X", &ctremu.inputmap.kb.x);
@@ -178,7 +179,8 @@ void draw_settings() {
                 if (igBeginTabItem("Freecam", nullptr,
                                    ImGuiTabItemFlags_None)) {
                     igBeginChild("freecam input panel", (ImVec2) {}, 0, 0);
-                    igBeginTable("freecam config", 2, 0, (ImVec2) {}, 0);
+                    igBeginTable("freecam config", 2,
+                                 ImGuiTableFlags_BordersOuterV, (ImVec2) {}, 0);
                     config_input("Move Forward", &ctremu.inputmap.freecam.mf);
                     config_input("Move Backward", &ctremu.inputmap.freecam.mb);
                     config_input("Move Left", &ctremu.inputmap.freecam.ml);
@@ -270,8 +272,10 @@ void draw_audioview() {
 
     igBeginChild("audioviewchild", (ImVec2) {0, -40}, 0, 0);
 
-    igBeginTable("##audioview", 4, ImGuiTableFlags_SizingFixedFit, (ImVec2) {},
-                 0);
+    igBeginTable("##audioview", 4,
+                 ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit |
+                     ImGuiTableFlags_BordersOuterV,
+                 (ImVec2) {}, 0);
 
     igTableNextRow(ImGuiTableRowFlags_Headers, 0);
     igTableNextColumn();
@@ -312,6 +316,14 @@ void draw_audioview() {
 
     igSeparator();
 
+    if (igButton("Enable All", (ImVec2) {})) {
+        g_dsp_chn_disable = 0;
+    }
+    igSameLine(0, 5);
+    if (igButton("Disable All", (ImVec2) {})) {
+        g_dsp_chn_disable = ~0;
+    }
+    igSameLine(0, 5);
     if (igButton("Close", (ImVec2) {})) {
         uistate.audioview = false;
     }
