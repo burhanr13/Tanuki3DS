@@ -161,6 +161,13 @@ void draw_settings() {
             igSeparatorText("Audio");
             igCheckbox("Audio Sync", &ctremu.audiosync);
             igSliderFloat("Volume", &ctremu.volume, 0, 200, nullptr, 0);
+            static const char* audiomodes[] = {
+                "Mono",
+                "Stereo",
+                "Surround",
+            };
+            igCombo("Audio Output Mode", &ctremu.audiomode, audiomodes,
+                    countof(audiomodes), 0);
             break;
         }
         case PANE_INPUT: {

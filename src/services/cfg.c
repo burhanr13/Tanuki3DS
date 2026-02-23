@@ -34,7 +34,7 @@ DECL_PORT(cfg) {
                     break;
                 }
                 case 0x70001: // sound output mode
-                    *(u8*) ptr = 2; // enable stereo/surround audio
+                    *(u8*) ptr = ctremu.audiomode;
                     break;
                 case 0xa0000: { // user name
                     convert_to_utf16(ptr, 0x1c, ctremu.username);

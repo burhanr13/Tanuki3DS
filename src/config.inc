@@ -34,6 +34,7 @@ SECT("Audio")
 BOOL("AudioSync", ctremu.audiosync)
 CMT("0%% - 200%%")
 FLT("Volume", ctremu.volume)
+INT("OutputMode", ctremu.audiomode)
 
 SECT("Input")
 CMT("keyboard scancodes for each button")

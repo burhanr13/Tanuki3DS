@@ -27,6 +27,7 @@ void emulator_load_default_settings() {
     ctremu.hashTextures = true;
     ctremu.audiosync = true;
     ctremu.volume = 100;
+    ctremu.audiomode = 1;
     strcpy(ctremu.username, "ctremu");
     ctremu.language = 1;
     ctremu.region = 1;
