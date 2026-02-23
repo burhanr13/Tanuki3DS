@@ -278,20 +278,28 @@ void draw_textureview() {
 
         auto texcache = &ctremu.system.gpu.textures;
 
-        char items[TEX_MAX][100];
-        const char* itemsp[TEX_MAX];
+        igPushStyleColor_Vec4(ImGuiCol_ChildBg,
+                              *igGetStyleColorVec4(ImGuiCol_FrameBg));
+        igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
+
         for (int i = 0; i < TEX_MAX; i++) {
+            char buf[100];
+
             if (BitVec_test(texcache->occupied, i)) {
-                sprintf(items[i], "Texture %d", i);
+                sprintf(buf, "Texture %d", i);
+                igBeginDisabled(false);
             } else {
-                strcpy(items[i], "[Empty]");
+                sprintf(buf, "[Empty]##%d", i);
+                igBeginDisabled(true);
             }
-            itemsp[i] = items[i];
+            if (igSelectable(buf, curTex == i, 0, (ImVec2) {})) {
+                curTex = i;
+            }
+            igEndDisabled();
         }
 
-        igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
-        igListBox("##texture list", &curTex, itemsp, countof(itemsp), 30);
         igEndChild();
+        igPopStyleColor(1);
 
         igSameLine(0, 0);
 
@@ -334,20 +342,28 @@ void draw_textureview() {
 
         auto fbcache = &ctremu.system.gpu.fbs;
 
-        char items[FB_MAX][100];
-        const char* itemsp[FB_MAX];
+        igPushStyleColor_Vec4(ImGuiCol_ChildBg,
+                              *igGetStyleColorVec4(ImGuiCol_FrameBg));
+        igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
+
         for (int i = 0; i < FB_MAX; i++) {
+            char buf[100];
+
             if (BitVec_test(fbcache->occupied, i)) {
-                sprintf(items[i], "Framebuffer %d", i);
+                sprintf(buf, "Framebuffer %d", i);
+                igBeginDisabled(false);
             } else {
-                strcpy(items[i], "[Empty]");
+                sprintf(buf, "[Empty]##%d", i);
+                igBeginDisabled(true);
             }
-            itemsp[i] = items[i];
+            if (igSelectable(buf, curFb == i, 0, (ImVec2) {})) {
+                curFb = i;
+            }
+            igEndDisabled();
         }
 
-        igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
-        igListBox("##fb list", &curFb, itemsp, countof(itemsp), 30);
         igEndChild();
+        igPopStyleColor(1);
 
         igSameLine(0, 0);
 
