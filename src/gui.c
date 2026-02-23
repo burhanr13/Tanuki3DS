@@ -7,6 +7,27 @@
 
 struct UIState uistate = {.menubar = true};
 
+void setup_gui_theme() {
+    igGetStyle()->FontSizeBase = 15;
+    ImFontAtlas_AddFontDefaultVector(igGetIO()->Fonts, nullptr);
+
+    igGetStyle()->FrameBorderSize = 1;
+    igGetStyle()->FramePadding = (ImVec2) {5, 5};
+    igGetStyle()->FrameRounding = 5;
+    igGetStyle()->GrabRounding = 5;
+    igGetStyle()->ItemSpacing = (ImVec2) {5, 5};
+    igGetStyle()->ItemInnerSpacing = (ImVec2) {5, 5};
+    igGetStyle()->PopupRounding = 5;
+    igGetStyle()->PopupBorderSize = 1;
+    igGetStyle()->SeparatorTextAlign = (ImVec2) {0.5, 0.5};
+    igGetStyle()->WindowPadding = (ImVec2) {10, 10};
+    igGetStyle()->WindowRounding = 5;
+    igGetStyle()->WindowBorderSize = 1;
+    igGetStyle()->SelectableTextAlign = (ImVec2) {0.5, 0.5};
+
+    igStyleColorsDark(nullptr);
+}
+
 void draw_swkbd() {
     if (ctremu.needs_swkbd) igOpenPopup_Str("Input Text", 0);
 
@@ -84,9 +105,10 @@ void draw_settings() {
     igEndChild();
     igPopStyleColor(1);
 
-    igSameLine(0, 5);
+    igSameLine(0, 0);
 
-    igBeginChild("settings", (ImVec2) {}, 0, 0);
+    igBeginChild("settings", (ImVec2) {},
+                 ImGuiChildFlags_AlwaysUseWindowPadding, 0);
     igBeginChild("settings pane", (ImVec2) {0, -40}, 0, 0);
 
     switch (curPane) {
@@ -232,6 +254,152 @@ void draw_settings() {
     igEnd();
 }
 
+void draw_textureview() {
+    if (!ctremu.initialized) uistate.textureview = false;
+    if (!uistate.textureview) return;
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
+    if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        flags |= ImGuiWindowFlags_NoTitleBar;
+    }
+
+    igSetNextWindowClass(&(ImGuiWindowClass) {
+        .ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge});
+
+    igSetNextWindowSize((ImVec2) {800, 700}, ImGuiCond_FirstUseEver);
+
+    igBegin("GPU Texture Viewer", &uistate.textureview, flags);
+
+    igBeginTabBar("##texturetabbar", 0);
+
+    if (igBeginTabItem("Textures", nullptr, 0)) {
+
+        static int curTex = 0;
+
+        auto texcache = &ctremu.system.gpu.textures;
+
+        char items[TEX_MAX][100];
+        const char* itemsp[TEX_MAX];
+        for (int i = 0; i < TEX_MAX; i++) {
+            if (BitVec_test(texcache->occupied, i)) {
+                sprintf(items[i], "Texture %d", i);
+            } else {
+                strcpy(items[i], "[Empty]");
+            }
+            itemsp[i] = items[i];
+        }
+
+        igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
+        igListBox("##texture list", &curTex, itemsp, countof(itemsp), 30);
+        igEndChild();
+
+        igSameLine(0, 0);
+
+        igBeginChild("##texture pane", (ImVec2) {},
+                     ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+
+        if (BitVec_test(texcache->occupied, curTex)) {
+
+            auto tex = &texcache->d[curTex];
+
+            float w, h;
+            if (tex->width > tex->height) {
+                w = 512;
+                h = (float) tex->height * 512 / tex->width;
+            } else {
+                h = 512;
+                w = (float) tex->width * 512 / tex->height;
+            }
+
+            igImageWithBg((ImTextureRef) {0, tex->tex}, (ImVec2) {w, h},
+                          (ImVec2) {0, 1}, (ImVec2) {1, 0},
+                          (ImVec4) {0.25, 0.25, 0.25, 1},
+                          (ImVec4) {1, 1, 1, 1});
+            static const char* fmts[] = {
+                "RGBA8888", "RGB888", "RGBA5551", "RGB565", "RGBA4444", "LA88",
+                "RG88",     "L8",     "A8",       "IA44",   "I4",       "A4",
+                "ETC1",     "ETC1A4", "???",      "???"};
+            igText("Addr: %#x  Size: %dx%d  Format: %s", tex->paddr, tex->width,
+                   tex->height, fmts[tex->fmt]);
+            igText("Hash: %016llx", tex->hash);
+        }
+        igEndChild();
+
+        igEndTabItem();
+    }
+
+    if (igBeginTabItem("Framebuffers", nullptr, 0)) {
+
+        static int curFb = 0;
+
+        auto fbcache = &ctremu.system.gpu.fbs;
+
+        char items[FB_MAX][100];
+        const char* itemsp[FB_MAX];
+        for (int i = 0; i < FB_MAX; i++) {
+            if (BitVec_test(fbcache->occupied, i)) {
+                sprintf(items[i], "Framebuffer %d", i);
+            } else {
+                strcpy(items[i], "[Empty]");
+            }
+            itemsp[i] = items[i];
+        }
+
+        igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
+        igListBox("##fb list", &curFb, itemsp, countof(itemsp), 30);
+        igEndChild();
+
+        igSameLine(0, 0);
+
+        igBeginChild("##fb pane", (ImVec2) {},
+                     ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+
+        if (BitVec_test(fbcache->occupied, curFb)) {
+
+            auto fb = &fbcache->d[curFb];
+
+            float w, h;
+            if (fb->width > fb->height) {
+                w = 512;
+                h = (float) fb->height * 512 / fb->width;
+            } else {
+                h = 512;
+                w = (float) fb->width * 512 / fb->height;
+            }
+
+            static int bufselect;
+            igRadioButton_IntPtr("Color Buffer", &bufselect, 0);
+            igSameLine(0, 0);
+            igRadioButton_IntPtr("Depth Buffer", &bufselect, 1);
+
+            if (bufselect == 0) {
+                igImageWithBg((ImTextureRef) {0, fb->color_tex},
+                              (ImVec2) {w, h}, (ImVec2) {0, 1}, (ImVec2) {1, 0},
+                              (ImVec4) {0.25, 0.25, 0.25, 1},
+                              (ImVec4) {1, 1, 1, 1});
+            } else {
+                igImageWithBg((ImTextureRef) {0, fb->depth_tex},
+                              (ImVec2) {w, h}, (ImVec2) {0, 1}, (ImVec2) {1, 0},
+                              (ImVec4) {0.25, 0.25, 0.25, 1},
+                              (ImVec4) {1, 1, 1, 1});
+            }
+            static const char* fmts[] = {"RGBA8888", "RGB888",   "RGB565",
+                                         "RGBA5551", "RGBA4444", "???",
+                                         "???",      "???"};
+            igText("Color Addr: %#x  Size: %dx%d  Format: %s", fb->color_paddr,
+                   fb->width, fb->height, fmts[fb->color_fmt]);
+            igText("Depth Addr: %#x", fb->depth_paddr);
+        }
+        igEndChild();
+
+        igEndTabItem();
+    }
+
+    igEndTabBar();
+
+    igEnd();
+}
+
 int samplenum = 2000;
 float samplerange = 0.25f;
 
@@ -251,6 +419,7 @@ void plot_samples(DSPSampHist* wave) {
 }
 
 void draw_audioview() {
+    if (!ctremu.initialized) uistate.audioview = false;
     if (!uistate.audioview) return;
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
@@ -334,5 +503,6 @@ void draw_audioview() {
 void draw_gui() {
     draw_swkbd();
     draw_settings();
+    draw_textureview();
     draw_audioview();
 }

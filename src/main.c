@@ -376,7 +376,13 @@ void draw_menubar() {
 
             igSeparator();
 
-            if (igMenuItem("Audio Channels", nullptr, false, ctremu.initialized)) {
+            if (igMenuItem("Texture Viewer", nullptr, false,
+                           ctremu.initialized)) {
+                uistate.textureview = true;
+            }
+
+            if (igMenuItem("Audio Channels", nullptr, false,
+                           ctremu.initialized)) {
                 uistate.audioview = true;
             }
 
@@ -486,31 +492,13 @@ int main(int argc, char** argv) {
     ctremu.audio_cb = audio_callback;
 
     igCreateContext(nullptr);
+    igGetIO()->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     igGetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     igGetIO()->ConfigViewportsNoDecoration = false;
-
-    igGetStyle()->FontSizeBase = 15;
-    ImFontAtlas_AddFontDefaultVector(igGetIO()->Fonts, nullptr);
-
-    igGetStyle()->FrameBorderSize = 1;
-    igGetStyle()->FramePadding = (ImVec2) {5, 5};
-    igGetStyle()->FrameRounding = 5;
-    igGetStyle()->GrabRounding = 5;
-    igGetStyle()->ItemSpacing = (ImVec2) {5, 5};
-    igGetStyle()->ItemInnerSpacing = (ImVec2) {5, 5};
-    igGetStyle()->PopupRounding = 5;
-    igGetStyle()->PopupBorderSize = 1;
-    igGetStyle()->SeparatorTextAlign = (ImVec2) {0.5, 0.5};
-    igGetStyle()->WindowPadding = (ImVec2) {10, 10};
-    igGetStyle()->WindowRounding = 5;
-    igGetStyle()->WindowBorderSize = 1;
-    igGetStyle()->ChildRounding = 5;
-    igGetStyle()->SelectableTextAlign = (ImVec2) {0.5, 0.5};
-
-    igStyleColorsDark(nullptr);
-
     ImGui_ImplSDL3_InitForOpenGL(g_window, glcontext);
     ImGui_ImplOpenGL3_Init(nullptr);
+
+    setup_gui_theme();
 
     if (ctremu.romfile) {
         g_pending_reset = true;
@@ -558,7 +546,7 @@ int main(int argc, char** argv) {
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
-            ImGui_ImplSDL3_ProcessEvent(&e);
+            bool forward_imgui = true;
             switch (e.type) {
                 case SDL_EVENT_QUIT:
                     ctremu.running = false;
@@ -567,6 +555,7 @@ int main(int argc, char** argv) {
                     if (uistate.waiting_key) {
                         *uistate.waiting_key = e.key.scancode;
                         uistate.waiting_key = nullptr;
+                        forward_imgui = false;
                     } else {
                         hotkey_press(e.key.key);
                     }
@@ -587,6 +576,7 @@ int main(int argc, char** argv) {
                     g_pending_reset = true;
                     break;
             }
+            if (forward_imgui) ImGui_ImplSDL3_ProcessEvent(&e);
         }
 
         if (!ctremu.initialized) ctremu.pause = true;

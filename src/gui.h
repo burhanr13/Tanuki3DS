@@ -13,17 +13,20 @@
 #define igSelectable igSelectable_Bool
 #define igSelectableP igSelectable_BoolPtr
 #define igCombo igCombo_Str_arr
+#define igListBox igListBox_Str_arr
 #define igBeginChild igBeginChild_Str
 
 extern struct UIState {
     bool menubar;
     bool settings;
 
+    bool textureview;
     bool audioview;
 
     int* waiting_key;
 } uistate;
 
+void setup_gui_theme();
 void draw_gui();
 
 #endif
