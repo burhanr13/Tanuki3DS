@@ -292,23 +292,24 @@ void update_input(E3DS* s) {
         // convert values to what the 3DS uses
         // formulas and constants from Panda3DS
 
-        const float accelMax = 9;
         const float accelClamp = 930;
+        const float accelMax = 9;
 
         accel[0] = glm_clamp(accel[0] / accelMax * accelClamp, -accelClamp,
                              accelClamp);
-        accel[1] = glm_clamp(accel[1] / accelMax * accelClamp - 500,
-                             -accelClamp, accelClamp);
-        accel[2] = glm_clamp(accel[2] / accelMax * accelClamp - 160,
+        accel[1] = glm_clamp(
+            accel[1] / (accelMax * SDL_STANDARD_GRAVITY) * accelClamp - 350,
+            -accelClamp, accelClamp);
+        accel[2] = glm_clamp((accel[2] - 2.1f) / accelMax * accelClamp,
                              -accelClamp, accelClamp);
 
-        const float gyroScale = -(180 / M_PI * 14.375f);
-        gyro[0] *= gyroScale;
-        gyro[1] *= gyroScale;
-        gyro[2] *= gyroScale;
+        const float gyroScale = 180 / M_PI * 14.375f;
+        gyro[0] *= -gyroScale;
+        gyro[1] *= -gyroScale;
+        gyro[2] *= -gyroScale;
     }
     hid_update_accel(&ctremu.system, accel[0], accel[1], accel[2]);
-    hid_update_gyro(&ctremu.system, gyro[0], gyro[1], gyro[2]);
+    hid_update_gyro(&ctremu.system, gyro[0], gyro[2], gyro[1]);
 }
 
 void audio_callback(s16 (*samples)[2], u32 count) {
