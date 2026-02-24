@@ -13,6 +13,8 @@
 
 #include "svc_types.h"
 
+#define IGNOREMEMERR
+
 #define PGROUNDDOWN(a) ((a) & ~(PAGE_SIZE - 1))
 #define PGROUNDUP(a) (((a) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
 
@@ -59,7 +61,11 @@ u32 physaddr2memoff(u32 paddr) {
     }
     lerror("unknown physical memory address %08x", paddr);
     cpu_print_state(&ctremu.system.cpu);
+#ifdef IGNOREMEMERR
+    return offsetof(E3DSMemory, dummy);
+#else
     longjmp(ctremu.exceptionJmp, 1);
+#endif
 }
 
 void memory_init(E3DS* s) {
@@ -199,7 +205,9 @@ PageEntry ptabread(PageTable ptab, u32 vaddr) {
     if (res.state == MEMST_FREE) {
         lerror("invalid virtual memory address %08x", vaddr);
         cpu_print_state(&ctremu.system.cpu);
+#ifndef IGNOREMEMERR
         longjmp(ctremu.exceptionJmp, 1);
+#endif
     }
     return res;
 }
