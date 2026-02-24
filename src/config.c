@@ -59,7 +59,7 @@ void load_config() {
 #define INT(k, v) MATCH(k) v = atoi(val);
 #define FLT(k, v) MATCH(k) v = atof(val);
 #define PSTR(k, v) MATCH(k) free(v), v = val[0] ? strdup(val) : nullptr;
-#define ASTR(k, v) MATCH(k) strncpy(v, val, sizeof v);
+#define ASTR(k, v) MATCH(k) strncpy(v, val, sizeof v - 1), v[sizeof v - 1] = '\0';
 #include "config.inc"
 #undef SECT
 #undef CMT

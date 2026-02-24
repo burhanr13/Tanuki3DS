@@ -723,10 +723,9 @@ DECL_PORT_ARG(fs_dir, fd) {
                 char* d = strrchr(ent->d_name, '.');
                 if (d) {
                     *d = '\0';
-                    strncpy(ents[i].shortext, d + 1, sizeof ents[i].shortext);
+                    memcpy(ents[i].shortext, d + 1, 3);
                 }
-                strncpy(ents[i].shortname, ent->d_name,
-                        sizeof ents[i].shortname);
+                memcpy(ents[i].shortname, ent->d_name, 8);
                 if (d) *d = '.';
 
                 ents[i]._21a[0] = 1;

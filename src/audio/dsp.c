@@ -139,7 +139,7 @@ void get_buf(DSPInputConfig* cfg, int bufid, BufInfo* out) {
 void update_bufs(DSP* dsp, int ch, DSPInputConfig* cfg) {
     FIFO_foreach(it, dsp->bufQueues[ch]) {
         auto old = it.p;
-        BufInfo new;
+        BufInfo new = {};
         get_buf(cfg, old->id, &new);
         // check if the buffer was found
         if (new.id != old->id) continue;

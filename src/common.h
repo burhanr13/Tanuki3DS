@@ -86,16 +86,16 @@ typedef float fvec4[4];
 #define FIFO_foreach(it, f)                                                    \
     for (                                                                      \
         struct {                                                               \
-            u32 i;                                                            \
-            typeof((f).head) _i;                                                \
+            u32 i;                                                             \
+            typeof((f).head) _i;                                               \
             typeof((f).d[0])* p;                                               \
         } it = {0, (f).head, &(f).d[(f).head]};                                \
         it.i < (f).size; it._i++, it.i++, it.p = &(f).d[it._i])
 #define FIFO_foreach_ring(it, f)                                               \
     for (                                                                      \
         struct {                                                               \
-            u32 i;                                                            \
-            typeof((f).head) _i;                                                \
+            u32 i;                                                             \
+            typeof((f).head) _i;                                               \
             typeof((f).d[0])* p;                                               \
         } it = {0, (f).tail, &(f).d[(f).tail]};                                \
         it.i < FIFO_MAX(f); it._i++, it.i++, it.p = &(f).d[it._i])
@@ -153,7 +153,7 @@ typedef float fvec4[4];
         }                                                                      \
     })
 #define SVec_remove Vec_remove
-#define Vec_foreach(e, v) for (auto* e = (v).d; e < (v).d + (v).size; e++)
+#define Vec_foreach(e, v) for (auto e = (v).d; e < (v).d + (v).size; e++)
 #define SVec_foreach Vec_foreach
 
 #define BitVec(N) typeof(u8[N / 8])
