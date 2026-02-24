@@ -27,7 +27,7 @@ extern bool g_infologs;
 #define lwarnonce(format, ...)                                                 \
     ({                                                                         \
         static bool hit = false;                                               \
-        if (!hit) {                                                            \
+        if (!hit || g_infologs) {                                                            \
             hit = true;                                                        \
             lwarn(format __VA_OPT__(, ) __VA_ARGS__);                          \
         }                                                                      \

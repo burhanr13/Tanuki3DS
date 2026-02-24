@@ -4,6 +4,8 @@
 
 void y2r_event(E3DS* s) {
     s->services.y2r.busy = false;
+    linfo("y2r conversion complete, enable interrupt = %d",
+          s->services.y2r.enableInterrupt);
     if (s->services.y2r.enableInterrupt) {
         event_signal(s, &s->services.y2r.transferend);
     }

@@ -302,7 +302,13 @@ DECL_SVC(SetTimer) {
           interval);
 
     t->interval = interval;
-    add_event(&s->sched, (SchedulerCallback) timer_signal, t, delay);
+    remove_event(&s->sched, (SchedulerCallback) timer_signal, t);
+    if (delay == 0) {
+        timer_signal(s, t);
+    } else {
+        add_event(&s->sched, (SchedulerCallback) timer_signal, t,
+                  NS_TO_CYCLES(delay));
+    }
 
     R(0) = 0;
 }
