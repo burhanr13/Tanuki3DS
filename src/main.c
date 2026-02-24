@@ -255,8 +255,6 @@ void update_input(E3DS* s) {
     btn.cleft = cx < INT16_MIN / 2;
     btn.cright = cx > INT16_MAX / 2;
 
-    hid_update_pad(s, btn.w, cx, cy);
-
     float xf, yf;
     bool pressed =
         SDL_GetMouseState(&xf, &yf) & SDL_BUTTON_MASK(SDL_BUTTON_LEFT);
@@ -275,12 +273,10 @@ void update_input(E3DS* s) {
         y -= ctremu.screens[SCREEN_BOT].y;
         y = y * SCREEN_HEIGHT / ctremu.screens[SCREEN_BOT].h;
         if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
-            hid_update_touch(s, 0, 0, false);
-        } else {
-            hid_update_touch(s, x, y, true);
+            pressed = false;
+            x = 0;
+            y = 0;
         }
-    } else {
-        hid_update_touch(s, 0, 0, false);
     }
 
     float accel[3] = {};
@@ -289,27 +285,28 @@ void update_input(E3DS* s) {
         SDL_GetGamepadSensorData(g_gamepad, SDL_SENSOR_ACCEL, accel, 3);
         SDL_GetGamepadSensorData(g_gamepad, SDL_SENSOR_GYRO, gyro, 3);
 
-        // convert values to what the 3DS uses
-        // formulas and constants from Panda3DS
-
         const float accelClamp = 930;
-        const float accelMax = 9;
+        const float gravityRead = 480;
+        const float accelScale = gravityRead / SDL_STANDARD_GRAVITY;
 
-        accel[0] = glm_clamp(accel[0] / accelMax * accelClamp, -accelClamp,
-                             accelClamp);
-        accel[1] = glm_clamp(
-            accel[1] / (accelMax * SDL_STANDARD_GRAVITY) * accelClamp - 350,
-            -accelClamp, accelClamp);
-        accel[2] = glm_clamp((accel[2] - 2.1f) / accelMax * accelClamp,
-                             -accelClamp, accelClamp);
+        accel[0] = glm_clamp(accel[0] * accelScale, -accelClamp, accelClamp);
+        accel[1] = glm_clamp(accel[1] * -accelScale, -accelClamp, accelClamp);
+        accel[2] = glm_clamp(accel[2] * accelScale, -accelClamp, accelClamp);
 
-        const float gyroScale = 180 / M_PI * 14.375f;
+        const float gyroScale = 180 / M_PI * HID_GYRO_DPS_COEFF;
         gyro[0] *= -gyroScale;
         gyro[1] *= -gyroScale;
         gyro[2] *= -gyroScale;
     }
-    hid_update_accel(&ctremu.system, accel[0], accel[1], accel[2]);
-    hid_update_gyro(&ctremu.system, gyro[0], gyro[2], gyro[1]);
+
+    // hid updates inputs 4x per frame so we must simulate this
+    // by calling each function 4 times
+    for (int i = 0; i < 4; i++) {
+        hid_update_pad(s, btn.w, cx, cy);
+        hid_update_touch(s, x, y, pressed);
+        hid_update_accel(&ctremu.system, accel[0], accel[1], accel[2]);
+        hid_update_gyro(&ctremu.system, gyro[0], gyro[2], gyro[1]);
+    }
 }
 
 void audio_callback(s16 (*samples)[2], u32 count) {

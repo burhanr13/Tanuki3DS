@@ -32,7 +32,7 @@ DECL_PORT(hid) {
             linfo("GetGyroscopeLowRawToDpsCoefficient");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            *(float*) &cmdbuf[2] = 14.375f;
+            *(float*) &cmdbuf[2] = HID_GYRO_DPS_COEFF;
             break;
         case 0x0016:
             linfo("GetGyroscopeLowCalibrateParam");
@@ -60,7 +60,7 @@ DECL_PORT(hid) {
 }
 
 void hid_update_pad(E3DS* s, u32 btns, s32 cx, s32 cy) {
-    int curidx = 0; //(HIDMEM->pad.idx + 1) % 8;
+    int curidx = (HIDMEM->pad.idx + 1) % 8;
     HIDMEM->pad.idx = curidx;
 
     if (curidx == 0) {
@@ -89,7 +89,7 @@ void hid_update_pad(E3DS* s, u32 btns, s32 cx, s32 cy) {
 }
 
 void hid_update_touch(E3DS* s, u16 x, u16 y, bool pressed) {
-    int curidx = 0;
+    int curidx = (HIDMEM->touch.idx + 1) % 8;
     HIDMEM->touch.idx = curidx;
 
     if (curidx == 0) {
@@ -97,19 +97,15 @@ void hid_update_touch(E3DS* s, u16 x, u16 y, bool pressed) {
         HIDMEM->touch.time = s->sched.now;
     }
 
-    // apparently some games just ignore the index field
-    // so we set all entries
-    for (int i = 0; i < 8; i++) {
-        HIDMEM->touch.entries[i].x = x;
-        HIDMEM->touch.entries[i].y = y;
-        HIDMEM->touch.entries[i].pressed = pressed;
-    }
+    HIDMEM->touch.entries[curidx].x = x;
+    HIDMEM->touch.entries[curidx].y = y;
+    HIDMEM->touch.entries[curidx].pressed = pressed;
 
     event_signal(s, &s->services.hid.events[HIDEVENT_PAD1]);
 }
 
 void hid_update_accel(E3DS* s, s16 x, s16 y, s16 z) {
-    int curidx = 0;
+    int curidx = (HIDMEM->accel.idx + 1) % 8;
     HIDMEM->accel.idx = curidx;
 
     if (curidx == 0) {
@@ -125,7 +121,7 @@ void hid_update_accel(E3DS* s, s16 x, s16 y, s16 z) {
 }
 
 void hid_update_gyro(E3DS* s, s16 x, s16 y, s16 z) {
-    int curidx = 0;
+    int curidx = (HIDMEM->gyro.idx + 1) % 32;
     HIDMEM->gyro.idx = curidx;
 
     if (curidx == 0) {

@@ -15,6 +15,8 @@ enum {
     HIDEVENT_MAX
 };
 
+#define HID_GYRO_DPS_COEFF 14.375f
+
 typedef union {
     u32 w;
     struct {
