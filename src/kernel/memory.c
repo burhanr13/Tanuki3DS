@@ -13,8 +13,6 @@
 
 #include "svc_types.h"
 
-#define IGNOREMEMERR
-
 #define PGROUNDDOWN(a) ((a) & ~(PAGE_SIZE - 1))
 #define PGROUNDUP(a) (((a) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
 
@@ -118,6 +116,23 @@ void memory_init(E3DS* s) {
         perror("mmap");
         exit(1);
     }
+
+#ifdef IGNOREMEMERR
+    ptr = mmap(&s->physmem[0], PAGE_SIZE, PROT_READ | PROT_WRITE,
+               MAP_SHARED | MAP_FIXED, s->mem_fd, offsetof(E3DSMemory, dummy));
+    if (ptr == MAP_FAILED) {
+        perror("mmap");
+        exit(1);
+    }
+    void* ptr =
+        mmap(&s->virtmem[0], PAGE_SIZE, PROT_READ | PROT_WRITE,
+             MAP_SHARED | MAP_FIXED, s->mem_fd, offsetof(E3DSMemory, dummy));
+    if (ptr == MAP_FAILED) {
+        perror("mmap");
+        exit(1);
+    }
+#endif
+
 #else
     s->gpu.mem = s->mem;
     s->dsp.mem = s->mem;
