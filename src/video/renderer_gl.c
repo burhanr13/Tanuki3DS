@@ -15,6 +15,9 @@ const char mainvertsource[] = {
 const char mainfragsource[] = {
 #embed "hostshaders/main.frag"
     , '\0'};
+const char mainfragsharpsource[] = {
+#embed "hostshaders/main_sharp_linear.frag"
+    , '\0'};
 
 const char gpuvertsource[] = {
 #embed "hostshaders/gpu.vert"
@@ -29,9 +32,14 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     auto mainvs = glCreateShader(GL_VERTEX_SHADER);
     auto mainfs = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(mainvs, 1, &(const char*) {mainvertsource}, nullptr);
-    glShaderSource(mainfs, 1, &(const char*) {mainfragsource}, nullptr);
+    glShaderSource(mainfs, 1,
+                   &(const char*) {ctremu.outputfilter == FILTER_SHARP_LINEAR
+                                       ? mainfragsharpsource
+                                       : mainfragsource},
+                   nullptr);
     glCompileShader(mainvs);
     glCompileShader(mainfs);
+
     state->main_program = glCreateProgram();
     glAttachShader(state->main_program, mainvs);
     glAttachShader(state->main_program, mainfs);
@@ -109,14 +117,16 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
 
     glGenTextures(2, state->screentex);
     glGenFramebuffers(2, state->screenfbo);
+    GLint filter =
+        ctremu.outputfilter == FILTER_NEAREST ? GL_NEAREST : GL_LINEAR;
     for (int i = 0; i < 2; i++) {
         glBindTexture(GL_TEXTURE_2D, state->screentex[i]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                      SCREEN_HEIGHT * ctremu.videoscale,
                      SCREEN_WIDTH(i) * ctremu.videoscale, 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
         glBindFramebuffer(GL_FRAMEBUFFER, state->screenfbo[i]);
         glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                              state->screentex[i], 0);

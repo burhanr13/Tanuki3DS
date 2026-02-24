@@ -23,6 +23,12 @@ typedef enum {
     LAYOUT_MAX
 } ViewLayout;
 
+enum {
+    FILTER_NEAREST,
+    FILTER_LINEAR,
+    FILTER_SHARP_LINEAR,
+};
+
 typedef struct {
     int x, y, w, h;
 } Rect;
@@ -53,6 +59,8 @@ typedef struct {
     ViewLayout viewlayout;
     Rect screens[2];
     int windowW, windowH;
+
+    int outputfilter;
 
     float volume;
     int audiomode;

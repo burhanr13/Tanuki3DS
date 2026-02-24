@@ -8,4 +8,3 @@ uniform sampler2D screen;
 void main() {
     fragclr = texture(screen, texcoord);
 }
-

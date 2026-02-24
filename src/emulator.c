@@ -18,6 +18,7 @@ void emulator_load_default_settings() {
     ctremu.windowW = 800;
     ctremu.windowH = 600;
     ctremu.vsync = false;
+    ctremu.outputfilter = FILTER_LINEAR;
     ctremu.videoscale = 1;
     ctremu.vshthreads = 0;
     ctremu.shaderjit = true;

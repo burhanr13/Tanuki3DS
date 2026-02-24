@@ -23,7 +23,6 @@ void setup_gui_theme() {
     igGetStyle()->WindowPadding = (ImVec2) {10, 10};
     igGetStyle()->WindowRounding = 5;
     igGetStyle()->WindowBorderSize = 1;
-    igGetStyle()->SelectableTextAlign = (ImVec2) {0.5, 0.5};
 
     igStyleColorsDark(nullptr);
 }
@@ -94,6 +93,7 @@ void draw_settings() {
 
     igPushStyleColor_Vec4(ImGuiCol_ChildBg,
                           *igGetStyleColorVec4(ImGuiCol_FrameBg));
+    igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign, (ImVec2) {0.5, 0.5});
     igBeginChild("sidebar", (ImVec2) {100, 0}, 0, 0);
     igSeparator();
     for (int i = 0; i < PANE_MAX; i++) {
@@ -103,6 +103,7 @@ void draw_settings() {
         igSeparator();
     }
     igEndChild();
+    igPopStyleVar(1);
     igPopStyleColor(1);
 
     igSameLine(0, 0);
@@ -142,6 +143,11 @@ void draw_settings() {
                 }
             }
             igBeginDisabled(ctremu.initialized);
+            static const char* filters[] = {"Nearest", "Bilinear",
+                                            "Sharp Bilinear"};
+            igSetNextItemWidth(150);
+            igCombo("Postprocessing Filter", &ctremu.outputfilter, filters,
+                    countof(filters), 0);
             igDragInt("Video Scale", &ctremu.videoscale, 0.1, 1, 10, nullptr,
                       0);
             igSetNextItemWidth(200);
@@ -287,6 +293,7 @@ void draw_textureview() {
 
         igPushStyleColor_Vec4(ImGuiCol_ChildBg,
                               *igGetStyleColorVec4(ImGuiCol_FrameBg));
+        igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign, (ImVec2) {0.5, 0.5});
         igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
 
         for (int i = 0; i < TEX_MAX; i++) {
@@ -306,6 +313,7 @@ void draw_textureview() {
         }
 
         igEndChild();
+        igPopStyleVar(1);
         igPopStyleColor(1);
 
         igSameLine(0, 0);
@@ -351,6 +359,7 @@ void draw_textureview() {
 
         igPushStyleColor_Vec4(ImGuiCol_ChildBg,
                               *igGetStyleColorVec4(ImGuiCol_FrameBg));
+        igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign, (ImVec2) {0.5, 0.5});
         igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
 
         for (int i = 0; i < FB_MAX; i++) {
@@ -370,6 +379,7 @@ void draw_textureview() {
         }
 
         igEndChild();
+        igPopStyleVar(1);
         igPopStyleColor(1);
 
         igSameLine(0, 0);

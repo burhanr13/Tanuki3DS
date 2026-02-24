@@ -21,6 +21,8 @@ INT("Region", ctremu.region)
 
 SECT("Video")
 BOOL("VSync", ctremu.vsync)
+CMT("0=nearest, 1=linear, 2=sharp linear")
+INT("OutputFilter", ctremu.outputfilter)
 INT("VideoScale", ctremu.videoscale)
 INT("SwVshNumThreads", ctremu.vshthreads)
 BOOL("ShaderJIT", ctremu.shaderjit)
