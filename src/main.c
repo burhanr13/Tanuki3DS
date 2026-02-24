@@ -140,7 +140,7 @@ void hotkey_press(SDL_Keycode key) {
     }
 }
 
-void update_input(E3DS* s, SDL_Gamepad* controller) {
+void update_input(E3DS* s) {
     if (igGetIO()->WantCaptureKeyboard || igGetIO()->WantCaptureMouse) return;
 
     const bool* keys = SDL_GetKeyboardState(nullptr);
@@ -224,29 +224,29 @@ void update_input(E3DS* s, SDL_Gamepad* controller) {
         renderer_gl_update_freecam(&ctremu.system.gpu.gl);
     }
 
-    if (controller) {
-        btn.a |= SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_EAST);
-        btn.b |= SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_SOUTH);
-        btn.x |= SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_NORTH);
-        btn.y |= SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_WEST);
-        btn.start |= SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_START);
-        btn.select |= SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_BACK);
+    if (g_gamepad) {
+        btn.a |= SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_EAST);
+        btn.b |= SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_SOUTH);
+        btn.x |= SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_NORTH);
+        btn.y |= SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_WEST);
+        btn.start |= SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_START);
+        btn.select |= SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_BACK);
         btn.left |=
-            SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+            SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
         btn.right |=
-            SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
-        btn.up |= SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_DPAD_UP);
+            SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+        btn.up |= SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
         btn.down |=
-            SDL_GetGamepadButton(controller, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+            SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
 
-        int x = SDL_GetGamepadAxis(controller, SDL_GAMEPAD_AXIS_LEFTX);
+        int x = SDL_GetGamepadAxis(g_gamepad, SDL_GAMEPAD_AXIS_LEFTX);
         if (abs(x) > abs(cx)) cx = x;
-        int y = -SDL_GetGamepadAxis(controller, SDL_GAMEPAD_AXIS_LEFTY);
+        int y = -SDL_GetGamepadAxis(g_gamepad, SDL_GAMEPAD_AXIS_LEFTY);
         if (abs(y) > abs(cy)) cy = y;
 
-        int tl = SDL_GetGamepadAxis(controller, SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
+        int tl = SDL_GetGamepadAxis(g_gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
         if (tl > INT16_MAX / 10) btn.l = 1;
-        int tr = SDL_GetGamepadAxis(controller, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
+        int tr = SDL_GetGamepadAxis(g_gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
         if (tr > INT16_MAX / 10) btn.r = 1;
     }
 
@@ -261,8 +261,8 @@ void update_input(E3DS* s, SDL_Gamepad* controller) {
     bool pressed =
         SDL_GetMouseState(&xf, &yf) & SDL_BUTTON_MASK(SDL_BUTTON_LEFT);
 
-    if (controller) {
-        if (SDL_GetGamepadButton(controller,
+    if (g_gamepad) {
+        if (SDL_GetGamepadButton(g_gamepad,
                                  SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
             pressed = true;
         }
@@ -282,6 +282,33 @@ void update_input(E3DS* s, SDL_Gamepad* controller) {
     } else {
         hid_update_touch(s, 0, 0, false);
     }
+
+    float accel[3] = {};
+    float gyro[3] = {};
+    if (g_gamepad) {
+        SDL_GetGamepadSensorData(g_gamepad, SDL_SENSOR_ACCEL, accel, 3);
+        SDL_GetGamepadSensorData(g_gamepad, SDL_SENSOR_GYRO, gyro, 3);
+
+        // convert values to what the 3DS uses
+        // formulas and constants from Panda3DS
+
+        const float accelMax = 9;
+        const float accelClamp = 930;
+
+        accel[0] = glm_clamp(accel[0] / accelMax * accelClamp, -accelClamp,
+                             accelClamp);
+        accel[1] = glm_clamp(accel[1] / accelMax * accelClamp - 500,
+                             -accelClamp, accelClamp);
+        accel[2] = glm_clamp(accel[2] / accelMax * accelClamp - 160,
+                             -accelClamp, accelClamp);
+
+        const float gyroScale = -(180 / M_PI * 14.375f);
+        gyro[0] *= gyroScale;
+        gyro[1] *= gyroScale;
+        gyro[2] *= gyroScale;
+    }
+    hid_update_accel(&ctremu.system, accel[0], accel[1], accel[2]);
+    hid_update_gyro(&ctremu.system, gyro[0], gyro[1], gyro[2]);
 }
 
 void audio_callback(s16 (*samples)[2], u32 count) {
@@ -564,6 +591,10 @@ int main(int argc, char** argv) {
                     if (!g_gamepad) {
                         g_gamepad_id = e.gdevice.which;
                         g_gamepad = SDL_OpenGamepad(g_gamepad_id);
+                        SDL_SetGamepadSensorEnabled(g_gamepad, SDL_SENSOR_ACCEL,
+                                                    true);
+                        SDL_SetGamepadSensorEnabled(g_gamepad, SDL_SENSOR_GYRO,
+                                                    true);
                     }
                     break;
                 case SDL_EVENT_GAMEPAD_REMOVED:
@@ -585,7 +616,7 @@ int main(int argc, char** argv) {
         emulator_calc_viewports();
 
         if (!ctremu.pause) {
-            update_input(&ctremu.system, g_gamepad);
+            update_input(&ctremu.system);
 
             gpu_gl_start_frame(&ctremu.system.gpu);
 

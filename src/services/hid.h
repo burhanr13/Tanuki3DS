@@ -68,6 +68,28 @@ typedef struct {
             u32 pressed;
         } entries[8];
     } touch;
+    struct {
+        u64 time;
+        u64 prevtime;
+        u64 idx;
+        u64 raw;
+        struct {
+            s16 x;
+            s16 y;
+            s16 z;
+        } entries[8];
+    } accel;
+    struct {
+        u64 time;
+        u64 prevtime;
+        u64 idx;
+        u64 raw;
+        struct {
+            s16 x;
+            s16 y;
+            s16 z;
+        } entries[32];
+    } gyro;
 } HIDSharedMem;
 
 typedef struct {
@@ -79,5 +101,7 @@ DECL_PORT(hid);
 
 void hid_update_pad(E3DS* s, u32 btns, s32 cx, s32 cy);
 void hid_update_touch(E3DS* s, u16 x, u16 y, bool pressed);
+void hid_update_accel(E3DS* s, s16 x, s16 y, s16 z);
+void hid_update_gyro(E3DS* s, s16 x, s16 y, s16 z);
 
 #endif

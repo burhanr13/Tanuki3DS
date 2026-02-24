@@ -32,17 +32,23 @@ DECL_PORT(hid) {
             linfo("GetGyroscopeLowRawToDpsCoefficient");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            *(float*) &cmdbuf[2] = 1.0f;
+            *(float*) &cmdbuf[2] = 14.375f;
             break;
         case 0x0016:
             linfo("GetGyroscopeLowCalibrateParam");
             cmdbuf[0] = IPCHDR(6, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = -1;
-            cmdbuf[3] = -1;
-            cmdbuf[4] = -1;
-            cmdbuf[5] = -1;
-            cmdbuf[6] = -1;
+            s16* params = (s16*) &cmdbuf[2];
+            // values from Panda3DS
+            params[0] = 0;
+            params[1] = 6700;
+            params[2] = -6700;
+            params[3] = 0;
+            params[4] = 6700;
+            params[5] = -6700;
+            params[6] = 0;
+            params[7] = 6700;
+            params[8] = -6700;
             break;
         default:
             lwarn("unknown command 0x%04x (%x,%x,%x,%x,%x)", cmd.command,
@@ -78,14 +84,8 @@ void hid_update_pad(E3DS* s, u32 btns, s32 cx, s32 cy) {
     HIDMEM->pad.entries[curidx].pressed = btns & ~prevbtn;
     HIDMEM->pad.entries[curidx].released = ~btns & prevbtn;
 
-    linfo("signaling hid event pad0");
+    linfo("signaling hid event");
     event_signal(s, &s->services.hid.events[HIDEVENT_PAD0]);
-    event_signal(s, &s->services.hid.events[HIDEVENT_PAD1]);
-
-    // need to signal these at some point so things don't get stuck
-    // but there isn't any actual data for these yet
-    event_signal(s, &s->services.hid.events[HIDEVENT_ACCEL]);
-    event_signal(s, &s->services.hid.events[HIDEVENT_GYRO]);
 }
 
 void hid_update_touch(E3DS* s, u16 x, u16 y, bool pressed) {
@@ -104,4 +104,38 @@ void hid_update_touch(E3DS* s, u16 x, u16 y, bool pressed) {
         HIDMEM->touch.entries[i].y = y;
         HIDMEM->touch.entries[i].pressed = pressed;
     }
+
+    event_signal(s, &s->services.hid.events[HIDEVENT_PAD1]);
+}
+
+void hid_update_accel(E3DS* s, s16 x, s16 y, s16 z) {
+    int curidx = 0;
+    HIDMEM->accel.idx = curidx;
+
+    if (curidx == 0) {
+        HIDMEM->accel.prevtime = HIDMEM->accel.time;
+        HIDMEM->accel.time = s->sched.now;
+    }
+
+    HIDMEM->accel.entries[curidx].x = x;
+    HIDMEM->accel.entries[curidx].y = y;
+    HIDMEM->accel.entries[curidx].z = z;
+
+    event_signal(s, &s->services.hid.events[HIDEVENT_ACCEL]);
+}
+
+void hid_update_gyro(E3DS* s, s16 x, s16 y, s16 z) {
+    int curidx = 0;
+    HIDMEM->gyro.idx = curidx;
+
+    if (curidx == 0) {
+        HIDMEM->gyro.prevtime = HIDMEM->gyro.time;
+        HIDMEM->gyro.time = s->sched.now;
+    }
+
+    HIDMEM->gyro.entries[curidx].x = x;
+    HIDMEM->gyro.entries[curidx].y = y;
+    HIDMEM->gyro.entries[curidx].z = z;
+
+    event_signal(s, &s->services.hid.events[HIDEVENT_GYRO]);
 }
