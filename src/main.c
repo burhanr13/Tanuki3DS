@@ -140,7 +140,7 @@ void hotkey_press(SDL_Keycode key) {
     }
 }
 
-void update_input(E3DS* s) {
+void update_input() {
     if (igGetIO()->WantCaptureKeyboard || igGetIO()->WantCaptureMouse) return;
 
     const bool* keys = SDL_GetKeyboardState(nullptr);
@@ -265,18 +265,21 @@ void update_input(E3DS* s) {
             pressed = true;
         }
     }
-    int x = xf, y = yf;
+    int tx = xf, ty = yf;
 
     if (pressed) {
-        x -= ctremu.screens[SCREEN_BOT].x;
-        x = x * SCREEN_WIDTH_BOT / ctremu.screens[SCREEN_BOT].w;
-        y -= ctremu.screens[SCREEN_BOT].y;
-        y = y * SCREEN_HEIGHT / ctremu.screens[SCREEN_BOT].h;
-        if (x < 0 || x >= SCREEN_WIDTH_BOT || y < 0 || y >= SCREEN_HEIGHT) {
+        tx -= ctremu.screens[SCREEN_BOT].x;
+        tx = tx * SCREEN_WIDTH_BOT / ctremu.screens[SCREEN_BOT].w;
+        ty -= ctremu.screens[SCREEN_BOT].y;
+        ty = ty * SCREEN_HEIGHT / ctremu.screens[SCREEN_BOT].h;
+        if (tx < 0 || tx >= SCREEN_WIDTH_BOT || ty < 0 || ty >= SCREEN_HEIGHT) {
             pressed = false;
-            x = 0;
-            y = 0;
+            tx = 0;
+            ty = 0;
         }
+    } else {
+        tx = 0;
+        ty = 0;
     }
 
     float accel[3] = {};
@@ -302,8 +305,8 @@ void update_input(E3DS* s) {
     // hid updates inputs 4x per frame so we must simulate this
     // by calling each function 4 times
     for (int i = 0; i < 4; i++) {
-        hid_update_pad(s, btn.w, cx, cy);
-        hid_update_touch(s, x, y, pressed);
+        hid_update_pad(&ctremu.system, btn.w, cx, cy);
+        hid_update_touch(&ctremu.system, tx, ty, pressed);
         hid_update_accel(&ctremu.system, accel[0], accel[1], accel[2]);
         hid_update_gyro(&ctremu.system, gyro[0], gyro[2], gyro[1]);
     }
@@ -614,7 +617,7 @@ int main(int argc, char** argv) {
         emulator_calc_viewports();
 
         if (!ctremu.pause) {
-            update_input(&ctremu.system);
+            update_input();
 
             gpu_gl_start_frame(&ctremu.system.gpu);
 
