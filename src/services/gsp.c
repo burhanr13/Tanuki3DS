@@ -7,13 +7,6 @@
 
 #define GSPMEM ((GSPSharedMem*) PPTR(s->services.gsp.sharedmem.paddr))
 
-u32 vaddr_to_paddr(u32 vaddr) {
-    if (vaddr >= VRAM_VBASE) {
-        return vaddr - VRAM_VBASE + VRAM_PBASE;
-    }
-    return vaddr - LINEAR_HEAP_BASE + FCRAM_PBASE;
-}
-
 DECL_PORT(gsp_gpu) {
     u32* cmdbuf = PTR(cmd_addr);
     switch (cmd.command) {

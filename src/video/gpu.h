@@ -193,6 +193,6 @@ void gpu_run_gsh(GPU* gpu, ShaderUnit* gsh, bool elements, int basevert,
 
 void gpu_write_outmap_vtx(GPU* gpu, Vertex* dst, fvec4* src);
 
-    u32 morton_swizzle(u32 w, u32 x, u32 y);
+u32 morton_swizzle(u32 w, u32 x, u32 y);
 
 #endif
