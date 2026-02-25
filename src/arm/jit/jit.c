@@ -7,21 +7,20 @@
 
 // #define JIT_DISASM
 // #define JIT_CPULOG
-// #define IR_INTERPRET
-// #define NO_OPTS
-// #define NO_LINKING
 
 #ifdef JIT_DISASM
 #define IR_DISASM
 #define BACKEND_DISASM
 #endif
 
-bool g_jit_opt_literals = true;
+JITConfig g_jit_config;
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
     block->attrs = cpu->cpsr.w & 0x3f;
     block->start_addr = addr;
+
+    block->cpu = cpu;
 
     Vec_init(block->linkingblocks);
 
@@ -32,19 +31,17 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     block->numinstr = ir.numinstr;
 
-#ifndef NO_OPTS
-    optimize_loadstore(&ir);
-    optimize_constprop(&ir);
-    if (g_jit_opt_literals) optimize_literals(&ir, cpu);
-    optimize_chainjumps(&ir);
-    optimize_loadstore(&ir);
-    optimize_constprop(&ir);
-    optimize_chainjumps(&ir);
-    optimize_deadcode(&ir);
-#ifndef NO_LINKING
-    optimize_blocklinking(&ir, cpu);
-#endif
-#endif
+    if (g_jit_config.optimize) {
+        optimize_loadstore(&ir);
+        optimize_constprop(&ir);
+        if (g_jit_config.optimize_literals) optimize_literals(&ir, cpu);
+        optimize_chainjumps(&ir);
+        optimize_loadstore(&ir);
+        optimize_constprop(&ir);
+        optimize_chainjumps(&ir);
+        optimize_deadcode(&ir);
+        if (g_jit_config.linking) optimize_blocklinking(&ir, cpu);
+    }
 
     block->end_addr = ir.end_addr;
 
@@ -52,8 +49,6 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     block->backend = backend_generate_code(&ir, &regalloc, cpu);
     block->code = backend_get_code(block->backend);
-
-    block->cpu = cpu;
 
     cpu->jit_cache[block->attrs][addr >> 16][(addr & 0xffff) >> 1] = block;
     backend_patch_links(block);
@@ -67,21 +62,21 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 #endif
 
     regalloc_free(&regalloc);
-#ifdef IR_INTERPRET
-    block->ir = malloc(sizeof(IRBlock));
-    *block->ir = ir;
-#else
-    irblock_free(&ir);
-#endif
+    if (g_jit_config.ir_interpret) {
+        block->ir = malloc(sizeof(IRBlock));
+        *block->ir = ir;
+    } else {
+        irblock_free(&ir);
+    }
 
     return block;
 }
 
 void destroy_jit_block(JITBlock* block) {
-#ifdef IR_INTERPRET
-    irblock_free(block->ir);
-    free(block->ir);
-#endif
+    if (g_jit_config.ir_interpret) {
+        irblock_free(block->ir);
+        free(block->ir);
+    }
 
     block->cpu->jit_cache[block->attrs][block->start_addr >> 16]
                          [(block->start_addr & 0xffff) >> 1] = nullptr;
@@ -103,11 +98,11 @@ void jit_exec(JITBlock* block) {
 #ifdef JIT_CPULOG
     cpu_print_state(block->cpu);
 #endif
-#ifdef IR_INTERPRET
-    ir_interpret(block->ir, block->cpu);
-#else
-    block->code();
-#endif
+    if (g_jit_config.ir_interpret) {
+        ir_interpret(block->ir, block->cpu);
+    } else {
+        block->code();
+    }
 }
 
 // the jit cache is formatted as follows

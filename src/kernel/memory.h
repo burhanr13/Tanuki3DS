@@ -21,9 +21,7 @@ typedef union {
         u8 fcram[FCRAM_SIZE];
         u8 vram[VRAM_SIZE];
         u8 dspram[DSPRAM_SIZE];
-#ifdef IGNOREMEMERR
-        u8 dummy[PAGE_SIZE];
-#endif
+        u8 nullpage[PAGE_SIZE];
     };
     u8 raw[];
 } E3DSMemory;

@@ -496,8 +496,8 @@ void optimize_constprop(IRBlock* block) {
 
 void optimize_literals(IRBlock* block, ArmCore* cpu) {
     u32 latest_const = block->end_addr + BIT(10);
-    if (latest_const > block->start_addr + MAX_BLOCK_SIZE)
-        latest_const = block->start_addr + MAX_BLOCK_SIZE;
+    if (latest_const > block->start_addr + g_jit_config.max_block_instrs * 4)
+        latest_const = block->start_addr + g_jit_config.max_block_instrs * 4;
     for (int i = 0; i < block->code.size; i++) {
         IRInstr* inst = &block->code.d[i];
         switch (inst->opcode) {

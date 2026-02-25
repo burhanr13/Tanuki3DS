@@ -75,7 +75,7 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
 
     EMIT00(BEGIN);
 
-    for (int i = 0; i < MAX_BLOCK_INSTRS; i++) {
+    for (int i = 0; i < g_jit_config.max_block_instrs; i++) {
         ArmInstr instr = cpu->cpsr.t ? thumb_lookup[cpu->fetch16(cpu, addr)]
                                      : (ArmInstr) {cpu->fetch32(cpu, addr)};
         bool can_continue = arm_compile_instr(block, cpu, addr, instr);

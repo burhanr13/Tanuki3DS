@@ -19,6 +19,13 @@ ASTR("Username", ctremu.username)
 INT("Language", ctremu.language)
 INT("Region", ctremu.region)
 
+SECT("CPU")
+BOOL("IRInterpreter", g_jit_config.ir_interpret)
+INT("MaxBlockInstrs", g_jit_config.max_block_instrs)
+BOOL("EnableOptimization", g_jit_config.optimize)
+BOOL("BlockLinking", g_jit_config.linking)
+BOOL("IgnoreNullPointer", ctremu.ignore_null)
+
 SECT("Video")
 BOOL("VSync", ctremu.vsync)
 CMT("0=nearest, 1=linear, 2=sharp linear")

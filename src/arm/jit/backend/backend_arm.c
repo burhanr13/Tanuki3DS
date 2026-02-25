@@ -148,7 +148,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
     Label(looplabel);
 
     // labels for jump instructions
-    rasLabel labels[MAX_BLOCK_INSTRS];
+    rasLabel labels[g_jit_config.max_block_instrs];
     int nlabel = 0;
 
     for (u32 i = 0; i < ir->code.size; i++) {

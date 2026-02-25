@@ -5,9 +5,6 @@
 
 #include "ir.h"
 
-#define MAX_BLOCK_INSTRS 128
-#define MAX_BLOCK_SIZE (MAX_BLOCK_INSTRS * 4)
-
 typedef void (*JITFunc)();
 
 typedef struct {
@@ -31,7 +28,16 @@ typedef struct _JITBlock {
 
 } JITBlock;
 
-extern bool g_jit_opt_literals;
+typedef struct {
+    bool ir_interpret;
+
+    int max_block_instrs;
+    bool optimize;
+    bool optimize_literals;
+    bool linking;
+} JITConfig;
+
+extern JITConfig g_jit_config;
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr);
 void destroy_jit_block(JITBlock* block);

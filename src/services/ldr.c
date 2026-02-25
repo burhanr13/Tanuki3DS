@@ -11,7 +11,7 @@ DECL_PORT(ldr_ro) {
         case 0x0001: {
             // if this game uses cros it doesn't get to optimize literals
             // anymore
-            g_jit_opt_literals = false;
+            g_jit_config.optimize_literals = false;
 
             u32 crssrc = cmdbuf[1];
             u32 size = cmdbuf[2];

@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "arm/jit/jit.h"
 #include "emulator.h"
 #include "services/applets.h"
 
@@ -71,13 +72,15 @@ void draw_settings() {
 
     static enum {
         PANE_SYSTEM,
+        PANE_CPU,
         PANE_VIDEO,
         PANE_AUDIO,
         PANE_INPUT,
         PANE_MAX
     } curPane = PANE_SYSTEM;
 
-    static const char* pane_names[] = {"System", "Video", "Audio", "Input"};
+    static const char* pane_names[] = {"System", "CPU", "Video", "Audio",
+                                       "Input"};
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
     if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
@@ -131,6 +134,20 @@ void draw_settings() {
             igCombo("System Region", &ctremu.region, regions, countof(regions),
                     0);
 
+            break;
+        }
+        case PANE_CPU: {
+            igSeparatorText("CPU JIT");
+            igBeginDisabled(ctremu.initialized);
+            igCheckbox("Use IR Interpreter", &g_jit_config.ir_interpret);
+            igSetNextItemWidth(200);
+            igInputInt("Maximum Block Instructions",
+                       &g_jit_config.max_block_instrs, 1, 1, 0);
+            igCheckbox("Enable Optimization", &g_jit_config.optimize);
+            igCheckbox("Enable Block Linking", &g_jit_config.linking);
+            igEndDisabled();
+            igSeparatorText("Memory");
+            igCheckbox("Ignore Invalid Access", &ctremu.ignore_null);
             break;
         }
         case PANE_VIDEO: {
@@ -293,7 +310,8 @@ void draw_textureview() {
 
         igPushStyleColor_Vec4(ImGuiCol_ChildBg,
                               *igGetStyleColorVec4(ImGuiCol_FrameBg));
-        igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign, (ImVec2) {0.5, 0.5});
+        igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign,
+                            (ImVec2) {0.5, 0.5});
         igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
 
         for (int i = 0; i < TEX_MAX; i++) {
@@ -359,7 +377,8 @@ void draw_textureview() {
 
         igPushStyleColor_Vec4(ImGuiCol_ChildBg,
                               *igGetStyleColorVec4(ImGuiCol_FrameBg));
-        igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign, (ImVec2) {0.5, 0.5});
+        igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign,
+                            (ImVec2) {0.5, 0.5});
         igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
 
         for (int i = 0; i < FB_MAX; i++) {

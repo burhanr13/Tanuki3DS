@@ -59,11 +59,10 @@ u32 physaddr2memoff(u32 paddr) {
     }
     lerror("unknown physical memory address %08x", paddr);
     cpu_print_state(&ctremu.system.cpu);
-#ifdef IGNOREMEMERR
-    return offsetof(E3DSMemory, dummy);
-#else
+    if (ctremu.ignore_null) {
+        return offsetof(E3DSMemory, nullpage);
+    }
     longjmp(ctremu.exceptionJmp, 1);
-#endif
 }
 
 void memory_init(E3DS* s) {
@@ -117,20 +116,22 @@ void memory_init(E3DS* s) {
         exit(1);
     }
 
-#ifdef IGNOREMEMERR
-    ptr = mmap(&s->physmem[0], PAGE_SIZE, PROT_READ | PROT_WRITE,
-               MAP_SHARED | MAP_FIXED, s->mem_fd, offsetof(E3DSMemory, dummy));
-    if (ptr == MAP_FAILED) {
-        perror("mmap");
-        exit(1);
+    if (ctremu.ignore_null) {
+        ptr = mmap(&s->physmem[0], PAGE_SIZE, PROT_READ | PROT_WRITE,
+                   MAP_SHARED | MAP_FIXED, s->mem_fd,
+                   offsetof(E3DSMemory, dummy));
+        if (ptr == MAP_FAILED) {
+            perror("mmap");
+            exit(1);
+        }
+        ptr = mmap(&s->virtmem[0], PAGE_SIZE, PROT_READ | PROT_WRITE,
+                   MAP_SHARED | MAP_FIXED, s->mem_fd,
+                   offsetof(E3DSMemory, dummy));
+        if (ptr == MAP_FAILED) {
+            perror("mmap");
+            exit(1);
+        }
     }
-    ptr = mmap(&s->virtmem[0], PAGE_SIZE, PROT_READ | PROT_WRITE,
-               MAP_SHARED | MAP_FIXED, s->mem_fd, offsetof(E3DSMemory, dummy));
-    if (ptr == MAP_FAILED) {
-        perror("mmap");
-        exit(1);
-    }
-#endif
 
 #else
     s->gpu.mem = s->mem;
@@ -219,9 +220,9 @@ PageEntry ptabread(PageTable ptab, u32 vaddr) {
     if (res.state == MEMST_FREE) {
         lerror("invalid virtual memory address %08x", vaddr);
         cpu_print_state(&ctremu.system.cpu);
-#ifndef IGNOREMEMERR
-        longjmp(ctremu.exceptionJmp, 1);
-#endif
+        if (!ctremu.ignore_null) {
+            longjmp(ctremu.exceptionJmp, 1);
+        }
     }
     return res;
 }

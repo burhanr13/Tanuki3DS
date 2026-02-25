@@ -30,6 +30,8 @@ void cpu_init(E3DS* s) {
     s->cpu.handle_svc = (void*) cpu_handle_svc;
     s->cpu.cp15_read = (void*) cp15_read;
     s->cpu.cp15_write = (void*) cp15_write;
+
+    g_jit_config.optimize_literals = true;
 }
 
 void cpu_free(E3DS* s) {

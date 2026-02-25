@@ -72,6 +72,8 @@ typedef struct {
     int language;
     int region;
 
+    bool ignore_null;
+
     struct {
         struct {
             int a, b, x, y, l, r, start, select;

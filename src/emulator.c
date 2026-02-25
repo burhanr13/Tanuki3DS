@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 
 #include "3ds.h"
+#include "arm/jit/jit.h"
 #include "config.h"
 
 #ifdef _WIN32
@@ -32,6 +33,11 @@ void emulator_load_default_settings() {
     strcpy(ctremu.username, "ctremu");
     ctremu.language = 1;
     ctremu.region = 1;
+    g_jit_config.ir_interpret = false;
+    g_jit_config.max_block_instrs = 128;
+    g_jit_config.optimize = true;
+    g_jit_config.linking = true;
+    ctremu.ignore_null = false;
 
     ctremu.inputmap.kb.a = SDL_SCANCODE_L;
     ctremu.inputmap.kb.b = SDL_SCANCODE_K;
