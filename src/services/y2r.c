@@ -231,9 +231,6 @@ DECL_PORT(y2r) {
 void y2r_do_conversion(E3DS* s) {
     auto y2r = &s->services.y2r;
 
-    linfo("Y=%08x,U=%08x,V=%08x,dst=%08x", y2r->srcY.addr, y2r->srcU.addr,
-           y2r->srcV.addr, y2r->dst.addr);
-
     if (y2r->srcY.addr == 0 || y2r->srcU.addr == 0 || y2r->srcV.addr == 0 ||
         y2r->dst.addr == 0) {
         lwarn("null y2r buffers");
@@ -247,14 +244,9 @@ void y2r_do_conversion(E3DS* s) {
     int ywidth = y2r->srcY.pitch + y2r->srcY.gap;
     int uwidth = y2r->srcU.pitch + y2r->srcU.gap;
     int vwidth = y2r->srcV.pitch + y2r->srcV.gap;
-    int dstwidth;
-    if (y2r->blockMode) {
-        dstwidth = (y2r->dst.pitch + y2r->dst.gap) / 8 /
-                   dstfmtsize[y2r->outputFmt & 3];
-    } else {
-        dstwidth =
-            (y2r->dst.pitch + y2r->dst.gap) / dstfmtsize[y2r->outputFmt & 3];
-    }
+    // these numbers seem to be for a row of tiles regardless of linear/block mode
+    int dstwidth =
+        (y2r->dst.pitch + y2r->dst.gap) / 8 / dstfmtsize[y2r->outputFmt & 3];
 
     u8* ydata = PTR(y2r->srcY.addr);
     u8* udata = PTR(y2r->srcU.addr);

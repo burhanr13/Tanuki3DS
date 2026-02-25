@@ -317,7 +317,7 @@ void draw_textureview() {
         for (int i = 0; i < TEX_MAX; i++) {
             char buf[100];
 
-            if (BitVec_test(texcache->occupied, i)) {
+            if (texcache->d[i].key) {
                 sprintf(buf, "Texture %d", i);
                 igBeginDisabled(false);
             } else {
@@ -339,10 +339,9 @@ void draw_textureview() {
         igBeginChild("##texture pane", (ImVec2) {},
                      ImGuiChildFlags_AlwaysUseWindowPadding, 0);
 
-        if (BitVec_test(texcache->occupied, curTex)) {
+        auto tex = &texcache->d[curTex];
 
-            auto tex = &texcache->d[curTex];
-
+        if (tex->key) {
             float w, h;
             if (tex->width > tex->height) {
                 w = 512;
