@@ -119,14 +119,14 @@ void memory_init(E3DS* s) {
     if (ctremu.ignore_null) {
         ptr = mmap(&s->physmem[0], PAGE_SIZE, PROT_READ | PROT_WRITE,
                    MAP_SHARED | MAP_FIXED, s->mem_fd,
-                   offsetof(E3DSMemory, dummy));
+                   offsetof(E3DSMemory, nullpage));
         if (ptr == MAP_FAILED) {
             perror("mmap");
             exit(1);
         }
         ptr = mmap(&s->virtmem[0], PAGE_SIZE, PROT_READ | PROT_WRITE,
                    MAP_SHARED | MAP_FIXED, s->mem_fd,
-                   offsetof(E3DSMemory, dummy));
+                   offsetof(E3DSMemory, nullpage));
         if (ptr == MAP_FAILED) {
             perror("mmap");
             exit(1);
