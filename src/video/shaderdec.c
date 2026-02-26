@@ -716,32 +716,40 @@ char* shader_dec_vs(GPU* gpu) {
                 written |= 0xf;
                 break;
             case 0x04'05'06'07:
-                if (!(written & (0xf << 4))) ds_printf(&final, "normquat = o[%d];\n", o);
+                if (!(written & (0xf << 4)))
+                    ds_printf(&final, "normquat = o[%d];\n", o);
                 written |= 0xf << 4;
                 break;
             case 0x08'09'0a'0b:
-                if (!(written & (0xf << 8))) ds_printf(&final, "color = o[%d];\n", o);
+                if (!(written & (0xf << 8)))
+                    ds_printf(&final, "color = o[%d];\n", o);
                 written |= 0xf << 8;
                 break;
             case 0x0c'0d'1f'1f:
-                if (!(written & (3 << 12))) ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                if (!(written & (3 << 12)))
+                    ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
                 written |= 3 << 12;
                 break;
             case 0x0c'0d'10'1f:
-                if (!(written & (3 << 12))) ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
-                if (!(written & (1 << 16))) ds_printf(&final, "texcoordw = o[%d].z;\n", o);
+                if (!(written & (3 << 12)))
+                    ds_printf(&final, "texcoord0 = o[%d].xy;\n", o);
+                if (!(written & (1 << 16)))
+                    ds_printf(&final, "texcoordw = o[%d].z;\n", o);
                 written |= 3 << 12 | 1 << 16;
                 break;
             case 0x0e'0f'1f'1f:
-                if (!(written & (3 << 14))) ds_printf(&final, "texcoord1 = o[%d].xy;\n", o);
+                if (!(written & (3 << 14)))
+                    ds_printf(&final, "texcoord1 = o[%d].xy;\n", o);
                 written |= 3 << 14;
                 break;
             case 0x12'13'14'1f:
-                if (!(written & (7 << 18))) ds_printf(&final, "view = o[%d].xyz;\n", o);
+                if (!(written & (7 << 18)))
+                    ds_printf(&final, "view = o[%d].xyz;\n", o);
                 written |= 7 << 18;
                 break;
             case 0x16'17'1f'1f:
-                if (!(written & (3 << 22))) ds_printf(&final, "texcoord2 = o[%d].xy;\n", o);
+                if (!(written & (3 << 22)))
+                    ds_printf(&final, "texcoord2 = o[%d].xy;\n", o);
                 written |= 3 << 22;
                 break;
             default:

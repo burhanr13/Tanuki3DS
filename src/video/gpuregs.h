@@ -107,7 +107,7 @@ typedef union {
                 struct {
                     u32 enable;
                     u16 x1, y1, x2, y2;
-                } scisssortest;
+                } scissortest;
                 s16 view_x;
                 s16 view_y;
                 u32 _069;

@@ -1106,16 +1106,16 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
                (gpu->regs.raster.view_y + vyoff) * ctremu.videoscale,
                2 * cvtf24(gpu->regs.raster.view_w) * ctremu.videoscale,
                2 * cvtf24(gpu->regs.raster.view_h) * ctremu.videoscale);
-    if (gpu->regs.raster.scisssortest.enable) {
+    if (gpu->regs.raster.scissortest.enable) {
         glEnable(GL_SCISSOR_TEST);
-        glScissor(gpu->regs.raster.scisssortest.x1 * ctremu.videoscale,
-                  (gpu->regs.raster.scisssortest.y1 + vyoff) *
+        glScissor(gpu->regs.raster.scissortest.x1 * ctremu.videoscale,
+                  (gpu->regs.raster.scissortest.y1 + vyoff) *
                       ctremu.videoscale,
-                  (gpu->regs.raster.scisssortest.x2 + 1 -
-                   gpu->regs.raster.scisssortest.x1) *
+                  (gpu->regs.raster.scissortest.x2 + 1 -
+                   gpu->regs.raster.scissortest.x1) *
                       ctremu.videoscale,
-                  (gpu->regs.raster.scisssortest.y2 + 1 -
-                   gpu->regs.raster.scisssortest.y1) *
+                  (gpu->regs.raster.scissortest.y2 + 1 -
+                   gpu->regs.raster.scissortest.y1) *
                       ctremu.videoscale);
     } else {
         glDisable(GL_SCISSOR_TEST);

@@ -246,6 +246,10 @@ void gsp_handle_command(E3DS* s) {
                 flags & BIT(0); // need to handle yoff differently probably
             bool lineartotiled = flags & BIT(1);
 
+            // these values are the unscaled dims for some reason
+            if (scalex) wout /= 2;
+            if (scaley) hout /= 2;
+
             static int fmtBpp[8] = {4, 3, 2, 2, 2, 4, 4, 4};
 
             linfo("display transfer from fb at %08x (%dx%d) to %08x (%dx%d) "

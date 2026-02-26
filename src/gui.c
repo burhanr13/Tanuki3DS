@@ -383,7 +383,7 @@ void draw_textureview() {
         for (int i = 0; i < FB_MAX; i++) {
             char buf[100];
 
-            if (BitVec_test(fbcache->occupied, i)) {
+            if (fbcache->d[i].key) {
                 sprintf(buf, "Framebuffer %d", i);
                 igBeginDisabled(false);
             } else {
@@ -405,9 +405,9 @@ void draw_textureview() {
         igBeginChild("##fb pane", (ImVec2) {},
                      ImGuiChildFlags_AlwaysUseWindowPadding, 0);
 
-        if (BitVec_test(fbcache->occupied, curFb)) {
+        auto fb = &fbcache->d[curFb];
 
-            auto fb = &fbcache->d[curFb];
+        if (fb->key) {
 
             float w, h;
             if (fb->width > fb->height) {

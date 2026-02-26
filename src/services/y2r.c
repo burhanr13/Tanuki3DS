@@ -244,7 +244,8 @@ void y2r_do_conversion(E3DS* s) {
     int ywidth = y2r->srcY.pitch + y2r->srcY.gap;
     int uwidth = y2r->srcU.pitch + y2r->srcU.gap;
     int vwidth = y2r->srcV.pitch + y2r->srcV.gap;
-    // these numbers seem to be for a row of tiles regardless of linear/block mode
+    // these numbers seem to be for a row of tiles regardless of linear/block
+    // mode
     int dstwidth =
         (y2r->dst.pitch + y2r->dst.gap) / 8 / dstfmtsize[y2r->outputFmt & 3];
 
@@ -253,25 +254,27 @@ void y2r_do_conversion(E3DS* s) {
     u8* vdata = PTR(y2r->srcV.addr);
     void* out = PTR(y2r->dst.addr);
 
+    float cy = 0, u = 0, v = 0;
+
     for (int y = 0; y < y2r->height; y++) {
         for (int x = 0; x < y2r->width; x++) {
-            float cy = 0, u = 0, v = 0;
             switch (y2r->inputFmt) {
                 case 1: // yuv420 -> each 2x2 gets one u/v sample
-                    cy = ydata[y * ywidth + x] / 255.f;
-                    u = udata[(y / 2) * uwidth + (x / 2)] / 255.f;
-                    v = vdata[(y / 2) * vwidth + (x / 2)] / 255.f;
+                    cy = ydata[y * ywidth + x] * (1 / 255.f);
+                    u = udata[(y / 2) * uwidth + (x / 2)] * (1 / 255.f);
+                    v = vdata[(y / 2) * vwidth + (x / 2)] * (1 / 255.f);
                     break;
                 default:
-                    lwarnonce("uknown input format %d", y2r->inputFmt);
+                    lwarnonce("unknown input format %d", y2r->inputFmt);
+                    return;
             }
 
-            float r =
-                cy * y2r->coeffs.y_a + v * y2r->coeffs.r_v + y2r->coeffs.r_off;
-            float g = cy * y2r->coeffs.y_a + u * y2r->coeffs.g_u +
-                      v * y2r->coeffs.g_v + y2r->coeffs.g_off;
-            float b =
-                cy * y2r->coeffs.y_a + u * y2r->coeffs.b_u + y2r->coeffs.b_off;
+            cy *= y2r->coeffs.y_a;
+
+            float r = cy + v * y2r->coeffs.r_v + y2r->coeffs.r_off;
+            float g = cy + u * y2r->coeffs.g_u + v * y2r->coeffs.g_v +
+                      y2r->coeffs.g_off;
+            float b = cy + u * y2r->coeffs.b_u + y2r->coeffs.b_off;
             r = fminf(fmaxf(r, 0), 1);
             g = fminf(fmaxf(g, 0), 1);
             b = fminf(fmaxf(b, 0), 1);
@@ -296,6 +299,7 @@ void y2r_do_conversion(E3DS* s) {
                     break;
                 default:
                     lwarnonce("unknown output format %d", y2r->outputFmt);
+                    return;
             }
         }
     }

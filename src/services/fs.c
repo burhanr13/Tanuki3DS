@@ -322,6 +322,16 @@ DECL_PORT(fs) {
             cmdbuf[1] = 0;
             break;
         }
+        case 0x0812:
+            linfo("GetFreeBytes");
+            cmdbuf[0] = IPCHDR(3, 0);
+            cmdbuf[1] = 0;
+            // report 6gb of free space
+            // this is supposedly a u64 but setting the bottom 32 bits
+            // to 0 causes problems
+            cmdbuf[2] = 0x8000'0000;
+            cmdbuf[3] = 1;
+            break;
         case 0x0817:
             linfo("IsSdmcDetected");
             cmdbuf[0] = IPCHDR(2, 0);
@@ -401,7 +411,7 @@ DECL_PORT(fs) {
             u32 numfiles = cmdbuf[6];
 
             linfo("CreateExtSaveData with numfiles=%d numdirs=%d", numfiles,
-                  numdirs);
+                   numdirs);
 
             FILE* fp = open_formatinfo(s, ARCHIVE_EXTSAVEDATA, true);
             fwrite(&numfiles, sizeof(u32), 1, fp);
@@ -420,7 +430,7 @@ DECL_PORT(fs) {
             bool duplicate = cmdbuf[9];
 
             linfo("CreateSystemSaveData with numfiles=%d numdirs=%d", numfiles,
-                  numdirs);
+                   numdirs);
 
             FILE* fp = open_formatinfo(s, ARCHIVE_SYSTEMSAVEDATA, true);
             fwrite(&numfiles, sizeof(u32), 1, fp);
@@ -479,7 +489,7 @@ DECL_PORT_ARG(fs_selfncch, base) {
             void* data = PTR(cmdbuf[5]);
 
             linfo("reading at offset 0x%lx, size 0x%x to 0x%x", offset, size,
-                  cmdbuf[5]);
+                   cmdbuf[5]);
 
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
@@ -746,8 +756,8 @@ DECL_PORT_ARG(fs_dir, fd) {
                 ents[i].ishidden = ent->d_name[0] == '.';
 
                 linfo("entry %s %s sz=%lld (%s.%s)", ent->d_name,
-                      ents[i].isdir ? "(dir)" : "", ents[i].size,
-                      ents[i].shortname, ents[i].shortext);
+                       ents[i].isdir ? "(dir)" : "", ents[i].size,
+                       ents[i].shortname, ents[i].shortext);
             }
 
             cmdbuf[0] = IPCHDR(2, 0);

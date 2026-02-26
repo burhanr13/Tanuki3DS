@@ -256,14 +256,15 @@ void gpu_run_command_list(GPU* gpu, u32 paddr, u32 size) {
 }
 
 // searches the framebuffer cache and return nullptr if not found
+// need to search starting at most recently used FB because
+// there can be overlapping fbs apparently
 FBInfo* gpu_fbcache_find_within(GPU* gpu, u32 color_paddr) {
     FBInfo* newfb = nullptr;
-    for (int i = 0; i < FB_MAX; i++) {
-        if (gpu->fbs.d[i].color_paddr <= color_paddr &&
-            color_paddr < gpu->fbs.d[i].color_paddr +
-                              gpu->fbs.d[i].width * gpu->fbs.d[i].height *
-                                  gpu->fbs.d[i].color_Bpp) {
-            newfb = &gpu->fbs.d[i];
+    for (auto fb = gpu->fbs.root.next; fb != &gpu->fbs.root; fb = fb->next) {
+        if (fb->color_paddr <= color_paddr &&
+            color_paddr <
+                fb->color_paddr + fb->width * fb->height * fb->color_Bpp) {
+            newfb = fb;
             break;
         }
     }
