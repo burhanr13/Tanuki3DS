@@ -106,6 +106,7 @@ char* create_text_path(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
         asprintf(&filepath, "%s/%s", basepath, path);
     } else {
         lerror("unknown text file path type");
+        free(basepath);
         return nullptr;
     }
 
@@ -118,6 +119,8 @@ char* create_text_path(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
 DECL_PORT(fs) {
     u32* cmdbuf = PTR(cmd_addr);
 
+    // fs operations are slow, and games have race conditions
+    // depending on this, so we must ensure they hatl the thread
     *delay = 1000000;
 
     switch (cmd.command) {
@@ -291,7 +294,7 @@ DECL_PORT(fs) {
                 handle == ARCHIVE_SYSTEMSAVEDATA) {
                 FILE* fp = open_formatinfo(s, handle, false);
                 if (!fp) {
-                    lwarn("opening unformatted archive");
+                    lwarn("opening unformatted archive %x", archiveid);
                     cmdbuf[1] = FSERR_ARCHIVE;
                     break;
                 }
@@ -362,7 +365,7 @@ DECL_PORT(fs) {
             FILE* fp = open_formatinfo(
                 s, fs_open_archive(s, archive, pathtype, path), false);
             if (!fp) {
-                lwarn("opening unformatted archive %x", archive);
+                lwarn("get format info for unformatted archive %x", archive);
                 cmdbuf[1] = FSERR_ARCHIVE;
                 break;
             }
@@ -379,6 +382,17 @@ DECL_PORT(fs) {
             cmdbuf[3] = numdirs;
             cmdbuf[4] = numfiles;
             cmdbuf[5] = duplicate;
+            break;
+        }
+        case 0x0849: {
+            linfo("GetArchiveResource");
+            cmdbuf[0] = IPCHDR(5, 0);
+            cmdbuf[1] = 0;
+            // put believable numbers here so games don't complain
+            cmdbuf[2] = 512;         // sector size
+            cmdbuf[3] = 0x10000;     // cluster byte size
+            cmdbuf[4] = 0x1000'0000; // capacity in clusters
+            cmdbuf[5] = 0x1000'0000; // free space in clusters
             break;
         }
         case 0x084c: {
@@ -411,7 +425,7 @@ DECL_PORT(fs) {
             u32 numfiles = cmdbuf[6];
 
             linfo("CreateExtSaveData with numfiles=%d numdirs=%d", numfiles,
-                   numdirs);
+                  numdirs);
 
             FILE* fp = open_formatinfo(s, ARCHIVE_EXTSAVEDATA, true);
             fwrite(&numfiles, sizeof(u32), 1, fp);
@@ -430,7 +444,7 @@ DECL_PORT(fs) {
             bool duplicate = cmdbuf[9];
 
             linfo("CreateSystemSaveData with numfiles=%d numdirs=%d", numfiles,
-                   numdirs);
+                  numdirs);
 
             FILE* fp = open_formatinfo(s, ARCHIVE_SYSTEMSAVEDATA, true);
             fwrite(&numfiles, sizeof(u32), 1, fp);
@@ -489,7 +503,7 @@ DECL_PORT_ARG(fs_selfncch, base) {
             void* data = PTR(cmdbuf[5]);
 
             linfo("reading at offset 0x%lx, size 0x%x to 0x%x", offset, size,
-                   cmdbuf[5]);
+                  cmdbuf[5]);
 
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
@@ -756,8 +770,8 @@ DECL_PORT_ARG(fs_dir, fd) {
                 ents[i].ishidden = ent->d_name[0] == '.';
 
                 linfo("entry %s %s sz=%lld (%s.%s)", ent->d_name,
-                       ents[i].isdir ? "(dir)" : "", ents[i].size,
-                       ents[i].shortname, ents[i].shortext);
+                      ents[i].isdir ? "(dir)" : "", ents[i].size,
+                      ents[i].shortname, ents[i].shortext);
             }
 
             cmdbuf[0] = IPCHDR(2, 0);
@@ -816,6 +830,21 @@ u64 fs_open_archive(E3DS* s, u32 id, u32 pathtype, void* path) {
                 char* apath = archive_basepath(s, aid);
                 mkdir(apath, S_IRWXU);
                 free(apath);
+
+                // ok so most games will create ext data if
+                // they find it is unformatted but apparently
+                // some games just expect it to already exist
+                // and complain if it is not formatted by default
+                // thus we crate a formatinfo here
+                FILE* fp = open_formatinfo(s, aid, false);
+                if (fp) fclose(fp);
+                else {
+                    fp = open_formatinfo(s, aid, true);
+                    fwrite(&(u32) {255}, sizeof(u32), 1, fp);
+                    fwrite(&(u32) {255}, sizeof(u32), 1, fp);
+                    fwrite(&(bool) {false}, sizeof(bool), 1, fp);
+                    fclose(fp);
+                }
                 return aid;
             } else {
                 lerror("unknown file path type");

@@ -547,14 +547,18 @@ int main(int argc, char** argv) {
     ctremu.running = true;
     while (ctremu.running) {
 
-        if (setjmp(ctremu.exceptionJmp)) {
+        int exc;
+        if ((exc = setjmp(ctremu.exceptionJmp))) {
             emulator_set_rom(nullptr);
             g_pending_reset = true;
-            SDL_ShowSimpleMessageBox(
-                SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
-                "A fatal error has occurred or the application has exited. "
-                "Please see the log for details.",
-                g_window);
+            static const char* errmess[] = {
+                [EXC_MEM] = "Invalid memory access.",
+                [EXC_EXIT] = "The application has exited.",
+                [EXC_ERRF] = "The application has reported a fatal error.",
+                [EXC_BREAK] = "The application has terminated.",
+            };
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Tanuki3DS",
+                                     errmess[exc], g_window);
         }
 
         if (g_pending_reset) {

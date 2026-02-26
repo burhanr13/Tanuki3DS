@@ -174,7 +174,7 @@ DECL_PORT(errf) {
             lerror("fatal error type %d, result %08x, pc %08x, message: %s",
                    errinfo->type, errinfo->resultcode, errinfo->pc,
                    errinfo->message);
-            longjmp(ctremu.exceptionJmp, 1);
+            longjmp(ctremu.exceptionJmp, EXC_ERRF);
             break;
         }
         default:

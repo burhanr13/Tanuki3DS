@@ -78,7 +78,7 @@ DECL_SVC(QueryMemory) {
 
 DECL_SVC(ExitProcess) {
     lerror("process exiting");
-    longjmp(ctremu.exceptionJmp, 1);
+    longjmp(ctremu.exceptionJmp, EXC_EXIT);
 }
 
 DECL_SVC(CreateThread) {
@@ -782,7 +782,7 @@ DECL_SVC(GetThreadContext) {
 
 DECL_SVC(Break) {
     lerror("at %08x (lr=%08x)", s->cpu.pc, s->cpu.lr);
-    longjmp(ctremu.exceptionJmp, 1);
+    longjmp(ctremu.exceptionJmp, EXC_BREAK);
 }
 
 DECL_SVC(OutputDebugString) {

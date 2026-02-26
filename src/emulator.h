@@ -15,6 +15,14 @@ typedef void (*EmuAudioCallback)(s16 (*samples)[2], u32 num);
 
 #define HISTORYLEN 10
 
+enum {
+    EXC_OK,
+    EXC_MEM,
+    EXC_EXIT,
+    EXC_ERRF,
+    EXC_BREAK,
+};
+
 typedef enum {
     LAYOUT_DEFAULT,
     LAYOUT_HORIZONTAL,
