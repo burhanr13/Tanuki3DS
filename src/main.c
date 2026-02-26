@@ -337,7 +337,7 @@ void draw_menubar() {
             }
             igSeparator();
 
-            if (igMenuItem("Open App Directory", nullptr, false, true)) {
+            if (igMenuItem("Open Tanuki3DS Folder", nullptr, false, true)) {
                 char* cwd = getcwd(nullptr, 0);
                 char* cmd;
                 asprintf(&cmd, OPEN_CMD " '%s'", cwd);
@@ -390,10 +390,12 @@ void draw_menubar() {
                                ctremu.viewlayout == LAYOUT_HORIZONTAL, true)) {
                     ctremu.viewlayout = LAYOUT_HORIZONTAL;
                 }
-                if (igMenuItem("Large Top Screen", nullptr,
+                if (igMenuItem("Large Screen", nullptr,
                                ctremu.viewlayout == LAYOUT_LARGETOP, true)) {
                     ctremu.viewlayout = LAYOUT_LARGETOP;
                 }
+                igSeparator();
+                igMenuItemP("Swap Screens", nullptr, &ctremu.swapscreens, true);
                 igEndMenu();
             }
             igSeparator();

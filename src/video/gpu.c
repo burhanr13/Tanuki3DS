@@ -101,7 +101,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             gsh.floatuniform_data[7]): {
             u32 idx = gpu->regs.gsh.floatuniform_idx;
             if (idx >= 96) {
-                lwarnonce("writing to out of bound uniform");
+                lwarnonce("writing to out of bound uniform %d", idx);
                 break;
             }
             fvec4* uniform = &gpu->gsh.floatuniform[idx];
@@ -143,7 +143,7 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             gpu->vsh_uniform_dirty = true;
             u32 idx = gpu->regs.vsh.floatuniform_idx;
             if (idx >= 96) {
-                lwarnonce("writing to out of bound uniform");
+                lwarnonce("writing to out of bound uniform %d", idx);
                 break;
             }
             fvec4* uniform = &gpu->vsh.floatuniform[idx];

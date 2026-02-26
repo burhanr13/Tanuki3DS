@@ -1,6 +1,8 @@
 SECT("General")
 CMT("0=default, 1=side by side, 2=large top screen")
 INT("ViewLayout", ctremu.viewlayout)
+FLT("LargeScreenRatio", ctremu.largescreenratio)
+BOOL("SwapScreens", ctremu.swapscreens)
 INT("WindowWidth", ctremu.windowW)
 INT("WindowHeight", ctremu.windowH)
 PSTR("History0", ctremu.history[0])

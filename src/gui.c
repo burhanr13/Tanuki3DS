@@ -159,17 +159,35 @@ void draw_settings() {
                     SDL_GL_SetSwapInterval(0);
                 }
             }
+            static const char* layouts[] = {"Vertical", "Horizontal",
+                                            "Large Screen"};
+            igSetNextItemWidth(150);
+            igCombo("Screen Layout", &ctremu.viewlayout, layouts,
+                    countof(layouts), 0);
+            igCheckbox("Swap Screens", &ctremu.swapscreens);
+            igSetNextItemWidth(150);
+            igInputFloat("Large Screen Ratio", &ctremu.largescreenratio, 1, 1,
+                         nullptr, 0);
+
             igBeginDisabled(ctremu.initialized);
             static const char* filters[] = {"Nearest", "Bilinear",
                                             "Sharp Bilinear"};
             igSetNextItemWidth(150);
             igCombo("Postprocessing Filter", &ctremu.outputfilter, filters,
                     countof(filters), 0);
-            igDragInt("Video Scale", &ctremu.videoscale, 0.1, 1, 10, nullptr,
-                      0);
-            igSetNextItemWidth(200);
-            igDragInt("Software Vertex Shader Threads", &ctremu.vshthreads, 0.1,
-                      0, MAX_VSH_THREADS, nullptr, 0);
+            igEndDisabled();
+
+            igSeparatorText("GPU");
+            igBeginDisabled(ctremu.initialized);
+            igSetNextItemWidth(150);
+            igInputInt("Video Scale", &ctremu.videoscale, 1, 1, 0);
+            if (ctremu.videoscale < 1) ctremu.videoscale = 1;
+            igSetNextItemWidth(150);
+            igInputInt("Software Vertex Shader Threads", &ctremu.vshthreads, 1,
+                       1, 0);
+            if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
+            if (ctremu.vshthreads > MAX_VSH_THREADS)
+                ctremu.vshthreads = MAX_VSH_THREADS;
             igEndDisabled();
             igCheckbox("Shader JIT", &ctremu.shaderjit);
             igCheckbox("Hardware Vertex Shaders", &ctremu.hwvshaders);

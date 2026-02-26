@@ -64,7 +64,9 @@ typedef struct {
     bool ubershader;
     bool hashTextures;
 
-    ViewLayout viewlayout;
+    int viewlayout;
+    bool swapscreens;
+    float largescreenratio;
     Rect screens[2];
     int windowW, windowH;
 

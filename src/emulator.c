@@ -18,6 +18,9 @@ EmulatorState ctremu;
 void emulator_load_default_settings() {
     ctremu.windowW = 800;
     ctremu.windowH = 600;
+    ctremu.viewlayout = LAYOUT_DEFAULT;
+    ctremu.swapscreens = false;
+    ctremu.largescreenratio = 3;
     ctremu.vsync = false;
     ctremu.outputfilter = FILTER_LINEAR;
     ctremu.videoscale = 1;
@@ -171,12 +174,20 @@ bool emulator_reset() {
 }
 
 void emulator_calc_viewports() {
+    int swt, swb;
+    if (ctremu.swapscreens) {
+        swt = SCREEN_WIDTH_BOT;
+        swb = SCREEN_WIDTH_TOP;
+    } else {
+        swt = SCREEN_WIDTH_TOP;
+        swb = SCREEN_WIDTH_BOT;
+    }
     switch (ctremu.viewlayout) {
         case LAYOUT_DEFAULT: {
 
             int h = ctremu.windowH / 2;
-            int wt = h * SCREEN_WIDTH_TOP / SCREEN_HEIGHT;
-            int wb = h * SCREEN_WIDTH_BOT / SCREEN_HEIGHT;
+            int wt = h * swt / SCREEN_HEIGHT;
+            int wb = h * swb / SCREEN_HEIGHT;
             int xt = (ctremu.windowW - wt) / 2;
             int xb = (ctremu.windowW - wb) / 2;
 
@@ -187,10 +198,9 @@ void emulator_calc_viewports() {
         }
         case LAYOUT_HORIZONTAL: {
 
-            int wt = ctremu.windowW * SCREEN_WIDTH_TOP /
-                     (SCREEN_WIDTH_TOP + SCREEN_WIDTH_BOT);
+            int wt = ctremu.windowW * swt / (swt + swb);
             int wb = ctremu.windowW - wt;
-            int h = wt * SCREEN_HEIGHT / SCREEN_WIDTH_TOP;
+            int h = wt * SCREEN_HEIGHT / swt;
             int y = (ctremu.windowH - h) / 2;
 
             ctremu.screens[SCREEN_TOP] = (Rect) {0, y, wt, h};
@@ -201,13 +211,15 @@ void emulator_calc_viewports() {
         case LAYOUT_LARGETOP: {
 
             int ht = ctremu.windowH;
-            int wt = ht * SCREEN_WIDTH_TOP / SCREEN_HEIGHT;
-            if (wt >= 4 * ctremu.windowW / 5) {
-                wt = 4 * ctremu.windowW / 5;
-                ht = wt * SCREEN_HEIGHT / SCREEN_WIDTH_TOP;
+            int wt = ht * swt / SCREEN_HEIGHT;
+            if (wt >= ctremu.largescreenratio * ctremu.windowW /
+                          (ctremu.largescreenratio + 1)) {
+                wt = ctremu.largescreenratio * ctremu.windowW /
+                     (ctremu.largescreenratio + 1);
+                ht = wt * SCREEN_HEIGHT / swt;
             }
             int wb = ctremu.windowW - wt;
-            int hb = wb * SCREEN_HEIGHT / SCREEN_WIDTH_BOT;
+            int hb = wb * SCREEN_HEIGHT / swb;
             int yt = (ctremu.windowH - ht) / 2;
             int yb = yt + ht - hb;
 
@@ -218,5 +230,10 @@ void emulator_calc_viewports() {
         }
         default:
             break;
+    }
+    if (ctremu.swapscreens) {
+        Rect tmp = ctremu.screens[SCREEN_TOP];
+        ctremu.screens[SCREEN_TOP] = ctremu.screens[SCREEN_BOT];
+        ctremu.screens[SCREEN_BOT] = tmp;
     }
 }
