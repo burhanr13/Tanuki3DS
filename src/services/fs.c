@@ -941,7 +941,8 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             if (pathtype == FSPATH_BINARY) {
                 u32* path = rawpath;
                 switch (path[0]) {
-                    case 0: {
+                    case 0:
+                    case 5: {
                         linfo("opening romfs");
                         return session_create_arg(port_handle_fs_selfncch,
                                                   s->romimage.romfs_off);
@@ -967,7 +968,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
                                                       offset);
                     }
                     default:
-                        lerror("unknown selfNCCH file");
+                        lerror("unknown selfNCCH file %d", path[0]);
                         return nullptr;
                 }
             } else {
