@@ -73,7 +73,7 @@ void read_args(int argc, char** argv) {
     }
 }
 
-void file_callback(void*, char** files, int n) {
+void file_callback(void*, const char* const* files, int n) {
     if (files && files[0]) {
         emulator_set_rom(files[0]);
         g_pending_reset = true;
@@ -86,9 +86,22 @@ void load_rom_dialog() {
         .pattern = "3ds;cci;cxi;app;elf;axf;3dsx",
     };
 
-    ctremu.pause = true;
-    SDL_ShowOpenFileDialog((SDL_DialogFileCallback) file_callback, nullptr,
-                           g_window, &filetypes, 1, nullptr, false);
+    SDL_ShowOpenFileDialog(file_callback, nullptr, g_window, &filetypes, 1,
+                           nullptr, false);
+}
+
+void load_sysfile_callback(void* dstfile, const char* const* files, int n) {
+    if (files && files[0]) {
+        char* cmd;
+        asprintf(&cmd, "cp '%s' 3ds/sys_files/%s", files[0], dstfile);
+        system(cmd);
+        free(cmd);
+    }
+}
+
+void load_sysfile_dialog(char* dstfile) {
+    SDL_ShowOpenFileDialog(load_sysfile_callback, dstfile, g_window, nullptr, 0,
+                           nullptr, false);
 }
 
 void hotkey_press(SDL_Keycode key) {
@@ -336,6 +349,16 @@ void draw_menubar() {
                 igEndMenu();
             }
             igSeparator();
+
+            if (igBeginMenu("Load System File", true)) {
+                if (igMenuItem("Shared Font", nullptr, false, true)) {
+                    load_sysfile_dialog("font.bcfnt");
+                }
+                if (igMenuItem("Mii Data", nullptr, false, true)) {
+                    load_sysfile_dialog("mii.app.romfs");
+                }
+                igEndMenu();
+            }
 
             if (igMenuItem("Open Tanuki3DS Folder", nullptr, false, true)) {
                 char* cwd = getcwd(nullptr, 0);
