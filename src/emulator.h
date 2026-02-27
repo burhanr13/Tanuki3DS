@@ -81,6 +81,7 @@ typedef struct {
     char username[0x1c];
     int language;
     int region;
+    bool detectRegion;
 
     bool ignore_null;
 

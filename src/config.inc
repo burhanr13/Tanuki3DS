@@ -19,6 +19,7 @@ PSTR("History9", ctremu.history[9])
 SECT("System")
 ASTR("Username", ctremu.username)
 INT("Language", ctremu.language)
+BOOL("DetectRegion", ctremu.detectRegion)
 INT("Region", ctremu.region)
 
 SECT("CPU")

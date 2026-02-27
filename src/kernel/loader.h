@@ -169,6 +169,8 @@ typedef struct {
     u32 smdh_off;
     u32 romfs_off;
 
+    u32 region;
+
     char name[128];
 } RomImage;
 

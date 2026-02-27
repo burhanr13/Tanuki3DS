@@ -36,6 +36,7 @@ void emulator_load_default_settings() {
     strcpy(ctremu.username, "ctremu");
     ctremu.language = 1;
     ctremu.region = 1;
+    ctremu.detectRegion = true;
     g_jit_config.ir_interpret = false;
     g_jit_config.max_block_instrs = 128;
     g_jit_config.optimize = true;

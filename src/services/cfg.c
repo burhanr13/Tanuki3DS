@@ -43,8 +43,8 @@ DECL_PORT(cfg) {
                 case 0xa0002: // language
                     *(u8*) ptr = ctremu.language;
                     break;
-                case 0xb0000: // country info
-                    ((u8*) ptr)[2] = 1; // state
+                case 0xb0000:            // country info
+                    ((u8*) ptr)[2] = 1;  // state
                     ((u8*) ptr)[3] = 49; // country
                     break;
                 case 0xb0001: {
@@ -89,7 +89,8 @@ DECL_PORT(cfg) {
             linfo("GetRegion");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = ctremu.region;
+            cmdbuf[2] =
+                ctremu.detectRegion ? s->romimage.region : ctremu.region;
             break;
         case 0x0003:
             linfo("GenHashConsoleUnique");

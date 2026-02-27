@@ -128,11 +128,14 @@ void draw_settings() {
             igCombo("System Language", &ctremu.language, languages,
                     countof(languages), 0);
 
+            igCheckbox("Auto Detect Region", &ctremu.detectRegion);
+            igBeginDisabled(ctremu.detectRegion);
             static const char* regions[] = {
                 "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
             };
             igCombo("System Region", &ctremu.region, regions, countof(regions),
                     0);
+            igEndDisabled();
 
             break;
         }
