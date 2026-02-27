@@ -40,6 +40,11 @@ DECL_PORT(cfg) {
                     convert_to_utf16(ptr, 0x1c, ctremu.username);
                     break;
                 }
+                case 0xa0001: {         // birthday
+                    ((u8*) ptr)[0] = 1; // month
+                    ((u8*) ptr)[1] = 1; // day
+                    break;
+                }
                 case 0xa0002: // language
                     *(u8*) ptr = ctremu.language;
                     break;

@@ -5,6 +5,7 @@
 
 #include "am.h"
 #include "apt.h"
+#include "boss.h"
 #include "cecd.h"
 #include "cfg.h"
 #include "dsp.h"
@@ -15,6 +16,7 @@
 #include "ir.h"
 #include "ldr.h"
 #include "nwm.h"
+#include "ptm.h"
 #include "y2r.h"
 
 typedef struct {

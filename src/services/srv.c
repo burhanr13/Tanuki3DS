@@ -14,12 +14,13 @@ struct {
     PortRequestHandler handler;
 } srvhandlers[] = {
 #define SRV(portname, name) {portname, port_handle_##name}
-    SRV("APT:U", apt),    SRV("APT:A", apt),        SRV("APT:S", apt),
-    SRV("fs:USER", fs),   SRV("gsp::Gpu", gsp_gpu), SRV("hid:USER", hid),
-    SRV("hid:SPVR", hid), SRV("dsp::DSP", dsp),     SRV("cfg:u", cfg),
-    SRV("cfg:s", cfg),    SRV("cfg:i", cfg),        SRV("y2r:u", y2r),
-    SRV("cecd:u", cecd),  SRV("ldr:ro", ldr_ro),    SRV("nwm::UDS", nwm_uds),
-    SRV("ir:USER", ir_user),   SRV("am:app", am),        SRV("frd:u", frd),
+    SRV("APT:U", apt),       SRV("APT:A", apt),        SRV("APT:S", apt),
+    SRV("fs:USER", fs),      SRV("gsp::Gpu", gsp_gpu), SRV("hid:USER", hid),
+    SRV("hid:SPVR", hid),    SRV("dsp::DSP", dsp),     SRV("cfg:u", cfg),
+    SRV("cfg:s", cfg),       SRV("cfg:i", cfg),        SRV("y2r:u", y2r),
+    SRV("cecd:u", cecd),     SRV("ldr:ro", ldr_ro),    SRV("nwm::UDS", nwm_uds),
+    SRV("ir:USER", ir_user), SRV("am:app", am),        SRV("frd:u", frd),
+    SRV("ptm:u", ptm),       SRV("boss:U", boss),
 #undef SRV
 };
 

@@ -59,7 +59,8 @@ bool e3ds_init(E3DS* s, char* romfile) {
     *(u32*) PTR(CONFIG_MEM + 0x40) = FCRAMUSERSIZE; // APPMEMALLOC
 
     memory_virtalloc(s, SHARED_PAGE, PAGE_SIZE, PERM_R, MEMST_SHARED);
-    *(u32*) PTR(SHARED_PAGE + 4) = 1;   // RUNNING_HW: 1 for prod
+    *(u32*) PTR(SHARED_PAGE + 4) = 1; // RUNNING_HW: 1 for prod
+    *(u8*) PTR(SHARED_PAGE + 0x85) = 5 << 2; // battery led state, bit2-4 is the level from 0-5
     *(u8*) PTR(SHARED_PAGE + 0x86) = 1; // "ptm sets this value to 1"
 
     memory_virtalloc(s, TLS_BASE, TLS_SIZE * THREAD_MAX, PERM_RW,

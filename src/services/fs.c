@@ -306,6 +306,12 @@ DECL_PORT(fs) {
             cmdbuf[3] = handle >> 32;
             break;
         }
+        case 0x080d: {
+            linfo("ControlArchive");
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
         case 0x080e: {
             linfo("CloseArchive");
             cmdbuf[0] = IPCHDR(1, 0);
