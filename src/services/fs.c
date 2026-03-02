@@ -331,6 +331,24 @@ DECL_PORT(fs) {
             cmdbuf[1] = 0;
             break;
         }
+        case 0x0810: {
+            u32 numdirs = cmdbuf[4];
+            u32 numfiles = cmdbuf[5];
+            bool duplicate = cmdbuf[8];
+
+            linfo("CreateSystemSaveData with numfiles=%d numdirs=%d", numfiles,
+                  numdirs);
+
+            FILE* fp = open_formatinfo(s, ARCHIVE_SYSTEMSAVEDATA, true);
+            fwrite(&numfiles, sizeof(u32), 1, fp);
+            fwrite(&numdirs, sizeof(u32), 1, fp);
+            fwrite(&duplicate, sizeof(bool), 1, fp);
+            fclose(fp);
+
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
         case 0x0812:
             linfo("GetFreeBytes");
             cmdbuf[0] = IPCHDR(3, 0);

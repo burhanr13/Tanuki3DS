@@ -10,7 +10,7 @@ SRC_DIR := src
 
 CSTD := -std=gnu23
 CXXSTD := -std=gnu++23
-CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Werror
+CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Wno-deprecated-declarations -Werror
 CFLAGS_RELEASE := -O3
 CFLAGS_DEBUG := -g -fsanitize=address
 
