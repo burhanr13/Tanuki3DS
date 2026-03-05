@@ -97,6 +97,9 @@ typedef struct _GPU {
     int curfixi;
     Vector(fvec4) immattrs;
 
+    u16 lightLuts[32][256];
+    bool lightLutDirty;
+
     LRUCache(FBInfo, FB_MAX) fbs;
     FBInfo* curfb;
     LRUCache(TexInfo, TEX_MAX) textures;

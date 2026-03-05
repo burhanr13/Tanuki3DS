@@ -292,6 +292,21 @@ typedef union {
                     u32 numlights : 3;
                     u32 : 29;
                 };
+                u32 config0;
+                u32 config1;
+                struct {
+                    u32 lutIndex : 8;
+                    u32 lutNum : 5;
+                    u32 : 19;
+                };
+                u32 disable;
+                u32 _1c7;
+                u32 lutData[8];
+                u32 lutinputAbs;
+                u32 lutinputSel;
+                u32 lutinputScale;
+                u32 _1d3[6];
+                u32 permutation;
             };
             u32 w[0xc0];
         } lighting;

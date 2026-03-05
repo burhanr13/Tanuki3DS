@@ -17,6 +17,8 @@ uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
+uniform sampler1DArray lightLuts;
+
 struct Light {
     vec3 specular0;
     vec3 specular1;
@@ -77,7 +79,7 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
     for (int i = 0; i < ubuf->numlights; i++) {
         ds_printf(s, "lprimary.rgb += light[%d].ambient;\n", i);
 
-        if (ubuf->light[i].config & L_DIRECTIONAL) {
+        if (ubuf->light[i].config & BIT(0)) {
             ds_printf(s, "l = normalize(quatrot(nq, light[%d].vec.xyz));\n", i);
         } else {
             ds_printf(s,

@@ -23,11 +23,6 @@ enum {
     TEVSRC_PREVIOUS
 };
 
-// light config bits
-enum {
-    L_DIRECTIONAL = BIT(0),
-};
-
 typedef struct {
     struct {
         struct {
@@ -52,6 +47,12 @@ typedef struct {
         int _pad[3];
     } light[8];
     int numlights;
+
+    int lconfig0;
+    int lconfig1;
+    int llutAbs;
+    int llutSel;
+    int llutScale;
 
     int alphatest;
     int alphafunc;

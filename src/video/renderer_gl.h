@@ -45,6 +45,8 @@ typedef struct {
 
     GLuint blanktex;
 
+    GLuint lightluttex;
+
     union {
         GLuint ubos[4];
         struct {

@@ -174,6 +174,10 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     for (int i = 0; i < TEX_MAX; i++) {
         gpu->textures.d[i].tex = textures[i];
     }
+
+    glGenTextures(1, &state->lightluttex);
+    glBindTexture(GL_TEXTURE_1D_ARRAY, state->lightluttex);
+    glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
 }
 
 void renderer_gl_destroy(GLState* state, GPU* gpu) {
@@ -208,6 +212,7 @@ void renderer_gl_destroy(GLState* state, GPU* gpu) {
     for (int i = 0; i < TEX_MAX; i++) {
         glDeleteTextures(1, &gpu->textures.d[i].tex);
     }
+    glDeleteTextures(1, &state->lightluttex);
 }
 
 // call before emulating gpu drawing
@@ -289,6 +294,8 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
     glUniform1i(glGetUniformLocation(prog, "tex0"), 0);
     glUniform1i(glGetUniformLocation(prog, "tex1"), 1);
     glUniform1i(glGetUniformLocation(prog, "tex2"), 2);
+    glUniform1i(glGetUniformLocation(prog, "lightLuts"), 4);
+
     if (vs != state->gpu_vs) {
         glUniformBlockBinding(prog,
                               glGetUniformBlockIndex(prog, "VertUniforms"), 0);
@@ -1109,8 +1116,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     if (gpu->regs.raster.scissortest.enable) {
         glEnable(GL_SCISSOR_TEST);
         glScissor(gpu->regs.raster.scissortest.x1 * ctremu.videoscale,
-                  (gpu->regs.raster.scissortest.y1 + vyoff) *
-                      ctremu.videoscale,
+                  (gpu->regs.raster.scissortest.y1 + vyoff) * ctremu.videoscale,
                   (gpu->regs.raster.scissortest.x2 + 1 -
                    gpu->regs.raster.scissortest.x1) *
                       ctremu.videoscale,
@@ -1234,17 +1240,34 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // lighting params
     ubuf.numlights = gpu->regs.lighting.numlights + 1;
     for (int i = 0; i < ubuf.numlights; i++) {
-        // TODO: handle light permutation
-        COPYRGB(fbuf.light[i].specular0, gpu->regs.lighting.light[i].specular0);
-        COPYRGB(fbuf.light[i].specular1, gpu->regs.lighting.light[i].specular1);
-        COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
-        COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
-        fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
-        fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
-        fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
-        ubuf.light[i].config = gpu->regs.lighting.light[i].config;
+        int pi = gpu->regs.lighting.permutation >> (4 * i) & 7;
+        COPYRGB(fbuf.light[i].specular0,
+                gpu->regs.lighting.light[pi].specular0);
+        COPYRGB(fbuf.light[i].specular1,
+                gpu->regs.lighting.light[pi].specular1);
+        COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[pi].diffuse);
+        COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[pi].ambient);
+        fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[pi].vec.x);
+        fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[pi].vec.y);
+        fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[pi].vec.z);
+        ubuf.light[i].config = gpu->regs.lighting.light[pi].config;
     }
     COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
+    ubuf.lconfig0 = gpu->regs.lighting.config0;
+    ubuf.lconfig1 = gpu->regs.lighting.config1;
+    ubuf.llutAbs = gpu->regs.lighting.lutinputAbs;
+    ubuf.llutSel = gpu->regs.lighting.lutinputSel;
+    ubuf.llutScale = gpu->regs.lighting.lutinputScale;
+
+    // light luts, use slot 4 for the light lut
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_1D_ARRAY, gpu->gl.lightluttex);
+    if (gpu->lightLutDirty) {
+        gpu->lightLutDirty = false;
+        glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_RED, countof(gpu->lightLuts[0]),
+                     countof(gpu->lightLuts), 0, GL_RED, GL_UNSIGNED_SHORT,
+                     gpu->lightLuts);
+    }
 
     // vertex shaders
     bool swshaders = !ctremu.hwvshaders || gpu->regs.geom.config.use_gsh;
@@ -1291,6 +1314,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // todo: do similar dirty checking for the fs
     glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
+
     GLuint fs;
     if (ctremu.ubershader) {
         glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);

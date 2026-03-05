@@ -97,6 +97,12 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
                 gpu_draw(gpu, false, true);
             }
             break;
+        case GPUREG(lighting.lutData[0])... GPUREG(lighting.lutData[7]):
+            gpu->lightLuts[gpu->regs.lighting.lutNum]
+                         [gpu->regs.lighting.lutIndex++] = (param & MASK(12))
+                                                           << 4;
+            gpu->lightLutDirty = true;
+            break;
         case GPUREG(gsh.floatuniform_data[0])... GPUREG(
             gsh.floatuniform_data[7]): {
             u32 idx = gpu->regs.gsh.floatuniform_idx;

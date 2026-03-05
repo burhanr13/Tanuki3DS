@@ -14,6 +14,8 @@ uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
+uniform sampler1DArray lightLuts;
+
 #define BIT(k, n) ((k&(1u<<n))!=0u)
 
 #define TEVSRC_COLOR 0
@@ -26,8 +28,6 @@ uniform sampler2D tex2;
 #define TEVSRC_BUFFER 13
 #define TEVSRC_CONSTANT 14
 #define TEVSRC_PREVIOUS 15
-
-#define L_DIRECTIONAL 0
 
 struct TevControl {
     uint src0;
@@ -63,6 +63,12 @@ layout(std140) uniform UberUniforms {
     uint light_config[8];
     uint numlights;
 
+    uint lconfig0;
+    uint lconfig1;
+    uint llutAbs;
+    uint llutSel;
+    uint llutScale;
+
     bool alphatest;
     uint alphafunc;
 };
@@ -83,42 +89,98 @@ vec3 quatrot(vec4 q, vec3 v) {
         (q.w * q.w - dot(q.xyz, q.xyz)) * v;
 }
 
+#define LUT_D0 0u
+#define LUT_D1 1u
+#define LUT_SP 2u
+#define LUT_FR 3u
+#define LUT_RB 4u
+#define LUT_RG 5u
+#define LUT_RR 6u
+#define LUT_DA 7u
+#define LUT_SP_BASE 8u
+#define LUT_DA_BASE 16u
+
+const uint lightenvEnabledLuts[8] = uint[](
+        0xc5u, 0xccu, 0xc3u, 0x8bu, 0xf7u, 0xfdu, 0xcfu, 0xffu
+    );
+
+float lutInputs[8];
+
+float read_lut(uint lutNum) {
+    if (!BIT(lightenvEnabledLuts[lconfig0 >> 4 & 7u], lutNum)) {
+        if (lutNum == LUT_RG || lutNum == LUT_RB) {
+            lutNum = LUT_RR;
+        } else {
+            return 1.0f;
+        }
+    }
+    float lin = lutInputs[llutSel >> (4u * lutNum) & 7u];
+    if (BIT(llutAbs, 4u * lutNum + 1u)) lin = abs(lin);
+    float res = texture(lightLuts, vec2((lin + 1) / 2, lutNum)).r;
+    int scale = int(llutScale >> (4u * lutNum) << 29) >> 29;
+    return res * pow(2, scale);
+}
+
 void calc_lighting(out vec4 primary, out vec4 secondary) {
     primary = vec4(0);
     secondary = vec4(0);
 
     primary.rgb = ambient_color.rgb;
-    primary.a = 1;
 
-    secondary.a = 0.5;
+    vec3 n = normalize(quatrot(normquat, vec3(0, 0, 1)));
+    vec3 t = normalize(quatrot(normquat, vec3(1, 0, 0)));
+    vec3 v = normalize(view);
 
-    vec4 nq = normalize(normquat);
-    vec3 v = normalize(quatrot(nq, view));
+    lutInputs[2] = dot(n, v);
 
     for (uint i = 0u; i < numlights; i++) {
-        primary.rgb += light[i].ambient;
-
         vec3 l;
-        if (BIT(light_config[i], L_DIRECTIONAL)) {
-            l = normalize(quatrot(nq, light[i].vec.xyz));
+        if (BIT(light_config[i], 0)) {
+            l = normalize(light[i].vec.xyz);
         } else {
-            l = normalize(quatrot(nq, view + light[i].vec.xyz));
+            l = normalize(view + light[i].vec.xyz);
         }
         vec3 h = normalize(l + v);
+        vec3 h_proj = normalize(h - n * dot(n, h));
 
-        // right now we just use phong shading
-        // TODO: implement this properly
+        float ndotl = dot(n, l);
 
-        float diffuselevel = max(l.z, 0);
-        primary.rgb += diffuselevel * light[i].diffuse;
+        lutInputs[0] = dot(n, h);
+        lutInputs[1] = dot(v, h);
+        lutInputs[3] = ndotl;
+        lutInputs[4] = 0; // -l dot p ?
+        lutInputs[5] = dot(t, h_proj);
 
-        primary.rgb = min(primary.rgb, 1);
+        if (BIT(light_config[i], 1)) {
+            ndotl = abs(ndotl);
+        } else {
+            ndotl = max(ndotl, 0);
+        }
 
-        float speclevel = pow(max(h.z, 0), 3);
-        secondary.rgb += speclevel * light[i].specular0;
+        vec4 cp = vec4(0);
+        vec4 cs = vec4(0);
 
-        secondary.rgb = min(secondary.rgb, 1);
+        cp.rgb = light[i].ambient + ndotl * light[i].diffuse;
+
+        float G = ndotl / dot(l + v, l + v);
+        float G0 = BIT(light_config[i], 2) ? G : 1;
+        float G1 = BIT(light_config[i], 3) ? G : 1;
+
+        cs.rgb = read_lut(LUT_D0) * light[i].specular0 * G0 +
+                read_lut(LUT_D1) * light[i].specular1 * G1 *
+                    vec3(read_lut(LUT_RR), read_lut(LUT_RG), read_lut(LUT_RB));
+
+        float fr = read_lut(LUT_FR);
+        if (BIT(lconfig0, 2)) cp.a = fr;
+        else cp.a = 1;
+        if (BIT(lconfig0, 3)) cs.a = fr;
+        else cs.a = 1;
+
+        primary += cp;
+        secondary += cs;
     }
+    primary = min(primary, 1);
+    secondary = min(secondary, 1);
 }
 
 vec4 tev_srcs[16];
