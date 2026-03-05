@@ -10,24 +10,35 @@ in vec3 view;
 
 out vec4 fragclr;
 
+#define BIT(k, n) ((k&(1u<<n))!=0u)
+
+#define TEVSRC_COLOR 0u
+#define TEVSRC_LIGHT_PRIMARY 1u
+#define TEVSRC_LIGHT_SECONDARY 2u
+#define TEVSRC_TEX0 3u
+#define TEVSRC_TEX1 4u
+#define TEVSRC_TEX2 5u
+#define TEVSRC_TEX3 6u
+#define TEVSRC_BUFFER 13u
+#define TEVSRC_CONSTANT 14u
+#define TEVSRC_PREVIOUS 15u
+
+#define LUT_D0 0u
+#define LUT_D1 1u
+#define LUT_SP 2u
+#define LUT_FR 3u
+#define LUT_RB 4u
+#define LUT_RG 5u
+#define LUT_RR 6u
+#define LUT_DA 7u
+#define LUT_SP_BASE 8u
+#define LUT_DA_BASE 16u
+
 uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
 uniform sampler1DArray lightLuts;
-
-#define BIT(k, n) ((k&(1u<<n))!=0u)
-
-#define TEVSRC_COLOR 0
-#define TEVSRC_LIGHT_PRIMARY 1
-#define TEVSRC_LIGHT_SECONDARY 2
-#define TEVSRC_TEX0 3
-#define TEVSRC_TEX1 4
-#define TEVSRC_TEX2 5
-#define TEVSRC_TEX3 6
-#define TEVSRC_BUFFER 13
-#define TEVSRC_CONSTANT 14
-#define TEVSRC_PREVIOUS 15
 
 struct TevControl {
     uint src0;
@@ -50,7 +61,10 @@ struct Light {
     vec3 specular1;
     vec3 diffuse;
     vec3 ambient;
-    vec4 vec;
+    vec3 vec;
+    vec3 spotdir;
+    float attn_bias;
+    float attn_scale;
 };
 
 layout(std140) uniform UberUniforms {
@@ -89,16 +103,7 @@ vec3 quatrot(vec4 q, vec3 v) {
         (q.w * q.w - dot(q.xyz, q.xyz)) * v;
 }
 
-#define LUT_D0 0u
-#define LUT_D1 1u
-#define LUT_SP 2u
-#define LUT_FR 3u
-#define LUT_RB 4u
-#define LUT_RG 5u
-#define LUT_RR 6u
-#define LUT_DA 7u
-#define LUT_SP_BASE 8u
-#define LUT_DA_BASE 16u
+vec4 tev_srcs[16];
 
 const uint lightenvEnabledLuts[8] = uint[](
         0xc5u, 0xccu, 0xc3u, 0x8bu, 0xf7u, 0xfdu, 0xcfu, 0xffu
@@ -107,13 +112,14 @@ const uint lightenvEnabledLuts[8] = uint[](
 float lutInputs[8];
 
 float read_lut(uint lutNum) {
-    if (!BIT(lightenvEnabledLuts[lconfig0 >> 4 & 7u], lutNum)) {
+    uint lutCfgNum = (LUT_SP_BASE <= lutNum && lutNum <= LUT_SP_BASE + 7u) ? LUT_SP : lutNum;
+    if (!BIT(lightenvEnabledLuts[lconfig0 >> 4 & 7u], lutCfgNum) || BIT(lconfig1, 16u + lutCfgNum)) {
         return 1.0f;
     }
-    float lin = lutInputs[llutSel >> (4u * lutNum) & 7u];
-    if (BIT(llutAbs, 4u * lutNum + 1u)) lin = abs(lin);
+    float lin = lutInputs[llutSel >> (4u * lutCfgNum) & 7u];
+    if (BIT(llutAbs, 4u * lutCfgNum + 1u)) lin = abs(lin);
     float res = texture(lightLuts, vec2((lin + 1) / 2, lutNum)).r;
-    int scale = int(llutScale >> (4u * lutNum) << 29) >> 29;
+    int scale = int(llutScale >> (4u * lutCfgNum) << 29) >> 29;
     return res * pow(2, scale);
 }
 
@@ -124,11 +130,15 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
     secondary.a = 1;
 
     primary.rgb = ambient_color.rgb;
-    
-    // todo: bump/tangent mapping
 
-    vec3 n = normalize(quatrot(normquat, vec3(0, 0, 1)));
-    vec3 t = normalize(quatrot(normquat, vec3(1, 0, 0)));
+    uint bumpMode = (lconfig0 >> 28) & 3u;
+    uint bumpTex = (lconfig0 >> 22) & 3u;
+    vec3 n = (bumpMode == 1u) ? tev_srcs[TEVSRC_TEX0 + bumpTex].xyz - 0.5f : vec3(0, 0, 1);
+    vec3 t = (bumpMode == 2u) ? tev_srcs[TEVSRC_TEX0 + bumpTex].xyz - 0.5f : vec3(1, 0, 0);
+
+    n = normalize(quatrot(normquat, n));
+    t = normalize(quatrot(normquat, t));
+
     vec3 v = normalize(view);
 
     lutInputs[2] = dot(n, v);
@@ -136,19 +146,21 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
     for (uint i = 0u; i < numlights; i++) {
         vec3 l;
         if (BIT(light_config[i], 0)) {
-            l = normalize(light[i].vec.xyz);
+            l = normalize(light[i].vec);
         } else {
-            l = normalize(view + light[i].vec.xyz);
+            l = normalize(view + light[i].vec);
         }
         vec3 h = normalize(l + v);
         vec3 h_proj = normalize(h - n * dot(n, h));
+        vec3 p = normalize(light[i].spotdir);
+        float dist = length(view + light[i].vec);
 
         float ndotl = dot(n, l);
 
         lutInputs[0] = dot(n, h);
         lutInputs[1] = dot(v, h);
         lutInputs[3] = ndotl;
-        lutInputs[4] = 0; // -l dot p ?
+        lutInputs[4] = dot(l, p);
         lutInputs[5] = dot(t, h_proj);
 
         if (BIT(light_config[i], 1)) {
@@ -174,21 +186,32 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
         vec3 cs = read_lut(LUT_D0) * light[i].specular0 * G0 +
                 read_lut(LUT_D1) * light[i].specular1 * R * G1;
 
-        // todo: spotlight, distance, shadow
-        
+        if (!BIT(lconfig1, 8u + i)) {
+            float S = read_lut(LUT_SP_BASE + i);
+            cp *= S;
+            cs *= S;
+        }
+        if (BIT(lightenvEnabledLuts[lconfig0 >> 4 & 7u], LUT_DA) && !BIT(lconfig1, 24u + i)) {
+            float A = texture(lightLuts,
+                    vec2(light[i].attn_bias + light[i].attn_scale * dist,
+                        LUT_DA_BASE + i)).r;
+            cp *= A;
+            cs *= A;
+        }
+
         primary.rgb += cp;
         secondary.rgb += cs;
-                
-        // alpha values are directly updated
+    }
+
+    if (BIT(lconfig0, 2) || BIT(lconfig0, 3)) {
         float fr = read_lut(LUT_FR);
         if (BIT(lconfig0, 2)) primary.a = fr;
         if (BIT(lconfig0, 3)) secondary.a = fr;
     }
+
     primary = min(primary, 1);
     secondary = min(secondary, 1);
 }
-
-vec4 tev_srcs[16];
 
 vec3 tev_operand_rgb(vec4 v, uint op) {
     switch (op) {
@@ -321,11 +344,11 @@ bool run_alphatest(float a) {
 
 void main() {
     tev_srcs[TEVSRC_COLOR] = color;
-    calc_lighting(tev_srcs[TEVSRC_LIGHT_PRIMARY], tev_srcs[TEVSRC_LIGHT_SECONDARY]);
     tev_srcs[TEVSRC_TEX0] = texture(tex0, texcoord0);
     tev_srcs[TEVSRC_TEX1] = texture(tex1, texcoord1);
     tev_srcs[TEVSRC_TEX2] = texture(tex2, tex2coord ? texcoord1 : texcoord2);
     tev_srcs[TEVSRC_BUFFER] = tev_buffer_color;
+    calc_lighting(tev_srcs[TEVSRC_LIGHT_PRIMARY], tev_srcs[TEVSRC_LIGHT_SECONDARY]);
 
     vec4 next_buf = tev_buffer_color;
 

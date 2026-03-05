@@ -1252,6 +1252,16 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[pi].vec.y);
         fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[pi].vec.z);
         ubuf.light[i].config = gpu->regs.lighting.light[pi].config;
+        fbuf.light[i].spotdir[0] =
+            (float) gpu->regs.lighting.light[pi].spotdir.x / BIT(11);
+        fbuf.light[i].spotdir[1] =
+            (float) gpu->regs.lighting.light[pi].spotdir.y / BIT(11);
+        fbuf.light[i].spotdir[2] =
+            (float) gpu->regs.lighting.light[pi].spotdir.z / BIT(11);
+        fbuf.light[i].attn_bias =
+            cvtf20(gpu->regs.lighting.light[pi].attn_bias);
+        fbuf.light[i].attn_scale =
+            cvtf20(gpu->regs.lighting.light[pi].attn_scale);
     }
     COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
     ubuf.lconfig0 = gpu->regs.lighting.config0;

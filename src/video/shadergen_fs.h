@@ -68,6 +68,10 @@ typedef struct {
         float diffuse[4];
         float ambient[4];
         float vec[4];
+        float spotdir[4];
+        float attn_bias;
+        float attn_scale;
+        float _pad[2];
     } light[8];
     float ambient_color[4];
 

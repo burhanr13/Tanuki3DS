@@ -271,7 +271,13 @@ typedef union {
                         u16 x, y, z, _w;
                     } vec;
                     struct {
-                        u16 x, y, z, _w;
+                        s16 x : 13;
+                        s16 : 3;
+                        s16 y : 13;
+                        s16 : 3;
+                        s16 z : 13;
+                        s16 : 3;
+                        s16 : 16;
                     } spotdir;
                     u32 _8;
                     u32 config;

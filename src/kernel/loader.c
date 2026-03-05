@@ -260,7 +260,9 @@ void parse_smdh(E3DS* s) {
         if (isspace(s->romimage.name[i])) s->romimage.name[i] = ' ';
     ldebug("name from smdh: %s", s->romimage.name);
 
-    s->romimage.region = __builtin_ctz(smdh.settings.regionLock);
+    if (smdh.settings.regionLock & BIT(ctremu.region))
+        s->romimage.region = ctremu.region;
+    else s->romimage.region = __builtin_ctz(smdh.settings.regionLock);
 }
 
 u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size) {

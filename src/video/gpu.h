@@ -159,6 +159,10 @@ static inline float cvtf24(u32 i) {
     return CONVERTFLOAT(7, 16, i);
 }
 
+static inline float cvtf20(u32 i) {
+    return CONVERTFLOAT(7, 12, i);
+}
+
 static inline float cvtf16(u32 i) {
     return CONVERTFLOAT(5, 10, i);
 }
