@@ -108,11 +108,7 @@ float lutInputs[8];
 
 float read_lut(uint lutNum) {
     if (!BIT(lightenvEnabledLuts[lconfig0 >> 4 & 7u], lutNum)) {
-        if (lutNum == LUT_RG || lutNum == LUT_RB) {
-            lutNum = LUT_RR;
-        } else {
-            return 1.0f;
-        }
+        return 1.0f;
     }
     float lin = lutInputs[llutSel >> (4u * lutNum) & 7u];
     if (BIT(llutAbs, 4u * lutNum + 1u)) lin = abs(lin);
@@ -124,8 +120,12 @@ float read_lut(uint lutNum) {
 void calc_lighting(out vec4 primary, out vec4 secondary) {
     primary = vec4(0);
     secondary = vec4(0);
+    primary.a = 1;
+    secondary.a = 1;
 
     primary.rgb = ambient_color.rgb;
+    
+    // todo: bump/tangent mapping
 
     vec3 n = normalize(quatrot(normquat, vec3(0, 0, 1)));
     vec3 t = normalize(quatrot(normquat, vec3(1, 0, 0)));
@@ -157,27 +157,32 @@ void calc_lighting(out vec4 primary, out vec4 secondary) {
             ndotl = max(ndotl, 0);
         }
 
-        vec4 cp = vec4(0);
-        vec4 cs = vec4(0);
+        vec3 cp = light[i].ambient + ndotl * light[i].diffuse;
 
-        cp.rgb = light[i].ambient + ndotl * light[i].diffuse;
-
-        float G = ndotl / dot(l + v, l + v);
+        float G = min(ndotl / dot(l + v, l + v), 1);
         float G0 = BIT(light_config[i], 2) ? G : 1;
         float G1 = BIT(light_config[i], 3) ? G : 1;
 
-        cs.rgb = read_lut(LUT_D0) * light[i].specular0 * G0 +
-                read_lut(LUT_D1) * light[i].specular1 * G1 *
-                    vec3(read_lut(LUT_RR), read_lut(LUT_RG), read_lut(LUT_RB));
+        vec3 R;
+        // either only RR enabled, or all three
+        if (BIT(lightenvEnabledLuts[lconfig0 >> 4 & 7u], LUT_RG)) {
+            R = vec3(read_lut(LUT_RR), read_lut(LUT_RG), read_lut(LUT_RB));
+        } else {
+            R = vec3(read_lut(LUT_RR));
+        }
 
+        vec3 cs = read_lut(LUT_D0) * light[i].specular0 * G0 +
+                read_lut(LUT_D1) * light[i].specular1 * R * G1;
+
+        // todo: spotlight, distance, shadow
+        
+        primary.rgb += cp;
+        secondary.rgb += cs;
+                
+        // alpha values are directly updated
         float fr = read_lut(LUT_FR);
-        if (BIT(lconfig0, 2)) cp.a = fr;
-        else cp.a = 1;
-        if (BIT(lconfig0, 3)) cs.a = fr;
-        else cs.a = 1;
-
-        primary += cp;
-        secondary += cs;
+        if (BIT(lconfig0, 2)) primary.a = fr;
+        if (BIT(lconfig0, 3)) secondary.a = fr;
     }
     primary = min(primary, 1);
     secondary = min(secondary, 1);

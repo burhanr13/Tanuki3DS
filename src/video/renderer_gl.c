@@ -178,6 +178,7 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glGenTextures(1, &state->lightluttex);
     glBindTexture(GL_TEXTURE_1D_ARRAY, state->lightluttex);
     glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 }
 
 void renderer_gl_destroy(GLState* state, GPU* gpu) {
