@@ -5,7 +5,7 @@
 
 #include "renderer_gl.h"
 
-#define FSH_MAX 512
+#define FSH_MAX 1024
 
 typedef struct _GPU GPU;
 
@@ -21,6 +21,17 @@ enum {
     TEVSRC_BUFFER = 13,
     TEVSRC_CONSTANT,
     TEVSRC_PREVIOUS
+};
+
+enum {
+    LLUT_D0,
+    LLUT_D1,
+    LLUT_SP,
+    LLUT_FR,
+    LLUT_RB,
+    LLUT_RG,
+    LLUT_RR,
+    LLUT_DA,
 };
 
 typedef struct {
@@ -69,6 +80,7 @@ typedef struct {
         float ambient[4];
         float vec[4];
         float spotdir[4];
+        float _pad0[4];
         float attn_bias;
         float attn_scale;
         float _pad[2];

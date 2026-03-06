@@ -1,5 +1,7 @@
 #include "shadergen_fs.h"
 
+#include <math.h>
+
 const char fs_header[] = R"(
 #version 330 core
 
@@ -24,7 +26,11 @@ struct Light {
     vec3 specular1;
     vec3 diffuse;
     vec3 ambient;
-    vec4 vec;
+    vec3 vec;
+    vec3 spotdir;
+    vec4 _pad;
+    float attn_bias;
+    float attn_scale;
 };
 
 layout (std140) uniform FragUniforms {
@@ -42,64 +48,207 @@ vec3 quatrot(vec4 q, vec3 v) {
            (q.w * q.w - dot(q.xyz, q.xyz)) * v;
 }
 
-)";
-
-const char light_setup[] = R"(
-vec4 lprimary = vec4(0);
-vec4 lsecondary = vec4(0);
-
-lprimary.rgb = ambient_color.rgb;
-lprimary.a = 1;
-
-lsecondary.a = 0.5;
-
-vec4 nq = normalize(normquat);
-vec3 v = normalize(quatrot(nq, view));
-vec3 l, h;
+#define LUT_D0 0u
+#define LUT_D1 1u
+#define LUT_SP 2u
+#define LUT_FR 3u
+#define LUT_RB 4u
+#define LUT_RG 5u
+#define LUT_RR 6u
+#define LUT_DA 7u
+#define LUT_SP_BASE 8u
+#define LUT_DA_BASE 16u
 
 )";
 
-const char lighting_stub[] = R"(
-{
-float diffuselevel = max(l.z, 0);
-lprimary.rgb += diffuselevel * light[%d].diffuse;
+const u8 lightenvEnabledLuts[8] = {
+    0xc5, 0xcc, 0xc3, 0x8b, 0xf7, 0xfd, 0xcf, 0xff,
+};
 
-lprimary.rgb = min(lprimary.rgb, 1);
-
-float speclevel = pow(max(h.z, 0), 3);
-lsecondary.rgb += speclevel * light[%d].specular0;
-
-lsecondary.rgb = min(lsecondary.rgb, 1);
-}
-)";
-
-void write_lighting(DynString* s, UberUniforms* ubuf) {
-    ds_printf(s, light_setup);
-
-    for (int i = 0; i < ubuf->numlights; i++) {
-        ds_printf(s, "lprimary.rgb += light[%d].ambient;\n", i);
-
-        if (ubuf->light[i].config & BIT(0)) {
-            ds_printf(s, "l = normalize(quatrot(nq, light[%d].vec.xyz));\n", i);
-        } else {
-            ds_printf(s,
-                      "l = normalize(quatrot(nq, view + light[%d].vec.xyz));\n",
-                      i);
-        }
-        ds_printf(s, "h = normalize(l + v);\n");
-
-        ds_printf(s, lighting_stub, i, i);
+const char* lutinput_str(int lutSel) {
+    switch (lutSel) {
+        case 0:
+            return "dot(n, h)";
+        case 1:
+            return "dot(v, h)";
+        case 2:
+            return "dot(n, v)";
+        case 3:
+            return "dot(n, l)";
+        case 4:
+            return "dot(l, p)";
+        case 5:
+            return "dot(t, h_proj)";
+        default:
+            return "0";
     }
 }
 
-#define CHECKSRC(s)                                                            \
-    ({                                                                         \
-        if (s == TEVSRC_LIGHT_PRIMARY || s == TEVSRC_LIGHT_SECONDARY)          \
-            lighting = true;                                                   \
-        if (s == TEVSRC_TEX0) tex0 = true;                                     \
-        if (s == TEVSRC_TEX1) tex1 = true;                                     \
-        if (s == TEVSRC_TEX2) tex2 = true;                                     \
-    })
+void write_lut_read(DynString* s, UberUniforms* ubuf, int lutNum, char* name) {
+    ds_printf(s, "texture(lightLuts, vec2(");
+    if (ubuf->llutAbs & BIT(4 * lutNum + 1)) {
+        ds_printf(s, "(%s+1)/2", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
+    } else {
+        ds_printf(s, "abs(%s)", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
+    }
+    ds_printf(s, ", %s)).r", name);
+    int scaleExp = (sbit(3))(ubuf->llutScale >> 4 * lutNum);
+    if (scaleExp != 0) {
+        float scale = powf(2, scaleExp);
+        ds_printf(s, "*%.2f", scale);
+    }
+}
+
+void write_lighting(DynString* s, UberUniforms* ubuf) {
+    ds_printf(s, "vec4 lprimary = vec4(ambient_color.rgb, 1);\n");
+    ds_printf(s, "vec4 lsecondary = vec4(0, 0, 0, 1);\n");
+
+    int bumpMode = (ubuf->lconfig0 >> 28) & 3;
+    int bumpTex = (ubuf->lconfig0 >> 22) & 3;
+    if (bumpMode != 0) {
+        ds_printf(s, "vec3 bumpVec = 2 * tex%dc.xyz - 1;\n", bumpTex);
+        if (!(ubuf->lconfig0 & BIT(30))) {
+            // recalcuate z value, if this is set then z is calculated to make a unit vector
+            ds_printf(s, "bumpVec.z = sqrt(max(1 - dot(bumpVec.xy, bumpVec.xy), 0));\n");
+        }
+    }
+    if (bumpMode == 1) {
+        ds_printf(s, "vec3 n = normalize(quatrot(normquat, bumpVec));\n",
+                  bumpTex);
+    } else {
+        ds_printf(s, "vec3 n = normalize(quatrot(normquat, vec3(0, 0, 1)));\n");
+    }
+    if (bumpMode == 2) {
+        ds_printf(s,
+                  "vec3 t = normalize(quatrot(normquat, vec3(bumpVec.xy, 0)));\n",
+                  bumpTex);
+    } else {
+        ds_printf(s, "vec3 t = normalize(quatrot(normquat, vec3(1, 0, 0)));\n");
+    }
+
+    ds_printf(s, "vec3 v = normalize(view);\n");
+
+    ds_printf(s, "vec3 l, h, h_proj, p;\n");
+    ds_printf(s, "float dist;\n");
+
+    int envLuts = lightenvEnabledLuts[ubuf->lconfig0 >> 4 & 7];
+    int disabledLuts = ubuf->lconfig1 >> 16 & 0xff;
+    int enabledLuts = envLuts & ~disabledLuts;
+
+    for (int i = 0; i < ubuf->numlights; i++) {
+        if (ubuf->light[i].config & BIT(0)) {
+            ds_printf(s, "l = light[%d].vec;\n", i);
+        } else {
+            ds_printf(s, "l = view + light[%d].vec;\n", i);
+        }
+        ds_printf(s, "dist = length(l);\n");
+        ds_printf(s, "l /= dist;\n");
+        ds_printf(s, "h = normalize(l + v);\n");
+        ds_printf(s, "h_proj = normalize(h - n * dot(n, h));\n");
+        ds_printf(s, "p = normalize(light[%d].spotdir);\n", i);
+
+        ds_printf(s, "vec3 cp_%d = light[%d].ambient + ", i, i);
+        if (ubuf->light[i].config & BIT(1)) {
+            ds_printf(s, "abs(dot(n, l)) * ");
+        } else {
+            ds_printf(s, "max(dot(n, l), 0) * ");
+        }
+        ds_printf(s, "light[%d].diffuse;\n", i);
+
+        if (ubuf->light[i].config >> 2 & 3) {
+            ds_printf(s, "float G_%d = clamp(dot(n,l)/dot(l+v,l+v),0,1);\n", i);
+        }
+
+        bool use_R = false;
+        if (envLuts & BIT(LLUT_RR) &&
+            (enabledLuts & (BIT(LLUT_RR) | BIT(LLUT_RG) | BIT(LLUT_RB)))) {
+            use_R = true;
+            ds_printf(s, "vec3 R_%d = vec3(", i);
+            if (envLuts & BIT(LLUT_RG)) {
+                if (enabledLuts & BIT(LLUT_RR)) {
+                    write_lut_read(s, ubuf, LLUT_RR, "LUT_RR");
+                } else {
+                    ds_printf(s, "1");
+                }
+                ds_printf(s, ", ");
+                if (enabledLuts & BIT(LLUT_RG)) {
+                    write_lut_read(s, ubuf, LLUT_RG, "LUT_RG");
+                } else {
+                    ds_printf(s, "1");
+                }
+                ds_printf(s, ", ");
+                if (enabledLuts & BIT(LLUT_RB)) {
+                    write_lut_read(s, ubuf, LLUT_RB, "LUT_RB");
+                } else {
+                    ds_printf(s, "1");
+                }
+            } else {
+                if (enabledLuts & BIT(LLUT_RR)) {
+                    write_lut_read(s, ubuf, LLUT_RR, "LUT_RR");
+                } else {
+                    ds_printf(s, "1");
+                }
+            }
+            ds_printf(s, ");\n");
+        }
+
+        ds_printf(s, "vec3 cs_%d = ", i);
+        if (enabledLuts & BIT(LLUT_D0)) {
+            write_lut_read(s, ubuf, LLUT_D0, "LUT_D0");
+            ds_printf(s, " * ");
+        }
+        if (ubuf->light[i].config & BIT(2)) {
+            ds_printf(s, "G_%d * ", i);
+        }
+        ds_printf(s, "light[%d].specular0 +\n", i);
+        if (enabledLuts & BIT(LLUT_D1)) {
+            write_lut_read(s, ubuf, LLUT_D1, "LUT_D1");
+            ds_printf(s, " * ");
+        }
+        if (use_R) {
+            ds_printf(s, "R_%d * ", i);
+        }
+        if (ubuf->light[i].config & BIT(3)) {
+            ds_printf(s, "G_%d * ", i);
+        }
+        ds_printf(s, "light[%d].specular1;\n", i);
+
+        if (envLuts & BIT(LLUT_SP) && !(ubuf->lconfig1 & BIT(8 + i))) {
+            ds_printf(s, "float S_%d = ", i);
+            char buf[64];
+            snprintf(buf, sizeof buf, "LUT_SP_BASE + %du", i);
+            write_lut_read(s, ubuf, LLUT_SP, buf);
+            ds_printf(s, ";\n");
+            ds_printf(s, "cp_%d *= S_%d;\n", i, i);
+            ds_printf(s, "cs_%d *= S_%d;\n", i, i);
+        }
+        if (envLuts & BIT(LLUT_DA) && !(ubuf->lconfig1 & BIT(24 + i))) {
+            ds_printf(s,
+                      "float A_%d = texture(lightLuts, vec2(\n"
+                      "light[%d].attn_bias + light[%d].attn_scale * dist,\n"
+                      "LUT_DA_BASE + %du)).r;\n",
+                      i, i, i, i);
+            ds_printf(s, "cp_%d *= A_%d;\n", i, i);
+            ds_printf(s, "cs_%d *= A_%d;\n", i, i);
+        }
+
+        ds_printf(s, "lprimary.rgb += cp_%d;\n", i);
+        ds_printf(s, "lsecondary.rgb += cs_%d;\n", i);
+    }
+    if (enabledLuts & BIT(LLUT_FR) && ubuf->lconfig0 >> 2 & 3) {
+        ds_printf(s, "float fr = ");
+        write_lut_read(s, ubuf, LLUT_FR, "LUT_FR");
+        ds_printf(s, ";\n");
+        if (ubuf->lconfig0 & BIT(2)) {
+            ds_printf(s, "lprimary.a = fr;\n");
+        }
+        if (ubuf->lconfig0 & BIT(3)) {
+            ds_printf(s, "lsecondary.a = fr;\n");
+        }
+    }
+    ds_printf(s, "lprimary = min(lprimary, 1);\n");
+    ds_printf(s, "lsecondary = min(lsecondary, 1);\n");
+}
 
 const char* tevsrc_str(int i, u32 tevsrc) {
     switch (tevsrc) {
@@ -384,41 +533,18 @@ char* shader_gen_fs(UberUniforms* ubuf) {
     DynString s;
     ds_init(&s, 8192);
 
-    bool lighting = false;
-    bool tex0 = false;
-    bool tex1 = false;
-    bool tex2 = false;
-
-    for (int i = 0; i < 6; i++) {
-        CHECKSRC(ubuf->tev[i].rgb.src0);
-        if (ubuf->tev[i].rgb.combiner != 0) CHECKSRC(ubuf->tev[i].rgb.src1);
-        if (ubuf->tev[i].rgb.combiner == 4 || ubuf->tev[i].rgb.combiner == 8 ||
-            ubuf->tev[i].rgb.combiner == 9)
-            CHECKSRC(ubuf->tev[i].rgb.src2);
-        CHECKSRC(ubuf->tev[i].a.src0);
-        if (ubuf->tev[i].a.combiner != 0) CHECKSRC(ubuf->tev[i].a.src1);
-        if (ubuf->tev[i].a.combiner == 4 || ubuf->tev[i].a.combiner == 8 ||
-            ubuf->tev[i].a.combiner == 9)
-            CHECKSRC(ubuf->tev[i].a.src2);
-    }
-
     ds_printf(&s, fs_header);
 
     ds_printf(&s, "void main() {\n");
 
-    if (lighting) {
-        write_lighting(&s, ubuf);
-    }
-    if (tex0) {
-        ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
-    }
-    if (tex1) {
-        ds_printf(&s, "vec4 tex1c = texture(tex1, texcoord1);\n");
-    }
-    if (tex2) {
-        ds_printf(&s, "vec4 tex2c = texture(tex2, texcoord%d);\n",
-                  ubuf->tex2coord ? 1 : 2);
-    }
+    ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
+    ds_printf(&s, "vec4 tex1c = texture(tex1, texcoord1);\n");
+    ds_printf(&s, "vec4 tex2c = texture(tex2, texcoord%d);\n",
+              ubuf->tex2coord ? 1 : 2);
+    // todo: proctex
+    ds_printf(&s, "vec4 tex3c = vec4(0);\n");
+
+    write_lighting(&s, ubuf);
 
     ds_printf(&s, tev_setup);
 

@@ -63,6 +63,7 @@ struct Light {
     vec3 ambient;
     vec3 vec;
     vec3 spotdir;
+    vec4 _pad;
     float attn_bias;
     float attn_scale;
 };
@@ -117,7 +118,7 @@ float read_lut(uint lutNum) {
         return 1.0f;
     }
     float lin = lutInputs[llutSel >> (4u * lutCfgNum) & 7u];
-    if (BIT(llutAbs, 4u * lutCfgNum + 1u)) lin = abs(lin);
+    if (!BIT(llutAbs, 4u * lutCfgNum + 1u)) lin = abs(lin);
     float res = texture(lightLuts, vec2((lin + 1) / 2, lutNum)).r;
     int scale = int(llutScale >> (4u * lutCfgNum) << 29) >> 29;
     return res * pow(2, scale);

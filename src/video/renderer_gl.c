@@ -275,6 +275,7 @@ static GLuint compile_shader(GLuint type, char* source) {
         char log[512];
         glGetShaderInfoLog(sh, sizeof log, nullptr, log);
         lerror("failed to compile shader: %s", log);
+        printf("%s\n", source);
     }
     return sh;
 }
