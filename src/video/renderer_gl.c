@@ -1241,28 +1241,27 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
 
     // lighting params
     ubuf.numlights = gpu->regs.lighting.numlights + 1;
-    for (int i = 0; i < ubuf.numlights; i++) {
-        int pi = gpu->regs.lighting.permutation >> (4 * i) & 7;
+    for (int i = 0; i < 8; i++) {
         COPYRGB(fbuf.light[i].specular0,
-                gpu->regs.lighting.light[pi].specular0);
+                gpu->regs.lighting.light[i].specular0);
         COPYRGB(fbuf.light[i].specular1,
-                gpu->regs.lighting.light[pi].specular1);
-        COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[pi].diffuse);
-        COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[pi].ambient);
-        fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[pi].vec.x);
-        fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[pi].vec.y);
-        fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[pi].vec.z);
-        ubuf.light[i].config = gpu->regs.lighting.light[pi].config;
+                gpu->regs.lighting.light[i].specular1);
+        COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
+        COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
+        fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
+        fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
+        fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
+        ubuf.light[i].config = gpu->regs.lighting.light[i].config;
         fbuf.light[i].spotdir[0] =
-            (float) gpu->regs.lighting.light[pi].spotdir.x / BIT(11);
+            (float) gpu->regs.lighting.light[i].spotdir.x / BIT(11);
         fbuf.light[i].spotdir[1] =
-            (float) gpu->regs.lighting.light[pi].spotdir.y / BIT(11);
+            (float) gpu->regs.lighting.light[i].spotdir.y / BIT(11);
         fbuf.light[i].spotdir[2] =
-            (float) gpu->regs.lighting.light[pi].spotdir.z / BIT(11);
+            (float) gpu->regs.lighting.light[i].spotdir.z / BIT(11);
         fbuf.light[i].attn_bias =
-            cvtf20(gpu->regs.lighting.light[pi].attn_bias);
+            cvtf20(gpu->regs.lighting.light[i].attn_bias);
         fbuf.light[i].attn_scale =
-            cvtf20(gpu->regs.lighting.light[pi].attn_scale);
+            cvtf20(gpu->regs.lighting.light[i].attn_scale);
     }
     COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
     ubuf.lconfig0 = gpu->regs.lighting.config0;
@@ -1270,6 +1269,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     ubuf.llutAbs = gpu->regs.lighting.lutinputAbs;
     ubuf.llutSel = gpu->regs.lighting.lutinputSel;
     ubuf.llutScale = gpu->regs.lighting.lutinputScale;
+    ubuf.lightPerm = gpu->regs.lighting.permutation;
 
     // light luts, use slot 4 for the light lut
     glActiveTexture(GL_TEXTURE4);

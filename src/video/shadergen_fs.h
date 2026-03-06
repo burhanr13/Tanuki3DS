@@ -64,6 +64,7 @@ typedef struct {
     int llutAbs;
     int llutSel;
     int llutScale;
+    int lightPerm;
 
     int alphatest;
     int alphafunc;

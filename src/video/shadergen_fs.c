@@ -108,8 +108,11 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
     if (bumpMode != 0) {
         ds_printf(s, "vec3 bumpVec = 2 * tex%dc.xyz - 1;\n", bumpTex);
         if (!(ubuf->lconfig0 & BIT(30))) {
-            // recalcuate z value, if this is set then z is calculated to make a unit vector
-            ds_printf(s, "bumpVec.z = sqrt(max(1 - dot(bumpVec.xy, bumpVec.xy), 0));\n");
+            // recalcuate z value, if this is set then z is calculated to make a
+            // unit vector
+            ds_printf(
+                s,
+                "bumpVec.z = sqrt(max(1 - dot(bumpVec.xy, bumpVec.xy), 0));\n");
         }
     }
     if (bumpMode == 1) {
@@ -119,9 +122,9 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
         ds_printf(s, "vec3 n = normalize(quatrot(normquat, vec3(0, 0, 1)));\n");
     }
     if (bumpMode == 2) {
-        ds_printf(s,
-                  "vec3 t = normalize(quatrot(normquat, vec3(bumpVec.xy, 0)));\n",
-                  bumpTex);
+        ds_printf(
+            s, "vec3 t = normalize(quatrot(normquat, vec3(bumpVec.xy, 0)));\n",
+            bumpTex);
     } else {
         ds_printf(s, "vec3 t = normalize(quatrot(normquat, vec3(1, 0, 0)));\n");
     }
@@ -135,7 +138,9 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
     int disabledLuts = ubuf->lconfig1 >> 16 & 0xff;
     int enabledLuts = envLuts & ~disabledLuts;
 
-    for (int i = 0; i < ubuf->numlights; i++) {
+    for (int _i = 0; _i < ubuf->numlights; _i++) {
+        int i = ubuf->lightPerm >> 4 * _i & 7;
+
         if (ubuf->light[i].config & BIT(0)) {
             ds_printf(s, "l = light[%d].vec;\n", i);
         } else {

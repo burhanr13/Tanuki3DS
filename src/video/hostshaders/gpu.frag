@@ -83,6 +83,7 @@ layout(std140) uniform UberUniforms {
     uint llutAbs;
     uint llutSel;
     uint llutScale;
+    uint lightPerm;
 
     bool alphatest;
     uint alphafunc;
