@@ -1313,7 +1313,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
                 char* source = shader_dec_vs(gpu);
                 ent->vs = compile_shader(GL_VERTEX_SHADER, source);
                 free(source);
-                linfo("compiled new vertex shader with hash %llx", hash);
+                linfo("compiled new vertex shader %d with hash %llx", ent->vs, hash);
             }
             vs = ent->vs;
         } else {
@@ -1341,7 +1341,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
             char* source = shader_gen_fs(&ubuf);
             ent->fs = compile_shader(GL_FRAGMENT_SHADER, source);
             free(source);
-            linfo("compiled new fragment shader with hash %llx", hash);
+            linfo("compiled new fragment shader %d with hash %llx", ent->fs, hash);
         }
         fs = ent->fs;
     }
