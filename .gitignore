@@ -34,3 +34,5 @@ gmon.out
 .DS_Store
 
 .clangd
+.cache/clangd
+compile_commands.json
