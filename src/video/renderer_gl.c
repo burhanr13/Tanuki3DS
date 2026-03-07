@@ -1242,10 +1242,8 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // lighting params
     ubuf.numlights = gpu->regs.lighting.numlights + 1;
     for (int i = 0; i < 8; i++) {
-        COPYRGB(fbuf.light[i].specular0,
-                gpu->regs.lighting.light[i].specular0);
-        COPYRGB(fbuf.light[i].specular1,
-                gpu->regs.lighting.light[i].specular1);
+        COPYRGB(fbuf.light[i].specular0, gpu->regs.lighting.light[i].specular0);
+        COPYRGB(fbuf.light[i].specular1, gpu->regs.lighting.light[i].specular1);
         COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
         COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
         fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
@@ -1258,8 +1256,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
             (float) gpu->regs.lighting.light[i].spotdir.y / BIT(11);
         fbuf.light[i].spotdir[2] =
             (float) gpu->regs.lighting.light[i].spotdir.z / BIT(11);
-        fbuf.light[i].attn_bias =
-            cvtf20(gpu->regs.lighting.light[i].attn_bias);
+        fbuf.light[i].attn_bias = cvtf20(gpu->regs.lighting.light[i].attn_bias);
         fbuf.light[i].attn_scale =
             cvtf20(gpu->regs.lighting.light[i].attn_scale);
     }
@@ -1313,7 +1310,8 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
                 char* source = shader_dec_vs(gpu);
                 ent->vs = compile_shader(GL_VERTEX_SHADER, source);
                 free(source);
-                linfo("compiled new vertex shader %d with hash %llx", ent->vs, hash);
+                linfo("compiled new vertex shader %d with hash %llx", ent->vs,
+                      hash);
             }
             vs = ent->vs;
         } else {
@@ -1341,7 +1339,8 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
             char* source = shader_gen_fs(&ubuf);
             ent->fs = compile_shader(GL_FRAGMENT_SHADER, source);
             free(source);
-            linfo("compiled new fragment shader %d with hash %llx", ent->fs, hash);
+            linfo("compiled new fragment shader %d with hash %llx", ent->fs,
+                  hash);
         }
         fs = ent->fs;
     }

@@ -48,16 +48,14 @@ vec3 quatrot(vec4 q, vec3 v) {
            (q.w * q.w - dot(q.xyz, q.xyz)) * v;
 }
 
-#define LUT_D0 0u
-#define LUT_D1 1u
-#define LUT_SP 2u
-#define LUT_FR 3u
-#define LUT_RB 4u
-#define LUT_RG 5u
-#define LUT_RR 6u
-#define LUT_DA 7u
-#define LUT_SP_BASE 8u
-#define LUT_DA_BASE 16u
+#define LUT_D0 0
+#define LUT_D1 1
+#define LUT_FR 3
+#define LUT_RB 4
+#define LUT_RG 5
+#define LUT_RR 6
+#define LUT_SP_BASE 8
+#define LUT_DA_BASE 16
 
 )";
 
@@ -89,7 +87,7 @@ void write_lut_read(DynString* s, UberUniforms* ubuf, int lutNum, char* name) {
     if (ubuf->llutAbs & BIT(4 * lutNum + 1)) {
         // to ensure proper clamping we need to multiply by the size of the
         // texture
-        ds_printf(s, "fract(clamp(%s*128,-128,127)/256)",
+        ds_printf(s, "fract(clamp(%s*128,-128,127.5)/256)*256",
                   lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
     } else {
         ds_printf(s, "abs(%s)", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
@@ -119,15 +117,12 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
         }
     }
     if (bumpMode == 1) {
-        ds_printf(s, "vec3 n = normalize(quatrot(normquat, bumpVec));\n",
-                  bumpTex);
+        ds_printf(s, "vec3 n = normalize(quatrot(normquat, bumpVec));\n");
     } else {
         ds_printf(s, "vec3 n = normalize(quatrot(normquat, vec3(0, 0, 1)));\n");
     }
     if (bumpMode == 2) {
-        ds_printf(
-            s, "vec3 t = normalize(quatrot(normquat, vec3(bumpVec.xy, 0)));\n",
-            bumpTex);
+        ds_printf(s, "vec3 t = normalize(quatrot(normquat, bumpVec));\n");
     } else {
         ds_printf(s, "vec3 t = normalize(quatrot(normquat, vec3(1, 0, 0)));\n");
     }
@@ -224,7 +219,7 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
         if (envLuts & BIT(LLUT_SP) && !(ubuf->lconfig1 & BIT(8 + i))) {
             ds_printf(s, "float S_%d = ", i);
             char buf[64];
-            snprintf(buf, sizeof buf, "LUT_SP_BASE + %du", i);
+            snprintf(buf, sizeof buf, "LUT_SP_BASE + %d", i);
             write_lut_read(s, ubuf, LLUT_SP, buf);
             ds_printf(s, ";\n");
             ds_printf(s, "cp_%d *= S_%d;\n", i, i);
@@ -243,6 +238,7 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
         ds_printf(s, "lprimary.rgb += cp_%d;\n", i);
         ds_printf(s, "lsecondary.rgb += cs_%d;\n", i);
     }
+
     if (enabledLuts & BIT(LLUT_FR) && ubuf->lconfig0 >> 2 & 3) {
         ds_printf(s, "float fr = ");
         write_lut_read(s, ubuf, LLUT_FR, "LUT_FR");
@@ -254,6 +250,7 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
             ds_printf(s, "lsecondary.a = fr;\n");
         }
     }
+
     ds_printf(s, "lprimary = min(lprimary, 1);\n");
     ds_printf(s, "lsecondary = min(lsecondary, 1);\n");
 }
@@ -272,6 +269,8 @@ const char* tevsrc_str(int i, u32 tevsrc) {
             return "tex1c";
         case TEVSRC_TEX2:
             return "tex2c";
+        case TEVSRC_TEX3:
+            return "tex3c";
         case TEVSRC_BUFFER:
             return "buf";
         case TEVSRC_CONSTANT: {
@@ -554,7 +553,7 @@ char* shader_gen_fs(UberUniforms* ubuf) {
     ds_printf(&s, "vec4 tex2c = texture(tex2, texcoord%d);\n",
               ubuf->tex2coord ? 1 : 2);
     // todo: proctex
-    ds_printf(&s, "vec4 tex3c = vec4(0);\n");
+    ds_printf(&s, "vec4 tex3c = vec4(1);\n");
 
     write_lighting(&s, ubuf);
 
@@ -562,7 +561,7 @@ char* shader_gen_fs(UberUniforms* ubuf) {
 vec4 cur = vec4(0);
 vec4 buf = tev_buffer_color;
 vec4 tmp;
-    )");
+)");
 
     for (int i = 0; i < 6; i++) {
         // check for do nothing stage
@@ -601,11 +600,11 @@ vec4 tmp;
         }
 
         if (ubuf->tev[i].rgb.scale != 1.0f) {
-            ds_printf(&s, "cur.rgb = min(cur.rgb * %f, 1);\n",
+            ds_printf(&s, "cur.rgb = min(cur.rgb * %.0f, 1);\n",
                       ubuf->tev[i].rgb.scale);
         }
         if (ubuf->tev[i].a.scale != 1.0f) {
-            ds_printf(&s, "cur.a = min(cur.a * %f, 1);\n",
+            ds_printf(&s, "cur.a = min(cur.a * %.0f, 1);\n",
                       ubuf->tev[i].a.scale);
         }
     }

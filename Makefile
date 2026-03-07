@@ -90,6 +90,7 @@ $(BUILD_DIR)/%.cpp.o: $(SRC_DIR)/%.cpp
 .PHONY: clean
 clean:
 	@echo clean...
-	@rm -rf $(BUILD_ROOT)
+	@rm -rf $(BUILD_ROOT)/debug $(BUILD_ROOT)/release \
+	        $(BUILD_ROOT)/$(TARGET_EXEC) $(BUILD_ROOT)/$(TARGET_EXEC)d
 
 -include $(DEPS)
