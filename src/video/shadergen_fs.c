@@ -87,7 +87,9 @@ const char* lutinput_str(int lutSel) {
 void write_lut_read(DynString* s, UberUniforms* ubuf, int lutNum, char* name) {
     ds_printf(s, "texture(lightLuts, vec2(");
     if (ubuf->llutAbs & BIT(4 * lutNum + 1)) {
-        ds_printf(s, "fract(%s/2)", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
+        // to ensure proper clamping we need to multiply by the size of the texture
+        ds_printf(s, "fract(clamp(%s*128,-128,127)/256)",
+                  lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
     } else {
         ds_printf(s, "abs(%s)", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
     }
@@ -365,9 +367,6 @@ void write_operand_a(DynString* s, const char* srcstr, u32 op) {
     }
 }
 
-#define NEEDSCLAMP(combiner)                                                   \
-    (!(combiner == 0 || combiner == 1 || combiner == 4))
-
 void write_combiner_rgb(DynString* s, UberUniforms* ubuf, int i) {
 #define SRC(n)                                                                 \
     write_operand_rgb(s, tevsrc_str(i, ubuf->tev[i].rgb.src##n),               \
@@ -382,15 +381,18 @@ void write_combiner_rgb(DynString* s, UberUniforms* ubuf, int i) {
             SRC(1);
             break;
         case 2:
+            ds_printf(s, "min(");
             SRC(0);
             ds_printf(s, " + ");
             SRC(1);
+            ds_printf(s, ", 1)");
             break;
         case 3:
+            ds_printf(s, "clamp(");
             SRC(0);
             ds_printf(s, " + ");
             SRC(1);
-            ds_printf(s, " - 0.5");
+            ds_printf(s, " - 0.5, 0, 1)");
             break;
         case 4:
             ds_printf(s, "mix(");
@@ -402,31 +404,35 @@ void write_combiner_rgb(DynString* s, UberUniforms* ubuf, int i) {
             ds_printf(s, ")");
             break;
         case 5:
+            ds_printf(s, "max(");
             SRC(0);
             ds_printf(s, " - ");
             SRC(1);
+            ds_printf(s, ", 0)");
             break;
         case 6:
         case 7:
-            ds_printf(s, "vec3(4 * dot(");
+            ds_printf(s, "max(vec3(4 * dot(");
             SRC(0);
             ds_printf(s, " - 0.5, ");
             SRC(1);
-            ds_printf(s, " - 0.5))");
+            ds_printf(s, " - 0.5)), 0)");
             break;
         case 8:
+            ds_printf(s, "min(");
             SRC(0);
             ds_printf(s, " * ");
             SRC(1);
             ds_printf(s, " + ");
             SRC(2);
+            ds_printf(s, ", 1)");
             break;
         case 9:
-            ds_printf(s, "(");
+            ds_printf(s, "min(");
             SRC(0);
             ds_printf(s, " + ");
             SRC(1);
-            ds_printf(s, ") * ");
+            ds_printf(s, ", 1) * ");
             SRC(2);
             break;
         default:
@@ -450,15 +456,18 @@ void write_combiner_a(DynString* s, UberUniforms* ubuf, int i) {
             SRC(1);
             break;
         case 2:
+            ds_printf(s, "min(");
             SRC(0);
             ds_printf(s, " + ");
             SRC(1);
+            ds_printf(s, ", 1)");
             break;
         case 3:
+            ds_printf(s, "clamp(");
             SRC(0);
             ds_printf(s, " + ");
             SRC(1);
-            ds_printf(s, " - 0.5");
+            ds_printf(s, " - 0.5, 0, 1)");
             break;
         case 4:
             ds_printf(s, "mix(");
@@ -470,31 +479,35 @@ void write_combiner_a(DynString* s, UberUniforms* ubuf, int i) {
             ds_printf(s, ")");
             break;
         case 5:
+            ds_printf(s, "max(");
             SRC(0);
             ds_printf(s, " - ");
             SRC(1);
+            ds_printf(s, ", 0)");
             break;
         case 6:
         case 7:
-            ds_printf(s, "4 * (");
+            ds_printf(s, "max(4 * (");
             SRC(0);
             ds_printf(s, " - 0.5) * (");
             SRC(1);
-            ds_printf(s, " - 0.5)");
+            ds_printf(s, " - 0.5), 0)");
             break;
         case 8:
+            ds_printf(s, "min(");
             SRC(0);
             ds_printf(s, " * ");
             SRC(1);
             ds_printf(s, " + ");
             SRC(2);
+            ds_printf(s, ", 1)");
             break;
         case 9:
-            ds_printf(s, "(");
+            ds_printf(s, "min(");
             SRC(0);
             ds_printf(s, " + ");
             SRC(1);
-            ds_printf(s, ") * ");
+            ds_printf(s, ", 1) * ");
             SRC(2);
             break;
         default:
@@ -527,13 +540,6 @@ const char* alphatest_str(int alphafunc) {
     }
 }
 
-const char tev_setup[] = R"(
-vec4 cur = vec4(0);
-vec4 buf = tev_buffer_color;
-vec4 next_buf = tev_buffer_color;
-vec4 tmp;
-)";
-
 char* shader_gen_fs(UberUniforms* ubuf) {
     DynString s;
     ds_init(&s, 8192);
@@ -551,7 +557,12 @@ char* shader_gen_fs(UberUniforms* ubuf) {
 
     write_lighting(&s, ubuf);
 
-    ds_printf(&s, tev_setup);
+    ds_printf(&s, R"(
+vec4 cur = vec4(0);
+vec4 buf = tev_buffer_color;
+vec4 next_buf = tev_buffer_color;
+vec4 tmp;
+    )");
 
     bool update_buffer = false;
     for (int i = 0; i < 6; i++) {
@@ -561,7 +572,6 @@ char* shader_gen_fs(UberUniforms* ubuf) {
                        ubuf->tev[i].rgb.src0 == TEVSRC_PREVIOUS;
         bool skipa = ubuf->tev[i].a.combiner == 0 && ubuf->tev[i].a.op0 == 0 &&
                      ubuf->tev[i].a.src0 == TEVSRC_PREVIOUS;
-        bool needsclamp = false; // dont clamp if we didnt do anything
         if (!(skiprgb && skipa)) {
             ds_printf(&s, "tmp.rgb = ");
             write_combiner_rgb(&s, ubuf, i);
@@ -575,20 +585,15 @@ char* shader_gen_fs(UberUniforms* ubuf) {
             }
 
             ds_printf(&s, "cur = tmp;\n");
-
-            // no clamp for combiners nothing, mod, or interp
-            needsclamp = NEEDSCLAMP(ubuf->tev[i].rgb.combiner) ||
-                         NEEDSCLAMP(ubuf->tev[i].a.combiner);
         }
         if (ubuf->tev[i].rgb.scale != 1.0f) {
-            ds_printf(&s, "cur.rgb *= %f;\n", ubuf->tev[i].rgb.scale);
-            needsclamp = true;
+            ds_printf(&s, "cur.rgb = min(cur.rgb * %f, 1);\n",
+                      ubuf->tev[i].rgb.scale);
         }
         if (ubuf->tev[i].a.scale != 1.0f) {
-            ds_printf(&s, "cur.a *= %f;\n", ubuf->tev[i].a.scale);
-            needsclamp = true;
+            ds_printf(&s, "cur.a = min(cur.a * %f, 1);\n",
+                      ubuf->tev[i].a.scale);
         }
-        if (needsclamp) ds_printf(&s, "cur = clamp(cur, 0, 1);\n");
 
         if (update_buffer) ds_printf(&s, "buf = next_buf;\n");
         if (ubuf->tev_update_rgb & BIT(i)) {
@@ -601,7 +606,7 @@ char* shader_gen_fs(UberUniforms* ubuf) {
         }
     }
 
-    ds_printf(&s, "fragclr = cur;\n");
+    ds_printf(&s, "fragclr = clamp(cur, 0, 1);\n");
 
     if (ubuf->alphatest) {
         ds_printf(&s, "if (!%s) discard;\n", alphatest_str(ubuf->alphafunc));
