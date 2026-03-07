@@ -1328,7 +1328,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     if (fbufHash != gpu->lastFragUboHash) {
         gpu->lastFragUboHash = fbufHash;
         glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_DYNAMIC_DRAW);
     }
 
     GLuint fs;
