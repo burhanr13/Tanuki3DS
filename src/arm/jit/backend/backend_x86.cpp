@@ -173,7 +173,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
     hralloc =
         allocate_host_registers(regalloc, tempregs.size(), savedregs.size());
     for (u32 i = 0; i < hralloc.count[REG_STACK]; i++) {
-        stackslots.push_back(dword[rsp + 4 * i]);
+        stackslots.push_back(dword[rsp + (int) (4 * i)]);
     }
 
     u32 flags_mask = 0;

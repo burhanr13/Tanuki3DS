@@ -82,14 +82,14 @@ struct ShaderCode : Xbyak::CodeGenerator {
     void readsrc(Xbyak::Xmm dst, u32 n, u8 idx, u8 swizzle, bool neg) {
         Xbyak::Address addr = xword[(int) 0];
         if (n < 0x10) {
-            addr = xword[reg_v + 16 * n];
+            addr = xword[reg_v + (int) (16 * n)];
         } else if (n < 0x20) {
             n -= 0x10;
-            addr = xword[reg_r + 16 * n];
+            addr = xword[reg_r + (int) (16 * n)];
         } else {
             n -= 0x20;
             if (idx == 0) {
-                addr = xword[reg_c + 16 * n];
+                addr = xword[reg_c + (int) (16 * n)];
             } else {
                 switch (idx) {
                     case 1:
