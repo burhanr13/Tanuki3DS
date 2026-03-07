@@ -179,6 +179,9 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glBindTexture(GL_TEXTURE_1D_ARRAY, state->lightluttex);
     glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_R16, countof(gpu->lightLuts[0]),
+                 countof(gpu->lightLuts), 0, GL_RED, GL_UNSIGNED_SHORT,
+                 nullptr);
 }
 
 void renderer_gl_destroy(GLState* state, GPU* gpu) {
@@ -1273,9 +1276,9 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     glBindTexture(GL_TEXTURE_1D_ARRAY, gpu->gl.lightluttex);
     if (gpu->lightLutDirty) {
         gpu->lightLutDirty = false;
-        glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_R16, countof(gpu->lightLuts[0]),
-                     countof(gpu->lightLuts), 0, GL_RED, GL_UNSIGNED_SHORT,
-                     gpu->lightLuts);
+        glTexSubImage2D(GL_TEXTURE_1D_ARRAY, 0, 0, 0,
+                        countof(gpu->lightLuts[0]), countof(gpu->lightLuts),
+                        GL_RED, GL_UNSIGNED_SHORT, gpu->lightLuts);
     }
 
     // vertex shaders
@@ -1321,9 +1324,12 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     }
 
     // fragment shaders
-    // todo: do similar dirty checking for the fs
-    glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
+    u64 fbufHash = gpu_hash_fs_data(&fbuf);
+    if (fbufHash != gpu->lastFragUboHash) {
+        gpu->lastFragUboHash = fbufHash;
+        glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.frag_ubo);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof fbuf, &fbuf, GL_STREAM_DRAW);
+    }
 
     GLuint fs;
     if (ctremu.ubershader) {

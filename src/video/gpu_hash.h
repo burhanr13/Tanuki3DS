@@ -39,4 +39,8 @@ static inline u64 gpu_hash_fs(UberUniforms* ubuf) {
     return XXH3_64bits(ubuf, sizeof *ubuf);
 }
 
+static inline u64 gpu_hash_fs_data(FragUniforms* fbuf) {
+    return XXH3_64bits(fbuf, sizeof *fbuf);
+}
+
 #endif

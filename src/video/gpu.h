@@ -107,6 +107,8 @@ typedef struct _GPU {
     LRUCache(VSHCacheEntry, VSH_MAX) vshaders_hw;
     LRUCache(FSHCacheEntry, FSH_MAX) fshaders;
 
+    u64 lastFragUboHash;
+
     struct {
         pthread_t threads[MAX_VSH_THREADS];
         volatile atomic_bool ready[MAX_VSH_THREADS];
