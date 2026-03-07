@@ -1276,7 +1276,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     glBindTexture(GL_TEXTURE_1D_ARRAY, gpu->gl.lightluttex);
     if (gpu->lightLutDirty) {
         gpu->lightLutDirty = false;
-        glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_RED, countof(gpu->lightLuts[0]),
+        glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_R16, countof(gpu->lightLuts[0]),
                      countof(gpu->lightLuts), 0, GL_RED, GL_UNSIGNED_SHORT,
                      gpu->lightLuts);
     }

@@ -87,7 +87,7 @@ const char* lutinput_str(int lutSel) {
 void write_lut_read(DynString* s, UberUniforms* ubuf, int lutNum, char* name) {
     ds_printf(s, "texture(lightLuts, vec2(");
     if (ubuf->llutAbs & BIT(4 * lutNum + 1)) {
-        ds_printf(s, "(%s+1)/2", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
+        ds_printf(s, "fract(%s/2)", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
     } else {
         ds_printf(s, "abs(%s)", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
     }

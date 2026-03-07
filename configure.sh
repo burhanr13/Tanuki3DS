@@ -1,5 +1,6 @@
-rm config.mk
+rm -f config.mk
 
 for v in $@; do
     echo $v >> config.mk
 done
+
