@@ -87,7 +87,7 @@ void write_lut_read(DynString* s, UberUniforms* ubuf, int lutNum, char* name) {
     if (ubuf->llutAbs & BIT(4 * lutNum + 1)) {
         // to ensure proper clamping we need to multiply by the size of the
         // texture
-        ds_printf(s, "fract(clamp(%s*128,-128,127.5)/256)*256",
+        ds_printf(s, "fract(clamp(%s*128,-128,127.5)/256)",
                   lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
     } else {
         ds_printf(s, "abs(%s)", lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
@@ -229,7 +229,7 @@ void write_lighting(DynString* s, UberUniforms* ubuf) {
             ds_printf(s,
                       "float A_%d = texture(lightLuts, vec2(\n"
                       "light[%d].attn_bias + light[%d].attn_scale * dist,\n"
-                      "LUT_DA_BASE + %du)).r;\n",
+                      "LUT_DA_BASE + %d)).r;\n",
                       i, i, i, i);
             ds_printf(s, "cp_%d *= A_%d;\n", i, i);
             ds_printf(s, "cs_%d *= A_%d;\n", i, i);
