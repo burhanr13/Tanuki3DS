@@ -87,7 +87,8 @@ const char* lutinput_str(int lutSel) {
 void write_lut_read(DynString* s, UberUniforms* ubuf, int lutNum, char* name) {
     ds_printf(s, "texture(lightLuts, vec2(");
     if (ubuf->llutAbs & BIT(4 * lutNum + 1)) {
-        // to ensure proper clamping we need to multiply by the size of the texture
+        // to ensure proper clamping we need to multiply by the size of the
+        // texture
         ds_printf(s, "fract(clamp(%s*128,-128,127)/256)",
                   lutinput_str(ubuf->llutSel >> 4 * lutNum & 7));
     } else {
@@ -560,11 +561,9 @@ char* shader_gen_fs(UberUniforms* ubuf) {
     ds_printf(&s, R"(
 vec4 cur = vec4(0);
 vec4 buf = tev_buffer_color;
-vec4 next_buf = tev_buffer_color;
 vec4 tmp;
     )");
 
-    bool update_buffer = false;
     for (int i = 0; i < 6; i++) {
         // check for do nothing stage
         bool skiprgb = ubuf->tev[i].rgb.combiner == 0 &&
@@ -583,9 +582,24 @@ vec4 tmp;
                 write_combiner_a(&s, ubuf, i);
                 ds_printf(&s, ";\n");
             }
+        }
 
+        if (i > 0) {
+            // buffer update should happen in parallel
+            // with the tev combiner
+            // input from previous stage and not visible until next stage
+            if (ubuf->tev_update_rgb & BIT(i - 1)) {
+                ds_printf(&s, "buf.rgb = cur.rgb;\n");
+            }
+            if (ubuf->tev_update_alpha & BIT(i - 1)) {
+                ds_printf(&s, "buf.a = cur.a;\n");
+            }
+        }
+
+        if (!(skiprgb && skipa)) {
             ds_printf(&s, "cur = tmp;\n");
         }
+
         if (ubuf->tev[i].rgb.scale != 1.0f) {
             ds_printf(&s, "cur.rgb = min(cur.rgb * %f, 1);\n",
                       ubuf->tev[i].rgb.scale);
@@ -593,16 +607,6 @@ vec4 tmp;
         if (ubuf->tev[i].a.scale != 1.0f) {
             ds_printf(&s, "cur.a = min(cur.a * %f, 1);\n",
                       ubuf->tev[i].a.scale);
-        }
-
-        if (update_buffer) ds_printf(&s, "buf = next_buf;\n");
-        if (ubuf->tev_update_rgb & BIT(i)) {
-            ds_printf(&s, "next_buf.rgb = cur.rgb;\n");
-            update_buffer = true;
-        }
-        if (ubuf->tev_update_alpha & BIT(i)) {
-            ds_printf(&s, "next_buf.a = cur.a;\n");
-            update_buffer = true;
         }
     }
 
