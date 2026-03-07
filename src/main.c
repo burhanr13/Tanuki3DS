@@ -133,6 +133,9 @@ void hotkey_press(SDL_Keycode key) {
         case SDLK_F6:
             ctremu.mute = !ctremu.mute;
             break;
+        case SDLK_F9:
+            ctremu.swapscreens = !ctremu.swapscreens;
+            break;
         case SDLK_F10:
             ctremu.viewlayout = (ctremu.viewlayout + 1) % LAYOUT_MAX;
             break;
@@ -418,7 +421,7 @@ void draw_menubar() {
                     ctremu.viewlayout = LAYOUT_LARGETOP;
                 }
                 igSeparator();
-                igMenuItemP("Swap Screens", nullptr, &ctremu.swapscreens, true);
+                igMenuItemP("Swap Screens", "F9", &ctremu.swapscreens, true);
                 igEndMenu();
             }
             igSeparator();
