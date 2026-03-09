@@ -153,15 +153,8 @@ typedef union {
                 TexEnvRegs tev1;
                 TexEnvRegs tev2;
                 TexEnvRegs tev3;
-                struct {
-                    u32 fogmode : 3;
-                    u32 densitysource : 1;
-                    u32 : 4;
-                    u32 update_rgb : 4;
-                    u32 update_alpha : 4;
-                    u32 zflip : 16;
-                } tev_buffer;
-                u32 _0e0[0xf];
+                u32 tev_buffer;
+                u32 _0e1[0xf];
                 TexEnvRegs tev4;
                 TexEnvRegs tev5;
             };
@@ -272,7 +265,10 @@ typedef union {
                         u32 : 4;
                     } specular0, specular1, diffuse, ambient;
                     struct {
-                        u16 x, y, z, _w;
+                        u16 x : 16;
+                        u16 y : 16;
+                        u16 z : 16;
+                        u16 : 16;
                     } vec;
                     struct {
                         s16 x : 13;

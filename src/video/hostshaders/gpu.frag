@@ -68,7 +68,7 @@ struct Light {
     float attn_scale;
 };
 
-layout(std140) uniform UberUniforms {
+layout(std140) uniform FragConfig {
     Tev tev[6];
 
     uint tev_update_rgb;

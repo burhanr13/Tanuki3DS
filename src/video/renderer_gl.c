@@ -309,7 +309,7 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
     }
     if (fs == state->gpu_uberfs)
         glUniformBlockBinding(prog,
-                              glGetUniformBlockIndex(prog, "UberUniforms"), 1);
+                              glGetUniformBlockIndex(prog, "FragConfig"), 1);
     glUniformBlockBinding(prog, glGetUniformBlockIndex(prog, "FragUniforms"),
                           2);
     return prog;
@@ -975,25 +975,25 @@ static void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, regs->lod.max);
 }
 
-static void load_texenv(UberUniforms* ubuf, FragUniforms* fbuf, int i,
+static void load_texenv(FragConfig* fcfg, FragUniforms* fbuf, int i,
                         TexEnvRegs* regs) {
-    ubuf->tev[i].rgb.src0 = regs->source.rgb0;
-    ubuf->tev[i].rgb.src1 = regs->source.rgb1;
-    ubuf->tev[i].rgb.src2 = regs->source.rgb2;
-    ubuf->tev[i].a.src0 = regs->source.a0;
-    ubuf->tev[i].a.src1 = regs->source.a1;
-    ubuf->tev[i].a.src2 = regs->source.a2;
-    ubuf->tev[i].rgb.op0 = regs->operand.rgb0;
-    ubuf->tev[i].rgb.op1 = regs->operand.rgb1;
-    ubuf->tev[i].rgb.op2 = regs->operand.rgb2;
-    ubuf->tev[i].a.op0 = regs->operand.a0;
-    ubuf->tev[i].a.op1 = regs->operand.a1;
-    ubuf->tev[i].a.op2 = regs->operand.a2;
-    ubuf->tev[i].rgb.combiner = regs->combiner.rgb;
-    ubuf->tev[i].a.combiner = regs->combiner.a;
+    fcfg->tev[i].rgb.src0 = regs->source.rgb0;
+    fcfg->tev[i].rgb.src1 = regs->source.rgb1;
+    fcfg->tev[i].rgb.src2 = regs->source.rgb2;
+    fcfg->tev[i].a.src0 = regs->source.a0;
+    fcfg->tev[i].a.src1 = regs->source.a1;
+    fcfg->tev[i].a.src2 = regs->source.a2;
+    fcfg->tev[i].rgb.op0 = regs->operand.rgb0;
+    fcfg->tev[i].rgb.op1 = regs->operand.rgb1;
+    fcfg->tev[i].rgb.op2 = regs->operand.rgb2;
+    fcfg->tev[i].a.op0 = regs->operand.a0;
+    fcfg->tev[i].a.op1 = regs->operand.a1;
+    fcfg->tev[i].a.op2 = regs->operand.a2;
+    fcfg->tev[i].rgb.combiner = regs->combiner.rgb;
+    fcfg->tev[i].a.combiner = regs->combiner.a;
     COPYRGBA(fbuf->tev_color[i], regs->color);
-    ubuf->tev[i].rgb.scale = 1 << (regs->scale.rgb);
-    ubuf->tev[i].a.scale = 1 << (regs->scale.a);
+    fcfg->tev[i].rgb.scale = 1 << (regs->scale.rgb);
+    fcfg->tev[i].a.scale = 1 << (regs->scale.a);
 }
 
 static const GLuint attrtypes[] = {
@@ -1092,7 +1092,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     update_cur_fb(gpu);
 
     // ensure unused entries are 0 so the hashing is consistent
-    UberUniforms ubuf = {};
+    FragConfig fcfg = {};
     FragUniforms fbuf;
 
     // cull mode
@@ -1150,7 +1150,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     }
 
     // textures
-    ubuf.tex2coord = gpu->regs.tex.config.tex2coord;
+    fcfg.tex2coord = gpu->regs.tex.config.tex2coord;
     if (gpu->regs.tex.config.tex0enable) {
         load_texture(gpu, 0, &gpu->regs.tex.tex0, gpu->regs.tex.tex0_fmt);
     }
@@ -1164,23 +1164,22 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     if (gpu->regs.tex.tex0.param.type != 0) {
         lwarnonce("unknown texture type %d", gpu->regs.tex.tex0.param.type);
     }
-    ubuf.tex0shadow = gpu->regs.tex.tex0.param.shadow;
-    ubuf.shadowPerspective = !gpu->regs.tex.tex0_shadow.perspective;
+    fcfg.tex0shadow = gpu->regs.tex.tex0.param.shadow;
+    fcfg.shadowPerspective = !gpu->regs.tex.tex0_shadow.perspective;
     fbuf.shadowBias = (float) gpu->regs.tex.tex0_shadow.bias / BIT(23);
 
     // texenvs
-    load_texenv(&ubuf, &fbuf, 0, &gpu->regs.tex.tev0);
-    load_texenv(&ubuf, &fbuf, 1, &gpu->regs.tex.tev1);
-    load_texenv(&ubuf, &fbuf, 2, &gpu->regs.tex.tev2);
-    load_texenv(&ubuf, &fbuf, 3, &gpu->regs.tex.tev3);
-    load_texenv(&ubuf, &fbuf, 4, &gpu->regs.tex.tev4);
-    load_texenv(&ubuf, &fbuf, 5, &gpu->regs.tex.tev5);
-    ubuf.tev_update_rgb = gpu->regs.tex.tev_buffer.update_rgb;
-    ubuf.tev_update_alpha = gpu->regs.tex.tev_buffer.update_alpha;
+    load_texenv(&fcfg, &fbuf, 0, &gpu->regs.tex.tev0);
+    load_texenv(&fcfg, &fbuf, 1, &gpu->regs.tex.tev1);
+    load_texenv(&fcfg, &fbuf, 2, &gpu->regs.tex.tev2);
+    load_texenv(&fcfg, &fbuf, 3, &gpu->regs.tex.tev3);
+    load_texenv(&fcfg, &fbuf, 4, &gpu->regs.tex.tev4);
+    load_texenv(&fcfg, &fbuf, 5, &gpu->regs.tex.tev5);
+    fcfg.tev_buffer.w = gpu->regs.tex.tev_buffer;
     COPYRGBA(fbuf.tev_buffer_color, gpu->regs.tex.tev5.buffer_color);
 
     // blending/logic ops
-    ubuf.fragOp = gpu->regs.fb.color_op.frag_mode;
+    fcfg.fragOp = gpu->regs.fb.color_op.frag_mode;
     if (gpu->regs.fb.color_op.blend_mode) {
         glDisable(GL_COLOR_LOGIC_OP);
         glEnable(GL_BLEND);
@@ -1201,8 +1200,8 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     }
 
     // alpha test
-    ubuf.alphatest = gpu->regs.fb.alpha_test.enable;
-    ubuf.alphafunc = gpu->regs.fb.alpha_test.func;
+    fcfg.alphatest = gpu->regs.fb.alpha_test.enable;
+    fcfg.alphafunc = gpu->regs.fb.alpha_test.func;
     fbuf.alpharef = (float) gpu->regs.fb.alpha_test.ref / 255;
 
     // stencil test
@@ -1264,7 +1263,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     }
 
     // lighting params
-    ubuf.numlights = gpu->regs.lighting.numlights + 1;
+    fcfg.numlights = gpu->regs.lighting.numlights + 1;
     for (int i = 0; i < 8; i++) {
         COPYRGB(fbuf.light[i].specular0, gpu->regs.lighting.light[i].specular0);
         COPYRGB(fbuf.light[i].specular1, gpu->regs.lighting.light[i].specular1);
@@ -1273,7 +1272,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
         fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
         fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
-        ubuf.light[i].config.w = gpu->regs.lighting.light[i].config;
+        fcfg.light[i].config.w = gpu->regs.lighting.light[i].config;
         fbuf.light[i].spotdir[0] =
             (float) gpu->regs.lighting.light[i].spotdir.x / BIT(11);
         fbuf.light[i].spotdir[1] =
@@ -1285,13 +1284,13 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
             cvtf20(gpu->regs.lighting.light[i].attn_scale);
     }
     COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
-    ubuf.lconfig0.w = gpu->regs.lighting.config0;
-    ubuf.lconfig1.w = gpu->regs.lighting.config1;
-    ubuf.llutAbs = gpu->regs.lighting.lutinputAbs;
-    ubuf.llutSel = gpu->regs.lighting.lutinputSel;
-    ubuf.llutScale = gpu->regs.lighting.lutinputScale;
-    ubuf.lightPerm = gpu->regs.lighting.permutation;
-    ubuf.lightDisable = gpu->regs.lighting.disable;
+    fcfg.lconfig0.w = gpu->regs.lighting.config0;
+    fcfg.lconfig1.w = gpu->regs.lighting.config1;
+    fcfg.llutAbs = gpu->regs.lighting.lutinputAbs;
+    fcfg.llutSel = gpu->regs.lighting.lutinputSel;
+    fcfg.llutScale = gpu->regs.lighting.lutinputScale;
+    fcfg.lightPerm = gpu->regs.lighting.permutation;
+    fcfg.lightDisable = gpu->regs.lighting.disable;
 
     // light luts, use slot 4 for the light lut
     glActiveTexture(GL_TEXTURE4);
@@ -1356,15 +1355,15 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     GLuint fs;
     if (ctremu.ubershader) {
         glBindBuffer(GL_UNIFORM_BUFFER, gpu->gl.uber_ubo);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof ubuf, &ubuf, GL_STREAM_DRAW);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof fcfg, &fcfg, GL_STREAM_DRAW);
         fs = gpu->gl.gpu_uberfs;
     } else {
-        u64 hash = gpu_hash_fs(&ubuf);
+        u64 hash = gpu_hash_fs(&fcfg);
         auto ent = LRU_load(gpu->fshaders, hash);
         if (ent->hash != hash) {
             ent->hash = hash;
             glDeleteShader(ent->fs);
-            char* source = shader_gen_fs(&ubuf);
+            char* source = shader_gen_fs(&fcfg);
             ent->fs = compile_shader(GL_FRAGMENT_SHADER, source);
             free(source);
             linfo("compiled new fragment shader %d with hash %llx", ent->fs,

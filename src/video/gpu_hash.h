@@ -35,8 +35,8 @@ static inline u64 gpu_hash_hw_shader(GPU* gpu) {
     return hash;
 }
 
-static inline u64 gpu_hash_fs(UberUniforms* ubuf) {
-    return XXH3_64bits(ubuf, sizeof *ubuf);
+static inline u64 gpu_hash_fs(FragConfig* fcfg) {
+    return XXH3_64bits(fcfg, sizeof *fcfg);
 }
 
 static inline u64 gpu_hash_fs_data(FragUniforms* fbuf) {

@@ -48,8 +48,18 @@ typedef struct {
         } rgb, a;
     } tev[6];
 
-    int tev_update_rgb;
-    int tev_update_alpha;
+    union {
+        u32 w;
+        struct {
+            u32 fogmode : 3;
+            u32 densitysource : 1;
+            u32 : 4;
+            u32 update_rgb : 4;
+            u32 update_alpha : 4;
+            u32 zflip : 1;
+            u32 : 15;
+        };
+    } tev_buffer;
     int tex2coord;
     int tex0shadow;
     int shadowPerspective;
@@ -112,7 +122,7 @@ typedef struct {
 
     int alphatest;
     int alphafunc;
-} UberUniforms;
+} FragConfig;
 
 typedef struct {
     float tev_color[6][4];
@@ -146,6 +156,6 @@ typedef struct _FSHCacheEntry {
     struct _FSHCacheEntry *next, *prev;
 } FSHCacheEntry;
 
-char* shader_gen_fs(UberUniforms* ubuf);
+char* shader_gen_fs(FragConfig* fcfg);
 
 #endif
