@@ -1249,6 +1249,13 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         glDepthFunc(GL_ALWAYS);
     }
 
+    // shadow map generation mode
+    // in this mode, the red component of color is set to depth
+    // and depth test is performed on the color buffer
+    // to make this easier for a modern shader
+    // we use our own depth buffer to do depth comparisons
+    // thus we must enable depth mask here and when this
+    // framebuffer is cleared the depth is cleared as well
     if (gpu->regs.fb.color_op.frag_mode == 3) {
         gpu->curfb->shadowMap = true;
         glDepthMask(true);

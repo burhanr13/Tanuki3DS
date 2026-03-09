@@ -593,11 +593,16 @@ char* shader_gen_fs(UberUniforms* ubuf) {
     ds_printf(&s, "void main() {\n");
 
     if (ubuf->tex0shadow) {
+        // shadow map sampling
+        // texcoord0.uvw is the fragment position in light space
+        // we read out the depth from the shadow map and compare
+        // with texcoord0.w which is fragment depth in light space
+        // to determine if it is in the shadow
         ds_printf(&s, "vec4 tex0c = vec4(texture(tex0, texcoord0");
         if (ubuf->shadowPerspective) {
             ds_printf(&s, "/texcoordw");
         }
-        ds_printf(&s, ").r+shadowBias >= min(texcoordw,1));\n");
+        ds_printf(&s, ").r+shadowBias > min(texcoordw,1));\n");
     } else {
         ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
     }
