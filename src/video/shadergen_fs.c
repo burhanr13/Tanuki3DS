@@ -548,14 +548,23 @@ char* shader_gen_fs(UberUniforms* ubuf) {
 
     ds_printf(&s, "void main() {\n");
 
-    ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
+    if (ubuf->tex0shadow) {
+        ds_printf(&s, "vec4 tex0c = vec4(texture(tex0, texcoord0).r > texcoordw);\n");
+    } else {
+        ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
+    }
     ds_printf(&s, "vec4 tex1c = texture(tex1, texcoord1);\n");
     ds_printf(&s, "vec4 tex2c = texture(tex2, texcoord%d);\n",
               ubuf->tex2coord ? 1 : 2);
     // todo: proctex
     ds_printf(&s, "vec4 tex3c = vec4(1);\n");
 
-    write_lighting(&s, ubuf);
+    if (ubuf->lightDisable) {
+        ds_printf(&s, "vec4 lprimary = vec4(1);\n");
+        ds_printf(&s, "vec4 lsecondary = vec4(1);\n");
+    } else {
+        write_lighting(&s, ubuf);
+    }
 
     ds_printf(&s, R"(
 vec4 cur = vec4(0);
@@ -613,6 +622,11 @@ vec4 tmp;
 
     if (ubuf->alphatest) {
         ds_printf(&s, "if (!%s) discard;\n", alphatest_str(ubuf->alphafunc));
+    }
+
+    if (ubuf->fragOp == 3) {
+        ds_printf(&s, "fragclr.rgb = vec3(gl_FragCoord.z);\n");
+        ds_printf(&s, "fragclr.a = 1;\n");
     }
 
     ds_printf(&s, "}\n");

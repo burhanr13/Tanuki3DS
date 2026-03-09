@@ -1157,6 +1157,11 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         load_texture(gpu, 2, &gpu->regs.tex.tex2, gpu->regs.tex.tex2_fmt);
     }
 
+    if (gpu->regs.tex.tex0.param.type!=0) {
+        lwarnonce("unknown texture type %d", gpu->regs.tex.tex0.param.type);
+    }
+    ubuf.tex0shadow = gpu->regs.tex.tex0.param.shadow;
+
     // texenvs
     load_texenv(&ubuf, &fbuf, 0, &gpu->regs.tex.tev0);
     load_texenv(&ubuf, &fbuf, 1, &gpu->regs.tex.tev1);
@@ -1169,11 +1174,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     COPYRGBA(fbuf.tev_buffer_color, gpu->regs.tex.tev5.buffer_color);
 
     // blending/logic ops
-    if (gpu->regs.fb.color_op.frag_mode != 0) {
-        // gas or shadows, not implemented
-        lwarnonce("unknown frag mode %d", gpu->regs.fb.color_op.frag_mode);
-        return;
-    }
+    ubuf.fragOp = gpu->regs.fb.color_op.frag_mode;
     if (gpu->regs.fb.color_op.blend_mode) {
         glDisable(GL_COLOR_LOGIC_OP);
         glEnable(GL_BLEND);
@@ -1270,6 +1271,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     ubuf.llutSel = gpu->regs.lighting.lutinputSel;
     ubuf.llutScale = gpu->regs.lighting.lutinputScale;
     ubuf.lightPerm = gpu->regs.lighting.permutation;
+    ubuf.lightDisable = gpu->regs.lighting.disable;
 
     // light luts, use slot 4 for the light lut
     glActiveTexture(GL_TEXTURE4);
