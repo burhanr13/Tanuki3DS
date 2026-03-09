@@ -134,7 +134,11 @@ typedef union {
                 } config;
                 TexUnitRegs tex0;
                 u32 tex0_cubeaddr[5];
-                u32 tex0_shadow;
+                struct {
+                    u32 perspective : 1;
+                    u32 bias : 23;
+                    u32 : 8;
+                } tex0_shadow;
                 u32 _08c[2];
                 u32 tex0_fmt;
                 u32 lighting_enable;

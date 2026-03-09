@@ -52,15 +52,56 @@ typedef struct {
     int tev_update_alpha;
     int tex2coord;
     int tex0shadow;
+    int shadowPerspective;
 
     struct {
-        int config;
+        union {
+            u32 w;
+            struct {
+                u32 directional : 1;
+                u32 twosided : 1;
+                u32 use_g0 : 1;
+                u32 use_g1 : 1;
+                u32 : 28;
+            };
+        } config;
         int _pad[3];
     } light[8];
     int numlights;
 
-    int lconfig0;
-    int lconfig1;
+    union {
+        u32 w;
+        struct {
+            u32 shadow : 1;
+            u32 : 1;
+            u32 frPrimary : 1;
+            u32 frSecondary : 1;
+            u32 lightenv : 4;
+            u32 : 4;
+            u32 : 4;
+            u32 shadowPrimary : 1;
+            u32 shadowSecondary : 1;
+            u32 shadowInv : 1;
+            u32 shadowAlpha : 1;
+            u32 : 2;
+            u32 bumpTex : 2;
+            u32 shadowTex : 2;
+            u32 : 1;
+            u32 clampHighlights : 1;
+            u32 bumpMode : 2;
+            u32 noRecalcBumpVec : 1;
+            u32 : 1;
+        };
+    } lconfig0;
+    union {
+        u32 w;
+        struct {
+            u32 shadow : 8;
+            u32 spotlight : 8;
+            u32 luts : 8;
+            u32 distattn : 8;
+        };
+    } lconfig1;
     int llutAbs;
     int llutSel;
     int llutScale;
@@ -91,6 +132,7 @@ typedef struct {
     } light[8];
     float ambient_color[4];
 
+    float shadowBias;
     float alpharef;
 } FragUniforms;
 

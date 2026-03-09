@@ -612,6 +612,10 @@ void gpu_gl_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
             glBindFramebuffer(GL_FRAMEBUFFER, gpu->fbs.d[i].fbo);
             glClearColor(r, g, b, a);
             glClear(GL_COLOR_BUFFER_BIT);
+            if (gpu->curfb->shadowMap) {
+                glClearDepth(r);
+                glClear(GL_DEPTH_BUFFER_BIT);
+            }
             linfo("cleared color buffer at %x of fb %d with value %x", paddr, i,
                   value);
             return;
@@ -1157,10 +1161,12 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         load_texture(gpu, 2, &gpu->regs.tex.tex2, gpu->regs.tex.tex2_fmt);
     }
 
-    if (gpu->regs.tex.tex0.param.type!=0) {
+    if (gpu->regs.tex.tex0.param.type != 0) {
         lwarnonce("unknown texture type %d", gpu->regs.tex.tex0.param.type);
     }
     ubuf.tex0shadow = gpu->regs.tex.tex0.param.shadow;
+    ubuf.shadowPerspective = !gpu->regs.tex.tex0_shadow.perspective;
+    fbuf.shadowBias = (float) gpu->regs.tex.tex0_shadow.bias / BIT(23);
 
     // texenvs
     load_texenv(&ubuf, &fbuf, 0, &gpu->regs.tex.tev0);
@@ -1243,6 +1249,13 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         glDepthFunc(GL_ALWAYS);
     }
 
+    if (gpu->regs.fb.color_op.frag_mode == 3) {
+        gpu->curfb->shadowMap = true;
+        glDepthMask(true);
+    } else {
+        gpu->curfb->shadowMap = false;
+    }
+
     // lighting params
     ubuf.numlights = gpu->regs.lighting.numlights + 1;
     for (int i = 0; i < 8; i++) {
@@ -1253,7 +1266,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
         fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
         fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
-        ubuf.light[i].config = gpu->regs.lighting.light[i].config;
+        ubuf.light[i].config.w = gpu->regs.lighting.light[i].config;
         fbuf.light[i].spotdir[0] =
             (float) gpu->regs.lighting.light[i].spotdir.x / BIT(11);
         fbuf.light[i].spotdir[1] =
@@ -1265,8 +1278,8 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
             cvtf20(gpu->regs.lighting.light[i].attn_scale);
     }
     COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
-    ubuf.lconfig0 = gpu->regs.lighting.config0;
-    ubuf.lconfig1 = gpu->regs.lighting.config1;
+    ubuf.lconfig0.w = gpu->regs.lighting.config0;
+    ubuf.lconfig1.w = gpu->regs.lighting.config1;
     ubuf.llutAbs = gpu->regs.lighting.lutinputAbs;
     ubuf.llutSel = gpu->regs.lighting.lutinputSel;
     ubuf.llutScale = gpu->regs.lighting.lutinputScale;

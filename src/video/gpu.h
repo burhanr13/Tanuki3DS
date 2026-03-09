@@ -44,6 +44,7 @@ typedef struct _FBInfo {
     u32 color_fmt;
     u32 color_Bpp;
 
+    bool shadowMap;
     bool dirty;
 
     struct _FBInfo *next, *prev;
