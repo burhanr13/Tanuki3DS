@@ -51,7 +51,7 @@ typedef struct {
     int tev_update_rgb;
     int tev_update_alpha;
     int tex2coord;
-    int _pad1;
+    int tex0shadow;
 
     struct {
         int config;
@@ -65,6 +65,9 @@ typedef struct {
     int llutSel;
     int llutScale;
     int lightPerm;
+    int lightDisable;
+
+    int fragOp;
 
     int alphatest;
     int alphafunc;
