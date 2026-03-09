@@ -308,28 +308,28 @@ void write_operand_rgb(DynString* s, const char* srcstr, u32 op) {
             ds_printf(s, "(1 - %s.rgb)", srcstr);
             break;
         case 2:
-            ds_printf(s, "vec3(%s.a)", srcstr);
+            ds_printf(s, "%s.aaa", srcstr);
             break;
         case 3:
-            ds_printf(s, "vec3(1 - %s.a)", srcstr);
+            ds_printf(s, "1 - %s.aaa", srcstr);
             break;
         case 4:
-            ds_printf(s, "vec3(%s.r)", srcstr);
+            ds_printf(s, "%s.rrr", srcstr);
             break;
         case 5:
-            ds_printf(s, "vec3(1 - %s.r)", srcstr);
+            ds_printf(s, "1 - %s.rrr", srcstr);
             break;
         case 8:
-            ds_printf(s, "vec3(%s.g)", srcstr);
+            ds_printf(s, "%s.ggg", srcstr);
             break;
         case 9:
-            ds_printf(s, "vec3(1 - %s.g)", srcstr);
+            ds_printf(s, "1 - %s.ggg", srcstr);
             break;
         case 12:
-            ds_printf(s, "vec3(%s.b)", srcstr);
+            ds_printf(s, "%s.bbb", srcstr);
             break;
         case 13:
-            ds_printf(s, "vec3(1 - %s.b)", srcstr);
+            ds_printf(s, "1 - %s.bbb", srcstr);
             break;
         default:
             ds_printf(s, "%s.rgb", srcstr);
