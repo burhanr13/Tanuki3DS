@@ -154,7 +154,21 @@ typedef union {
                 TexEnvRegs tev2;
                 TexEnvRegs tev3;
                 u32 tev_buffer;
-                u32 _0e1[0xf];
+                struct {
+                    u8 r : 8;
+                    u8 g : 8;
+                    u8 b : 8;
+                    u8 : 8;
+                } fogColor;
+                u32 _0e2[2];
+                u32 gasAttn;
+                u32 gasAccMax;
+                struct {
+                    u32 fogLutIdx : 7;
+                    u32 : 25;
+                };
+                u32 _e7;
+                u32 fogLutData[8];
                 TexEnvRegs tev4;
                 TexEnvRegs tev5;
             };

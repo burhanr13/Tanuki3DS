@@ -20,6 +20,7 @@ uniform sampler2D tex1;
 uniform sampler2D tex2;
 
 uniform sampler1DArray lightLuts;
+uniform sampler1D fogLut;
 
 struct Light {
     vec3 specular0;
@@ -27,8 +28,7 @@ struct Light {
     vec3 diffuse;
     vec3 ambient;
     vec3 vec;
-    vec3 spotdir;
-    vec4 _pad;
+    vec4 spotdir;
     float attn_bias;
     float attn_scale;
 };
@@ -38,7 +38,8 @@ layout (std140) uniform FragUniforms {
     vec4 tev_buffer_color;
 
     Light light[8];
-    vec4 ambient_color;
+    vec3 ambient_color;
+    vec4 fog_color;
 
     float shadowBias;
     float alpharef;
@@ -164,7 +165,7 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
         ds_printf(s, "l /= dist;\n");
         ds_printf(s, "h = normalize(l + v);\n");
         ds_printf(s, "h_proj = normalize(h - n * dot(n, h));\n");
-        ds_printf(s, "p = normalize(light[%d].spotdir);\n", i);
+        ds_printf(s, "p = normalize(light[%d].spotdir.xyz);\n", i);
 
         ds_printf(s, "vec3 cp_%d = light[%d].ambient + ", i, i);
         if (fcfg->light[i].config.twosided) {
@@ -293,7 +294,7 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
         ds_printf(s, "lsecondary.a *= H;\n");
     }
 
-    ds_printf(s, "lprimary.rgb += ambient_color.rgb;\n");
+    ds_printf(s, "lprimary.rgb += ambient_color;\n");
 
     ds_printf(s, "lprimary = min(lprimary, 1);\n");
     ds_printf(s, "lsecondary = min(lsecondary, 1);\n");
@@ -675,6 +676,15 @@ vec4 tmp;
 
     if (fcfg->alphatest) {
         ds_printf(&s, "if (!%s) discard;\n", alphatest_str(fcfg->alphafunc));
+    }
+
+    if (fcfg->tev_buffer.fogmode == 5) {
+        ds_printf(&s, "float fog = texture(fogLut, ");
+        if (fcfg->tev_buffer.zflip) {
+            ds_printf(&s, "1 - ");
+        }
+        ds_printf(&s, "gl_FragCoord.z).r;\n");
+        ds_printf(&s, "fragclr.rgb = mix(fog_color.rgb, fragclr.rgb, fog);\n");
     }
 
     if (fcfg->fragOp == 3) {

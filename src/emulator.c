@@ -102,6 +102,7 @@ void emulator_init() {
     if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
     if (ctremu.volume < 0) ctremu.volume = 0;
     if (ctremu.volume > 200) ctremu.volume = 200;
+    ctremu.ubershader = false;
 
     save_config();
 }

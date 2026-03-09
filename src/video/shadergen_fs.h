@@ -135,12 +135,12 @@ typedef struct {
         float ambient[4];
         float vec[4];
         float spotdir[4];
-        float _pad0[4];
         float attn_bias;
         float attn_scale;
         float _pad[2];
     } light[8];
     float ambient_color[4];
+    float fog_color[4];
 
     float shadowBias;
     float alpharef;

@@ -197,7 +197,7 @@ void draw_settings() {
             igBeginDisabled(!ctremu.hwvshaders);
             igCheckbox("Safe Multiplication", &ctremu.safeShaderMul);
             igEndDisabled();
-            igCheckbox("Use Ubershader", &ctremu.ubershader);
+            // igCheckbox("Use Ubershader", &ctremu.ubershader);
             igCheckbox("Hash Textures", &ctremu.hashTextures);
             break;
         }
@@ -466,7 +466,6 @@ void draw_textureview() {
 
         igEndTabItem();
     }
-
     igEndTabBar();
 
     igEnd();

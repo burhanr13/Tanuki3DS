@@ -182,6 +182,12 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_R16, countof(gpu->lightLuts[0]),
                  countof(gpu->lightLuts), 0, GL_RED, GL_UNSIGNED_SHORT,
                  nullptr);
+    glGenTextures(1, &state->fogluttex);
+    glBindTexture(GL_TEXTURE_1D, state->fogluttex);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_R16, countof(gpu->fogLut), 0, GL_RED,
+                 GL_UNSIGNED_SHORT, nullptr);
 }
 
 void renderer_gl_destroy(GLState* state, GPU* gpu) {
@@ -217,6 +223,7 @@ void renderer_gl_destroy(GLState* state, GPU* gpu) {
         glDeleteTextures(1, &gpu->textures.d[i].tex);
     }
     glDeleteTextures(1, &state->lightluttex);
+    glDeleteTextures(1, &state->fogluttex);
 }
 
 // call before emulating gpu drawing
@@ -300,6 +307,7 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
     glUniform1i(glGetUniformLocation(prog, "tex1"), 1);
     glUniform1i(glGetUniformLocation(prog, "tex2"), 2);
     glUniform1i(glGetUniformLocation(prog, "lightLuts"), 4);
+    glUniform1i(glGetUniformLocation(prog, "fogLut"), 5);
 
     if (vs != state->gpu_vs) {
         glUniformBlockBinding(prog,
@@ -308,8 +316,8 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
             prog, glGetUniformBlockIndex(prog, "FreecamUniforms"), 3);
     }
     if (fs == state->gpu_uberfs)
-        glUniformBlockBinding(prog,
-                              glGetUniformBlockIndex(prog, "FragConfig"), 1);
+        glUniformBlockBinding(prog, glGetUniformBlockIndex(prog, "FragConfig"),
+                              1);
     glUniformBlockBinding(prog, glGetUniformBlockIndex(prog, "FragUniforms"),
                           2);
     return prog;
@@ -399,9 +407,9 @@ static void update_cur_fb(GPU* gpu) {
 
 #define COPYRGB(dst, src)                                                      \
     ({                                                                         \
-        dst[0] = (float) (src.r & 0xff) / 255;                                 \
-        dst[1] = (float) (src.g & 0xff) / 255;                                 \
-        dst[2] = (float) (src.b & 0xff) / 255;                                 \
+        dst[0] = (float) src.r / 255;                                          \
+        dst[1] = (float) src.g / 255;                                          \
+        dst[2] = (float) src.b / 255;                                          \
     })
 
 void gpu_gl_display_transfer(GPU* gpu, u32 paddr, int yoffdst, bool scalex,
@@ -1177,6 +1185,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     load_texenv(&fcfg, &fbuf, 5, &gpu->regs.tex.tev5);
     fcfg.tev_buffer.w = gpu->regs.tex.tev_buffer;
     COPYRGBA(fbuf.tev_buffer_color, gpu->regs.tex.tev5.buffer_color);
+    COPYRGB(fbuf.fog_color, gpu->regs.tex.fogColor);
 
     // blending/logic ops
     fcfg.fragOp = gpu->regs.fb.color_op.frag_mode;
@@ -1292,7 +1301,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     fcfg.lightPerm = gpu->regs.lighting.permutation;
     fcfg.lightDisable = gpu->regs.lighting.disable;
 
-    // light luts, use slot 4 for the light lut
+    // light luts, use slot 4
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_1D_ARRAY, gpu->gl.lightluttex);
     if (gpu->lightLutDirty) {
@@ -1300,6 +1309,15 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
         glTexSubImage2D(GL_TEXTURE_1D_ARRAY, 0, 0, 0,
                         countof(gpu->lightLuts[0]), countof(gpu->lightLuts),
                         GL_RED, GL_UNSIGNED_SHORT, gpu->lightLuts);
+    }
+
+    // fog lut, use slot 5
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_1D, gpu->gl.fogluttex);
+    if (gpu->fogLutDirty) {
+        gpu->fogLutDirty = false;
+        glTexSubImage1D(GL_TEXTURE_1D, 0, 0, countof(gpu->fogLut), GL_RED,
+                        GL_UNSIGNED_SHORT, gpu->fogLut);
     }
 
     // vertex shaders

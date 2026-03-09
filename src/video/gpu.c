@@ -97,12 +97,19 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
                 gpu_draw(gpu, false, true);
             }
             break;
-        case GPUREG(lighting.lutData[0])... GPUREG(lighting.lutData[7]):
+        case GPUREG(lighting.lutData[0])... GPUREG(lighting.lutData[7]): {
+            u16 p12 = param & MASK(12);
             gpu->lightLuts[gpu->regs.lighting.lutNum]
-                         [gpu->regs.lighting.lutIndex++] = (param & MASK(12))
-                                                           << 4;
+                          [gpu->regs.lighting.lutIndex++] = p12 << 4 | p12 >> 8;
             gpu->lightLutDirty = true;
             break;
+        }
+        case GPUREG(tex.fogLutData[0])... GPUREG(tex.fogLutData[7]): {
+            u16 p11 = param >> 13 & MASK(11);
+            gpu->fogLut[gpu->regs.tex.fogLutIdx++] = p11 << 5 | p11 >> 6;
+            gpu->fogLutDirty = true;
+            break;
+        }
         case GPUREG(gsh.floatuniform_data[0])... GPUREG(
             gsh.floatuniform_data[7]): {
             u32 idx = gpu->regs.gsh.floatuniform_idx;
