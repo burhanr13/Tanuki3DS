@@ -107,6 +107,10 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
         case GPUREG(tex.fogLutData[0])... GPUREG(tex.fogLutData[7]): {
             u16 p11 = param >> 13 & MASK(11);
             gpu->fogLut[gpu->regs.tex.fogLutIdx++] = p11 << 5 | p11 >> 6;
+            if (gpu->regs.tex.fogLutIdx == 0) {
+                p11 -= (sbit(13)) param;
+                gpu->fogLut[128] = p11 << 5 | p11 >> 6;
+            }
             gpu->fogLutDirty = true;
             break;
         }

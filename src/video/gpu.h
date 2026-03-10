@@ -101,7 +101,7 @@ typedef struct _GPU {
     u16 lightLuts[32][256];
     bool lightLutDirty;
 
-    u16 fogLut[128];
+    u16 fogLut[129];
     bool fogLutDirty;
 
     LRUCache(FBInfo, FB_MAX) fbs;

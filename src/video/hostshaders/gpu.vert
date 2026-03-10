@@ -17,9 +17,17 @@ out float texcoordw;
 out vec4 normquat;
 out vec3 view;
 
+uniform float depthOffset;
+uniform float depthScale;
+uniform bool depthWBuffer;
+
 void main() {
     vec4 pos = a_pos;
-    pos.z = pos.z * 2 + pos.w; // we need to recorrect the depth from -1,0 to -1,1
+    // apply depth map
+    pos.z = pos.z * depthScale + pos.w * depthOffset;
+    if (depthWBuffer) pos.z *= pos.w;
+    // correct depth from 0,1 to -1,1
+    pos.z = 2 * pos.z - pos.w;
     gl_Position = pos;
 
     color = a_color;

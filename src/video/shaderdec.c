@@ -61,6 +61,10 @@ layout (std140) uniform VertUniforms {
     uint b_raw;
 };
 
+uniform float depthOffset;
+uniform float depthScale;
+uniform bool depthWBuffer;
+
 #define b(n) ((b_raw & (1u << n)) != 0u)
 
 layout (std140) uniform FreecamUniforms {
@@ -763,8 +767,12 @@ char* shader_dec_vs(GPU* gpu) {
         }
     }
 
-    // correct z value
-    ds_printf(&final, "pos.z = pos.z * 2 + pos.w;\n");
+    // depth map
+    ds_printf(&final, R"(
+pos.z = pos.z * depthScale + pos.w * depthOffset;
+if (depthWBuffer) pos.z *= pos.w;
+pos.z = 2 * pos.z - pos.w;
+)");
     ds_printf(&final, "gl_Position = pos;\n");
 
     ds_printf(&final, "}\n");

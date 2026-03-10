@@ -67,8 +67,8 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
 
     LRU_init(state->progcache);
 
-    glGenBuffers(4, state->ubos);
-    for (int i = 0; i < 4; i++) {
+    glGenBuffers(countof(state->ubos), state->ubos);
+    for (int i = 0; i < countof(state->ubos); i++) {
         glBindBufferBase(GL_UNIFORM_BUFFER, i, state->ubos[i]);
     }
     // freecam buffer contains a matrix and a bool
@@ -1145,17 +1145,12 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     }
 
     // depth map
-    if (gpu->regs.raster.depthmap_enable) {
-        float offset = cvtf24(gpu->regs.raster.depthmap_offset);
-        float scale = cvtf24(gpu->regs.raster.depthmap_scale);
-        // pica near plane is -1 and farplane is 0
-        glDepthRange(offset - scale, offset);
-    } else {
-        // default depth range maps -1 -> 1 and 0 -> 0
-        // supposedly this actually uses "w buffering" instead
-        // and does something with offset/scale
-        glDepthRange(1, 0);
-    }
+    float dmOffset = cvtf24(gpu->regs.raster.depthmap_offset);
+    float dmScale = cvtf24(gpu->regs.raster.depthmap_scale);
+    bool wbuffer = !gpu->regs.raster.depthmap_enable;
+    // previously we used glDepthRange here, but this cannot properly
+    // emulate negative depth offset (probably glPolygonOffset)
+    // so we do in vertex shader instead
 
     // textures
     fcfg.tex2coord = gpu->regs.tex.config.tex2coord;
@@ -1404,6 +1399,10 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
             glUseProgram(ent->prog);
         }
     }
+    GLuint prog = LRU_mru(gpu->gl.progcache)->prog;
+    glUniform1f(glGetUniformLocation(prog, "depthOffset"), dmOffset);
+    glUniform1f(glGetUniformLocation(prog, "depthScale"), dmScale);
+    glUniform1i(glGetUniformLocation(prog, "depthWBuffer"), wbuffer);
 
     // starting  index
     int basevert = immediate ? 0 : gpu->regs.geom.vtx_off;
