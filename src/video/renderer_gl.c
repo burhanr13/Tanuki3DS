@@ -177,6 +177,7 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
 
     glGenTextures(1, &state->lightluttex);
     glBindTexture(GL_TEXTURE_1D_ARRAY, state->lightluttex);
+    glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_R16, countof(gpu->lightLuts[0]),
@@ -184,6 +185,7 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
                  nullptr);
     glGenTextures(1, &state->fogluttex);
     glBindTexture(GL_TEXTURE_1D, state->fogluttex);
+    glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_R16, countof(gpu->fogLut), 0, GL_RED,

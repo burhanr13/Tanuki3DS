@@ -43,6 +43,8 @@ layout (std140) uniform FragUniforms {
 
     float shadowBias;
     float alpharef;
+    float depthOffset;
+    float depthScale;
 };
 
 vec3 quatrot(vec4 q, vec3 v) {
@@ -278,17 +280,21 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
         write_lut_read(s, fcfg, LLUT_FR, "LUT_FR",
                        fcfg->light[i].config.twosided);
         ds_printf(s, ";\n");
-    }
-    if (fcfg->lconfig0.frPrimary) {
-        ds_printf(s, "lprimary.a = fr;\n");
+        if (fcfg->lconfig0.frPrimary) {
+            ds_printf(s, "lprimary.a = fr;\n");
+        } else {
+            ds_printf(s, "lprimary.a = 1;\n");
+        }
+        if (fcfg->lconfig0.frSecondary) {
+            ds_printf(s, "lsecondary.a = fr;\n");
+        } else {
+            ds_printf(s, "lsecondary.a = 1;\n");
+        }
     } else {
         ds_printf(s, "lprimary.a = 1;\n");
-    }
-    if (fcfg->lconfig0.frSecondary) {
-        ds_printf(s, "lsecondary.a = fr;\n");
-    } else {
         ds_printf(s, "lsecondary.a = 1;\n");
     }
+    
     if (fcfg->lconfig0.shadowAlpha) {
         ds_printf(s, "lprimary.a *= H;\n");
         ds_printf(s, "lsecondary.a *= H;\n");
@@ -683,7 +689,7 @@ vec4 tmp;
         if (fcfg->tev_buffer.zflip) {
             ds_printf(&s, "1 - ");
         }
-        ds_printf(&s, "gl_FragCoord.z).r;\n");
+        ds_printf(&s, "(gl_FragCoord.z*128.f/129+0.5f/129)).r;\n");
         ds_printf(&s, "fragclr.rgb = mix(fog_color.rgb, fragclr.rgb, fog);\n");
     }
 

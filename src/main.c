@@ -264,6 +264,13 @@ void update_input() {
         if (tl > INT16_MAX / 10) btn.l = 1;
         int tr = SDL_GetGamepadAxis(g_gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
         if (tr > INT16_MAX / 10) btn.r = 1;
+
+        int rx = SDL_GetGamepadAxis(g_gamepad, SDL_GAMEPAD_AXIS_RIGHTX);
+        int ry = SDL_GetGamepadAxis(g_gamepad, SDL_GAMEPAD_AXIS_RIGHTY);
+        if (rx > INT16_MAX / 2) btn.right = 1;
+        if (rx < -INT16_MAX / 2) btn.left = 1;
+        if (ry > INT16_MAX / 2) btn.down = 1;
+        if (ry < -INT16_MAX / 2) btn.up = 1;
     }
 
     btn.cup = cy > INT16_MAX / 2;
