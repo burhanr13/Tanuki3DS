@@ -601,21 +601,21 @@ void gpu_gl_clear_fb(GPU* gpu, u32 paddr, u32 endPaddr, u32 value, u32 datasz) {
                     r = (value >> 16 & 0xff) / 255.f;
                     break;
                 case 2:
-                    r = (value & 0x1f) / 31.f;
+                    b = (value & 0x1f) / 31.f;
                     g = (value >> 5 & 0x3f) / 63.f;
-                    b = (value >> 11 & 0x1f) / 31.f;
+                    r = (value >> 11 & 0x1f) / 31.f;
                     break;
                 case 3:
-                    r = (value & 0x1f) / 31.f;
-                    g = (value >> 5 & 0x1f) / 31.f;
-                    b = (value >> 10 & 0x1f) / 31.f;
-                    a = (value >> 15 & 1);
+                    a = value & 1;
+                    b = (value >> 1 & 0x1f) / 31.f;
+                    g = (value >> 6 & 0x1f) / 31.f;
+                    r = (value >> 15 & 0x1f) / 31.f;
                     break;
                 case 4:
-                    r = (value & 0xf) / 15.f;
-                    g = (value >> 4 & 0xf) / 15.f;
-                    b = (value >> 8 & 0xf) / 15.f;
-                    a = (value >> 12 & 0xf) / 15.f;
+                    a = (value & 0xf) / 15.f;
+                    b = (value >> 4 & 0xf) / 15.f;
+                    g = (value >> 8 & 0xf) / 15.f;
+                    r = (value >> 12 & 0xf) / 15.f;
                     break;
             }
 

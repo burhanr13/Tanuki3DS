@@ -107,8 +107,18 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
         case GPUREG(tex.fogLutData[0])... GPUREG(tex.fogLutData[7]): {
             u16 p11 = param >> 13 & MASK(11);
             gpu->fogLut[gpu->regs.tex.fogLutIdx++] = p11 << 5 | p11 >> 6;
+            // fog lut input comes with value, difference to next value
+            // for the most part this difference can be ignored since it
+            // is just there to make linear interpolation easier
+            // however for the last entry of the table we cannot ignore it
+            // since effectively it gives a 128th entry of the table
+            // depth = 127/128 -> entry 127
+            // depth = 128/128 = 1 -> entry 128
+            // depth = 127..128 -> interpolate between the above
+            // in the fragment shader when sampling we will also
+            // modify texture coordinate to allow proper sampling in this way
             if (gpu->regs.tex.fogLutIdx == 0) {
-                p11 -= (sbit(13)) param;
+                p11 += (sbit(13)) param + 1;
                 gpu->fogLut[128] = p11 << 5 | p11 >> 6;
             }
             gpu->fogLutDirty = true;

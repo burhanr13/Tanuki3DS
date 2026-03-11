@@ -689,6 +689,11 @@ vec4 tmp;
         if (fcfg->tev_buffer.zflip) {
             ds_printf(&s, "1 - ");
         }
+        // gl will take coordinate n.5 as the value at n in the texture
+        // and coordinate n is actually interpolated between n-1,n
+        // but we want to shift over by 0.5
+        // coordinate 0/128 -> 0.5, ... 127/128 -> 127.5, 128/128 -> 128.5
+        // for proper fog we recorrect the coordinate (it is quite sensitive to this)
         ds_printf(&s, "(gl_FragCoord.z*128.f/129+0.5f/129)).r;\n");
         ds_printf(&s, "fragclr.rgb = mix(fog_color.rgb, fragclr.rgb, fog);\n");
     }
