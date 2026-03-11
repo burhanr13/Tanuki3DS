@@ -43,8 +43,6 @@ layout (std140) uniform FragUniforms {
 
     float shadowBias;
     float alpharef;
-    float depthOffset;
-    float depthScale;
 };
 
 vec3 quatrot(vec4 q, vec3 v) {
