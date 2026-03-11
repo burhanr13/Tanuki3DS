@@ -618,8 +618,8 @@ char* shader_gen_fs(FragConfig* fcfg) {
     ds_printf(&s, "vec4 tex3c = vec4(1);\n");
 
     if (fcfg->lightDisable) {
-        ds_printf(&s, "vec4 lprimary = vec4(1);\n");
-        ds_printf(&s, "vec4 lsecondary = vec4(1);\n");
+        ds_printf(&s, "vec4 lprimary = vec4(0);\n");
+        ds_printf(&s, "vec4 lsecondary = vec4(0);\n");
     } else {
         write_lighting(&s, fcfg);
     }
