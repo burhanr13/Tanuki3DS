@@ -276,24 +276,23 @@ static inline void ds_free(DynString* s) {
 }
 
 static inline void ds_printf(DynString* s, const char* fmt, ...) {
+    char* buf;
     va_list v;
-    while (true) {
-        int rem = s->end - s->cur;
-        va_start(v);
-        int n = vsnprintf(s->cur, rem, fmt, v);
-        va_end(v);
-
-        if (n < rem) {
-            s->cur += n;
-            return;
-        }
-
+    va_start(v);
+    int n = vasprintf(&buf, fmt, v);
+    va_end(v);
+    if (s->cur + n >= s->end) {
         auto curoff = s->cur - s->str;
         auto curlen = s->end - s->str;
-        s->str = realloc(s->str, 2 * curlen);
+        auto newlen = 2 * curlen;
+        if (curlen + n >= newlen) newlen = curlen + n + 1;
+        s->str = realloc(s->str, newlen);
         s->cur = s->str + curoff;
-        s->end = s->str + 2 * curlen;
+        s->end = s->str + newlen;
     }
+    strcpy(s->cur, buf);
+    free(buf);
+    s->cur += n;
 }
 
 #endif
