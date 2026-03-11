@@ -20,7 +20,8 @@ struct {
     SRV("cfg:s", cfg),       SRV("cfg:i", cfg),        SRV("y2r:u", y2r),
     SRV("cecd:u", cecd),     SRV("ldr:ro", ldr_ro),    SRV("nwm::UDS", nwm_uds),
     SRV("ir:USER", ir_user), SRV("am:app", am),        SRV("frd:u", frd),
-    SRV("ptm:u", ptm),       SRV("boss:U", boss),
+    SRV("ptm:u", ptm),       SRV("ptm:play", ptm),     SRV("ptm:sysm", ptm),
+    SRV("boss:U", boss),
 #undef SRV
 };
 
