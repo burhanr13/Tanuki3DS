@@ -110,9 +110,6 @@ void write_lut_read(DynString* s, FragConfig* fcfg, int lutNum, char* name,
 }
 
 void write_lighting(DynString* s, FragConfig* fcfg) {
-    ds_printf(s, "vec4 lprimary = vec4(0);\n");
-    ds_printf(s, "vec4 lsecondary = vec4(0);\n");
-
     if (fcfg->lconfig0.bumpMode != 0) {
         ds_printf(s, "vec3 bumpVec = 2 * tex%dc.xyz - 1;\n",
                   fcfg->lconfig0.bumpTex);
@@ -292,7 +289,7 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
         ds_printf(s, "lprimary.a = 1;\n");
         ds_printf(s, "lsecondary.a = 1;\n");
     }
-    
+
     if (fcfg->lconfig0.shadowAlpha) {
         ds_printf(s, "lprimary.a *= H;\n");
         ds_printf(s, "lsecondary.a *= H;\n");
@@ -617,10 +614,9 @@ char* shader_gen_fs(FragConfig* fcfg) {
     // todo: proctex
     ds_printf(&s, "vec4 tex3c = vec4(1);\n");
 
-    if (fcfg->lightDisable) {
-        ds_printf(&s, "vec4 lprimary = vec4(0);\n");
-        ds_printf(&s, "vec4 lsecondary = vec4(0);\n");
-    } else {
+    ds_printf(&s, "vec4 lprimary = vec4(0);\n");
+    ds_printf(&s, "vec4 lsecondary = vec4(0);\n");
+    if (!fcfg->lightDisable) {
         write_lighting(&s, fcfg);
     }
 
@@ -691,7 +687,8 @@ vec4 tmp;
         // and coordinate n is actually interpolated between n-1,n
         // but we want to shift over by 0.5
         // coordinate 0/128 -> 0.5, ... 127/128 -> 127.5, 128/128 -> 128.5
-        // for proper fog we recorrect the coordinate (it is quite sensitive to this)
+        // for proper fog we recorrect the coordinate (it is quite sensitive to
+        // this)
         ds_printf(&s, "(gl_FragCoord.z*128.f/129+0.5f/129)).r;\n");
         ds_printf(&s, "fragclr.rgb = mix(fog_color.rgb, fragclr.rgb, fog);\n");
     }
