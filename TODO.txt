@@ -1,0 +1,23 @@
+- GPU
+    - proctex
+    - cubemap
+    - soft shadows
+    - other geoshader modes
+    - gas
+- Audio
+    - CSND
+    - reverb
+- Services
+    - mic
+    - camera
+    - IR/Circle pad pro
+    - networking
+- Kernel
+    - lle sysmodule support
+- CPU
+    - return stack buffer
+    - jit block allocation
+- boot home menu
+- new 3ds support
+
+- fixing bugs

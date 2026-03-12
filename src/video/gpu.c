@@ -98,15 +98,15 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             }
             break;
         case GPUREG(lighting.lutData[0])... GPUREG(lighting.lutData[7]): {
-            u16 p12 = param & MASK(12);
+            u16 val = param & MASK(12);
             gpu->lightLuts[gpu->regs.lighting.lutNum]
-                          [gpu->regs.lighting.lutIndex++] = p12 << 4 | p12 >> 8;
+                          [gpu->regs.lighting.lutIndex++] = val << 4 | val >> 8;
             gpu->lightLutDirty = true;
             break;
         }
         case GPUREG(tex.fogLutData[0])... GPUREG(tex.fogLutData[7]): {
-            u16 p11 = param >> 13 & MASK(11);
-            gpu->fogLut[gpu->regs.tex.fogLutIdx++] = p11 << 5 | p11 >> 6;
+            u16 val = param >> 13 & MASK(11);
+            gpu->fogLut[gpu->regs.tex.fogLutIdx++] = val << 5 | val >> 6;
             // fog lut input comes with value, difference to next value
             // for the most part this difference can be ignored since it
             // is just there to make linear interpolation easier
@@ -118,8 +118,10 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             // in the fragment shader when sampling we will also
             // modify texture coordinate to allow proper sampling in this way
             if (gpu->regs.tex.fogLutIdx == 0) {
-                p11 += (sbit(13)) param + 1;
-                gpu->fogLut[128] = p11 << 5 | p11 >> 6;
+                val += (sbit(13)) param;
+                if ((s16) val < 0) val = 0;
+                if ((s16) val > MASK(11)) val = MASK(11);
+                gpu->fogLut[128] = val << 5 | val >> 6;
             }
             gpu->fogLutDirty = true;
             break;
