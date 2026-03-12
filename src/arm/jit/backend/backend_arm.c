@@ -1083,6 +1083,7 @@ static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
                     }
                     fpconvertintrv(0, dp, 0, 3, !(crn & 1), r0, v0);
                     str(r0, CPU(s[vd]));
+                    if (!op) lwarnonce("unimpl rounding mode");
                     break;
             }
             break;

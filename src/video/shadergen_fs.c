@@ -600,11 +600,12 @@ char* shader_gen_fs(FragConfig* fcfg) {
         // we read out the depth from the shadow map and compare
         // with texcoord0.w which is fragment depth in light space
         // to determine if it is in the shadow
-        ds_printf(&s, "vec4 tex0c = vec4(texture(tex0, texcoord0");
+        ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0");
         if (fcfg->shadowPerspective) {
             ds_printf(&s, "/texcoordw");
         }
-        ds_printf(&s, ").r+shadowBias > min(texcoordw,1));\n");
+        ds_printf(&s, ");\n");
+        ds_printf(&s, "tex0c = vec4(mix(tex0c.g, 1, tex0c.r+shadowBias > min(texcoordw,1)));\n");
     } else {
         ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
     }
@@ -697,7 +698,7 @@ vec4 tmp;
         // for shadow map, r is the depth in light space
         ds_printf(&s, "fragclr.r = gl_FragCoord.z;\n");
         // g is the intensity?
-        ds_printf(&s, "fragclr.g = 1;\n");
+        ds_printf(&s, "fragclr.g = 0;\n");
         // b and a are unused?
         ds_printf(&s, "fragclr.b = 0;\n");
         ds_printf(&s, "fragclr.a = 1;\n");
