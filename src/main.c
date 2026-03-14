@@ -254,6 +254,10 @@ void update_input() {
         btn.up |= SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
         btn.down |=
             SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+        btn.l |=
+            SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
+        btn.r |=
+            SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
 
         int x = SDL_GetGamepadAxis(g_gamepad, SDL_GAMEPAD_AXIS_LEFTX);
         if (abs(x) > abs(cx)) cx = x;
@@ -283,8 +287,7 @@ void update_input() {
         SDL_GetMouseState(&xf, &yf) & SDL_BUTTON_MASK(SDL_BUTTON_LEFT);
 
     if (g_gamepad) {
-        if (SDL_GetGamepadButton(g_gamepad,
-                                 SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
+        if (SDL_GetGamepadButton(g_gamepad, SDL_GAMEPAD_BUTTON_RIGHT_STICK)) {
             pressed = true;
         }
     }
@@ -311,8 +314,20 @@ void update_input() {
         SDL_GetGamepadSensorData(g_gamepad, SDL_SENSOR_ACCEL, accel, 3);
         SDL_GetGamepadSensorData(g_gamepad, SDL_SENSOR_GYRO, gyro, 3);
 
+        // measurements from 3ds
+        // gyroscope
+        // yaw left: +z
+        // pitch down: +x
+        // roll left: -y
+        // accelerometer
+        // resting: around 0, -500, 0
+        // left: -x
+        // up: -y
+        // back: -z
+        // clamp at 930
+
         const float accelClamp = 930;
-        const float gravityRead = 480;
+        const float gravityRead = 500;
         const float accelScale = gravityRead / SDL_STANDARD_GRAVITY;
 
         accel[0] = glm_clamp(accel[0] * accelScale, -accelClamp, accelClamp);
@@ -321,7 +336,7 @@ void update_input() {
 
         const float gyroScale = 180 / M_PI * HID_GYRO_DPS_COEFF;
         gyro[0] *= -gyroScale;
-        gyro[1] *= -gyroScale;
+        gyro[1] *= gyroScale;
         gyro[2] *= -gyroScale;
     }
 
@@ -331,7 +346,7 @@ void update_input() {
         hid_update_pad(&ctremu.system, btn.w, cx, cy);
         hid_update_touch(&ctremu.system, tx, ty, pressed);
         hid_update_accel(&ctremu.system, accel[0], accel[1], accel[2]);
-        hid_update_gyro(&ctremu.system, gyro[0], gyro[2], gyro[1]);
+        hid_update_gyro(&ctremu.system, gyro[0], gyro[1], gyro[2]);
     }
 }
 

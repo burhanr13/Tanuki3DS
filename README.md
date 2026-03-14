@@ -62,7 +62,7 @@ Default keyboard controls are as follows:
 The touch screen can be used with the mouse.
 
 You can also connect a controller to use controller input. When using the
-controller the right shoulder button can be used to tap the touch screen
+controller clicking the right stick can be used to tap the touch screen
 at the current mouse location.
 
 Freecam controls (regular keyboard input is disabled):
