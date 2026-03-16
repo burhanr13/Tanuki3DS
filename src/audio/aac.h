@@ -36,6 +36,15 @@ typedef struct {
             u32 unk[2];
             u32 nSamples;
         } decodeResponse;
+        struct {
+            u32 paddrInL;
+            u32 paddrInR;
+            u32 paddrOut;
+            u32 sizeIn;
+            u32 sizeOut;
+            u32 unk;
+        } encodeRequest;
+        u32 data[6];
     };
 } DSPAACMessage;
 

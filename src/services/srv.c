@@ -21,7 +21,7 @@ struct {
     SRV("cecd:u", cecd),     SRV("ldr:ro", ldr_ro),    SRV("nwm::UDS", nwm_uds),
     SRV("ir:USER", ir_user), SRV("am:app", am),        SRV("frd:u", frd),
     SRV("ptm:u", ptm),       SRV("ptm:play", ptm),     SRV("ptm:sysm", ptm),
-    SRV("boss:U", boss),
+    SRV("boss:U", boss),     SRV("mic:u", mic)
 #undef SRV
 };
 
@@ -76,6 +76,8 @@ void services_init(E3DS* s) {
     srvobj_init(&s->services.y2r.transferend.hdr, KOT_EVENT);
 
     srvobj_init(&s->services.ir.connection_status.hdr, KOT_EVENT);
+
+    srvobj_init(&s->services.mic.event.hdr, KOT_EVENT);
 }
 
 DECL_PORT_ARG(stub, name) {

@@ -74,6 +74,7 @@ typedef struct {
 
     float volume;
     int audiomode;
+    bool micEnable;
 
     mat4 freecam_mtx;
     bool freecam_enable;

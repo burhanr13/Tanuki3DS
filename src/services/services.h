@@ -15,6 +15,7 @@
 #include "hid.h"
 #include "ir.h"
 #include "ldr.h"
+#include "mic.h"
 #include "nwm.h"
 #include "ptm.h"
 #include "y2r.h"
@@ -32,6 +33,7 @@ typedef struct {
     Y2RData y2r;
     LDRData ldr;
     IRData ir;
+    MICData mic;
 
 } ServiceData;
 

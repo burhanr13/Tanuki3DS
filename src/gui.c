@@ -212,6 +212,7 @@ void draw_settings() {
             };
             igCombo("Audio Output Mode", &ctremu.audiomode, audiomodes,
                     countof(audiomodes), 0);
+            igCheckbox("Enable Microphone", &ctremu.micEnable);
             break;
         }
         case PANE_INPUT: {

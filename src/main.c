@@ -35,6 +35,7 @@ SDL_JoystickID g_gamepad_id;
 SDL_Gamepad* g_gamepad;
 
 SDL_AudioStream* g_audio;
+SDL_AudioStream* g_audio_input;
 
 bool g_pending_reset;
 
@@ -350,6 +351,31 @@ void update_input() {
     }
 }
 
+void update_mic() {
+    if (!ctremu.system.services.mic.sampling || !ctremu.micEnable) {
+        SDL_ClearAudioStream(g_audio_input);
+        SDL_PauseAudioStreamDevice(g_audio_input);
+        return;
+    }
+    if (SDL_AudioStreamDevicePaused(g_audio_input)) {
+        SDL_AudioFormat fmts[] = {SDL_AUDIO_U8, SDL_AUDIO_S16, SDL_AUDIO_S8,
+                                  SDL_AUDIO_S16};
+        SDL_AudioSpec as = {
+            .format = fmts[ctremu.system.services.mic.encoding & 3],
+            .channels = 1,
+            .freq = ctremu.system.services.mic.sampleRate,
+        };
+        SDL_SetAudioStreamFormat(g_audio_input, &as, &as);
+        SDL_SetAudioStreamGain(g_audio_input,
+                               (float) ctremu.system.services.mic.gain / 64);
+        SDL_ResumeAudioStreamDevice(g_audio_input);
+    }
+    int buflen = SDL_GetAudioStreamAvailable(g_audio_input);
+    u8 buf[buflen];
+    SDL_GetAudioStreamData(g_audio_input, buf, buflen);
+    mic_send_data(&ctremu.system, buf, buflen);
+}
+
 void audio_callback(s16 (*samples)[2], u32 count) {
     if (ctremu.fastforward || ctremu.mute) return;
     SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
@@ -569,6 +595,14 @@ int main(int argc, char** argv) {
     SDL_ResumeAudioStreamDevice(g_audio);
     ctremu.audio_cb = audio_callback;
 
+    SDL_AudioSpec as_in = {
+        .format = SDL_AUDIO_S16,
+        .channels = 1,
+        .freq = SAMPLE_RATE,
+    };
+    g_audio_input = SDL_OpenAudioDeviceStream(
+        SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &as_in, nullptr, nullptr);
+
     igCreateContext(nullptr);
     igGetIO()->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     igGetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
@@ -672,6 +706,7 @@ int main(int argc, char** argv) {
 
         if (!ctremu.pause) {
             update_input();
+            update_mic();
 
             gpu_gl_start_frame(&ctremu.system.gpu);
 
@@ -762,6 +797,7 @@ int main(int argc, char** argv) {
     ImGui_ImplSDL3_Shutdown();
     igDestroyContext(nullptr);
 
+    SDL_DestroyAudioStream(g_audio_input);
     SDL_DestroyAudioStream(g_audio);
 
     SDL_GL_DestroyContext(glcontext);

@@ -1,6 +1,7 @@
 #include "aac.h"
 
 #include <fdk-aac/aacdecoder_lib.h>
+#include <fdk-aac/aacenc_lib.h>
 
 #include "dspptr.inc"
 
@@ -41,56 +42,55 @@ void aac_handle_request(DSP* dsp, DSPAACMessage* in, DSPAACMessage* out) {
         }
         return;
     }
-    if (in->mode != AACMODE_DECODE) {
-        lerror("unknown aac mode");
-        out->result = -1;
-        return;
-    }
     if (!dsp->aac_handle) {
         lerror("aac was not initialized");
         out->result = -1;
         return;
     }
+    if (in->mode == AACMODE_DECODE) {
+        u8* src = PTR(in->decodeRequest.paddrIn);
+        s16* dstL = PTR(in->decodeRequest.paddrOutL);
+        s16* dstR = nullptr;
 
-    u8* src = PTR(in->decodeRequest.paddrIn);
-    s16* dstL = PTR(in->decodeRequest.paddrOutL);
-    s16* dstR = nullptr;
+        out->decodeResponse.size = in->decodeRequest.sizeIn;
 
-    out->decodeResponse.size = in->decodeRequest.sizeIn;
+        u32 size = in->decodeRequest.sizeIn;
+        u32 bytesValid = size;
 
-    u32 size = in->decodeRequest.sizeIn;
-    u32 bytesValid = size;
+        linfo("aac decoding %d bytes", size);
 
-    linfo("aac decoding %d bytes", size);
+        AAC_DECODER_ERROR res;
 
-    AAC_DECODER_ERROR res;
+        while (bytesValid) {
+            res = aacDecoder_Fill(dsp->aac_handle, &src, &size, &bytesValid);
+            if (res != AAC_DEC_OK) lerror("aac failed: %d", res);
 
-    while (bytesValid) {
-        res = aacDecoder_Fill(dsp->aac_handle, &src, &size, &bytesValid);
-        if (res != AAC_DEC_OK) lerror("aac failed: %d", res);
+            // largest size of an aac stereo frame
+            s16 buf[2048];
+            res = aacDecoder_DecodeFrame(dsp->aac_handle, buf, 2048, 0);
+            if (res != AAC_DEC_OK) lerror("aac failed: %d", res);
 
-        // largest size of an aac stereo frame
-        s16 buf[2048];
-        res = aacDecoder_DecodeFrame(dsp->aac_handle, buf, 2048, 0);
-        if (res != AAC_DEC_OK) lerror("aac failed: %d", res);
+            auto info = aacDecoder_GetStreamInfo(dsp->aac_handle);
 
-        auto info = aacDecoder_GetStreamInfo(dsp->aac_handle);
+            out->decodeResponse.nChannels = info->numChannels;
+            out->decodeResponse.nSamples = info->frameSize;
+            out->decodeResponse.rate = rate_to_enum(info->sampleRate);
 
-        out->decodeResponse.nChannels = info->numChannels;
-        out->decodeResponse.nSamples = info->frameSize;
-        out->decodeResponse.rate = rate_to_enum(info->sampleRate);
-
-        if (info->numChannels == 2) {
-            if (!dstR) dstR = PTR(in->decodeRequest.paddrOutR);
+            if (info->numChannels == 2) {
+                if (!dstR) dstR = PTR(in->decodeRequest.paddrOutR);
+            }
+            auto p = buf;
+            for (int i = 0; i < info->frameSize; i++) {
+                *dstL++ = *p++;
+                if (info->numChannels == 2) *dstR++ = *p++;
+            }
         }
-        auto p = buf;
-        for (int i = 0; i < info->frameSize; i++) {
-            *dstL++ = *p++;
-            if (info->numChannels == 2) *dstR++ = *p++;
-        }
+
+        linfo("decoded %d samples, %d channels at rate enum %d",
+              out->decodeResponse.nSamples, out->decodeResponse.nChannels,
+              out->decodeResponse.rate);
+    } else if (in->mode == AACMODE_ENCODE) {
+        lwarn("aac encode command %08x %08x %08x %08x %08x %08x", in->data[0],
+               in->data[1], in->data[2], in->data[3], in->data[4], in->data[5]);
     }
-
-    linfo("decoded %d samples, %d channels at rate enum %d",
-          out->decodeResponse.nSamples, out->decodeResponse.nChannels,
-          out->decodeResponse.rate);
 }

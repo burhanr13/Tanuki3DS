@@ -42,6 +42,7 @@ void emulator_load_default_settings() {
     g_jit_config.optimize = true;
     g_jit_config.linking = true;
     ctremu.ignore_null = false;
+    ctremu.micEnable = true;
 
     ctremu.inputmap.kb.a = SDL_SCANCODE_L;
     ctremu.inputmap.kb.b = SDL_SCANCODE_K;
