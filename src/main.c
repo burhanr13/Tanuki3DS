@@ -353,9 +353,19 @@ void update_input() {
 
 void update_mic() {
     if (!ctremu.system.services.mic.sampling || !ctremu.micEnable) {
+        if (!g_audio_input) return;
         SDL_ClearAudioStream(g_audio_input);
         SDL_PauseAudioStreamDevice(g_audio_input);
         return;
+    }
+    if (!g_audio_input) {
+        SDL_AudioSpec as_in = {
+            .format = SDL_AUDIO_S16,
+            .channels = 1,
+            .freq = SAMPLE_RATE,
+        };
+        g_audio_input = SDL_OpenAudioDeviceStream(
+            SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &as_in, nullptr, nullptr);
     }
     if (SDL_AudioStreamDevicePaused(g_audio_input)) {
         SDL_AudioFormat fmts[] = {SDL_AUDIO_U8, SDL_AUDIO_S16, SDL_AUDIO_S8,
@@ -595,14 +605,6 @@ int main(int argc, char** argv) {
     SDL_ResumeAudioStreamDevice(g_audio);
     ctremu.audio_cb = audio_callback;
 
-    SDL_AudioSpec as_in = {
-        .format = SDL_AUDIO_S16,
-        .channels = 1,
-        .freq = SAMPLE_RATE,
-    };
-    g_audio_input = SDL_OpenAudioDeviceStream(
-        SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &as_in, nullptr, nullptr);
-
     igCreateContext(nullptr);
     igGetIO()->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     igGetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
@@ -797,7 +799,7 @@ int main(int argc, char** argv) {
     ImGui_ImplSDL3_Shutdown();
     igDestroyContext(nullptr);
 
-    SDL_DestroyAudioStream(g_audio_input);
+    if (g_audio_input) SDL_DestroyAudioStream(g_audio_input);
     SDL_DestroyAudioStream(g_audio);
 
     SDL_GL_DestroyContext(glcontext);
