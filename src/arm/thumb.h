@@ -157,6 +157,4 @@ void thumb_generate_lookup();
 
 ArmInstr thumb_decode_instr(ThumbInstr instr);
 
-void thumb_disassemble(ThumbInstr instr, u32 addr, FILE* out);
-
 #endif

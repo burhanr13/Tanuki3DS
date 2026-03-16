@@ -2,45 +2,30 @@
 
 #include <stdlib.h>
 
-// most of the code in this file is leftover from my GBA emulator,
-// mostly irrelevant now for 3ds
+void cpu_undefined_fail(ArmCore* cpu, u32 instr) {
+    lerror("executing undefined instruction %08x near %08x", instr, cpu->pc);
+}
 
-// #include "thumb.h"
-
-// void cpu_fetch_instr(ArmCore* cpu) {
-//     cpu->cur_instr = cpu->next_instr;
-//     if (cpu->cpsr.t) {
-//         cpu->next_instr = thumb_lookup[cpu->fetch16(cpu, cpu->pc)];
-//         cpu->cur_instr_addr += 2;
-//         cpu->next_instr_addr += 2;
-//         cpu->pc += 2;
-//     } else {
-//         cpu->next_instr.w = cpu->fetch32(cpu, cpu->pc);
-//         cpu->cur_instr_addr += 4;
-//         cpu->next_instr_addr += 4;
-//         cpu->pc += 4;
-//     }
-// }
-
-// void cpu_flush(ArmCore* cpu) {
-//     if (cpu->cpsr.t) {
-//         cpu->pc &= ~1;
-//         cpu->cur_instr_addr = cpu->pc;
-//         cpu->cur_instr = thumb_lookup[cpu->fetch16(cpu, cpu->pc)];
-//         cpu->pc += 2;
-//         cpu->next_instr_addr = cpu->pc;
-//         cpu->next_instr = thumb_lookup[cpu->fetch16(cpu, cpu->pc)];
-//         cpu->pc += 2;
-//     } else {
-//         cpu->pc &= ~0b11;
-//         cpu->cur_instr_addr = cpu->pc;
-//         cpu->cur_instr.w = cpu->fetch32(cpu, cpu->pc);
-//         cpu->pc += 4;
-//         cpu->next_instr_addr = cpu->pc;
-//         cpu->next_instr.w = cpu->fetch32(cpu, cpu->pc);
-//         cpu->pc += 4;
-//     }
-// }
+char* mode_name(CpuMode m) {
+    switch (m) {
+        case M_USER:
+            return "USER";
+        case M_FIQ:
+            return "FIQ";
+        case M_IRQ:
+            return "IRQ";
+        case M_SVC:
+            return "SVC";
+        case M_ABT:
+            return "ABT";
+        case M_UND:
+            return "UND";
+        case M_SYSTEM:
+            return "SYSTEM";
+        default:
+            return "ILLEGAL";
+    }
+}
 
 RegBank get_bank(CpuMode mode) {
     switch (mode) {
@@ -98,71 +83,6 @@ void cpu_update_mode(ArmCore* cpu, CpuMode old) {
     }
 }
 
-// void cpu_handle_exception(ArmCore* cpu, CpuException intr) {
-//     if (cpu->pending_flush) {
-//         cpu_flush(cpu);
-//         cpu->pending_flush = false;
-//     }
-
-//     CpuMode old = cpu->cpsr.m;
-//     u32 spsr = cpu->cpsr.w;
-//     switch (intr) {
-//         case E_RESET:
-//         case E_SWI:
-//         case E_ADDR:
-//             cpu->cpsr.m = M_SVC;
-//             break;
-//         case E_PABT:
-//         case E_DABT:
-//             cpu->cpsr.m = M_ABT;
-//             break;
-//         case E_UND:
-//             cpu->cpsr.m = M_UND;
-//             break;
-//         case E_IRQ:
-//             cpu->cpsr.m = M_IRQ;
-//             break;
-//         case E_FIQ:
-//             cpu->cpsr.m = M_FIQ;
-//             break;
-//     }
-//     cpu_update_mode(cpu, old);
-//     cpu->spsr = spsr;
-//     cpu->lr = cpu->pc;
-//     if (cpu->cpsr.t) {
-//         if (intr == E_SWI || intr == E_UND) cpu->lr -= 2;
-//     } else cpu->lr -= 4;
-//     cpu->cpsr.t = 0;
-//     cpu->cpsr.i = 1;
-//     cpu->pc = cpu->vector_base + 4 * intr;
-//     cpu_flush(cpu);
-// }
-
-void cpu_undefined_fail(ArmCore* cpu, u32 instr) {
-    lerror("executing undefined instruction %08x near %08x", instr, cpu->pc);
-}
-
-char* mode_name(CpuMode m) {
-    switch (m) {
-        case M_USER:
-            return "USER";
-        case M_FIQ:
-            return "FIQ";
-        case M_IRQ:
-            return "IRQ";
-        case M_SVC:
-            return "SVC";
-        case M_ABT:
-            return "ABT";
-        case M_UND:
-            return "UND";
-        case M_SYSTEM:
-            return "SYSTEM";
-        default:
-            return "ILLEGAL";
-    }
-}
-
 void cpu_print_state(ArmCore* cpu) {
     static char* reg_names[16] = {"r0", "r1", "r2", "r3", "r4",  "r5",
                                   "r6", "r7", "r8", "r9", "r10", "r11",
@@ -201,16 +121,3 @@ void cpu_print_vfp_state(ArmCore* cpu) {
         printf("\n");
     }
 }
-
-// void cpu_print_cur_instr(ArmCore* cpu) {
-//     if (cpu->cpsr.t) {
-//         ThumbInstr instr = {cpu->fetch16(cpu, cpu->cur_instr_addr)};
-//         printf("%08x: %04x ", cpu->cur_instr_addr, instr.h);
-//         thumb_disassemble(instr, cpu->cur_instr_addr, stdout);
-//         printf("\n");
-//     } else {
-//         printf("%08x: %08x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-//         arm_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
-//         printf("\n");
-//     }
-// }

@@ -64,7 +64,12 @@ char* archive_basepath(E3DS* s, u64 archive) {
             asprintf(&basepath, "3ds/extdata/%s", s->romimage.name);
             break;
         case ARCHIVE_SHAREDEXTDATA:
-            asprintf(&basepath, "3ds/extdata/shared");
+            if (archive >> 32 == 0xf000'000b) {
+                asprintf(&basepath, "3ds/extdata/shared");
+            } else {
+                // shared extdata f000'0001/f000'0002 used only by camera and sound apps
+                asprintf(&basepath, "3ds/extdata/shared/%s", s->romimage.name);
+            }
             break;
         case ARCHIVE_SDMC:
             asprintf(&basepath, "3ds/sdmc");
@@ -98,7 +103,7 @@ char* create_text_path(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
 
     char* filepath = nullptr;
     if (pathtype == FSPATH_ASCII) {
-        asprintf(&filepath, "%s%s", basepath, rawpath);
+        asprintf(&filepath, "%s%s", basepath, (char*) rawpath);
     } else if (pathtype == FSPATH_UTF16) {
         u16* path16 = rawpath;
         char path[pathsize];
@@ -606,7 +611,7 @@ DECL_PORT_ARG(fs_sysfile, file) {
             linfo("accessing country list");
             break;
         default:
-            lerror("unknown system file %x", file);
+            lerror("unknown system file %lx", file);
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = -1;
             return;
@@ -663,7 +668,7 @@ DECL_PORT_ARG(fs_file, fd) {
         return;
     }
 
-    linfo("fd is %d", fd);
+    linfo("fd is %d", (int) fd);
 
     *delay = 1000000;
 
@@ -743,7 +748,7 @@ DECL_PORT_ARG(fs_dir, fd) {
         return;
     }
 
-    linfo("fd is %d", fd);
+    linfo("fd is %d", (int) fd);
 
     switch (cmd.command) {
         case 0x0801: {
@@ -793,7 +798,7 @@ DECL_PORT_ARG(fs_dir, fd) {
 
                 ents[i].ishidden = ent->d_name[0] == '.';
 
-                linfo("entry %s %s sz=%lld (%s.%s)", ent->d_name,
+                linfo("entry %s %s sz=%ld (%s.%s)", ent->d_name,
                       ents[i].isdir ? "(dir)" : "", ents[i].size,
                       ents[i].shortname, ents[i].shortext);
             }
@@ -880,8 +885,7 @@ u64 fs_open_archive(E3DS* s, u32 id, u32 pathtype, void* path) {
             if (pathtype == FSPATH_BINARY) {
                 u32* lowpath = path;
                 linfo("opening shared extdata");
-                if (lowpath[1] != 0xf000'000b) lerror("unknown shared extdata");
-                u64 aid = 7;
+                u64 aid = 7 | (u64) lowpath[1] << 32;
                 char* apath = archive_basepath(s, aid);
                 mkdir(apath, S_IRWXU);
                 free(apath);
@@ -894,8 +898,7 @@ u64 fs_open_archive(E3DS* s, u32 id, u32 pathtype, void* path) {
         }
         case ARCHIVE_SYSTEMSAVEDATA: {
             if (pathtype == FSPATH_BINARY) {
-                u32* lowpath = path;
-                linfo("opening system save data", id, lowpath[1]);
+                linfo("opening system save data");
                 u64 aid = ARCHIVE_SYSTEMSAVEDATA;
                 char* apath = archive_basepath(s, aid);
                 mkdir(apath, S_IRWXU);
@@ -1093,7 +1096,7 @@ KSession* fs_open_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             break;
         }
         default:
-            lerror("unknown archive %llx", archive);
+            lerror("unknown archive %lx", archive);
             return nullptr;
     }
 }
@@ -1109,7 +1112,7 @@ bool fs_create_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             char* filepath =
                 create_text_path(s, archive, pathtype, rawpath, pathsize);
 
-            linfo("creating file %s with size %x", filepath, filesize);
+            linfo("creating file %s with size %lx", filepath, filesize);
 
             int hostfd =
                 open(filepath, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
@@ -1124,7 +1127,7 @@ bool fs_create_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             return true;
         }
         default:
-            lerror("unknown archive %llx", archive);
+            lerror("unknown archive %lx", archive);
             return false;
     }
 }
@@ -1148,7 +1151,7 @@ bool fs_delete_file(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             return true;
         }
         default:
-            lerror("unknown archive %llx", archive);
+            lerror("unknown archive %lx", archive);
             return false;
     }
 }
@@ -1197,7 +1200,7 @@ KSession* fs_open_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             break;
         }
         default:
-            lerror("unknown archive %llx", archive);
+            lerror("unknown archive %lx", archive);
             return nullptr;
     }
 }
@@ -1225,7 +1228,7 @@ bool fs_create_dir(E3DS* s, u64 archive, u32 pathtype, void* rawpath,
             return true;
         }
         default:
-            lerror("unknown archive %llx", archive);
+            lerror("unknown archive %lx", archive);
             return false;
     }
 }

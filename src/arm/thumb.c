@@ -340,7 +340,3 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
 
     return dec;
 }
-
-void thumb_disassemble(ThumbInstr instr, u32 addr, FILE* out) {
-    arm_disassemble(thumb_lookup[instr.h], addr, out);
-}

@@ -5,29 +5,8 @@
 
 #include "jit.h"
 
-ArmCompileFunc compile_funcs[ARM_MAX] = {
-    [ARM_DATAPROC] = compile_arm_data_proc,
-    [ARM_PSRTRANS] = compile_arm_psr_trans,
-    [ARM_MULTIPLY] = compile_arm_multiply,
-    [ARM_MULTIPLYLONG] = compile_arm_multiply_long,
-    [ARM_MULTIPLYSHORT] = compile_arm_multiply_short,
-    [ARM_SWAP] = compile_arm_swap,
-    [ARM_BRANCHEXCH] = compile_arm_branch_exch,
-    [ARM_LEADINGZEROS] = compile_arm_leading_zeros,
-    [ARM_SATARITH] = compile_arm_sat_arith,
-    [ARM_PACKSAT] = compile_arm_pack_sat,
-    [ARM_PARALLELARITH] = compile_arm_parallel_arith,
-    [ARM_HALFTRANS] = compile_arm_half_trans,
-    [ARM_SINGLETRANS] = compile_arm_single_trans,
-    [ARM_UNDEFINED] = compile_arm_undefined,
-    [ARM_BLOCKTRANS] = compile_arm_block_trans,
-    [ARM_BRANCH] = compile_arm_branch,
-    [ARM_CPDOUBLEREGTRANS] = compile_arm_cp_double_reg_trans,
-    [ARM_CPDATATRANS] = compile_arm_cp_data_trans,
-    [ARM_CPDATAPROC] = compile_arm_cp_data_proc,
-    [ARM_CPREGTRANS] = compile_arm_cp_reg_trans,
-    [ARM_SWINTR] = compile_arm_sw_intr,
-};
+#define DECL_ARM_COMPILE(f)                                                    \
+    bool compile_arm_##f(IRBlock* block, ArmCore* cpu, u32 addr, ArmInstr instr)
 
 #define INSTRLEN (cpu->cpsr.t ? 2 : 4)
 
@@ -797,6 +776,22 @@ DECL_ARM_COMPILE(parallel_arith) {
     return true;
 }
 
+DECL_ARM_COMPILE(multiply_extra) {
+    if (instr.multiply_extra.op1 == 5 && instr.multiply_extra.op2 == 0) {
+        if (instr.multiply_extra.r || instr.multiply_extra.ra != 15) {
+            lwarn("unknown smmulr/smmla/smmlar");
+            return true;
+        }
+        u32 vrn = EMIT_LOAD_REG(instr.multiply_extra.rn);
+        u32 vrm = EMIT_LOAD_REG(instr.multiply_extra.rm);
+        EMITVV(SMULH, vrn, vrm);
+        EMITI_STORE_REG(instr.multiply_extra.rd, LASTV);
+        return true;
+    }
+    lwarn("unknown multiply extra %08x", instr.w);
+    return true;
+}
+
 DECL_ARM_COMPILE(half_trans) {
     u32 vaddr = EMIT_LOAD_REG(instr.half_trans.rn);
     u32 voffset;
@@ -1273,3 +1268,29 @@ DECL_ARM_COMPILE(sw_intr) {
     EMIT00(END_RET);
     return false;
 }
+
+
+ArmCompileFunc compile_funcs[ARM_MAX] = {
+    [ARM_DATAPROC] = compile_arm_data_proc,
+    [ARM_PSRTRANS] = compile_arm_psr_trans,
+    [ARM_MULTIPLY] = compile_arm_multiply,
+    [ARM_MULTIPLYLONG] = compile_arm_multiply_long,
+    [ARM_MULTIPLYSHORT] = compile_arm_multiply_short,
+    [ARM_SWAP] = compile_arm_swap,
+    [ARM_BRANCHEXCH] = compile_arm_branch_exch,
+    [ARM_LEADINGZEROS] = compile_arm_leading_zeros,
+    [ARM_SATARITH] = compile_arm_sat_arith,
+    [ARM_PACKSAT] = compile_arm_pack_sat,
+    [ARM_PARALLELARITH] = compile_arm_parallel_arith,
+    [ARM_MULTIPLYEXTRA] = compile_arm_multiply_extra,
+    [ARM_HALFTRANS] = compile_arm_half_trans,
+    [ARM_SINGLETRANS] = compile_arm_single_trans,
+    [ARM_UNDEFINED] = compile_arm_undefined,
+    [ARM_BLOCKTRANS] = compile_arm_block_trans,
+    [ARM_BRANCH] = compile_arm_branch,
+    [ARM_CPDOUBLEREGTRANS] = compile_arm_cp_double_reg_trans,
+    [ARM_CPDATATRANS] = compile_arm_cp_data_trans,
+    [ARM_CPDATAPROC] = compile_arm_cp_data_proc,
+    [ARM_CPREGTRANS] = compile_arm_cp_reg_trans,
+    [ARM_SWINTR] = compile_arm_sw_intr,
+};

@@ -233,6 +233,18 @@ typedef union {
         u32 cond : 4;
     } parallel_arith;
     struct {
+        u32 rn : 4;
+        u32 c2 : 1; // 1
+        u32 r : 1;
+        u32 op2 : 2;
+        u32 rm : 4;
+        u32 ra : 4;
+        u32 rd : 4;
+        u32 op1 : 3;
+        u32 c1 : 5; // 01110
+        u32 cond : 4;
+    } multiply_extra;
+    struct {
         u32 u2 : 4;
         u32 c2 : 1; // 1
         u32 u1 : 20;
@@ -323,6 +335,7 @@ typedef enum {
     ARM_SINGLETRANS,
     ARM_PACKSAT,
     ARM_PARALLELARITH,
+    ARM_MULTIPLYEXTRA,
     ARM_UNDEFINED,
     ARM_BLOCKTRANS,
     ARM_BRANCH,
@@ -341,30 +354,5 @@ extern ArmInstrFormat arm_lookup[BIT(8)][BIT(4)];
 
 void arm_generate_lookup();
 ArmInstrFormat arm_decode_instr(ArmInstr instr);
-
-void arm_exec_instr(ArmCore* cpu);
-
-typedef void (*ArmExecFunc)(ArmCore*, ArmInstr);
-
-#define DECL_ARM_EXEC(f) void exec_arm_##f(ArmCore* cpu, ArmInstr instr)
-
-DECL_ARM_EXEC(data_proc);
-DECL_ARM_EXEC(psr_trans);
-DECL_ARM_EXEC(multiply);
-DECL_ARM_EXEC(multiply_long);
-DECL_ARM_EXEC(multiply_short);
-DECL_ARM_EXEC(swap);
-DECL_ARM_EXEC(branch_exch);
-DECL_ARM_EXEC(leading_zeros);
-DECL_ARM_EXEC(sat_arith);
-DECL_ARM_EXEC(half_trans);
-DECL_ARM_EXEC(single_trans);
-DECL_ARM_EXEC(undefined);
-DECL_ARM_EXEC(block_trans);
-DECL_ARM_EXEC(branch);
-DECL_ARM_EXEC(cp_reg_trans);
-DECL_ARM_EXEC(sw_intr);
-
-void arm_disassemble(ArmInstr instr, u32 addr, FILE* out);
 
 #endif

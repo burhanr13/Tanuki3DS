@@ -94,7 +94,7 @@ void load_rom_dialog() {
 void load_sysfile_callback(void* dstfile, const char* const* files, int n) {
     if (files && files[0]) {
         char* cmd;
-        asprintf(&cmd, "cp '%s' 3ds/sys_files/%s", files[0], dstfile);
+        asprintf(&cmd, "cp '%s' 3ds/sys_files/%s", files[0], (char*) dstfile);
         system(cmd);
         free(cmd);
     }
