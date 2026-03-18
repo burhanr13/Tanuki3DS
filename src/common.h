@@ -101,21 +101,21 @@ typedef float fvec4[4];
         it.i < FIFO_MAX(f); it._i++, it.i++, it.p = &(f).d[it._i])
 #define FIFO_clear(f) ((f).head = (f).tail = (f).size = 0)
 
-#define StaticVector(T, N)                                                     \
+#define Array(T, N)                                                     \
     struct {                                                                   \
         typeof(T) d[N];                                                        \
         size_t size;                                                           \
     }
 
-#define SVec_MAX(v) countof((v).d)
-#define SVec_push(v, e)                                                        \
+#define Array_MAX(v) countof((v).d)
+#define Array_push(v, e)                                                        \
     ({                                                                         \
         (v).d[(v).size++] = (e);                                               \
         (v).size - 1;                                                          \
     })
-#define SVec_full(v) ((v).size == SVec_MAX(v))
+#define Array_full(v) ((v).size == SVec_MAX(v))
 
-#define Vector(T)                                                              \
+#define Vec(T)                                                              \
     struct {                                                                   \
         typeof(T)* d;                                                          \
         size_t size;                                                           \
@@ -152,9 +152,9 @@ typedef float fvec4[4];
             (v).d[j] = (v).d[j + 1];                                           \
         }                                                                      \
     })
-#define SVec_remove Vec_remove
+#define Array_remove Vec_remove
 #define Vec_foreach(e, v) for (auto e = (v).d; e < (v).d + (v).size; e++)
-#define SVec_foreach Vec_foreach
+#define Array_foreach Vec_foreach
 
 #define BitVec(N) typeof(u8[N / 8])
 

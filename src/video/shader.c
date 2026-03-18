@@ -638,7 +638,7 @@ static inline void disasmcompare(u32 op) {
     break;
 
 static struct {
-    Vector(PICAInstr) calls;
+    Vec(PICAInstr) calls;
     u32 depth;
     u32 farthestjmp;
 } disasm;

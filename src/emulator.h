@@ -46,6 +46,7 @@ typedef struct {
     char* romfilenodir;
     char* romfilenoext;
 
+    char* gamedir;
     char* history[HISTORYLEN];
 
     bool initialized;
@@ -53,6 +54,8 @@ typedef struct {
     bool fastforward;
     bool pause;
     bool mute;
+    bool fullscreen;
+    bool pending_reset;
 
     bool vsync;
     bool audiosync;

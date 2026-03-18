@@ -19,7 +19,7 @@ typedef struct {
     HostRegAllocation hralloc;
     ArmCore* cpu;
 
-    Vector(ArmLinkPatch) links;
+    Vec(ArmLinkPatch) links;
 } ArmCodeBackend;
 
 ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,

@@ -96,7 +96,7 @@ typedef struct _GPU {
     fvec4 fixattrs[16];
     u32 curfixattr;
     int curfixi;
-    Vector(fvec4) immattrs;
+    Vec(fvec4) immattrs;
 
     u16 lightLuts[32][256];
     bool lightLutDirty;

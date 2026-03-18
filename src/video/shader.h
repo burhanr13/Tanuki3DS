@@ -163,7 +163,7 @@ typedef struct {
 
         fvec4 curvtx[4][16];
 
-        Vector(fvec4[16]) outvtx;
+        Vec(fvec4[16]) outvtx;
     } gsh;
 
 } ShaderUnit;

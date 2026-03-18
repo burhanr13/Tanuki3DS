@@ -20,7 +20,7 @@ RegAllocation allocate_registers(IRBlock* block) {
     Vec_init(ret.reg_info);
     ret.reg_assn = malloc(block->code.size * sizeof(u32));
     ret.nassns = block->code.size;
-    Vector(bool) reg_active = {};
+    Vec(bool) reg_active = {};
 
     for (int i = 0; i < block->code.size; i++) {
         IRInstr inst = block->code.d[i];

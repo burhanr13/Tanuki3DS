@@ -6,20 +6,12 @@
 #include <unistd.h>
 
 #include "3ds.h"
-#include "cpu.h"
 #include "emulator.h"
 #include "gui.h"
-#include "services/applets.h"
 #include "video/renderer_gl.h"
 
 #ifdef _WIN32
 #define realpath(a, b) _fullpath(b, a, 4096)
-#endif
-
-#ifdef __linux__
-#define OPEN_CMD "xdg-open"
-#else
-#define OPEN_CMD "open"
 #endif
 
 const char usage[] =
@@ -36,10 +28,6 @@ SDL_Gamepad* g_gamepad;
 
 SDL_AudioStream* g_audio;
 SDL_AudioStream* g_audio_input;
-
-bool g_pending_reset;
-
-bool g_fullscreen;
 
 char* romfile_arg;
 
@@ -74,37 +62,6 @@ void read_args(int argc, char** argv) {
     }
 }
 
-void file_callback(void*, const char* const* files, int n) {
-    if (files && files[0]) {
-        emulator_set_rom(files[0]);
-        g_pending_reset = true;
-    }
-}
-
-void load_rom_dialog() {
-    SDL_DialogFileFilter filetypes = {
-        .name = "3DS Applications",
-        .pattern = "3ds;cci;cxi;app;elf;axf;3dsx",
-    };
-
-    SDL_ShowOpenFileDialog(file_callback, nullptr, g_window, &filetypes, 1,
-                           nullptr, false);
-}
-
-void load_sysfile_callback(void* dstfile, const char* const* files, int n) {
-    if (files && files[0]) {
-        char* cmd;
-        asprintf(&cmd, "cp '%s' 3ds/sys_files/%s", files[0], (char*) dstfile);
-        system(cmd);
-        free(cmd);
-    }
-}
-
-void load_sysfile_dialog(char* dstfile) {
-    SDL_ShowOpenFileDialog(load_sysfile_callback, dstfile, g_window, nullptr, 0,
-                           nullptr, false);
-}
-
 void hotkey_press(SDL_Keycode key) {
     if (igGetIO()->WantCaptureKeyboard) return;
     switch (key) {
@@ -115,16 +72,13 @@ void hotkey_press(SDL_Keycode key) {
             ctremu.fastforward = !ctremu.fastforward;
             break;
         case SDLK_F1:
-            g_pending_reset = true;
+            ctremu.pending_reset = true;
             break;
         case SDLK_F2:
             load_rom_dialog();
             break;
         case SDLK_F3:
             uistate.settings = true;
-            break;
-        case SDLK_F4:
-            g_cpulog = !g_cpulog;
             break;
         case SDLK_F7:
             ctremu.freecam_enable = !ctremu.freecam_enable;
@@ -141,8 +95,8 @@ void hotkey_press(SDL_Keycode key) {
             ctremu.viewlayout = (ctremu.viewlayout + 1) % LAYOUT_MAX;
             break;
         case SDLK_F11:
-            g_fullscreen = !g_fullscreen;
-            SDL_SetWindowFullscreen(g_window, g_fullscreen);
+            ctremu.fullscreen = !ctremu.fullscreen;
+            SDL_SetWindowFullscreen(g_window, ctremu.fullscreen);
             break;
         case SDLK_ESCAPE:
             uistate.menubar = !uistate.menubar;
@@ -391,140 +345,6 @@ void audio_callback(s16 (*samples)[2], u32 count) {
     SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
 }
 
-void draw_menubar() {
-    if (!uistate.menubar) return;
-
-    if (igBeginMainMenuBar()) {
-        if (igBeginMenu("File", true)) {
-            if (igMenuItem("Open", "F2", false, true)) {
-                load_rom_dialog();
-            }
-            if (igBeginMenu("Open Recent", ctremu.history[0])) {
-                for (int i = 0; i < HISTORYLEN; i++) {
-                    if (!ctremu.history[i]) break;
-                    if (igMenuItem(ctremu.history[i], nullptr, false, true)) {
-                        emulator_set_rom(ctremu.history[i]);
-                        g_pending_reset = true;
-                    }
-                }
-                igEndMenu();
-            }
-            igSeparator();
-
-            if (igBeginMenu("Load System File", true)) {
-                if (igMenuItem("Shared Font", nullptr, false, true)) {
-                    load_sysfile_dialog("font.bcfnt");
-                }
-                if (igMenuItem("Mii Data", nullptr, false, true)) {
-                    load_sysfile_dialog("mii.app.romfs");
-                }
-                igEndMenu();
-            }
-
-            if (igMenuItem("Open Tanuki3DS Folder", nullptr, false, true)) {
-                char* cwd = getcwd(nullptr, 0);
-                char* cmd;
-                asprintf(&cmd, OPEN_CMD " '%s'", cwd);
-                system(cmd);
-                free(cwd);
-                free(cmd);
-            }
-
-            igSeparator();
-            if (igMenuItem("Exit", nullptr, false, true)) {
-                ctremu.running = false;
-            }
-            igEndMenu();
-        }
-        if (igBeginMenu("Emulation", ctremu.initialized)) {
-            if (igMenuItem("Reset", "F1", false, true)) {
-                g_pending_reset = true;
-            }
-            igMenuItemP("Pause", "F5", &ctremu.pause, true);
-            if (igMenuItem("Stop", nullptr, false, true)) {
-                emulator_set_rom(nullptr);
-                g_pending_reset = true;
-            }
-            igSeparator();
-
-            igMenuItemP("Fast Forward", "Tab", &ctremu.fastforward, true);
-            igMenuItemP("Mute", "F6", &ctremu.mute, true);
-
-            igSeparator();
-
-            if (igMenuItemP("Free Camera", "F7", &ctremu.freecam_enable,
-                            true)) {
-                glm_mat4_identity(ctremu.freecam_mtx);
-                renderer_gl_update_freecam(&ctremu.system.gpu.gl);
-            }
-
-            igEndMenu();
-        }
-
-        if (igBeginMenu("View", true)) {
-            if (igMenuItemP("Fullscreen", "F11", &g_fullscreen, true)) {
-                SDL_SetWindowFullscreen(g_window, g_fullscreen);
-            }
-            if (igBeginMenu("Screen Layout", true)) {
-                if (igMenuItem("Vertical", nullptr,
-                               ctremu.viewlayout == LAYOUT_DEFAULT, true)) {
-                    ctremu.viewlayout = LAYOUT_DEFAULT;
-                }
-                if (igMenuItem("Horizontal", nullptr,
-                               ctremu.viewlayout == LAYOUT_HORIZONTAL, true)) {
-                    ctremu.viewlayout = LAYOUT_HORIZONTAL;
-                }
-                if (igMenuItem("Large Screen", nullptr,
-                               ctremu.viewlayout == LAYOUT_LARGETOP, true)) {
-                    ctremu.viewlayout = LAYOUT_LARGETOP;
-                }
-                igSeparator();
-                igMenuItemP("Swap Screens", "F9", &ctremu.swapscreens, true);
-                igEndMenu();
-            }
-            igSeparator();
-
-            if (igMenuItem("Settings", "F3", false, true)) {
-                uistate.settings = true;
-            }
-
-            igSeparator();
-
-            if (igMenuItem("Texture Viewer", nullptr, false,
-                           ctremu.initialized)) {
-                uistate.textureview = true;
-            }
-
-            if (igMenuItem("Audio Channels", nullptr, false,
-                           ctremu.initialized)) {
-                uistate.audioview = true;
-            }
-
-            igEndMenu();
-        }
-
-        if (igBeginMenu("Debug", ctremu.initialized)) {
-            igMenuItemP("Verbose Log", nullptr, &g_infologs, true);
-            igMenuItemP("CPU Trace Log", nullptr, &g_cpulog, true);
-            igSeparator();
-            igMenuItemP("Wireframe", nullptr, &g_wireframe, true);
-            igEndMenu();
-        }
-
-        if (igBeginMenu("About", true)) {
-            igTextLinkOpenURL("GitHub",
-                              "https://github.com/burhanr13/Tanuki3DS");
-            igTextLinkOpenURL("Discord", "https://discord.gg/6ya65fvD3g");
-            igEndMenu();
-        }
-
-        igSpacing();
-        igTextDisabled("Esc to toggle menu bar");
-
-        igEndMainMenuBar();
-    }
-}
-
 int main(int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "Tanuki3DS");
 
@@ -614,12 +434,6 @@ int main(int argc, char** argv) {
 
     setup_gui_theme();
 
-    if (ctremu.romfile) {
-        g_pending_reset = true;
-    } else {
-        ctremu.pause = true;
-    }
-
     Uint64 prev_frame_time = SDL_GetTicksNS();
     Uint64 prev_fps_update = prev_frame_time;
     Uint64 prev_fps_frame = 0;
@@ -636,7 +450,6 @@ int main(int argc, char** argv) {
         int exc;
         if ((exc = setjmp(ctremu.exceptionJmp))) {
             emulator_set_rom(nullptr);
-            g_pending_reset = true;
             static const char* errmess[] = {
                 [EXC_MEM] = "Invalid memory access.",
                 [EXC_EXIT] = "The application has exited.",
@@ -647,8 +460,8 @@ int main(int argc, char** argv) {
                                      errmess[exc], g_window);
         }
 
-        if (g_pending_reset) {
-            g_pending_reset = false;
+        if (ctremu.pending_reset) {
+            ctremu.pending_reset = false;
             if (emulator_reset()) {
                 ctremu.pause = false;
                 uistate.menubar = !ctremu.initialized;
@@ -695,7 +508,6 @@ int main(int argc, char** argv) {
                     break;
                 case SDL_EVENT_DROP_FILE:
                     emulator_set_rom(e.drop.data);
-                    g_pending_reset = true;
                     break;
             }
             if (forward_imgui) ImGui_ImplSDL3_ProcessEvent(&e);
@@ -732,6 +544,8 @@ int main(int argc, char** argv) {
         igNewFrame();
 
         draw_menubar();
+
+        if (!ctremu.initialized) draw_gamelist();
 
         draw_gui();
 

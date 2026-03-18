@@ -9,7 +9,7 @@
 // #define VSH_DEBUG
 
 typedef struct {
-    Vector(PICAInstr) calls;
+    Vec(PICAInstr) calls;
     u32 depth;
     u32 farthestjmp;
     DynString s;

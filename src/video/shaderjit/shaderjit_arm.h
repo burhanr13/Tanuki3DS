@@ -16,9 +16,9 @@ typedef struct {
 typedef struct {
     rasBlock* code;
 
-    Vector(rasLabel) jmplabels;
-    Vector(PICAInstr) calls;
-    Vector(ArmShaderEntrypoint) entrypoints;
+    Vec(rasLabel) jmplabels;
+    Vec(PICAInstr) calls;
+    Vec(ArmShaderEntrypoint) entrypoints;
     rasLabel ex2func, lg2func;
     bool usingex2, usinglg2;
 

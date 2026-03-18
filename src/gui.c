@@ -1,12 +1,55 @@
 #include "gui.h"
 
 #include <SDL3/SDL.h>
+#include <dirent.h>
+#include <unistd.h>
 
 #include "arm/jit/jit.h"
+#include "cpu.h"
 #include "emulator.h"
+#include "kernel/loader.h"
 #include "services/applets.h"
+#include "unicode.h"
+
+#ifdef __linux__
+#define OPEN_CMD "xdg-open"
+#else
+#define OPEN_CMD "open"
+#endif
 
 struct UIState uistate = {.menubar = true};
+
+extern SDL_Window* g_window;
+
+void file_callback(void*, const char* const* files, int) {
+    if (files && files[0]) {
+        emulator_set_rom(files[0]);
+    }
+}
+
+void load_rom_dialog() {
+    SDL_DialogFileFilter filetypes = {
+        .name = "3DS Applications",
+        .pattern = "3ds;cci;cxi;app;elf;axf;3dsx",
+    };
+
+    SDL_ShowOpenFileDialog(file_callback, nullptr, g_window, &filetypes, 1,
+                           nullptr, false);
+}
+
+void load_sysfile_callback(void* dstfile, const char* const* files, int) {
+    if (files && files[0]) {
+        char* cmd;
+        asprintf(&cmd, "cp '%s' 3ds/sys_files/%s", files[0], (char*) dstfile);
+        system(cmd);
+        free(cmd);
+    }
+}
+
+void load_sysfile_dialog(char* dstfile) {
+    SDL_ShowOpenFileDialog(load_sysfile_callback, dstfile, g_window, nullptr, 0,
+                           nullptr, false);
+}
 
 void setup_gui_theme() {
     igGetStyle()->FontSizeBase = 15;
@@ -26,6 +69,265 @@ void setup_gui_theme() {
     igGetStyle()->WindowBorderSize = 1;
 
     igStyleColorsDark(nullptr);
+}
+
+void draw_menubar() {
+    if (!uistate.menubar) return;
+
+    if (igBeginMainMenuBar()) {
+        if (igBeginMenu("File", true)) {
+            if (igMenuItem("Open", "F2", false, true)) {
+                load_rom_dialog();
+            }
+            if (igBeginMenu("Open Recent", ctremu.history[0])) {
+                for (int i = 0; i < HISTORYLEN; i++) {
+                    if (!ctremu.history[i]) break;
+                    if (igMenuItem(ctremu.history[i], nullptr, false, true)) {
+                        emulator_set_rom(ctremu.history[i]);
+                    }
+                }
+                igEndMenu();
+            }
+            igSeparator();
+
+            if (igBeginMenu("Load System File", true)) {
+                if (igMenuItem("Shared Font", nullptr, false, true)) {
+                    load_sysfile_dialog("font.bcfnt");
+                }
+                if (igMenuItem("Mii Data", nullptr, false, true)) {
+                    load_sysfile_dialog("mii.app.romfs");
+                }
+                igEndMenu();
+            }
+
+            if (igMenuItem("Open Tanuki3DS Folder", nullptr, false, true)) {
+                char* cwd = getcwd(nullptr, 0);
+                char* cmd;
+                asprintf(&cmd, OPEN_CMD " '%s'", cwd);
+                system(cmd);
+                free(cwd);
+                free(cmd);
+            }
+
+            igSeparator();
+            if (igMenuItem("Exit", nullptr, false, true)) {
+                ctremu.running = false;
+            }
+            igEndMenu();
+        }
+        if (igBeginMenu("Emulation", ctremu.initialized)) {
+            if (igMenuItem("Reset", "F1", false, true)) {
+                ctremu.pending_reset = true;
+            }
+            igMenuItemP("Pause", "F5", &ctremu.pause, true);
+            if (igMenuItem("Stop", nullptr, false, true)) {
+                emulator_set_rom(nullptr);
+            }
+            igSeparator();
+
+            igMenuItemP("Fast Forward", "Tab", &ctremu.fastforward, true);
+            igMenuItemP("Mute", "F6", &ctremu.mute, true);
+
+            igSeparator();
+
+            if (igMenuItemP("Free Camera", "F7", &ctremu.freecam_enable,
+                            true)) {
+                glm_mat4_identity(ctremu.freecam_mtx);
+                renderer_gl_update_freecam(&ctremu.system.gpu.gl);
+            }
+
+            igEndMenu();
+        }
+
+        if (igBeginMenu("View", true)) {
+            if (igMenuItemP("Fullscreen", "F11", &ctremu.fullscreen, true)) {
+                SDL_SetWindowFullscreen(g_window, ctremu.fullscreen);
+            }
+            if (igBeginMenu("Screen Layout", true)) {
+                if (igMenuItem("Vertical", nullptr,
+                               ctremu.viewlayout == LAYOUT_DEFAULT, true)) {
+                    ctremu.viewlayout = LAYOUT_DEFAULT;
+                }
+                if (igMenuItem("Horizontal", nullptr,
+                               ctremu.viewlayout == LAYOUT_HORIZONTAL, true)) {
+                    ctremu.viewlayout = LAYOUT_HORIZONTAL;
+                }
+                if (igMenuItem("Large Screen", nullptr,
+                               ctremu.viewlayout == LAYOUT_LARGETOP, true)) {
+                    ctremu.viewlayout = LAYOUT_LARGETOP;
+                }
+                igSeparator();
+                igMenuItemP("Swap Screens", "F9", &ctremu.swapscreens, true);
+                igEndMenu();
+            }
+            igSeparator();
+
+            if (igMenuItem("Settings", "F3", false, true)) {
+                uistate.settings = true;
+            }
+
+            igSeparator();
+
+            if (igMenuItem("Texture Viewer", nullptr, false,
+                           ctremu.initialized)) {
+                uistate.textureview = true;
+            }
+
+            if (igMenuItem("Audio Channels", nullptr, false,
+                           ctremu.initialized)) {
+                uistate.audioview = true;
+            }
+
+            igEndMenu();
+        }
+
+        if (igBeginMenu("Debug", ctremu.initialized)) {
+            igMenuItemP("Verbose Log", nullptr, &g_infologs, true);
+            igMenuItemP("CPU Trace Log", nullptr, &g_cpulog, true);
+            igSeparator();
+            igMenuItemP("Wireframe", nullptr, &g_wireframe, true);
+            igEndMenu();
+        }
+
+        if (igBeginMenu("About", true)) {
+            igTextLinkOpenURL("GitHub",
+                              "https://github.com/burhanr13/Tanuki3DS");
+            igTextLinkOpenURL("Discord", "https://discord.gg/6ya65fvD3g");
+            igEndMenu();
+        }
+
+        igSpacing();
+        igTextDisabled("Esc to toggle menu bar");
+
+        igEndMainMenuBar();
+    }
+}
+
+struct GameEntry {
+    char* filename;
+    char gamename[128];
+    GLuint icontex;
+};
+bool gamelist_refresh = true;
+Vec(struct GameEntry) gamelist;
+
+void game_dir_callback(void*, const char* const* files, int) {
+    if (files && files[0]) {
+        free(ctremu.gamedir);
+        ctremu.gamedir = strdup(files[0]);
+        gamelist_refresh = true;
+    }
+}
+
+int compar_game(struct GameEntry* a, struct GameEntry* b) {
+    return strcmp(a->gamename, b->gamename);
+}
+
+void create_gamelist() {
+    Vec_foreach(g, gamelist) {
+        free(g->filename);
+        glDeleteTextures(1, &g->icontex);
+    }
+    Vec_free(gamelist);
+    gamelist_refresh = false;
+
+    if (!ctremu.gamedir) return;
+
+    DIR* dp = opendir(ctremu.gamedir);
+    if (!dp) return;
+    struct dirent* ent;
+    while ((ent = readdir(dp))) {
+        struct GameEntry g;
+        asprintf(&g.filename, "%s/%s", ctremu.gamedir, ent->d_name);
+
+        int smdhOff = find_smdh(g.filename);
+        if (smdhOff == -1) continue;
+
+        FILE* fp = fopen(g.filename, "rb");
+        if (!fp) continue;
+
+        fseek(fp, smdhOff, SEEK_SET);
+
+        SMDHFile smdh;
+        fread(&smdh, sizeof smdh, 1, fp);
+
+        convert_utf16(g.gamename, countof(g.gamename), smdh.titles[1].longname,
+                      countof(smdh.titles[1].longname));
+
+        // icons generally stored 48x48 in rgb565 format, swizzled
+        u16 iconraw[48 * 48];
+        u16 icon[48][48];
+        // skip smaller icon
+        fseek(fp, 24 * 24 * 2, SEEK_CUR);
+        fread(iconraw, sizeof(u16), 48 * 48, fp);
+        for (int y = 0; y < 48; y++) {
+            for (int x = 0; x < 48; x++) {
+                icon[y][x] = iconraw[morton_swizzle(48, x, y)];
+            }
+        }
+        glGenTextures(1, &g.icontex);
+        glBindTexture(GL_TEXTURE_2D, g.icontex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 48, 48, 0, GL_RGB,
+                     GL_UNSIGNED_SHORT_5_6_5, icon);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+        fclose(fp);
+
+        Vec_push(gamelist, g);
+    }
+    closedir(dp);
+
+    qsort(gamelist.d, gamelist.size, sizeof(gamelist.d[0]),
+          (void*) compar_game);
+}
+
+void draw_gamelist() {
+    if (gamelist_refresh) create_gamelist();
+
+    igSetNextWindowViewport(igGetMainViewport()->ID);
+    igSetNextWindowPos(igGetMainViewport()->WorkPos, 0, (ImVec2) {});
+    igSetNextWindowSize(igGetMainViewport()->WorkSize, 0);
+    igBegin("game list", nullptr,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
+
+    if (igButton("Select Game Folder...", (ImVec2) {})) {
+        SDL_ShowOpenFolderDialog(game_dir_callback, nullptr, g_window, nullptr,
+                                 false);
+    }
+    igSameLine(0, 5);
+    if (ctremu.gamedir) {
+        igText("Current: %s", ctremu.gamedir);
+    } else {
+        igText("Current: [None]");
+    }
+    igSameLine(0, 5);
+    if (igButton("Refresh", (ImVec2) {})) {
+        gamelist_refresh = true;
+    }
+
+    igBeginChild("gamelist_child", (ImVec2) {}, 0, 0);
+    igBeginTable("gamelist", 3, ImGuiTableFlags_RowBg, (ImVec2) {}, 0);
+
+    Vec_foreach(g, gamelist) {
+        igPushID_Str(g->filename);
+        igTableNextRow(0, 0);
+        igTableNextColumn();
+        igImage((ImTextureRef) {0, g->icontex}, (ImVec2) {48, 48},
+                (ImVec2) {0, 0}, (ImVec2) {1, 1});
+        igTableNextColumn();
+        igText("%s", g->gamename);
+        igTableNextColumn();
+        if (igButton("Launch", (ImVec2) {})) {
+            emulator_set_rom(g->filename);
+        }
+        igPopID();
+    }
+
+    igEndTable();
+    igEndChild();
+
+    igEnd();
 }
 
 void draw_swkbd() {

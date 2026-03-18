@@ -149,7 +149,7 @@ typedef struct {
 } IRInstr;
 
 typedef struct {
-    Vector(IRInstr) code;
+    Vec(IRInstr) code;
     u32 start_addr;
     u32 end_addr;
     u32 numinstr;

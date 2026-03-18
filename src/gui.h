@@ -26,7 +26,11 @@ extern struct UIState {
     int* waiting_key;
 } uistate;
 
+
+void load_rom_dialog();
 void setup_gui_theme();
+void draw_menubar();
+void draw_gamelist();
 void draw_gui();
 
 #endif

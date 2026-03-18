@@ -180,6 +180,7 @@ u32 load_ncsd(E3DS* s, char* filename);
 u32 load_ncch(E3DS* s, char* filename, u64 offset);
 
 void parse_smdh(E3DS* s);
+int find_smdh(char* filename);
 
 u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size);
 

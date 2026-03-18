@@ -128,6 +128,7 @@ void emulator_set_rom(const char* filename) {
     ctremu.romfile = nullptr;
     free(ctremu.romfilenoext);
     ctremu.romfilenoext = nullptr;
+    ctremu.pending_reset = true;
 
     if (!filename) {
         ctremu.romfile = nullptr;

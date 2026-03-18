@@ -3131,7 +3131,7 @@ static float GetExpectedContextFontSize(ImGuiContext* ctx)
     return ((ctx->Style.FontSizeBase > 0.0f) ? ctx->Style.FontSizeBase : 13.0f) * ctx->Style.FontScaleMain * ctx->Style.FontScaleDpi;
 }
 
-// Legacy function with heuristic to select Pixel or Vector font.
+// Legacy function with heuristic to select Pixel or Vec font.
 // The selection is based on (style.FontSizeBase * style.FontScaleMain * style.FontScaleDpi) reaching a small threshold at the time of adding the default font.
 // Prefer calling AddFontDefaultVector() or AddFontDefaultBitmap() based on your own logic.
 ImFont* ImFontAtlas::AddFontDefault(const ImFontConfig* font_cfg)

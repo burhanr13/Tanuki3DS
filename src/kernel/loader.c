@@ -265,6 +265,69 @@ void parse_smdh(E3DS* s) {
     else s->romimage.region = __builtin_ctz(smdh.settings.regionLock);
 }
 
+int find_smdh(char* filename) {
+    char* ext = strrchr(filename, '.');
+    if (!ext) {
+        return -1;
+    }
+
+    u32 ncchbase;
+    if (!strcmp(ext, ".3ds") || !strcmp(ext, ".cci") || !strcmp(ext, ".ncsd")) {
+        FILE* fp = fopen(filename, "rb");
+        if (!fp) return -1;
+        NCSDHeader hdrncsd;
+        fread(&hdrncsd, sizeof hdrncsd, 1, fp);
+        if (strncmp(hdrncsd.magic, "NCSD", 4)) {
+            fclose(fp);
+            return -1;
+        }
+        fclose(fp);
+        ncchbase = hdrncsd.part[0].offset * 0x200;
+    } else if (!strcmp(ext, ".cxi") || !strcmp(ext, ".app") ||
+               !strcmp(ext, ".ncch")) {
+        ncchbase = 0;
+    } else if (!strcmp(ext, ".3dsx")) {
+        FILE* fp = fopen(filename, "rb");
+        if (!fp) return -1;
+        _3DSXHeader hdr;
+        fread(&hdr, 1, sizeof(_3DSXHeader), fp);
+        if (strncmp(hdr.magic, "3DSX", 4)) {
+            fclose(fp);
+            return -1;
+        }
+        fclose(fp);
+        return hdr.smdhOff;
+    } else {
+        return -1;
+    }
+    FILE* fp = fopen(filename, "rb");
+    if (!fp) return -1;
+
+    u64 base = ncchbase;
+    fseek(fp, base, SEEK_SET);
+    NCCHHeader hdrncch;
+    fread(&hdrncch, sizeof hdrncch, 1, fp);
+    if (strncmp(hdrncch.magic, "NCCH", 4)) {
+        fclose(fp);
+        return -1;
+    }
+    ExHeader exhdr;
+    fread(&exhdr, sizeof exhdr, 1, fp);
+    base += hdrncch.exefs.offset * 0x200;
+    fseek(fp, base, SEEK_SET);
+    ExeFSHeader hdrexefs;
+    fread(&hdrexefs, sizeof hdrexefs, 1, fp);
+    base += 0x200;
+    u32 iconoff = 0;
+    for (int i = 0; i < 10; i++) {
+        if (!strcmp(hdrexefs.file[i].name, "icon")) {
+            iconoff = hdrexefs.file[i].offset;
+        }
+    }
+    fclose(fp);
+    return base + iconoff;
+}
+
 u8* lzssrev_decompress(u8* in, u32 src_size, u32* dst_size) {
     *dst_size = src_size + *(u32*) &in[src_size - 4];
     u8* out = malloc(*dst_size);

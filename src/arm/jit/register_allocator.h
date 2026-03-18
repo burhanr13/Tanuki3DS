@@ -29,7 +29,7 @@ typedef struct {
 // vars without an assignment have index -1
 // nassns is the length of reg_assn
 typedef struct {
-    Vector(RegInfo) reg_info;
+    Vec(RegInfo) reg_info;
     u32* reg_assn;
     u32 nassns;
 } RegAllocation;

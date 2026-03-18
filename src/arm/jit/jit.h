@@ -24,7 +24,7 @@ typedef struct _JITBlock {
     ArmCore* cpu;
     IRBlock* ir;
 
-    Vector(BlockLocation) linkingblocks;
+    Vec(BlockLocation) linkingblocks;
 
 } JITBlock;
 
