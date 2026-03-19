@@ -206,6 +206,7 @@ void draw_menubar() {
 struct GameEntry {
     char* filename;
     char gamename[128];
+    char publisher[64];
     GLuint icontex;
 };
 bool gamelist_refresh = true;
@@ -253,6 +254,9 @@ void create_gamelist() {
 
         convert_utf16(g.gamename, countof(g.gamename), smdh.titles[1].longname,
                       countof(smdh.titles[1].longname));
+        convert_utf16(g.publisher, countof(g.publisher),
+                      smdh.titles[1].publisher,
+                      countof(smdh.titles[1].publisher));
 
         // icons generally stored 48x48 in rgb565 format, swizzled
         u16 iconraw[48 * 48];
@@ -307,7 +311,9 @@ void draw_gamelist() {
     }
 
     igBeginChild("gamelist_child", (ImVec2) {}, 0, 0);
-    igBeginTable("gamelist", 3, ImGuiTableFlags_RowBg, (ImVec2) {}, 0);
+    igBeginTable("gamelist", 4,
+                 ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp,
+                 (ImVec2) {}, 0);
 
     Vec_foreach(g, gamelist) {
         igPushID_Str(g->filename);
@@ -317,6 +323,8 @@ void draw_gamelist() {
                 (ImVec2) {0, 0}, (ImVec2) {1, 1});
         igTableNextColumn();
         igText("%s", g->gamename);
+        igTableNextColumn();
+        igText("%s", g->publisher);
         igTableNextColumn();
         if (igButton("Launch", (ImVec2) {})) {
             emulator_set_rom(g->filename);
