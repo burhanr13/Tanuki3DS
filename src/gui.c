@@ -207,6 +207,7 @@ struct GameEntry {
     char* filename;
     char gamename[128];
     char publisher[64];
+    int region;
     GLuint icontex;
 };
 bool gamelist_refresh = true;
@@ -257,7 +258,8 @@ void create_gamelist() {
         convert_utf16(g.publisher, countof(g.publisher),
                       smdh.titles[1].publisher,
                       countof(smdh.titles[1].publisher));
-
+        g.region = smdh.settings.regionLock;
+        
         // icons generally stored 48x48 in rgb565 format, swizzled
         u16 iconraw[48 * 48];
         u16 icon[48][48];
@@ -311,7 +313,7 @@ void draw_gamelist() {
     }
 
     igBeginChild("gamelist_child", (ImVec2) {}, 0, 0);
-    igBeginTable("gamelist", 4,
+    igBeginTable("gamelist", 5,
                  ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp,
                  (ImVec2) {}, 0);
 
@@ -323,8 +325,18 @@ void draw_gamelist() {
                 (ImVec2) {0, 0}, (ImVec2) {1, 1});
         igTableNextColumn();
         igText("%s", g->gamename);
+        igTextDisabled("%s", strrchr(g->filename, '/') + 1);
         igTableNextColumn();
         igText("%s", g->publisher);
+        igTableNextColumn();
+        static const char* regions[] = {
+            "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
+        };
+        if ((g->region & 0x7f) == 0x7f) {
+            igText("Any");
+        } else {
+            igText("%s", regions[__builtin_ctz(g->region)]);
+        }
         igTableNextColumn();
         if (igButton("Launch", (ImVec2) {})) {
             emulator_set_rom(g->filename);
