@@ -17,6 +17,11 @@
 #define OPEN_CMD "open"
 #endif
 
+#ifdef _WIN32
+#define fseek(a, b, c) _fseeki64(a, b, c)
+#define ftell(a) _ftelli64(a)
+#endif
+
 struct UIState uistate = {.menubar = true};
 
 extern SDL_Window* g_window;
@@ -208,6 +213,7 @@ struct GameEntry {
     char gamename[128];
     char publisher[64];
     int region;
+    size_t size;
     GLuint icontex;
 };
 bool gamelist_refresh = true;
@@ -248,6 +254,9 @@ void create_gamelist() {
         FILE* fp = fopen(g.filename, "rb");
         if (!fp) continue;
 
+        fseek(fp, 0, SEEK_END);
+        g.size = ftell(fp);
+
         fseek(fp, smdhOff, SEEK_SET);
 
         SMDHFile smdh;
@@ -255,11 +264,14 @@ void create_gamelist() {
 
         convert_utf16(g.gamename, countof(g.gamename), smdh.titles[1].longname,
                       countof(smdh.titles[1].longname));
+        for (int i = 0; i < countof(g.gamename); i++) {
+            if (g.gamename[i] == '\n') g.gamename[i] = ' ';
+        }
         convert_utf16(g.publisher, countof(g.publisher),
                       smdh.titles[1].publisher,
                       countof(smdh.titles[1].publisher));
         g.region = smdh.settings.regionLock;
-        
+
         // icons generally stored 48x48 in rgb565 format, swizzled
         u16 iconraw[48 * 48];
         u16 icon[48][48];
@@ -301,26 +313,43 @@ void draw_gamelist() {
         SDL_ShowOpenFolderDialog(game_dir_callback, nullptr, g_window, nullptr,
                                  false);
     }
-    igSameLine(0, 5);
+    igSameLine(0, -1);
     if (ctremu.gamedir) {
         igText("Current: %s", ctremu.gamedir);
     } else {
         igText("Current: [None]");
     }
-    igSameLine(0, 5);
+    igSameLine(0, -1);
     if (igButton("Refresh", (ImVec2) {})) {
         gamelist_refresh = true;
     }
 
     igBeginChild("gamelist_child", (ImVec2) {}, 0, 0);
     igBeginTable("gamelist", 5,
-                 ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp,
+                 ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp |
+                     ImGuiTableFlags_ScrollY,
                  (ImVec2) {}, 0);
+
+    igTableSetupScrollFreeze(0, 1);
+    igTableSetupColumn("Icon", ImGuiTableColumnFlags_WidthFixed, 50, 0);
+    igTableSetupColumn("Title", 0, 0, 0);
+    igTableSetupColumn("Publisher", 0, 0, 0);
+    igTableSetupColumn("Region", 0, 0, 0);
+    igTableSetupColumn("Size", 0, 0, 0);
+    igTableHeadersRow();
 
     Vec_foreach(g, gamelist) {
         igPushID_Str(g->filename);
         igTableNextRow(0, 0);
         igTableNextColumn();
+        if (igSelectable("##", false,
+                         ImGuiSelectableFlags_SpanAllColumns |
+                             ImGuiSelectableFlags_AllowOverlap |
+                             ImGuiSelectableFlags_AllowDoubleClick,
+                         (ImVec2) {0, 48})) {
+            if (igIsMouseDoubleClicked_Nil(0)) emulator_set_rom(g->filename);
+        }
+        igSameLine(0, -1);
         igImage((ImTextureRef) {0, g->icontex}, (ImVec2) {48, 48},
                 (ImVec2) {0, 0}, (ImVec2) {1, 1});
         igTableNextColumn();
@@ -338,8 +367,12 @@ void draw_gamelist() {
             igText("%s", regions[__builtin_ctz(g->region)]);
         }
         igTableNextColumn();
-        if (igButton("Launch", (ImVec2) {})) {
-            emulator_set_rom(g->filename);
+        if (g->size < BIT(20)) {
+            igText("%.1f KiB", (double) g->size / BIT(10));
+        } else if (g->size < BIT(30)) {
+            igText("%.1f MiB", (double) g->size / BIT(20));
+        } else {
+            igText("%.1f GiB", (double) g->size / BIT(30));
         }
         igPopID();
     }
@@ -431,7 +464,7 @@ void draw_settings() {
     igPopStyleVar(1);
     igPopStyleColor(1);
 
-    igSameLine(0, 0);
+    igSameLine(0, -1);
 
     igBeginChild("settings", (ImVec2) {},
                  ImGuiChildFlags_AlwaysUseWindowPadding, 0);
@@ -516,9 +549,11 @@ void draw_settings() {
             igEndDisabled();
             igCheckbox("Shader JIT", &ctremu.shaderjit);
             igCheckbox("Hardware Vertex Shaders", &ctremu.hwvshaders);
+            igIndent(0);
             igBeginDisabled(!ctremu.hwvshaders);
             igCheckbox("Safe Multiplication", &ctremu.safeShaderMul);
             igEndDisabled();
+            igUnindent(0);
             // igCheckbox("Use Ubershader", &ctremu.ubershader);
             igCheckbox("Hash Textures", &ctremu.hashTextures);
             break;
@@ -617,7 +652,7 @@ void draw_settings() {
     }
     igEndDisabled();
 
-    igSameLine(0, 5);
+    igSameLine(0, -1);
 
     if (igButton("Close", (ImVec2) {})) {
         uistate.settings = false;
@@ -678,7 +713,7 @@ void draw_textureview() {
         igPopStyleVar(1);
         igPopStyleColor(1);
 
-        igSameLine(0, 0);
+        igSameLine(0, -1);
 
         igBeginChild("##texture pane", (ImVec2) {},
                      ImGuiChildFlags_AlwaysUseWindowPadding, 0);
@@ -744,7 +779,7 @@ void draw_textureview() {
         igPopStyleVar(1);
         igPopStyleColor(1);
 
-        igSameLine(0, 0);
+        igSameLine(0, -1);
 
         igBeginChild("##fb pane", (ImVec2) {},
                      ImGuiChildFlags_AlwaysUseWindowPadding, 0);
@@ -764,7 +799,7 @@ void draw_textureview() {
 
             static int bufselect;
             igRadioButton_IntPtr("Color Buffer", &bufselect, 0);
-            igSameLine(0, 0);
+            igSameLine(0, -1);
             igRadioButton_IntPtr("Depth Buffer", &bufselect, 1);
 
             if (bufselect == 0) {
@@ -837,17 +872,15 @@ void draw_audioview() {
 
     igBeginTable("##audioview", 4,
                  ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit |
-                     ImGuiTableFlags_BordersOuterV,
+                     ImGuiTableFlags_BordersOuterV | ImGuiTableFlags_ScrollY,
                  (ImVec2) {}, 0);
 
-    igTableNextRow(ImGuiTableRowFlags_Headers, 0);
-    igTableNextColumn();
-    igTableNextColumn();
-    igText("Left");
-    igTableNextColumn();
-    igText("Right");
-    igTableNextColumn();
-    igText("Disabled");
+    igTableSetupScrollFreeze(0, 1);
+    igTableSetupColumn("##", 0, 0, 0);
+    igTableSetupColumn("Left", 0, 0, 0);
+    igTableSetupColumn("Right", 0, 0, 0);
+    igTableSetupColumn("Disabled", 0, 0, 0);
+    igTableHeadersRow();
 
     igTableNextRow(0, 0);
     igTableNextColumn();
@@ -882,11 +915,11 @@ void draw_audioview() {
     if (igButton("Enable All", (ImVec2) {})) {
         g_dsp_chn_disable = 0;
     }
-    igSameLine(0, 5);
+    igSameLine(0, -1);
     if (igButton("Disable All", (ImVec2) {})) {
         g_dsp_chn_disable = ~0;
     }
-    igSameLine(0, 5);
+    igSameLine(0, -1);
     if (igButton("Close", (ImVec2) {})) {
         uistate.audioview = false;
     }
