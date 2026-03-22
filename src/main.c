@@ -595,7 +595,7 @@ int main(int argc, char** argv) {
             }
         } else {
             if (ctremu.audiosync && !ctremu.mute && ctremu.initialized &&
-                SDL_GetAudioStreamQueued(g_audio) == 0) {
+                SDL_GetAudioStreamQueued(g_audio) != 0) {
                 while (SDL_GetAudioStreamQueued(g_audio) > 100 * FRAME_SAMPLES)
                     SDL_Delay(1);
             } else if (!ctremu.vsync) {

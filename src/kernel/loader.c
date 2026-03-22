@@ -126,6 +126,7 @@ u32 load_3dsx(E3DS* s, char* filename) {
     s->romimage.fp = fp;
     s->romimage.romfs_off = hdr.romfsOff;
     s->romimage.smdh_off = hdr.smdhOff;
+    s->romimage.is3DSX = true;
 
     memory_virtalloc(s, STACK_BASE - BIT(14), BIT(14), PERM_RW, MEMST_PRIVATE);
 
@@ -254,7 +255,12 @@ void parse_smdh(E3DS* s) {
         return;
     }
 
-    convert_utf16(s->romimage.name, 128, smdh.titles[1].longname, 128);
+    if (s->romimage.is3DSX) {
+        // homebrew seems to be using longname as a subtitle
+        convert_utf16(s->romimage.name, 128, smdh.titles[1].shortname, 64);
+    } else {
+        convert_utf16(s->romimage.name, 128, smdh.titles[1].longname, 128);
+    }
     // remove stupid whitespace
     for (int i = 0; i < 128; i++)
         if (isspace(s->romimage.name[i])) s->romimage.name[i] = ' ';

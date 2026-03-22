@@ -170,6 +170,7 @@ typedef struct {
     u32 romfs_off;
 
     u32 region;
+    bool is3DSX;
 
     char name[128];
 } RomImage;

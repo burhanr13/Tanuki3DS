@@ -262,8 +262,15 @@ void create_gamelist() {
         SMDHFile smdh;
         fread(&smdh, sizeof smdh, 1, fp);
 
-        convert_utf16(g.gamename, countof(g.gamename), smdh.titles[1].longname,
-                      countof(smdh.titles[1].longname));
+        if (!strcmp(strrchr(g.filename, '.'), ".3dsx")) {
+            convert_utf16(g.gamename, countof(g.gamename),
+                          smdh.titles[1].shortname,
+                          countof(smdh.titles[1].shortname));
+        } else {
+            convert_utf16(g.gamename, countof(g.gamename),
+                          smdh.titles[1].longname,
+                          countof(smdh.titles[1].longname));
+        }
         for (int i = 0; i < countof(g.gamename); i++) {
             if (g.gamename[i] == '\n') g.gamename[i] = ' ';
         }
