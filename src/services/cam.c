@@ -4,16 +4,17 @@
 
 DECL_PORT(cam) {
     u32* cmdbuf = PTR(cmd_addr);
+    auto cam = &s->services.cam;
     switch (cmd.command) {
         case 0x0001:
             linfo("StartCapture");
-            s->services.cam.capturing = true;
+            cam->capturing = true;
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
         case 0x0002:
             linfo("StopCapture");
-            s->services.cam.capturing = false;
+            cam->capturing = false;
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -32,25 +33,37 @@ DECL_PORT(cam) {
             cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;
-            cmdbuf[3] = srvobj_make_handle(s, &s->services.cam.vsyncEvent.hdr);
+            cmdbuf[3] = srvobj_make_handle(s, &cam->vsyncEvent.hdr);
             linfo("GetVSyncInterruptEvent handle %08x", cmdbuf[3]);
             break;
         case 0x0006:
             cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;
-            cmdbuf[3] = srvobj_make_handle(s, &s->services.cam.errEvent.hdr);
+            cmdbuf[3] = srvobj_make_handle(s, &cam->errEvent.hdr);
             linfo("GetBufferErrorInterruptEvent handle %08x", cmdbuf[3]);
             break;
         case 0x0007: {
             u32 dst = cmdbuf[1];
+            u32 port = cmdbuf[2];
             u32 size = cmdbuf[3];
-            s->services.cam.dstAddr = dst;
+            s16 unit = cmdbuf[4];
+            // port bits 0,1 for left,right cameras for 3d camera
+            // we only render left eye screen so ignore commands for right
+            // camera
+            if (port & 1) cam->dstAddr = dst;
             cmdbuf[0] = IPCHDR(1, 2);
             cmdbuf[1] = 0;
             cmdbuf[2] = 0;
-            cmdbuf[3] = srvobj_make_handle(s, &s->services.cam.recvEvent.hdr);
-            linfo("SetReceiving size %d handle %08x", size, cmdbuf[3]);
+            cmdbuf[3] = srvobj_make_handle(s, &cam->recvEvent.hdr);
+            linfo("SetReceiving size %d unit %d handle %08x", size, unit,
+                  cmdbuf[3]);
+            if (cam->trimming) {
+                linfo("trimming params: %d %d %d %d", cam->x0, cam->y0, cam->x1,
+                      cam->y1);
+                cam->width = cam->x1 - cam->x0;
+                cam->height = cam->y1 - cam->y0;
+            }
             break;
         }
         case 0x0009: {
@@ -58,8 +71,6 @@ DECL_PORT(cam) {
             s16 w = cmdbuf[3];
             s16 h = cmdbuf[4];
             linfo("SetTransferLines %d %d %d", lines, w, h);
-            s->services.cam.width = w;
-            s->services.cam.height = h;
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -78,8 +89,6 @@ DECL_PORT(cam) {
             s16 w = cmdbuf[3];
             s16 h = cmdbuf[4];
             linfo("SetTransferBytes %d %d %d", bytes, w, h);
-            s->services.cam.width = w;
-            s->services.cam.height = h;
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -88,8 +97,7 @@ DECL_PORT(cam) {
             linfo("GetTransferBytes");
             cmdbuf[0] = IPCHDR(2, 0);
             cmdbuf[1] = 0;
-            cmdbuf[2] = s->services.cam.width * s->services.cam.height *
-                        (s->services.cam.rgb ? 2 : 3);
+            cmdbuf[2] = cam->width * cam->height * 2;
             break;
         }
         case 0x000d: {
@@ -103,6 +111,16 @@ DECL_PORT(cam) {
         }
         case 0x000e:
             linfo("SetTrimming");
+            cam->trimming = cmdbuf[2];
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        case 0x0010:
+            linfo("SetTrimmingParams");
+            cam->x0 = cmdbuf[2];
+            cam->y0 = cmdbuf[3];
+            cam->x1 = cmdbuf[4];
+            cam->y1 = cmdbuf[5];
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -124,6 +142,12 @@ DECL_PORT(cam) {
         case 0x001f: {
             u32 size = cmdbuf[2];
             linfo("SetSize %d", size);
+            static const int sizes[8][2] = {
+                {640, 480}, {320, 240}, {160, 120}, {352, 288},
+                {176, 144}, {256, 192}, {512, 384}, {400, 240},
+            };
+            cam->width = sizes[size & 7][0];
+            cam->height = sizes[size & 7][1];
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -131,6 +155,7 @@ DECL_PORT(cam) {
         case 0x0025: {
             u32 fmt = cmdbuf[2];
             linfo("SetOutputFormat %d", fmt);
+            cam->rgb = fmt;
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
             break;
@@ -165,13 +190,14 @@ DECL_PORT(cam) {
 }
 
 void cam_send_data(E3DS* s, void* src) {
-    if (!s->services.cam.dstAddr) return;
-    void* dst = PTR(s->services.cam.dstAddr);
-    u32 w = s->services.cam.width;
-    u32 h = s->services.cam.height;
-    u32 bpp = s->services.cam.rgb ? 2 : 3;
-    if (src) memcpy(dst, src, w * h * bpp);
-    s->services.cam.dstAddr = 0;
+    auto cam = &s->services.cam;
+    if (!cam->dstAddr) return;
+    void* dst = PTR(cam->dstAddr);
+    u32 w = cam->width;
+    u32 h = cam->height;
+    linfo("sending camera image %dx%d size=%d", w, h, w * h * 2);
+    if (src) memcpy(dst, src, w * h * 2);
+    cam->dstAddr = 0;
     linfo("signaling camera event");
-    event_signal(s, &s->services.cam.recvEvent);
+    event_signal(s, &cam->recvEvent);
 }

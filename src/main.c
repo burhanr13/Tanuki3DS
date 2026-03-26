@@ -352,9 +352,9 @@ void update_cam() {
         SDL_CameraSpec cs = {
             .format = SDL_PIXELFORMAT_RGB565,
             .colorspace = SDL_COLORSPACE_RGB_DEFAULT,
-            .width = 512,
-            .height = 512,
-            .framerate_numerator = 60,
+            .width = 640,
+            .height = 480,
+            .framerate_numerator = 30,
             .framerate_denominator = 1,
         };
         g_camera = SDL_OpenCamera(cams[0], &cs);
@@ -367,7 +367,7 @@ void update_cam() {
                                    SDL_SCALEMODE_LINEAR);
     if (!ctremu.system.services.cam.rgb) {
         auto imageYUV = SDL_ConvertSurfaceAndColorspace(
-            scaled, SDL_PIXELFORMAT_IYUV, nullptr, SDL_COLORSPACE_YUV_DEFAULT,
+            scaled, SDL_PIXELFORMAT_YUY2, nullptr, SDL_COLORSPACE_YUV_DEFAULT,
             0);
         SDL_DestroySurface(scaled);
         scaled = imageYUV;

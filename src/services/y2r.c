@@ -181,6 +181,16 @@ DECL_PORT(y2r) {
                     break;
                 default:
                     lwarnonce("unknown coefficient %d", coef);
+                    // just use the same coefficients for now
+                    s->services.y2r.coeffs.y_a = 298.082f / 256;
+                    s->services.y2r.coeffs.r_v = 408.583f / 256;
+                    s->services.y2r.coeffs.r_off = -222.921f / 256;
+                    s->services.y2r.coeffs.g_u = -100.291f / 256;
+                    s->services.y2r.coeffs.g_v = -208.120f / 256;
+                    s->services.y2r.coeffs.g_off = 135.576f / 256;
+                    s->services.y2r.coeffs.b_u = 516.412f / 256;
+                    s->services.y2r.coeffs.b_off = -276.836f / 256;
+                    break;
             }
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
@@ -284,10 +294,10 @@ void y2r_do_conversion(E3DS* s) {
                     u = udata[(y >> 1) * uwidth + (x >> 1)] * (1 / 255.f);
                     v = vdata[(y >> 1) * vwidth + (x >> 1)] * (1 / 255.f);
                     break;
-                case 4: // yuv422 batch (packed yuv)
-                    cy = ydata[3 * (y * ywidth + x)] * (1 / 255.f);
-                    u = udata[3 * (y * ywidth + x) + 1] * (1 / 255.f);
-                    v = vdata[3 * (y * ywidth + x) + 2] * (1 / 255.f);
+                case 4: // yuv422 batch packed yuv yuyv
+                    cy = ydata[2 * (y * ywidth + x)] * (1 / 255.f);
+                    u = ydata[2 * (y * ywidth + (x & ~1)) + 1] * (1 / 255.f);
+                    v = ydata[2 * (y * ywidth + (x | 1)) + 1] * (1 / 255.f);
                     break;
                 default:
                     lwarnonce("unknown input format %d", y2r->inputFmt);

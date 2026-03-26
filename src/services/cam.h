@@ -16,6 +16,9 @@ typedef struct {
     u32 height;
     bool rgb;
 
+    bool trimming;
+    s16 x0, y0, x1, y1;
+
     u32 dstAddr;
 } CAMData;
 
