@@ -294,10 +294,11 @@ void y2r_do_conversion(E3DS* s) {
                     u = udata[(y >> 1) * uwidth + (x >> 1)] * (1 / 255.f);
                     v = vdata[(y >> 1) * vwidth + (x >> 1)] * (1 / 255.f);
                     break;
-                case 4: // yuv422 batch packed yuv yuyv
-                    cy = ydata[2 * (y * ywidth + x)] * (1 / 255.f);
-                    u = ydata[2 * (y * ywidth + (x & ~1)) + 1] * (1 / 255.f);
-                    v = ydata[2 * (y * ywidth + (x | 1)) + 1] * (1 / 255.f);
+                case 4: // yuv422 batch -> packed yuyv for each 2x1 chunk of pixels
+                    cy = ydata[2 * ((y >> 1) * ywidth + x) + ((y & 1) << 1)] *
+                         (1 / 255.f);
+                    u = ydata[2 * ((y >> 1) * ywidth + x) + 1] * (1 / 255.f);
+                    v = ydata[2 * ((y >> 1) * ywidth + x) + 3] * (1 / 255.f);
                     break;
                 default:
                     lwarnonce("unknown input format %d", y2r->inputFmt);
