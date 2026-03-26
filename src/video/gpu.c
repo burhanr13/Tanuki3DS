@@ -642,7 +642,7 @@ void gpu_run_gsh(GPU* gpu, ShaderUnit* gsh, bool elements, int basevert,
     // normal mode
 
     if (gpu->regs.geom.gsh_misc0.mode != 0) {
-        lwarn("unknown geoshader mode");
+        lwarnonce("unknown geoshader mode %d", gpu->regs.geom.gsh_misc0.mode);
         return;
     }
 

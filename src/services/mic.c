@@ -92,5 +92,6 @@ void mic_send_data(E3DS* s, void* src, u32 srclen) {
         srclen -= rem;
         src += rem;
     }
+    linfo("signaling mic event");
     event_signal(s, &mic->event);
 }

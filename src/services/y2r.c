@@ -105,6 +105,21 @@ DECL_PORT(y2r) {
             cmdbuf[1] = 0;
             break;
         }
+        case 0x0013: {
+            u32 buf = cmdbuf[1];
+            u32 sz = cmdbuf[2];
+            s16 unit = cmdbuf[3];
+            s16 stride = cmdbuf[4];
+            linfo("SetSendingYuv %08x %d %d %d", buf, sz, unit, stride);
+            s->services.y2r.srcY.addr = buf;
+            s->services.y2r.srcY.pitch = unit;
+            s->services.y2r.srcY.gap = stride;
+            s->services.y2r.srcY.size = sz;
+            s->services.y2r.srcU = s->services.y2r.srcV = s->services.y2r.srcY;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
         case 0x0018: {
             u32 buf = cmdbuf[1];
             u32 sz = cmdbuf[2];
@@ -238,7 +253,7 @@ void y2r_do_conversion(E3DS* s) {
 
     if (y2r->srcY.addr == 0 || y2r->srcU.addr == 0 || y2r->srcV.addr == 0 ||
         y2r->dst.addr == 0) {
-        lwarn("null y2r buffers");
+        lwarnonce("null y2r buffers");
         return;
     }
 
@@ -266,8 +281,13 @@ void y2r_do_conversion(E3DS* s) {
             switch (y2r->inputFmt) {
                 case 1: // yuv420 -> each 2x2 gets one u/v sample
                     cy = ydata[y * ywidth + x] * (1 / 255.f);
-                    u = udata[(y / 2) * uwidth + (x / 2)] * (1 / 255.f);
-                    v = vdata[(y / 2) * vwidth + (x / 2)] * (1 / 255.f);
+                    u = udata[(y >> 1) * uwidth + (x >> 1)] * (1 / 255.f);
+                    v = vdata[(y >> 1) * vwidth + (x >> 1)] * (1 / 255.f);
+                    break;
+                case 4: // yuv422 batch (packed yuv)
+                    cy = ydata[3 * (y * ywidth + x)] * (1 / 255.f);
+                    u = udata[3 * (y * ywidth + x) + 1] * (1 / 255.f);
+                    v = vdata[3 * (y * ywidth + x) + 2] * (1 / 255.f);
                     break;
                 default:
                     lwarnonce("unknown input format %d", y2r->inputFmt);

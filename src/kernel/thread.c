@@ -432,6 +432,9 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
             klist_insert(&sem->waiting_thrds, &t->hdr);
             return true;
         }
+        case KOT_SESSION:
+            // supposedly this is always waited on
+            return true;
         default:
             t->ctx.r[0] = -1;
             lerror("cannot wait on this %d", o->type);
@@ -471,6 +474,8 @@ void sync_cancel(KThread* t, KObject* o) {
             klist_remove_key(&arb->waiting_thrds, &t->hdr);
             break;
         }
+        case KOT_SESSION:
+            break;
         default:
             lerror("unknown sync object %d", o->type);
             break;

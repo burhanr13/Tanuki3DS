@@ -29,6 +29,8 @@ SDL_Gamepad* g_gamepad;
 SDL_AudioStream* g_audio;
 SDL_AudioStream* g_audio_input;
 
+SDL_Camera* g_camera;
+
 char* romfile_arg;
 
 #define FREECAM_SPEED 5.0
@@ -340,6 +342,41 @@ void update_mic() {
     mic_send_data(&ctremu.system, buf, buflen);
 }
 
+void update_cam() {
+    if (!ctremu.system.services.cam.capturing) {
+        return;
+    }
+    if (!g_camera) {
+        SDL_CameraID* cams = SDL_GetCameras(nullptr);
+        if (!cams || !cams[0]) return;
+        SDL_CameraSpec cs = {
+            .format = SDL_PIXELFORMAT_RGB565,
+            .colorspace = SDL_COLORSPACE_RGB_DEFAULT,
+            .width = 512,
+            .height = 512,
+            .framerate_numerator = 60,
+            .framerate_denominator = 1,
+        };
+        g_camera = SDL_OpenCamera(cams[0], &cs);
+    }
+
+    auto image = SDL_AcquireCameraFrame(g_camera, nullptr);
+    if (!image) return;
+    auto scaled = SDL_ScaleSurface(image, ctremu.system.services.cam.width,
+                                   ctremu.system.services.cam.height,
+                                   SDL_SCALEMODE_LINEAR);
+    if (!ctremu.system.services.cam.rgb) {
+        auto imageYUV = SDL_ConvertSurfaceAndColorspace(
+            scaled, SDL_PIXELFORMAT_IYUV, nullptr, SDL_COLORSPACE_YUV_DEFAULT,
+            0);
+        SDL_DestroySurface(scaled);
+        scaled = imageYUV;
+    }
+    cam_send_data(&ctremu.system, scaled->pixels);
+    SDL_DestroySurface(scaled);
+    SDL_ReleaseCameraFrame(g_camera, image);
+}
+
 void audio_callback(s16 (*samples)[2], u32 count) {
     if (ctremu.fastforward || ctremu.mute) return;
     SDL_PutAudioStreamData(g_audio, samples, count * 2 * sizeof(s16));
@@ -374,7 +411,8 @@ int main(int argc, char** argv) {
         free(romfile_arg);
     }
 
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD |
+             SDL_INIT_CAMERA);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -521,6 +559,7 @@ int main(int argc, char** argv) {
         if (!ctremu.pause) {
             update_input();
             update_mic();
+            update_cam();
 
             gpu_gl_start_frame(&ctremu.system.gpu);
 
@@ -613,6 +652,8 @@ int main(int argc, char** argv) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     igDestroyContext(nullptr);
+
+    if (g_camera) SDL_CloseCamera(g_camera);
 
     if (g_audio_input) SDL_DestroyAudioStream(g_audio_input);
     SDL_DestroyAudioStream(g_audio);

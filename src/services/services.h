@@ -6,6 +6,7 @@
 #include "am.h"
 #include "apt.h"
 #include "boss.h"
+#include "cam.h"
 #include "cecd.h"
 #include "cfg.h"
 #include "dsp.h"
@@ -34,6 +35,7 @@ typedef struct {
     LDRData ldr;
     IRData ir;
     MICData mic;
+    CAMData cam;
 
 } ServiceData;
 
