@@ -350,8 +350,8 @@ void update_cam() {
         SDL_CameraID* cams = SDL_GetCameras(nullptr);
         if (!cams || !cams[0]) return;
         SDL_CameraSpec cs = {
-            .format = SDL_PIXELFORMAT_RGB565,
-            .colorspace = SDL_COLORSPACE_RGB_DEFAULT,
+            .format = SDL_PIXELFORMAT_YUY2,
+            .colorspace = SDL_COLORSPACE_YUV_DEFAULT,
             .width = 640,
             .height = 480,
             .framerate_numerator = 30,
@@ -365,12 +365,12 @@ void update_cam() {
     auto scaled = SDL_ScaleSurface(image, ctremu.system.services.cam.width,
                                    ctremu.system.services.cam.height,
                                    SDL_SCALEMODE_LINEAR);
-    if (!ctremu.system.services.cam.rgb) {
-        auto imageYUV = SDL_ConvertSurfaceAndColorspace(
-            scaled, SDL_PIXELFORMAT_YUY2, nullptr, SDL_COLORSPACE_YUV_DEFAULT,
+    if (ctremu.system.services.cam.rgb) {
+        auto imageRGB = SDL_ConvertSurfaceAndColorspace(
+            scaled, SDL_PIXELFORMAT_RGB565, nullptr, SDL_COLORSPACE_RGB_DEFAULT,
             0);
         SDL_DestroySurface(scaled);
-        scaled = imageYUV;
+        scaled = imageRGB;
     }
     cam_send_data(&ctremu.system, scaled->pixels);
     SDL_DestroySurface(scaled);
