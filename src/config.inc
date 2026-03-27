@@ -22,6 +22,7 @@ ASTR("Username", ctremu.username)
 INT("Language", ctremu.language)
 BOOL("DetectRegion", ctremu.detectRegion)
 INT("Region", ctremu.region)
+BOOL("EnableCamera", ctremu.camEnable)
 
 SECT("CPU")
 BOOL("IRInterpreter", g_jit_config.ir_interpret)

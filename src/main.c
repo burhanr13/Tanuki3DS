@@ -343,7 +343,7 @@ void update_mic() {
 }
 
 void update_cam() {
-    if (!ctremu.system.services.cam.capturing) {
+    if (!ctremu.system.services.cam.capturing || !ctremu.camEnable) {
         return;
     }
     if (!g_camera) {

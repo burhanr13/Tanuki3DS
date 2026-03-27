@@ -499,6 +499,9 @@ void draw_settings() {
                     0);
             igEndDisabled();
 
+            igSeparatorText("Camera");
+            igCheckbox("Enable Camera", &ctremu.camEnable);
+
             break;
         }
         case PANE_CPU: {
@@ -576,6 +579,7 @@ void draw_settings() {
             };
             igCombo("Audio Output Mode", &ctremu.audiomode, audiomodes,
                     countof(audiomodes), 0);
+            igSeparatorText("Microphone");
             igCheckbox("Enable Microphone", &ctremu.micEnable);
             break;
         }

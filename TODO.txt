@@ -8,7 +8,6 @@
     - CSND
     - reverb
 - Services
-    - camera
     - IR/Circle pad pro
     - networking
 - Kernel
