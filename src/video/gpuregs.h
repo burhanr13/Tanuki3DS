@@ -119,18 +119,21 @@ typedef union {
         } raster;
         union {
             struct {
-                struct {
-                    u32 tex0enable : 1;
-                    u32 tex1enable : 1;
-                    u32 tex2enable : 1;
-                    u32 : 5;
-                    u32 tex3coord : 2;
-                    u32 tex3enable : 1;
-                    u32 : 2;
-                    u32 tex2coord : 1;
-                    u32 : 2;
-                    u32 clearcache : 1;
-                    u32 : 15;
+                union {
+                    struct {
+                        u32 tex0enable : 1;
+                        u32 tex1enable : 1;
+                        u32 tex2enable : 1;
+                        u32 : 5;
+                        u32 tex3coord : 2;
+                        u32 tex3enable : 1;
+                        u32 : 2;
+                        u32 tex2coord : 1;
+                        u32 : 2;
+                        u32 clearcache : 1;
+                        u32 : 15;
+                    };
+                    u32 raw;
                 } config;
                 TexUnitRegs tex0;
                 u32 tex0_cubeaddr[5];

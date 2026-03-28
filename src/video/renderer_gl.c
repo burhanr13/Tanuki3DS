@@ -1155,7 +1155,7 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // so we do in vertex shader instead
 
     // textures
-    fcfg.tex2coord = gpu->regs.tex.config.tex2coord;
+    fcfg.texconfig.w = gpu->regs.tex.config.raw;
     if (gpu->regs.tex.config.tex0enable) {
         load_texture(gpu, 0, &gpu->regs.tex.tex0, gpu->regs.tex.tex0_fmt);
     }
@@ -1269,43 +1269,48 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     }
 
     // lighting params
-    fcfg.numlights = gpu->regs.lighting.numlights + 1;
-    for (int i = 0; i < 8; i++) {
-        COPYRGB(fbuf.light[i].specular0, gpu->regs.lighting.light[i].specular0);
-        COPYRGB(fbuf.light[i].specular1, gpu->regs.lighting.light[i].specular1);
-        COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
-        COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
-        fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
-        fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
-        fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
-        fcfg.light[i].config.w = gpu->regs.lighting.light[i].config;
-        fbuf.light[i].spotdir[0] =
-            (float) gpu->regs.lighting.light[i].spotdir.x / BIT(11);
-        fbuf.light[i].spotdir[1] =
-            (float) gpu->regs.lighting.light[i].spotdir.y / BIT(11);
-        fbuf.light[i].spotdir[2] =
-            (float) gpu->regs.lighting.light[i].spotdir.z / BIT(11);
-        fbuf.light[i].attn_bias = cvtf20(gpu->regs.lighting.light[i].attn_bias);
-        fbuf.light[i].attn_scale =
-            cvtf20(gpu->regs.lighting.light[i].attn_scale);
-    }
-    COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
-    fcfg.lconfig0.w = gpu->regs.lighting.config0;
-    fcfg.lconfig1.w = gpu->regs.lighting.config1;
-    fcfg.llutAbs = gpu->regs.lighting.lutinputAbs;
-    fcfg.llutSel = gpu->regs.lighting.lutinputSel;
-    fcfg.llutScale = gpu->regs.lighting.lutinputScale;
-    fcfg.lightPerm = gpu->regs.lighting.permutation;
     fcfg.lightDisable = gpu->regs.lighting.disable;
+    if (!fcfg.lightDisable) {
+        fcfg.numlights = gpu->regs.lighting.numlights + 1;
+        for (int i = 0; i < 8; i++) {
+            COPYRGB(fbuf.light[i].specular0,
+                    gpu->regs.lighting.light[i].specular0);
+            COPYRGB(fbuf.light[i].specular1,
+                    gpu->regs.lighting.light[i].specular1);
+            COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
+            COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
+            fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
+            fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
+            fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
+            fcfg.light[i].config.w = gpu->regs.lighting.light[i].config;
+            fbuf.light[i].spotdir[0] =
+                (float) gpu->regs.lighting.light[i].spotdir.x / BIT(11);
+            fbuf.light[i].spotdir[1] =
+                (float) gpu->regs.lighting.light[i].spotdir.y / BIT(11);
+            fbuf.light[i].spotdir[2] =
+                (float) gpu->regs.lighting.light[i].spotdir.z / BIT(11);
+            fbuf.light[i].attn_bias =
+                cvtf20(gpu->regs.lighting.light[i].attn_bias);
+            fbuf.light[i].attn_scale =
+                cvtf20(gpu->regs.lighting.light[i].attn_scale);
+        }
+        COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
+        fcfg.lconfig0.w = gpu->regs.lighting.config0;
+        fcfg.lconfig1.w = gpu->regs.lighting.config1;
+        fcfg.llutAbs = gpu->regs.lighting.lutinputAbs;
+        fcfg.llutSel = gpu->regs.lighting.lutinputSel;
+        fcfg.llutScale = gpu->regs.lighting.lutinputScale;
+        fcfg.lightPerm = gpu->regs.lighting.permutation;
 
-    // light luts, use slot 4
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_1D_ARRAY, gpu->gl.lightluttex);
-    if (gpu->lightLutDirty) {
-        gpu->lightLutDirty = false;
-        glTexSubImage2D(GL_TEXTURE_1D_ARRAY, 0, 0, 0,
-                        countof(gpu->lightLuts[0]), countof(gpu->lightLuts),
-                        GL_RED, GL_UNSIGNED_SHORT, gpu->lightLuts);
+        // light luts, use slot 4
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_1D_ARRAY, gpu->gl.lightluttex);
+        if (gpu->lightLutDirty) {
+            gpu->lightLutDirty = false;
+            glTexSubImage2D(GL_TEXTURE_1D_ARRAY, 0, 0, 0,
+                            countof(gpu->lightLuts[0]), countof(gpu->lightLuts),
+                            GL_RED, GL_UNSIGNED_SHORT, gpu->lightLuts);
+        }
     }
 
     // fog lut, use slot 5

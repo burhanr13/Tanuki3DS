@@ -594,26 +594,35 @@ char* shader_gen_fs(FragConfig* fcfg) {
 
     ds_printf(&s, "void main() {\n");
 
-    if (fcfg->tex0shadow) {
-        // shadow map sampling
-        // texcoord0.uvw is the fragment position in light space
-        // we read out the depth from the shadow map and compare
-        // with texcoord0.w which is fragment depth in light space
-        // to determine if it is in the shadow
-        ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0");
-        if (fcfg->shadowPerspective) {
-            ds_printf(&s, "/texcoordw");
+    if (fcfg->texconfig.tex0enable) {
+        if (fcfg->tex0shadow) {
+            // shadow map sampling
+            // texcoord0.uvw is the fragment position in light space
+            // we read out the depth from the shadow map and compare
+            // with texcoord0.w which is fragment depth in light space
+            // to determine if it is in the shadow
+            ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0");
+            if (fcfg->shadowPerspective) {
+                ds_printf(&s, "/texcoordw");
+            }
+            ds_printf(&s, ");\n");
+            ds_printf(&s, "tex0c = vec4(mix(tex0c.g, 1, tex0c.r+shadowBias > "
+                          "min(texcoordw,1)));\n");
+        } else {
+            ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
         }
-        ds_printf(&s, ");\n");
-        ds_printf(&s, "tex0c = vec4(mix(tex0c.g, 1, tex0c.r+shadowBias > min(texcoordw,1)));\n");
-    } else {
-        ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
-    }
-    ds_printf(&s, "vec4 tex1c = texture(tex1, texcoord1);\n");
-    ds_printf(&s, "vec4 tex2c = texture(tex2, texcoord%d);\n",
-              fcfg->tex2coord ? 1 : 2);
-    // todo: proctex
-    ds_printf(&s, "vec4 tex3c = vec4(1);\n");
+    } else ds_printf(&s, "vec4 tex0c = vec4(0);\n");
+    if (fcfg->texconfig.tex1enable) {
+        ds_printf(&s, "vec4 tex1c = texture(tex1, texcoord1);\n");
+    } else ds_printf(&s, "vec4 tex1c = vec4(0);\n");
+    if (fcfg->texconfig.tex2enable) {
+        ds_printf(&s, "vec4 tex2c = texture(tex2, texcoord%d);\n",
+                  fcfg->texconfig.tex2coord ? 1 : 2);
+    } else ds_printf(&s, "vec4 tex2c = vec4(0);\n");
+    if (fcfg->texconfig.tex3enable) {
+        // todo: proctex
+        ds_printf(&s, "vec4 tex3c = vec4(1);\n");
+    } else ds_printf(&s, "vec4 tex3c = vec4(0);\n");
 
     ds_printf(&s, "vec4 lprimary = vec4(0);\n");
     ds_printf(&s, "vec4 lsecondary = vec4(0);\n");

@@ -60,7 +60,22 @@ typedef struct {
             u32 : 15;
         };
     } tev_buffer;
-    int tex2coord;
+    union {
+        u32 w;
+        struct {
+            u32 tex0enable : 1;
+            u32 tex1enable : 1;
+            u32 tex2enable : 1;
+            u32 : 5;
+            u32 tex3coord : 2;
+            u32 tex3enable : 1;
+            u32 : 2;
+            u32 tex2coord : 1;
+            u32 : 2;
+            u32 clearcache : 1;
+            u32 : 15;
+        };
+    } texconfig;
     int tex0shadow;
     int shadowPerspective;
 

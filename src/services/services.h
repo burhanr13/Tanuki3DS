@@ -9,6 +9,7 @@
 #include "cam.h"
 #include "cecd.h"
 #include "cfg.h"
+#include "csnd.h"
 #include "dsp.h"
 #include "frd.h"
 #include "fs.h"
@@ -36,6 +37,7 @@ typedef struct {
     IRData ir;
     MICData mic;
     CAMData cam;
+    CSNDData csnd;
 
 } ServiceData;
 
