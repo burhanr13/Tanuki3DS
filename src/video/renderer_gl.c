@@ -330,7 +330,7 @@ static void update_cur_fb(GPU* gpu) {
     u32 h = gpu->regs.fb.dim.height + 1;
     // using the same fb (height does not matter if its big enough)
     if (gpu->curfb->color_paddr == (gpu->regs.fb.colorbuf_loc << 3) &&
-        gpu->curfb->width == w && gpu->curfb->height <= h)
+        gpu->curfb->width == w && h <= gpu->curfb->height)
         return;
 
     if (gpu->regs.fb.colorbuf_loc == 0) {
