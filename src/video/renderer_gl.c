@@ -306,6 +306,7 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
     }
     glUseProgram(prog);
     glUniform1i(glGetUniformLocation(prog, "tex0"), 0);
+    glUniform1i(glGetUniformLocation(prog, "tex0shadow"), 0);
     glUniform1i(glGetUniformLocation(prog, "tex1"), 1);
     glUniform1i(glGetUniformLocation(prog, "tex2"), 2);
     glUniform1i(glGetUniformLocation(prog, "lightLuts"), 4);
@@ -886,7 +887,7 @@ static void create_texture(GPU* gpu, TexInfo* tex, TexUnitRegs* regs) {
     }
 }
 
-static void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
+static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs, u32 fmt) {
     // make sure we are binding to the correct texture
     glActiveTexture(GL_TEXTURE0 + id);
 
@@ -957,10 +958,28 @@ static void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
         linfo("rtt at %08x", fb->color_paddr);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
         glBindTexture(GL_TEXTURE_2D, tex->tex);
-        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
-                         (fb->height - tex->height) * ctremu.videoscale,
-                         tex->width * ctremu.videoscale,
-                         tex->height * ctremu.videoscale, 0);
+        if (fb->shadowMap && regs->param.shadow) {
+            // the real data we need from a shadow map is the depth, we dont
+            // care about color
+            // so we copy the depth buffer into the texture so we can then
+            // bind it to a sampler2DShadow to sample from
+            // notably we need the full 24 bits of depth information
+            // so we need to use the depth format
+            // previously we copied the depth into the red color in the fs
+            // but that drops precision from 24 to 8 bit
+            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 0,
+                             (fb->height - tex->height) * ctremu.videoscale,
+                             tex->width * ctremu.videoscale,
+                             tex->height * ctremu.videoscale, 0);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
+                            GL_COMPARE_REF_TO_TEXTURE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
+        } else {
+            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
+                             (fb->height - tex->height) * ctremu.videoscale,
+                             tex->width * ctremu.videoscale,
+                             tex->height * ctremu.videoscale, 0);
+        }
         // no swizzling or mipmaps for rtt textures
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
         glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
@@ -1157,13 +1176,13 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // textures
     fcfg.texconfig.w = gpu->regs.tex.config.raw;
     if (gpu->regs.tex.config.tex0enable) {
-        load_texture(gpu, 0, &gpu->regs.tex.tex0, gpu->regs.tex.tex0_fmt);
+        load_texture(gpu, &fcfg, 0, &gpu->regs.tex.tex0, gpu->regs.tex.tex0_fmt);
     }
     if (gpu->regs.tex.config.tex1enable) {
-        load_texture(gpu, 1, &gpu->regs.tex.tex1, gpu->regs.tex.tex1_fmt);
+        load_texture(gpu, &fcfg, 1, &gpu->regs.tex.tex1, gpu->regs.tex.tex1_fmt);
     }
     if (gpu->regs.tex.config.tex2enable) {
-        load_texture(gpu, 2, &gpu->regs.tex.tex2, gpu->regs.tex.tex2_fmt);
+        load_texture(gpu, &fcfg, 2, &gpu->regs.tex.tex2, gpu->regs.tex.tex2_fmt);
     }
 
     if (gpu->regs.tex.tex0.param.type != 0) {

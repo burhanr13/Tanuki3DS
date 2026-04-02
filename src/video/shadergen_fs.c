@@ -16,6 +16,8 @@ in vec3 view;
 out vec4 fragclr;
 
 uniform sampler2D tex0;
+uniform sampler2DShadow tex0shadow;
+
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
@@ -291,8 +293,8 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
     }
 
     if (fcfg->lconfig0.shadowAlpha) {
-        ds_printf(s, "lprimary.a *= H;\n");
-        ds_printf(s, "lsecondary.a *= H;\n");
+        ds_printf(s, "lprimary.a *= H.a;\n");
+        ds_printf(s, "lsecondary.a *= H.a;\n");
     }
 
     ds_printf(s, "lprimary.rgb += ambient_color;\n");
@@ -601,13 +603,11 @@ char* shader_gen_fs(FragConfig* fcfg) {
             // we read out the depth from the shadow map and compare
             // with texcoord0.w which is fragment depth in light space
             // to determine if it is in the shadow
-            ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0");
-            if (fcfg->shadowPerspective) {
-                ds_printf(&s, "/texcoordw");
-            }
-            ds_printf(&s, ");\n");
-            ds_printf(&s, "tex0c = vec4(mix(tex0c.g, 1, tex0c.r+shadowBias > "
-                          "min(texcoordw,1)));\n");
+            // previously we did this by hand but now are using sampler2DShadow
+            // which does all this for us
+            ds_printf(&s, "vec4 tex0c = vec4(texture(tex0shadow, vec3(texcoord0");
+            if (fcfg->shadowPerspective) ds_printf(&s, "/texcoordw");
+            ds_printf(&s, ", texcoordw-shadowBias)));\n");
         } else {
             ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
         }
@@ -701,16 +701,6 @@ vec4 tmp;
         // this)
         ds_printf(&s, "(gl_FragCoord.z*128.f/129+0.5f/129)).r;\n");
         ds_printf(&s, "fragclr.rgb = mix(fog_color.rgb, fragclr.rgb, fog);\n");
-    }
-
-    if (fcfg->fragOp == 3) {
-        // for shadow map, r is the depth in light space
-        ds_printf(&s, "fragclr.r = gl_FragCoord.z;\n");
-        // g is the intensity?
-        ds_printf(&s, "fragclr.g = 0;\n");
-        // b and a are unused?
-        ds_printf(&s, "fragclr.b = 0;\n");
-        ds_printf(&s, "fragclr.a = 1;\n");
     }
 
     ds_printf(&s, "}\n");
