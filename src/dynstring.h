@@ -1,6 +1,11 @@
 #ifndef DYNSTRING_H
 #define DYNSTRING_H
 
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 typedef struct {
     char* str;
     char* cur;

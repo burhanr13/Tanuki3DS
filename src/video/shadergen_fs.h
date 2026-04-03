@@ -76,7 +76,7 @@ typedef struct {
             u32 : 15;
         };
     } texconfig;
-    int tex0shadow;
+    int tex0type;
     int shadowPerspective;
 
     struct {

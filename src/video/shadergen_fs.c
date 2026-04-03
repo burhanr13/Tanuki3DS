@@ -601,21 +601,35 @@ char* shader_gen_fs(FragConfig* fcfg) {
     ds_printf(&s, "void main() {\n");
 
     if (fcfg->texconfig.tex0enable) {
-        if (fcfg->tex0shadow) {
-            // shadow map sampling
-            // texcoord0.uvw is the fragment position in light space
-            // we read out the depth from the shadow map and compare
-            // with texcoord0.w which is fragment depth in light space
-            // to determine if it is in the shadow
-            // previously we did this by hand but now are using sampler2DShadow
-            // which does all this for us
-            ds_printf(&s,
-                      "vec4 tex0c = vec4("
-                      "1 - texture(tex0shadow, vec3(texcoord0%s, "
-                      "texcoordw-shadowBias)));\n",
-                      fcfg->shadowPerspective ? "/texcoordw" : "");
-        } else {
-            ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
+        switch (fcfg->tex0type) {
+            case 0: // normal
+                ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
+                break;
+            case 2: // shadow map
+                // shadow map sampling
+                // texcoord0.uvw is the fragment position in light space
+                // we read out the depth from the shadow map and compare
+                // with texcoord0.w which is fragment depth in light space
+                // to determine if it is in the shadow
+                // previously we did this by hand but now are using
+                // sampler2DShadow which does all this for us
+                ds_printf(&s,
+                          "vec4 tex0c = vec4("
+                          "1 - texture(tex0shadow, vec3(texcoord0%s, "
+                          "texcoordw-shadowBias)));\n",
+                          fcfg->shadowPerspective ? "/texcoordw" : "");
+                break;
+            case 1: // cube
+            case 4: // shadow cube
+                lwarnonce("cube map texture");
+                ds_printf(&s, "vec4 tex0c = vec4(1);\n");
+                break;
+            case 3: // projection
+                ds_printf(&s, "vec4 tex0c = textureProj(tex0, vec3(texcoord0, texcoordw));\n");
+                break;
+            default:
+                lwarnonce("unknown texture type %d", fcfg->tex0type);
+                ds_printf(&s, "vec4 tex0c = vec4(0);\n");
         }
     } else ds_printf(&s, "vec4 tex0c = vec4(0);\n");
     if (fcfg->texconfig.tex1enable) {

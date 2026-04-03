@@ -1208,6 +1208,11 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     if (gpu->regs.tex.config.tex0enable) {
         load_texture(gpu, &fcfg, 0, &gpu->regs.tex.tex0,
                      gpu->regs.tex.tex0_fmt);
+        fcfg.tex0type = gpu->regs.tex.tex0.param.type;
+        fcfg.shadowPerspective = !gpu->regs.tex.tex0_shadow.perspective;
+        fbuf.shadowBias = (float) gpu->regs.tex.tex0_shadow.bias / BIT(23);
+        fbuf.shadowMax = cvtf16(gpu->regs.fb.shadow.max);
+        fbuf.shadowRamp = cvtf16(gpu->regs.fb.shadow.ramp);
     }
     if (gpu->regs.tex.config.tex1enable) {
         load_texture(gpu, &fcfg, 1, &gpu->regs.tex.tex1,
@@ -1218,15 +1223,6 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
                      gpu->regs.tex.tex2_fmt);
     }
 
-    if (gpu->regs.tex.tex0.param.type != 0) {
-        lwarnonce("unknown texture type %d", gpu->regs.tex.tex0.param.type);
-    }
-    fcfg.tex0shadow = gpu->regs.tex.tex0.param.shadow;
-    fcfg.shadowPerspective = !gpu->regs.tex.tex0_shadow.perspective;
-    fbuf.shadowBias = (float) gpu->regs.tex.tex0_shadow.bias / BIT(23);
-    fbuf.shadowMax = cvtf16(gpu->regs.fb.shadow.max);
-    fbuf.shadowRamp = cvtf16(gpu->regs.fb.shadow.ramp);
-    
     // texenvs
     load_texenv(&fcfg, &fbuf, 0, &gpu->regs.tex.tev0);
     load_texenv(&fcfg, &fbuf, 1, &gpu->regs.tex.tev1);
@@ -1261,8 +1257,10 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
 
     // alpha test
     fcfg.alphatest = gpu->regs.fb.alpha_test.enable;
-    fcfg.alphafunc = gpu->regs.fb.alpha_test.func;
-    fbuf.alpharef = (float) gpu->regs.fb.alpha_test.ref / 255;
+    if (gpu->regs.fb.alpha_test.enable) {
+        fcfg.alphafunc = gpu->regs.fb.alpha_test.func;
+        fbuf.alpharef = (float) gpu->regs.fb.alpha_test.ref / 255;
+    }
 
     // stencil test
     if (gpu->regs.fb.stencil_test.enable) {
