@@ -1,5 +1,6 @@
 #include "shaderdec.h"
 
+#include "dynstring.h"
 #include "emulator.h"
 
 #include "gpu.h"

@@ -360,6 +360,7 @@ static void update_cur_fb(GPU* gpu) {
     curfb->depth_paddr = gpu->regs.fb.depthbuf_loc << 3;
     curfb->color_fmt = gpu->regs.fb.colorbuf_fmt.fmt;
     curfb->color_Bpp = gpu->regs.fb.colorbuf_fmt.size + 2;
+    curfb->depth_fmt = gpu->regs.fb.depthbuf_fmt & 3;
 
     linfo("drawing on fb %d at %x with depth buffer at %x", curfb - gpu->fbs.d,
           curfb->color_paddr, curfb->depth_paddr);
@@ -388,8 +389,6 @@ static void update_cur_fb(GPU* gpu) {
                      GL_UNSIGNED_INT_24_8, nullptr);
         // needed for the texture viewer
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_ZERO);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_2D, curfb->color_tex, 0);
@@ -887,7 +886,8 @@ static void create_texture(GPU* gpu, TexInfo* tex, TexUnitRegs* regs) {
     }
 }
 
-static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs, u32 fmt) {
+static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
+                         u32 fmt) {
     // make sure we are binding to the correct texture
     glActiveTexture(GL_TEXTURE0 + id);
 
@@ -952,6 +952,25 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs, 
 
     // handle simple render to texture cases, but better ...?
     FBInfo* fb = LRU_find(gpu->fbs, tex->paddr);
+    // look for cases of reading a depth buffer as a texture
+    bool copyDepth = false;
+    if (!fb) {
+        for (int i = 0; i < FB_MAX; i++) {
+            auto t = &gpu->fbs.d[i];
+            if (t->depth_paddr == tex->paddr) {
+                // reinterpret d24s8 to rgba8888 or d24 as rgb888
+                if ((tex->fmt == 0 && t->depth_fmt == 3) ||
+                    (tex->fmt == 1 && t->depth_fmt == 2)) {
+                    fb = t;
+                    copyDepth = true;
+                    break;
+                } else {
+                    lwarnonce("unknown reinterpret depth %d to color %d",
+                              t->depth_fmt, tex->fmt);
+                }
+            }
+        }
+    }
     if (fb && fb->dirty) {
         // only read from a framebuffer if its been modified since the last time
         fb->dirty = false;
@@ -974,6 +993,17 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs, 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
                             GL_COMPARE_REF_TO_TEXTURE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
+        } else if (copyDepth) {
+            // reading a depth texture puts depth in r component
+            // games also seems to only read r component when reading back from
+            // depth texture, since r gives the top 8 bits of the 24bit depth
+            // so this can be emulated by just providing the original depth
+            // buffer
+            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 0,
+                             (fb->height - tex->height) * ctremu.videoscale,
+                             tex->width * ctremu.videoscale,
+                             tex->height * ctremu.videoscale, 0);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
         } else {
             glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
                              (fb->height - tex->height) * ctremu.videoscale,
@@ -1176,13 +1206,16 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // textures
     fcfg.texconfig.w = gpu->regs.tex.config.raw;
     if (gpu->regs.tex.config.tex0enable) {
-        load_texture(gpu, &fcfg, 0, &gpu->regs.tex.tex0, gpu->regs.tex.tex0_fmt);
+        load_texture(gpu, &fcfg, 0, &gpu->regs.tex.tex0,
+                     gpu->regs.tex.tex0_fmt);
     }
     if (gpu->regs.tex.config.tex1enable) {
-        load_texture(gpu, &fcfg, 1, &gpu->regs.tex.tex1, gpu->regs.tex.tex1_fmt);
+        load_texture(gpu, &fcfg, 1, &gpu->regs.tex.tex1,
+                     gpu->regs.tex.tex1_fmt);
     }
     if (gpu->regs.tex.config.tex2enable) {
-        load_texture(gpu, &fcfg, 2, &gpu->regs.tex.tex2, gpu->regs.tex.tex2_fmt);
+        load_texture(gpu, &fcfg, 2, &gpu->regs.tex.tex2,
+                     gpu->regs.tex.tex2_fmt);
     }
 
     if (gpu->regs.tex.tex0.param.type != 0) {

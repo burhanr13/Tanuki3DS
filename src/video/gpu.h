@@ -43,6 +43,7 @@ typedef struct _FBInfo {
     u32 width, height;
     u32 color_fmt;
     u32 color_Bpp;
+    u32 depth_fmt;
 
     bool shadowMap;
     bool dirty;

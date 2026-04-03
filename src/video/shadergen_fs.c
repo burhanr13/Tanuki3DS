@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+#include "dynstring.h"
+
 const char fs_header[] = R"(
 #version 330 core
 
@@ -605,9 +607,10 @@ char* shader_gen_fs(FragConfig* fcfg) {
             // to determine if it is in the shadow
             // previously we did this by hand but now are using sampler2DShadow
             // which does all this for us
-            ds_printf(&s, "vec4 tex0c = vec4(texture(tex0shadow, vec3(texcoord0");
-            if (fcfg->shadowPerspective) ds_printf(&s, "/texcoordw");
-            ds_printf(&s, ", texcoordw-shadowBias)));\n");
+            ds_printf(&s,
+                      "vec4 tex0c = vec4(texture(tex0shadow, "
+                      "vec3(texcoord0%s, texcoordw-shadowBias)));\n",
+                      fcfg->shadowPerspective ? "/texcoordw" : "");
         } else {
             ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");
         }
