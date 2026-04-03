@@ -45,6 +45,8 @@ layout (std140) uniform FragUniforms {
     vec3 ambient_color;
     vec4 fog_color;
 
+    float shadowMax;
+    float shadowRamp;
     float shadowBias;
     float alpharef;
 };
@@ -608,8 +610,9 @@ char* shader_gen_fs(FragConfig* fcfg) {
             // previously we did this by hand but now are using sampler2DShadow
             // which does all this for us
             ds_printf(&s,
-                      "vec4 tex0c = vec4(texture(tex0shadow, "
-                      "vec3(texcoord0%s, texcoordw-shadowBias)));\n",
+                      "vec4 tex0c = vec4("
+                      "1 - texture(tex0shadow, vec3(texcoord0%s, "
+                      "texcoordw-shadowBias)));\n",
                       fcfg->shadowPerspective ? "/texcoordw" : "");
         } else {
             ds_printf(&s, "vec4 tex0c = texture(tex0, texcoord0);\n");

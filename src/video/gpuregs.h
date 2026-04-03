@@ -267,6 +267,12 @@ typedef union {
                     u32 height : 12;
                     u32 : 8;
                 } dim;
+                u32 _11f;
+                u32 gas[16];
+                struct {
+                    u16 max;
+                    u16 ramp;
+                } shadow;
             };
             u32 w[0x40];
         } fb;

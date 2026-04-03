@@ -157,6 +157,8 @@ typedef struct {
     float ambient_color[4];
     float fog_color[4];
 
+    float shadowMax;
+    float shadowRamp;
     float shadowBias;
     float alpharef;
 } FragUniforms;

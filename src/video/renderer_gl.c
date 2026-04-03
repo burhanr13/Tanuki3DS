@@ -509,7 +509,7 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
 
         // need to handle more general cases at some point
 
-        if (srcgap == 0 || srcgap == dstgap) {
+        if (srcgap == 0 || srcgap == dstgap || srcpitch == dstpitch) {
             int yoff = srcpaddr - srcfb->color_paddr + dsttex->paddr - dstpaddr;
             yoff /= (int) (srcfb->width * srcfb->color_Bpp);
 
@@ -992,7 +992,7 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
                              tex->height * ctremu.videoscale, 0);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
                             GL_COMPARE_REF_TO_TEXTURE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
         } else if (copyDepth) {
             // reading a depth texture puts depth in r component
             // games also seems to only read r component when reading back from
@@ -1224,7 +1224,9 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     fcfg.tex0shadow = gpu->regs.tex.tex0.param.shadow;
     fcfg.shadowPerspective = !gpu->regs.tex.tex0_shadow.perspective;
     fbuf.shadowBias = (float) gpu->regs.tex.tex0_shadow.bias / BIT(23);
-
+    fbuf.shadowMax = cvtf16(gpu->regs.fb.shadow.max);
+    fbuf.shadowRamp = cvtf16(gpu->regs.fb.shadow.ramp);
+    
     // texenvs
     load_texenv(&fcfg, &fbuf, 0, &gpu->regs.tex.tev0);
     load_texenv(&fcfg, &fbuf, 1, &gpu->regs.tex.tev1);
