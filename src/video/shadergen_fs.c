@@ -23,8 +23,12 @@ uniform sampler2DShadow tex0shadow;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 
+uniform sampler1D tex3;
+
 uniform sampler1DArray lightLuts;
 uniform sampler1D fogLut;
+uniform sampler1D proctexMapLut;
+uniform sampler1D proctexNoiseLut;
 
 struct Light {
     vec3 specular0;
@@ -37,9 +41,19 @@ struct Light {
     float attn_scale;
 };
 
+struct PTNoiseParam {
+    float ampl;
+    float phase;
+    float freq;
+    float pad;
+};
+
 layout (std140) uniform FragUniforms {
     vec4 tev_color[6];
     vec4 tev_buffer_color;
+
+    PTNoiseParam noiseU;
+    PTNoiseParam noiseV;
 
     Light light[8];
     vec3 ambient_color;
@@ -305,6 +319,79 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
 
     ds_printf(s, "lprimary = min(lprimary, 1);\n");
     ds_printf(s, "lsecondary = min(lsecondary, 1);\n");
+}
+
+void write_proctex_clamp(DynString* s, const char* v, u32 mode) {
+    switch (mode) {
+        case 0:
+            ds_printf(s, "%s = mix(max(%s,0), 0, %s>=1);\n", v, v, v);
+            break;
+        case 1:
+            ds_printf(s, "%s = clamp(%s,0,1);\n", v, v);
+            break;
+        case 2:
+            ds_printf(s, "%s = fract(%s);\n", v, v);
+            break;
+        case 3:
+            ds_printf(s, "%s = mix(fract(%s),fract(-%s),(int(%s) & 1) == 1);\n",
+                      v, v, v, v);
+            break;
+        case 4:
+            ds_printf(s, "%s = float(%s > 0.5)", v, v);
+            break;
+    }
+}
+
+const char* proctex_combiner_str(u32 combiner) {
+    switch (combiner) {
+        case 0:
+            return "texcoord3.x";
+        case 1:
+            return "texcoord3.x * texcoord3.x";
+        case 2:
+            return "texcoord3.y";
+        case 3:
+            return "texcoord3.y * texcoord3.y";
+        case 4:
+            return "0.5 * (texcoord3.x + texcoord3.y)";
+        case 5:
+            return "0.5 * dot(texcoord3, texcoord3)";
+        case 6:
+            return "min(length(texcoord3), 1)";
+        case 7:
+            return "min(texcoord3.x, texcoord3.y)";
+        case 8:
+            return "max(texcoord3.x, texcoord3.y)";
+        case 9:
+            return "0.5 * (0.5 * (texcoord3.x + texcoord3.y) + "
+                   "min(length(texcoord3), 1))";
+        default:
+            return "0";
+    }
+}
+
+void write_proctex(DynString* s, FragConfig* fcfg) {
+    ds_printf(s, "vec2 texcoord3 = texcoord%d;\n", fcfg->texconfig.tex3coord);
+
+    if (fcfg->proctex.noise) {
+        ds_printf(s, "texcoord3.x += noiseU.ampl * "
+                     "texture(proctexNoiseLut, (texcoord3.x + noiseU.phase) / "
+                     "noiseU.freq).r;\n");
+        ds_printf(s, "texcoord3.y += noiseV.ampl * "
+                     "texture(proctexNoiseLut, (texcoord3.y + noiseV.phase) / "
+                     "noiseV.freq).r;\n");
+    }
+
+    write_proctex_clamp(s, "texcoord3.x", fcfg->proctex.clampU);
+    write_proctex_clamp(s, "texcoord3.y", fcfg->proctex.clampV);
+
+    ds_printf(s, "vec4 tex3c = texture(tex3, texture(proctexMapLut, %s).r);\n",
+              proctex_combiner_str(fcfg->proctex.rgbCombiner));
+    if (fcfg->proctex.separateAlpha) {
+        ds_printf(s,
+                  "tex3c.a = texture(tex3, texture(proctexMapLut, %s).g).a;\n",
+                  proctex_combiner_str(fcfg->proctex.alphaCombiner));
+    }
 }
 
 const char* tevsrc_str(int i, u32 tevsrc) {
@@ -625,7 +712,8 @@ char* shader_gen_fs(FragConfig* fcfg) {
                 ds_printf(&s, "vec4 tex0c = vec4(1);\n");
                 break;
             case 3: // projection
-                ds_printf(&s, "vec4 tex0c = textureProj(tex0, vec3(texcoord0, texcoordw));\n");
+                ds_printf(&s, "vec4 tex0c = textureProj(tex0, vec3(texcoord0, "
+                              "texcoordw));\n");
                 break;
             default:
                 lwarnonce("unknown texture type %d", fcfg->tex0type);
@@ -640,8 +728,7 @@ char* shader_gen_fs(FragConfig* fcfg) {
                   fcfg->texconfig.tex2coord ? 1 : 2);
     } else ds_printf(&s, "vec4 tex2c = vec4(0);\n");
     if (fcfg->texconfig.tex3enable) {
-        // todo: proctex
-        ds_printf(&s, "vec4 tex3c = vec4(1);\n");
+        write_proctex(&s, fcfg);
     } else ds_printf(&s, "vec4 tex3c = vec4(0);\n");
 
     ds_printf(&s, "vec4 lprimary = vec4(0);\n");

@@ -175,6 +175,10 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         gpu->textures.d[i].tex = textures[i];
     }
 
+    glGenTextures(1, &gpu->proctex.tex);
+    glBindTexture(GL_TEXTURE_1D, gpu->proctex.tex);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
     glGenTextures(1, &state->lightluttex);
     glBindTexture(GL_TEXTURE_1D_ARRAY, state->lightluttex);
     glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -190,6 +194,20 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_R16, countof(gpu->fogLut), 0, GL_RED,
                  GL_UNSIGNED_SHORT, nullptr);
+    glGenTextures(1, &state->proctexmaptex);
+    glBindTexture(GL_TEXTURE_1D, state->proctexmaptex);
+    glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_RG16, countof(gpu->proctexMapLut), 0,
+                 GL_RG, GL_UNSIGNED_SHORT, nullptr);
+    glGenTextures(1, &state->proctexnoisetex);
+    glBindTexture(GL_TEXTURE_1D, state->proctexnoisetex);
+    glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_R16, countof(gpu->proctexNoiseLut), 0,
+                 GL_RED, GL_UNSIGNED_SHORT, nullptr);
 }
 
 void renderer_gl_destroy(GLState* state, GPU* gpu) {
@@ -224,8 +242,11 @@ void renderer_gl_destroy(GLState* state, GPU* gpu) {
     for (int i = 0; i < TEX_MAX; i++) {
         glDeleteTextures(1, &gpu->textures.d[i].tex);
     }
+    glDeleteTextures(1, &gpu->proctex.tex);
     glDeleteTextures(1, &state->lightluttex);
     glDeleteTextures(1, &state->fogluttex);
+    glDeleteTextures(1, &state->proctexmaptex);
+    glDeleteTextures(1, &state->proctexnoisetex);
 }
 
 // call before emulating gpu drawing
@@ -309,8 +330,11 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
     glUniform1i(glGetUniformLocation(prog, "tex0shadow"), 0);
     glUniform1i(glGetUniformLocation(prog, "tex1"), 1);
     glUniform1i(glGetUniformLocation(prog, "tex2"), 2);
+    glUniform1i(glGetUniformLocation(prog, "tex3"), 3);
     glUniform1i(glGetUniformLocation(prog, "lightLuts"), 4);
     glUniform1i(glGetUniformLocation(prog, "fogLut"), 5);
+    glUniform1i(glGetUniformLocation(prog, "proctexMapLut"), 6);
+    glUniform1i(glGetUniformLocation(prog, "proctexNoiseLut"), 7);
 
     if (vs != state->gpu_vs) {
         glUniformBlockBinding(prog,
@@ -742,6 +766,17 @@ static const GLenum texminfilter[4] = {
     GL_NEAREST_MIPMAP_NEAREST, GL_LINEAR_MIPMAP_NEAREST,
     GL_NEAREST_MIPMAP_LINEAR, GL_LINEAR_MIPMAP_LINEAR};
 static const GLenum texmagfilter[2] = {GL_NEAREST, GL_LINEAR};
+
+static const GLenum proctexfilter[8] = {
+    GL_NEAREST,
+    GL_LINEAR,
+    GL_NEAREST_MIPMAP_NEAREST,
+    GL_LINEAR_MIPMAP_NEAREST,
+    GL_NEAREST_MIPMAP_LINEAR,
+    GL_LINEAR_MIPMAP_LINEAR,
+    GL_NEAREST,
+    GL_NEAREST,
+};
 
 static const GLenum texwrap[4] = {
     GL_CLAMP_TO_EDGE,
@@ -1221,6 +1256,49 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     if (gpu->regs.tex.config.tex2enable) {
         load_texture(gpu, &fcfg, 2, &gpu->regs.tex.tex2,
                      gpu->regs.tex.tex2_fmt);
+    }
+
+    if (gpu->regs.tex.config.tex3enable) {
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_1D, gpu->proctex.tex);
+        if (gpu->proctexLutDirty ||
+            gpu->proctex.width != gpu->regs.tex.tex3.paramH.width ||
+            gpu->proctex.offset != gpu->regs.tex.tex3.offset[0]) {
+            gpu->proctexLutDirty = false;
+            gpu->proctex.width = gpu->regs.tex.tex3.paramH.width;
+            gpu->proctex.offset = gpu->regs.tex.tex3.offset[0];
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, gpu->proctex.width, 0,
+                         GL_RGBA, GL_UNSIGNED_BYTE,
+                         &gpu->proctexLut[gpu->proctex.offset]);
+        }
+        // todo proctex mipmaps
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER,
+                        proctexfilter[gpu->regs.tex.tex3.paramH.minFilter]);
+        fcfg.proctex.w = gpu->regs.tex.tex3.paramL.w;
+
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_1D, gpu->gl.proctexmaptex);
+        if (gpu->proctexMapLutDirty) {
+            gpu->proctexMapLutDirty = false;
+            glTexSubImage1D(GL_TEXTURE_1D, 0, 0, countof(gpu->proctexMapLut),
+                            GL_RG, GL_UNSIGNED_SHORT, gpu->proctexMapLut);
+        }
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_1D, gpu->gl.proctexnoisetex);
+        if (gpu->proctexNoiseLutDirty) {
+            gpu->proctexNoiseLutDirty = false;
+            glTexSubImage1D(GL_TEXTURE_1D, 0, 0, countof(gpu->proctexNoiseLut),
+                            GL_RED, GL_UNSIGNED_SHORT, gpu->proctexNoiseLut);
+        }
+        fbuf.ptNoiseU.ampl =
+            (float) (s16) gpu->regs.tex.tex3.noise.ampU / BIT(12);
+        fbuf.ptNoiseU.phase = cvtf16(gpu->regs.tex.tex3.noise.phaseU);
+        fbuf.ptNoiseU.freq = cvtf16(gpu->regs.tex.tex3.noise.freqU);
+        fbuf.ptNoiseV.ampl =
+            (float) (s16) gpu->regs.tex.tex3.noise.ampV / BIT(12);
+        fbuf.ptNoiseV.phase = cvtf16(gpu->regs.tex.tex3.noise.phaseV);
+        fbuf.ptNoiseV.freq = cvtf16(gpu->regs.tex.tex3.noise.freqV);
     }
 
     // texenvs

@@ -126,6 +126,40 @@ void gpu_write_internalreg(GPU* gpu, u16 id, u32 param, u32 mask) {
             gpu->fogLutDirty = true;
             break;
         }
+        case GPUREG(tex.proctexLutData[0])... GPUREG(tex.proctexLutData[7]): {
+            switch (gpu->regs.tex.proctexLutIndex.table) {
+                case 0: {
+                    u16 val = param & MASK(12);
+                    val = val << 4 | val >> 8;
+                    gpu->proctexNoiseLut[gpu->regs.tex.proctexLutIndex.index++ %
+                                         128] = val;
+                    gpu->proctexNoiseLutDirty = true;
+                    break;
+                }
+                case 2: {
+                    u16 val = param & MASK(12);
+                    val = val << 4 | val >> 8;
+                    gpu->proctexMapLut[gpu->regs.tex.proctexLutIndex.index++ %
+                                       128][0] = val;
+                    gpu->proctexMapLutDirty = true;
+                    break;
+                }
+                case 3: {
+                    u16 val = param & MASK(12);
+                    val = val << 4 | val >> 8;
+                    gpu->proctexMapLut[gpu->regs.tex.proctexLutIndex.index++ %
+                                       128][1] = val;
+                    gpu->proctexMapLutDirty = true;
+                    break;
+                }
+                case 4:
+                    gpu->proctexLut[gpu->regs.tex.proctexLutIndex.index++] =
+                        param;
+                    gpu->proctexLutDirty = true;
+                    break;
+            }
+            break;
+        }
         case GPUREG(gsh.floatuniform_data[0])... GPUREG(
             gsh.floatuniform_data[7]): {
             u32 idx = gpu->regs.gsh.floatuniform_idx;

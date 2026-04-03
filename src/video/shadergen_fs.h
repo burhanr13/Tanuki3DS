@@ -78,6 +78,22 @@ typedef struct {
     } texconfig;
     int tex0type;
     int shadowPerspective;
+    union {
+        u32 w;
+        struct {
+            u32 clampU : 3;
+            u32 clampV : 3;
+            u32 rgbCombiner : 4;
+            u32 alphaCombiner : 4;
+            u32 separateAlpha : 1;
+            u32 noise : 1;
+            u32 shiftU : 2;
+            u32 shiftV : 2;
+            u32 lodBiasL : 8;
+            u32 : 4;
+        };
+    } proctex;
+    int _pad[3];
 
     struct {
         union {
@@ -142,6 +158,13 @@ typedef struct {
 typedef struct {
     float tev_color[6][4];
     float tev_buffer_color[4];
+
+    struct {
+        float ampl;
+        float phase;
+        float freq;
+        float pad;
+    } ptNoiseU, ptNoiseV;
 
     struct {
         float specular0[4];
