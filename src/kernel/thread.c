@@ -302,6 +302,7 @@ void event_signal(E3DS* s, KEvent* ev) {
     } else {
         KThread* thr = remove_highest_prio(&ev->waiting_thrds);
         if (thr) thread_wakeup(s, thr, &ev->hdr);
+        else ev->signal = true;
     }
     if (ev->callback) ev->callback(s);
 }
@@ -325,6 +326,7 @@ void timer_signal(E3DS* s, KTimer* tmr) {
     } else {
         KThread* thr = remove_highest_prio(&tmr->waiting_thrds);
         if (thr) thread_wakeup(s, thr, &tmr->hdr);
+        else tmr->signal = true;
     }
 
     if (tmr->repeat) {
@@ -396,13 +398,19 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
         }
         case KOT_EVENT: {
             auto event = (KEvent*) o;
-            if (event->signal) return false;
+            if (event->signal) {
+                if (!event->sticky) event->signal = false;
+                return false;
+            }
             klist_insert(&event->waiting_thrds, &t->hdr);
             return true;
         }
         case KOT_TIMER: {
             auto tmr = (KTimer*) o;
-            if (tmr->signal) return false;
+            if (tmr->signal) {
+                if (!tmr->sticky) tmr->signal = false;
+                return false;
+            }
             klist_insert(&tmr->waiting_thrds, &t->hdr);
             return true;
         }
