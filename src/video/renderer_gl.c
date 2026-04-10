@@ -749,6 +749,7 @@ static const GLint texswizzle_lum_alpha[4] = {GL_GREEN, GL_GREEN, GL_GREEN,
                                               GL_RED};
 static const GLint texswizzle_luminance[4] = {GL_RED, GL_RED, GL_RED, GL_ONE};
 static const GLint texswizzle_alpha[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
+static const GLint texswizzle_d24s8[4] = {GL_RED, GL_ALPHA, GL_BLUE, GL_GREEN};
 
 [[maybe_unused]] static const GLint texswizzle_dbg_red[4] = {GL_ONE, GL_ZERO,
                                                              GL_ZERO, GL_ALPHA};
@@ -1025,6 +1026,10 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
         linfo("rtt at %08x", fb->color_paddr);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
         glBindTexture(GL_TEXTURE_2D, tex->tex);
+        // no swizzling or mipmaps for rtt textures
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                         texswizzle_default);
         if (fb->shadowMap && regs->param.shadow) {
             // the real data we need from a shadow map is the depth, we dont
             // care about color
@@ -1072,6 +1077,8 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
 
                 glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
                 glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+                glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                                 texswizzle_d24s8);
             }
         } else {
             glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
@@ -1079,10 +1086,6 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
                              tex->width * ctremu.videoscale,
                              tex->height * ctremu.videoscale, 0);
         }
-        // no swizzling or mipmaps for rtt textures
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-        glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
-                         texswizzle_default);
     }
 
     glTexParameteri(
