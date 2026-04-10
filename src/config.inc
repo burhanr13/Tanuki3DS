@@ -43,6 +43,7 @@ CMT("necessary for a few games to not have graphical issues")
 BOOL("HWShaderSafeMul", ctremu.safeShaderMul)
 BOOL("Ubershader", ctremu.ubershader)
 BOOL("HashTextures", ctremu.hashTextures)
+BOOL("ReinterpretTexturePass", ctremu.reinterpretTexture)
 
 SECT("Audio")
 BOOL("AudioSync", ctremu.audiosync)

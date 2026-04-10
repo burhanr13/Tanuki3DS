@@ -566,6 +566,7 @@ void draw_settings() {
             igUnindent(0);
             // igCheckbox("Use Ubershader", &ctremu.ubershader);
             igCheckbox("Hash Textures", &ctremu.hashTextures);
+            igCheckbox("Enable Texture Reinterpret", &ctremu.reinterpretTexture);
             break;
         }
         case PANE_AUDIO: {

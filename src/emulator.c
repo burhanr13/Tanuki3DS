@@ -30,6 +30,7 @@ void emulator_load_default_settings() {
     ctremu.safeShaderMul = true;
     ctremu.ubershader = false;
     ctremu.hashTextures = true;
+    ctremu.reinterpretTexture = true;
     ctremu.audiosync = true;
     ctremu.volume = 100;
     ctremu.audiomode = 1;

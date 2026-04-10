@@ -208,6 +208,13 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_R16, countof(gpu->proctexNoiseLut), 0,
                  GL_RED, GL_UNSIGNED_SHORT, nullptr);
+
+    glGenBuffers(1, &state->pbo);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, state->pbo);
+    glBufferData(GL_PIXEL_PACK_BUFFER,
+                 4 * 512 * ctremu.videoscale * 512 * ctremu.videoscale, nullptr,
+                 GL_STATIC_DRAW);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
 
 void renderer_gl_destroy(GLState* state, GPU* gpu) {
@@ -247,6 +254,7 @@ void renderer_gl_destroy(GLState* state, GPU* gpu) {
     glDeleteTextures(1, &state->fogluttex);
     glDeleteTextures(1, &state->proctexmaptex);
     glDeleteTextures(1, &state->proctexnoisetex);
+    glDeleteBuffers(1, &state->pbo);
 }
 
 // call before emulating gpu drawing
@@ -989,15 +997,20 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
     FBInfo* fb = LRU_find(gpu->fbs, tex->paddr);
     // look for cases of reading a depth buffer as a texture
     bool copyDepth = false;
+    bool copyDepthStencil = false;
     if (!fb) {
         for (int i = 0; i < FB_MAX; i++) {
             auto t = &gpu->fbs.d[i];
             if (t->depth_paddr == tex->paddr) {
                 // reinterpret d24s8 to rgba8888 or d24 as rgb888
-                if ((tex->fmt == 0 && t->depth_fmt == 3) ||
-                    (tex->fmt == 1 && t->depth_fmt == 2)) {
+                if (tex->fmt == 1 && t->depth_fmt == 2) {
                     fb = t;
                     copyDepth = true;
+                    break;
+                } else if (tex->fmt == 0 && t->depth_fmt == 3) {
+                    // reading back both depth and stencil is a bit more work
+                    fb = t;
+                    copyDepthStencil = true;
                     break;
                 } else {
                     lwarnonce("unknown reinterpret depth %d to color %d",
@@ -1029,6 +1042,7 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
                             GL_COMPARE_REF_TO_TEXTURE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
         } else if (copyDepth) {
+            // the below only works for d24 -> rgb8
             // reading a depth texture puts depth in r component
             // games also seems to only read r component when reading back from
             // depth texture, since r gives the top 8 bits of the 24bit depth
@@ -1039,6 +1053,26 @@ static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
                              tex->width * ctremu.videoscale,
                              tex->height * ctremu.videoscale, 0);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        } else if (copyDepthStencil) {
+            // on macos at least there is no way to read the stencil
+            // part of a texture except for reading back the raw data
+            // this is pretty slow so its a setting
+            if (ctremu.reinterpretTexture) {
+                glBindBuffer(GL_PIXEL_PACK_BUFFER, gpu->gl.pbo);
+                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gpu->gl.pbo);
+
+                glBindTexture(GL_TEXTURE_2D, fb->depth_tex);
+                glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_STENCIL,
+                              GL_UNSIGNED_INT_24_8, nullptr);
+                glBindTexture(GL_TEXTURE_2D, tex->tex);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                             tex->width * ctremu.videoscale,
+                             tex->height * ctremu.videoscale, 0, GL_RGBA,
+                             GL_UNSIGNED_INT_8_8_8_8_REV, nullptr);
+
+                glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+            }
         } else {
             glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
                              (fb->height - tex->height) * ctremu.videoscale,

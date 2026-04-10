@@ -53,14 +53,28 @@ DECL_SVC(ControlMemory) {
                 R(1) = memory_virtalloc(s, addr0, size, perm, MEMST_PRIVATE);
             }
             break;
+        case MEMOP_FREE:
+            lwarnonce("memop free");
+            R(0) = 0;
+            R(1) = addr0;
+            break;
         case MEMOP_MIRRORMAP:
             R(1) = memory_virtmirror(s, addr1, addr0, size, perm);
             break;
-        default:
-            lwarn("unknown memory op %d addr0=%08x addr1=%08x size=%x", memop,
-                  addr0, addr1, size);
+        case MEMOP_UNMAP:
+            lwarnonce("memop unmap");
             R(0) = 0;
             R(1) = addr0;
+            break;
+        case MEMOP_PROTECT:
+            lwarnonce("memop protect");
+            R(0) = 0;
+            R(1) = addr0;
+            break;
+        default:
+            lerror("unknown memory op %d addr0=%08x addr1=%08x size=%x", memop,
+                   addr0, addr1, size);
+            R(0) = -1;
             break;
     }
 }

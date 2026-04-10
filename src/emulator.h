@@ -66,6 +66,7 @@ typedef struct {
     bool safeShaderMul;
     bool ubershader;
     bool hashTextures;
+    bool reinterpretTexture;
 
     int viewlayout;
     bool swapscreens;
