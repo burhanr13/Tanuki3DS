@@ -4,7 +4,7 @@
 
 <img src=images/logo.png width=100>
 
-Tanuki3DS is a 3DS emulator for MacOS, Linux, and Windows written in C which aims to be simple, fast, and compatible. Currently it can play a decent number of games with reasonable graphics and audio at full speed. It also supports some nice features like controller input, fast-forward, video upscaling, and free camera.
+Tanuki3DS is a 3DS emulator for MacOS, Linux, and Windows written in C which aims to be simple, fast, and compatible.
 
 If you want to ask questions or discuss the emulator, join our discord:
 
@@ -34,7 +34,9 @@ On launching the app you can use the UI to open a game or drop its file onto the
 
 All games must be decrypted.
 
-You can modify emulator settings by opening the settings menu or by manually editing the generated `ctremu.ini` file. The settings and save data are stored by default in the application data path of your OS, but you can optionally create a file called `portable.txt` in the same directory as the executable to have them be created there. You can open the directory containing the settings and savedata using the UI.
+The settings and save data are stored by default in the application data path of your OS, but you can optionally create a file called `portable.txt` in the same directory as the executable to have them be created there. You can open the directory containing the settings and savedata using the UI.
+
+Certain files needed by games that provided by the OS (shared font, mii resource) use open replacements by default. If you want to load the originals you can do so using the UI. You can obtain the originals from a real 3DS using the [dumper.3dsx](tools/dumper/dumper.3dsx) program.
 
 You can also run the executable in the command line with the rom file as the argument or pass `-h` to see other options.
 
