@@ -12,7 +12,8 @@ in vec2 texcoord0;
 in vec2 texcoord1;
 in vec2 texcoord2;
 in float texcoordw;
-in vec4 normquat;
+in vec3 normal;
+in vec3 tangent;
 in vec3 view;
 
 out vec4 fragclr;
@@ -64,11 +65,6 @@ layout (std140) uniform FragUniforms {
     float shadowBias;
     float alpharef;
 };
-
-vec3 quatrot(vec4 q, vec3 v) {
-    return 2 * (q.w * cross(q.xyz, v) + q.xyz * dot(q.xyz, v)) +
-           (q.w * q.w - dot(q.xyz, q.xyz)) * v;
-}
 
 #define LUT_D0 0
 #define LUT_D1 1
@@ -123,6 +119,9 @@ void write_lut_read(DynString* s, FragConfig* fcfg, int lutNum, char* name) {
 }
 
 void write_lighting(DynString* s, FragConfig* fcfg) {
+    ds_printf(s, "vec3 n = normalize(normal);\n");
+    ds_printf(s, "vec3 t = normalize(tangent);\n");
+
     if (fcfg->lconfig0.bumpMode != 0) {
         ds_printf(s, "vec3 bumpVec = 2 * tex%dc.xyz - 1;\n",
                   fcfg->lconfig0.bumpTex);
@@ -133,16 +132,17 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
                 s,
                 "bumpVec.z = sqrt(max(1 - dot(bumpVec.xy, bumpVec.xy), 0));\n");
         }
-    }
-    if (fcfg->lconfig0.bumpMode == 1) {
-        ds_printf(s, "vec3 n = normalize(quatrot(normquat, bumpVec));\n");
-    } else {
-        ds_printf(s, "vec3 n = normalize(quatrot(normquat, vec3(0, 0, 1)));\n");
-    }
-    if (fcfg->lconfig0.bumpMode == 2) {
-        ds_printf(s, "vec3 t = normalize(quatrot(normquat, bumpVec));\n");
-    } else {
-        ds_printf(s, "vec3 t = normalize(quatrot(normquat, vec3(1, 0, 0)));\n");
+        // reconstruct the tbn matrix from normal and tangent and
+        // use it to rotate the bump map vector
+        // pica uses quaternions which are translated into normal/tangent
+        // vectors in the vertex shader
+        ds_printf(s, "mat3 tbn = mat3(t, cross(n,t), n);\n");
+        if (fcfg->lconfig0.bumpMode == 1) {
+            ds_printf(s, "n = normalize(tbn * bumpVec);\n");
+        }
+        if (fcfg->lconfig0.bumpMode == 2) {
+            ds_printf(s, "t = normalize(tbn * bumpVec);\n");
+        }
     }
 
     ds_printf(s, "vec3 v = normalize(view);\n");
@@ -252,7 +252,7 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
         }
 
         ds_printf(s, "cp_%d += light[%d].ambient;\n", i, i);
-        
+
         if (fcfg->lconfig0.clampHighlights) {
             ds_printf(s, "float f_%d = float(dot(n,l)>=0);\n", i);
             ds_printf(s, "cp_%d *= f_%d;\n", i, i);

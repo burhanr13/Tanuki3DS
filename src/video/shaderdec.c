@@ -45,7 +45,8 @@ out vec2 texcoord0;
 out vec2 texcoord1;
 out vec2 texcoord2;
 out float texcoordw;
-out vec4 normquat;
+out vec3 normal;
+out vec3 tangent;
 out vec3 view;
 
 vec4 o[16];
@@ -74,6 +75,11 @@ layout (std140) uniform FreecamUniforms {
 };
 
 #define SAFEMUL(a,b) (a * mix(vec4(0),b,notEqual(a,vec4(0))))
+
+vec3 quatrot(vec4 q, vec3 v) {
+    return 2 * (q.w * cross(q.xyz, v) + q.xyz * dot(q.xyz, v)) +
+           (q.w * q.w - dot(q.xyz, q.xyz)) * v;
+}
 
 )";
 
@@ -693,7 +699,7 @@ char* shader_dec_vs(GPU* gpu) {
     // macos gets mad if you dont write all the outputs
     // so we do that first
     ds_printf(&final, "color = vec4(1);\n");
-    ds_printf(&final, "normquat = vec4(1);\n");
+    ds_printf(&final, "vec4 normquat = vec4(1);\n");
     ds_printf(&final, "view = vec3(1);\n");
     ds_printf(&final, "texcoord0 = vec2(1);\n");
     ds_printf(&final, "texcoord1 = vec2(1);\n");
@@ -775,6 +781,9 @@ if (depthWBuffer) pos.z *= pos.w;
 pos.z = 2 * pos.z - pos.w;
 )");
     ds_printf(&final, "gl_Position = pos;\n");
+
+    ds_printf(&final, "normal = normalize(quatrot(normquat, vec3(0, 0, 1)));\n");
+    ds_printf(&final, "tangent = normalize(quatrot(normquat, vec3(1, 0, 0)));\n");
 
     ds_printf(&final, "}\n");
 
