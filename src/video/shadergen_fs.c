@@ -104,8 +104,7 @@ const char* lutinput_str(int lutSel) {
     }
 }
 
-void write_lut_read(DynString* s, FragConfig* fcfg, int lutNum, char* name,
-                    bool twosided) {
+void write_lut_read(DynString* s, FragConfig* fcfg, int lutNum, char* name) {
     ds_printf(s, "texture(lightLuts, vec2(");
     if (fcfg->llutAbs & BIT(4 * lutNum + 1)) {
         // to ensure proper clamping we need to multiply by the size of the
@@ -113,13 +112,7 @@ void write_lut_read(DynString* s, FragConfig* fcfg, int lutNum, char* name,
         ds_printf(s, "fract(clamp(%s*128,-127.5,127.5)/256)",
                   lutinput_str(fcfg->llutSel >> 4 * lutNum & 7));
     } else {
-        if (twosided) {
-            ds_printf(s, "abs(%s)",
-                      lutinput_str(fcfg->llutSel >> 4 * lutNum & 7));
-        } else {
-            ds_printf(s, "max(%s, 0)",
-                      lutinput_str(fcfg->llutSel >> 4 * lutNum & 7));
-        }
+        ds_printf(s, "abs(%s)", lutinput_str(fcfg->llutSel >> 4 * lutNum & 7));
     }
     ds_printf(s, ", %s)).r", name);
     int scaleExp = (sbit(3))(fcfg->llutScale >> 4 * lutNum);
@@ -133,7 +126,7 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
     if (fcfg->lconfig0.bumpMode != 0) {
         ds_printf(s, "vec3 bumpVec = 2 * tex%dc.xyz - 1;\n",
                   fcfg->lconfig0.bumpTex);
-        if (!(fcfg->lconfig0.noRecalcBumpVec)) {
+        if (!fcfg->lconfig0.noRecalcBumpVec) {
             // recalcuate z value, if this is set then z is calculated to make a
             // unit vector
             ds_printf(
@@ -184,16 +177,15 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
         ds_printf(s, "h_proj = normalize(h - n * dot(n, h));\n");
         ds_printf(s, "p = normalize(light[%d].spotdir.xyz);\n", i);
 
-        ds_printf(s, "vec3 cp_%d = light[%d].ambient + ", i, i);
-        if (fcfg->light[i].config.twosided) {
-            ds_printf(s, "abs(dot(n, l)) * ");
-        } else {
-            ds_printf(s, "max(dot(n, l), 0) * ");
-        }
-        ds_printf(s, "light[%d].diffuse;\n", i);
+        const char* ndotlstr = fcfg->light[i].config.twosided
+                                   ? "abs(dot(n, l))"
+                                   : "max(dot(n, l), 0)";
+
+        ds_printf(s, "vec3 cp_%d = %s * light[%d].diffuse;\n", i, ndotlstr, i,
+                  i);
 
         if (fcfg->light[i].config.use_g0 || fcfg->light[i].config.use_g1) {
-            ds_printf(s, "float G_%d = clamp(dot(n,l)/dot(l+v,l+v),0,1);\n", i);
+            ds_printf(s, "float G_%d = %s/dot(l+v,l+v);\n", i, ndotlstr);
         }
 
         bool use_R = false;
@@ -203,29 +195,25 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
             ds_printf(s, "vec3 R_%d = vec3(", i);
             if (envLuts & BIT(LLUT_RG)) {
                 if (enabledLuts & BIT(LLUT_RR)) {
-                    write_lut_read(s, fcfg, LLUT_RR, "LUT_RR",
-                                   fcfg->light[i].config.twosided);
+                    write_lut_read(s, fcfg, LLUT_RR, "LUT_RR");
                 } else {
                     ds_printf(s, "1");
                 }
                 ds_printf(s, ", ");
                 if (enabledLuts & BIT(LLUT_RG)) {
-                    write_lut_read(s, fcfg, LLUT_RG, "LUT_RG",
-                                   fcfg->light[i].config.twosided);
+                    write_lut_read(s, fcfg, LLUT_RG, "LUT_RG");
                 } else {
                     ds_printf(s, "1");
                 }
                 ds_printf(s, ", ");
                 if (enabledLuts & BIT(LLUT_RB)) {
-                    write_lut_read(s, fcfg, LLUT_RB, "LUT_RB",
-                                   fcfg->light[i].config.twosided);
+                    write_lut_read(s, fcfg, LLUT_RB, "LUT_RB");
                 } else {
                     ds_printf(s, "1");
                 }
             } else {
                 if (enabledLuts & BIT(LLUT_RR)) {
-                    write_lut_read(s, fcfg, LLUT_RR, "LUT_RR",
-                                   fcfg->light[i].config.twosided);
+                    write_lut_read(s, fcfg, LLUT_RR, "LUT_RR");
                 } else {
                     ds_printf(s, "1");
                 }
@@ -235,8 +223,7 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
 
         ds_printf(s, "vec3 cs_%d = ", i);
         if (enabledLuts & BIT(LLUT_D0)) {
-            write_lut_read(s, fcfg, LLUT_D0, "LUT_D0",
-                           fcfg->light[i].config.twosided);
+            write_lut_read(s, fcfg, LLUT_D0, "LUT_D0");
             ds_printf(s, " * ");
         }
         if (fcfg->light[i].config.use_g0) {
@@ -244,8 +231,7 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
         }
         ds_printf(s, "light[%d].specular0 +\n", i);
         if (enabledLuts & BIT(LLUT_D1)) {
-            write_lut_read(s, fcfg, LLUT_D1, "LUT_D1",
-                           fcfg->light[i].config.twosided);
+            write_lut_read(s, fcfg, LLUT_D1, "LUT_D1");
             ds_printf(s, " * ");
         }
         if (use_R) {
@@ -256,12 +242,28 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
         }
         ds_printf(s, "light[%d].specular1;\n", i);
 
+        if (!(fcfg->lconfig1.shadow & BIT(i))) {
+            if (fcfg->lconfig0.shadowPrimary) {
+                ds_printf(s, "cp_%d *= H.rgb;\n", i);
+            }
+            if (fcfg->lconfig0.shadowSecondary) {
+                ds_printf(s, "cs_%d *= H.rgb;\n", i);
+            }
+        }
+
+        ds_printf(s, "cp_%d += light[%d].ambient;\n", i, i);
+        
+        if (fcfg->lconfig0.clampHighlights) {
+            ds_printf(s, "float f_%d = float(dot(n,l)>=0);\n", i);
+            ds_printf(s, "cp_%d *= f_%d;\n", i, i);
+            ds_printf(s, "cs_%d *= f_%d;\n", i, i);
+        }
+
         if (envLuts & BIT(LLUT_SP) && !(fcfg->lconfig1.spotlight & BIT(i))) {
             ds_printf(s, "float S_%d = ", i);
             char buf[64];
             snprintf(buf, sizeof buf, "LUT_SP_BASE + %d", i);
-            write_lut_read(s, fcfg, LLUT_SP, buf,
-                           fcfg->light[i].config.twosided);
+            write_lut_read(s, fcfg, LLUT_SP, buf);
             ds_printf(s, ";\n");
             ds_printf(s, "cp_%d *= S_%d;\n", i, i);
             ds_printf(s, "cs_%d *= S_%d;\n", i, i);
@@ -276,15 +278,6 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
             ds_printf(s, "cs_%d *= A_%d;\n", i, i);
         }
 
-        if (!(fcfg->lconfig1.shadow & BIT(i))) {
-            if (fcfg->lconfig0.shadowPrimary) {
-                ds_printf(s, "cp_%d *= H.rgb;\n", i);
-            }
-            if (fcfg->lconfig0.shadowSecondary) {
-                ds_printf(s, "cs_%d *= H.rgb;\n", i);
-            }
-        }
-
         ds_printf(s, "lprimary.rgb += cp_%d;\n", i);
         ds_printf(s, "lsecondary.rgb += cs_%d;\n", i);
     }
@@ -292,8 +285,7 @@ void write_lighting(DynString* s, FragConfig* fcfg) {
     if (enabledLuts & BIT(LLUT_FR) &&
         (fcfg->lconfig0.frPrimary || fcfg->lconfig0.frSecondary)) {
         ds_printf(s, "float fr = ");
-        write_lut_read(s, fcfg, LLUT_FR, "LUT_FR",
-                       fcfg->light[i].config.twosided);
+        write_lut_read(s, fcfg, LLUT_FR, "LUT_FR");
         ds_printf(s, ";\n");
         if (fcfg->lconfig0.frPrimary) {
             ds_printf(s, "lprimary.a = fr;\n");
