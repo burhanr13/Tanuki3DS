@@ -132,13 +132,14 @@ void draw_menubar() {
             }
             ImGui_Separator();
 
-            ImGui_MenuItemBoolPtr("Fast Forward", "Tab", &ctremu.fastforward, true);
+            ImGui_MenuItemBoolPtr("Fast Forward", "Tab", &ctremu.fastforward,
+                                  true);
             ImGui_MenuItemBoolPtr("Mute", "F6", &ctremu.mute, true);
 
             ImGui_Separator();
 
-            if (ImGui_MenuItemBoolPtr("Free Camera", "F7", &ctremu.freecam_enable,
-                            true)) {
+            if (ImGui_MenuItemBoolPtr("Free Camera", "F7",
+                                      &ctremu.freecam_enable, true)) {
                 glm_mat4_identity(ctremu.freecam_mtx);
                 renderer_gl_update_freecam(&ctremu.system.gpu.gl);
             }
@@ -147,24 +148,29 @@ void draw_menubar() {
         }
 
         if (ImGui_BeginMenu("View")) {
-            if (ImGui_MenuItemBoolPtr("Fullscreen", "F11", &ctremu.fullscreen, true)) {
+            if (ImGui_MenuItemBoolPtr("Fullscreen", "F11", &ctremu.fullscreen,
+                                      true)) {
                 SDL_SetWindowFullscreen(g_window, ctremu.fullscreen);
             }
             if (ImGui_BeginMenu("Screen Layout")) {
                 if (ImGui_MenuItemEx("Vertical", nullptr,
-                               ctremu.viewlayout == LAYOUT_DEFAULT, true)) {
+                                     ctremu.viewlayout == LAYOUT_DEFAULT,
+                                     true)) {
                     ctremu.viewlayout = LAYOUT_DEFAULT;
                 }
                 if (ImGui_MenuItemEx("Horizontal", nullptr,
-                               ctremu.viewlayout == LAYOUT_HORIZONTAL, true)) {
+                                     ctremu.viewlayout == LAYOUT_HORIZONTAL,
+                                     true)) {
                     ctremu.viewlayout = LAYOUT_HORIZONTAL;
                 }
                 if (ImGui_MenuItemEx("Large Screen", nullptr,
-                               ctremu.viewlayout == LAYOUT_LARGETOP, true)) {
+                                     ctremu.viewlayout == LAYOUT_LARGETOP,
+                                     true)) {
                     ctremu.viewlayout = LAYOUT_LARGETOP;
                 }
                 ImGui_Separator();
-                ImGui_MenuItemBoolPtr("Swap Screens", "F9", &ctremu.swapscreens, true);
+                ImGui_MenuItemBoolPtr("Swap Screens", "F9", &ctremu.swapscreens,
+                                      true);
                 ImGui_EndMenu();
             }
             ImGui_Separator();
@@ -176,12 +182,12 @@ void draw_menubar() {
             ImGui_Separator();
 
             if (ImGui_MenuItemEx("Texture Viewer", nullptr, false,
-                           ctremu.initialized)) {
+                                 ctremu.initialized)) {
                 uistate.textureview = true;
             }
 
             if (ImGui_MenuItemEx("Audio Channels", nullptr, false,
-                           ctremu.initialized)) {
+                                 ctremu.initialized)) {
                 uistate.audioview = true;
             }
 
@@ -198,7 +204,7 @@ void draw_menubar() {
 
         if (ImGui_BeginMenu("About")) {
             ImGui_TextLinkOpenURLEx("GitHub",
-                              "https://github.com/burhanr13/Tanuki3DS");
+                                    "https://github.com/burhanr13/Tanuki3DS");
             ImGui_TextLinkOpenURLEx("Discord", "https://discord.gg/6ya65fvD3g");
             ImGui_EndMenu();
         }
@@ -315,8 +321,9 @@ void draw_gamelist() {
     ImGui_SetNextWindowPos(ImGui_GetMainViewport()->WorkPos, 0);
     ImGui_SetNextWindowSize(ImGui_GetMainViewport()->WorkSize, 0);
     ImGui_Begin("game list", nullptr,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+                    ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoSavedSettings);
 
     if (ImGui_Button("Select Game Folder...")) {
         SDL_ShowOpenFolderDialog(game_dir_callback, nullptr, g_window, nullptr,
@@ -335,8 +342,8 @@ void draw_gamelist() {
 
     ImGui_BeginChild("gamelist_child", (ImVec2) {}, 0, 0);
     ImGui_BeginTable("gamelist", 5,
-                 ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp |
-                     ImGuiTableFlags_ScrollY);
+                     ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp |
+                         ImGuiTableFlags_ScrollY);
 
     ImGui_TableSetupScrollFreeze(0, 1);
     ImGui_TableSetupColumnEx("Icon", ImGuiTableColumnFlags_WidthFixed, 50, 0);
@@ -351,10 +358,10 @@ void draw_gamelist() {
         ImGui_TableNextRow();
         ImGui_TableNextColumn();
         if (ImGui_SelectableEx("##", false,
-                         ImGuiSelectableFlags_SpanAllColumns |
-                             ImGuiSelectableFlags_AllowOverlap |
-                             ImGuiSelectableFlags_AllowDoubleClick,
-                         (ImVec2) {0, 48})) {
+                               ImGuiSelectableFlags_SpanAllColumns |
+                                   ImGuiSelectableFlags_AllowOverlap |
+                                   ImGuiSelectableFlags_AllowDoubleClick,
+                               (ImVec2) {0, 48})) {
             if (ImGui_IsMouseDoubleClicked(0)) emulator_set_rom(g->filename);
         }
         ImGui_SameLine();
@@ -395,7 +402,7 @@ void draw_swkbd() {
     if (ctremu.needs_swkbd) ImGui_OpenPopup("Input Text", 0);
 
     if (ImGui_BeginPopupModal("Input Text", nullptr,
-                          ImGuiWindowFlags_AlwaysAutoResize)) {
+                              ImGuiWindowFlags_AlwaysAutoResize)) {
         static char buf[100];
         if (ImGui_IsWindowAppearing()) {
             memset(buf, 0, sizeof buf);
@@ -458,8 +465,9 @@ void draw_settings() {
     ImGui_Begin("Settings", &uistate.settings, flags);
 
     ImGui_PushStyleColorImVec4(ImGuiCol_ChildBg,
-                          *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
-    ImGui_PushStyleVarImVec2(ImGuiStyleVar_SelectableTextAlign, (ImVec2) {0.5, 0.5});
+                               *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
+    ImGui_PushStyleVarImVec2(ImGuiStyleVar_SelectableTextAlign,
+                             (ImVec2) {0.5, 0.5});
     ImGui_BeginChild("sidebar", (ImVec2) {100, 0}, 0, 0);
     ImGui_Separator();
     for (int i = 0; i < PANE_MAX; i++) {
@@ -475,28 +483,33 @@ void draw_settings() {
     ImGui_SameLine();
 
     ImGui_BeginChild("settings", (ImVec2) {},
-                 ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+                     ImGuiChildFlags_AlwaysUseWindowPadding, 0);
     ImGui_BeginChild("settings pane", (ImVec2) {0, -40}, 0, 0);
 
     switch (curPane) {
         case PANE_SYSTEM: {
             ImGui_SeparatorText("System");
-            ImGui_InputText("Username", ctremu.username, sizeof ctremu.username, 0);
+            ImGui_InputText("Username", ctremu.username, sizeof ctremu.username,
+                            0);
             static const char* languages[] = {
                 "Japanese", "English",    "French",  "German",
                 "Italian",  "Spanish",    "Chinese", "Korean",
                 "Dutch",    "Portuguese", "Russian", "Taiwanese",
             };
             ImGui_ComboChar("System Language", &ctremu.language, languages,
-                    countof(languages));
+                            countof(languages));
 
             ImGui_Checkbox("Auto Detect Region", &ctremu.detectRegion);
             ImGui_BeginDisabled(ctremu.detectRegion);
             static const char* regions[] = {
                 "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
             };
-            ImGui_ComboChar("System Region", &ctremu.region, regions, countof(regions));
+            ImGui_ComboChar("System Region", &ctremu.region, regions,
+                            countof(regions));
             ImGui_EndDisabled();
+
+            ImGui_SeparatorText("Camera");
+            ImGui_Checkbox("Enable Camera", &ctremu.camEnable);
 
             break;
         }
@@ -505,7 +518,8 @@ void draw_settings() {
             ImGui_BeginDisabled(ctremu.initialized);
             ImGui_Checkbox("Use IR Interpreter", &g_jit_config.ir_interpret);
             ImGui_SetNextItemWidth(200);
-            ImGui_InputInt("Maximum Block Instructions", &g_jit_config.max_block_instrs);
+            ImGui_InputInt("Maximum Block Instructions",
+                           &g_jit_config.max_block_instrs);
             ImGui_Checkbox("Enable Optimization", &g_jit_config.optimize);
             ImGui_Checkbox("Enable Block Linking", &g_jit_config.linking);
             ImGui_EndDisabled();
@@ -526,7 +540,7 @@ void draw_settings() {
                                             "Large Screen"};
             ImGui_SetNextItemWidth(150);
             ImGui_ComboChar("Screen Layout", &ctremu.viewlayout, layouts,
-                    countof(layouts));
+                            countof(layouts));
             ImGui_Checkbox("Swap Screens", &ctremu.swapscreens);
             ImGui_SetNextItemWidth(150);
             ImGui_InputFloat("Large Screen Ratio", &ctremu.largescreenratio);
@@ -535,8 +549,8 @@ void draw_settings() {
             static const char* filters[] = {"Nearest", "Bilinear",
                                             "Sharp Bilinear"};
             ImGui_SetNextItemWidth(150);
-            ImGui_ComboChar("Postprocessing Filter", &ctremu.outputfilter, filters,
-                    countof(filters));
+            ImGui_ComboChar("Postprocessing Filter", &ctremu.outputfilter,
+                            filters, countof(filters));
             ImGui_EndDisabled();
 
             ImGui_SeparatorText("GPU");
@@ -545,7 +559,8 @@ void draw_settings() {
             ImGui_InputInt("Video Scale", &ctremu.videoscale);
             if (ctremu.videoscale < 1) ctremu.videoscale = 1;
             ImGui_SetNextItemWidth(150);
-            ImGui_InputInt("Software Vertex Shader Threads", &ctremu.vshthreads);
+            ImGui_InputInt("Software Vertex Shader Threads",
+                           &ctremu.vshthreads);
             if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
             if (ctremu.vshthreads > MAX_VSH_THREADS)
                 ctremu.vshthreads = MAX_VSH_THREADS;
@@ -559,6 +574,8 @@ void draw_settings() {
             ImGui_Unindent();
             // ImGui_Checkbox("Use Ubershader", &ctremu.ubershader);
             ImGui_Checkbox("Hash Textures", &ctremu.hashTextures);
+            ImGui_Checkbox("Enable Texture Reinterpret",
+                           &ctremu.reinterpretTexture);
             break;
         }
         case PANE_AUDIO: {
@@ -571,7 +588,8 @@ void draw_settings() {
                 "Surround",
             };
             ImGui_ComboChar("Audio Output Mode", &ctremu.audiomode, audiomodes,
-                    countof(audiomodes));
+                            countof(audiomodes));
+            ImGui_SeparatorText("Microphone");
             ImGui_Checkbox("Enable Microphone", &ctremu.micEnable);
             break;
         }
@@ -580,7 +598,7 @@ void draw_settings() {
                 if (ImGui_BeginTabItem("Keyboard Input", nullptr, 0)) {
                     ImGui_BeginChild("keyboard input panel", (ImVec2) {}, 0, 0);
                     ImGui_BeginTable("input config", 2,
-                                 ImGuiTableFlags_BordersOuterV);
+                                     ImGuiTableFlags_BordersOuterV);
                     config_input("A", &ctremu.inputmap.kb.a);
                     config_input("B", &ctremu.inputmap.kb.b);
                     config_input("X", &ctremu.inputmap.kb.x);
@@ -604,16 +622,16 @@ void draw_settings() {
                     ImGui_EndTable();
                     ImGui_SetNextItemWidth(200);
                     ImGui_SliderFloat("Circle Pad Modifier Scale",
-                                  &ctremu.inputmap.kb.cmodscale, 0, 1);
+                                      &ctremu.inputmap.kb.cmodscale, 0, 1);
                     ImGui_EndChild();
                     ImGui_EndTabItem();
                 }
 
                 if (ImGui_BeginTabItem("Freecam", nullptr,
-                                   ImGuiTabItemFlags_None)) {
+                                       ImGuiTabItemFlags_None)) {
                     ImGui_BeginChild("freecam input panel", (ImVec2) {}, 0, 0);
                     ImGui_BeginTable("freecam config", 2,
-                                 ImGuiTableFlags_BordersOuterV);
+                                     ImGuiTableFlags_BordersOuterV);
                     config_input("Move Forward", &ctremu.inputmap.freecam.mf);
                     config_input("Move Backward", &ctremu.inputmap.freecam.mb);
                     config_input("Move Left", &ctremu.inputmap.freecam.ml);
@@ -690,9 +708,9 @@ void draw_textureview() {
         auto texcache = &ctremu.system.gpu.textures;
 
         ImGui_PushStyleColorImVec4(ImGuiCol_ChildBg,
-                              *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
+                                   *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
         ImGui_PushStyleVarImVec2(ImGuiStyleVar_SelectableTextAlign,
-                            (ImVec2) {0.5, 0.5});
+                                 (ImVec2) {0.5, 0.5});
         ImGui_BeginChild("##list", (ImVec2) {200, 0}, 0, 0);
 
         for (int i = 0; i < TEX_MAX; i++) {
@@ -718,7 +736,7 @@ void draw_textureview() {
         ImGui_SameLine();
 
         ImGui_BeginChild("##texture pane", (ImVec2) {},
-                     ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+                         ImGuiChildFlags_AlwaysUseWindowPadding, 0);
 
         auto tex = &texcache->d[curTex];
 
@@ -733,15 +751,15 @@ void draw_textureview() {
             }
 
             ImGui_ImageWithBgEx((ImTextureRef) {0, tex->tex}, (ImVec2) {w, h},
-                          (ImVec2) {0, 1}, (ImVec2) {1, 0},
-                          (ImVec4) {0.25, 0.25, 0.25, 1},
-                          (ImVec4) {1, 1, 1, 1});
+                                (ImVec2) {0, 1}, (ImVec2) {1, 0},
+                                (ImVec4) {0.25, 0.25, 0.25, 1},
+                                (ImVec4) {1, 1, 1, 1});
             static const char* fmts[] = {
                 "RGBA8888", "RGB888", "RGBA5551", "RGB565", "RGBA4444", "LA88",
                 "RG88",     "L8",     "A8",       "IA44",   "I4",       "A4",
                 "ETC1",     "ETC1A4", "???",      "???"};
-            ImGui_Text("Addr: %#lx  Size: %dx%d  Format: %s", tex->paddr, tex->width,
-                   tex->height, fmts[tex->fmt]);
+            ImGui_Text("Addr: %#lx  Size: %dx%d  Format: %s", tex->paddr,
+                       tex->width, tex->height, fmts[tex->fmt]);
             ImGui_Text("Hash: %016lx", tex->hash);
         }
         ImGui_EndChild();
@@ -756,9 +774,9 @@ void draw_textureview() {
         auto fbcache = &ctremu.system.gpu.fbs;
 
         ImGui_PushStyleColorImVec4(ImGuiCol_ChildBg,
-                              *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
+                                   *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
         ImGui_PushStyleVarImVec2(ImGuiStyleVar_SelectableTextAlign,
-                            (ImVec2) {0.5, 0.5});
+                                 (ImVec2) {0.5, 0.5});
         ImGui_BeginChild("##list", (ImVec2) {200, 0}, 0, 0);
 
         for (int i = 0; i < FB_MAX; i++) {
@@ -784,7 +802,7 @@ void draw_textureview() {
         ImGui_SameLine();
 
         ImGui_BeginChild("##fb pane", (ImVec2) {},
-                     ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+                         ImGuiChildFlags_AlwaysUseWindowPadding, 0);
 
         auto fb = &fbcache->d[curFb];
 
@@ -805,21 +823,22 @@ void draw_textureview() {
             ImGui_RadioButtonIntPtr("Depth Buffer", &bufselect, 1);
 
             if (bufselect == 0) {
-                ImGui_ImageWithBgEx((ImTextureRef) {0, fb->color_tex},
-                              (ImVec2) {w, h}, (ImVec2) {0, 1}, (ImVec2) {1, 0},
-                              (ImVec4) {0.25, 0.25, 0.25, 1},
-                              (ImVec4) {1, 1, 1, 1});
+                ImGui_ImageWithBgEx(
+                    (ImTextureRef) {0, fb->color_tex}, (ImVec2) {w, h},
+                    (ImVec2) {0, 1}, (ImVec2) {1, 0},
+                    (ImVec4) {0.25, 0.25, 0.25, 1}, (ImVec4) {1, 1, 1, 1});
             } else {
-                ImGui_ImageWithBgEx((ImTextureRef) {0, fb->depth_tex},
-                              (ImVec2) {w, h}, (ImVec2) {0, 1}, (ImVec2) {1, 0},
-                              (ImVec4) {0.25, 0.25, 0.25, 1},
-                              (ImVec4) {1, 1, 1, 1});
+                ImGui_ImageWithBgEx(
+                    (ImTextureRef) {0, fb->depth_tex}, (ImVec2) {w, h},
+                    (ImVec2) {0, 1}, (ImVec2) {1, 0},
+                    (ImVec4) {0.25, 0.25, 0.25, 1}, (ImVec4) {1, 1, 1, 1});
             }
             static const char* fmts[] = {"RGBA8888", "RGB888",   "RGB565",
                                          "RGBA5551", "RGBA4444", "???",
                                          "???",      "???"};
-            ImGui_Text("Color Addr: %#lx  Size: %dx%d  Format: %s", fb->color_paddr,
-                   fb->width, fb->height, fmts[fb->color_fmt]);
+            ImGui_Text("Color Addr: %#lx  Size: %dx%d  Format: %s",
+                       fb->color_paddr, fb->width, fb->height,
+                       fmts[fb->color_fmt]);
             ImGui_Text("Depth Addr: %#x", fb->depth_paddr);
         }
         ImGui_EndChild();
@@ -843,8 +862,8 @@ void plot_samples(DSPSampHist* wave) {
             samples[it.i] = (float) *it.p / BIT(16);
         }
         ImGui_PlotLinesEx("##", samples + countof(samples) - samplenum,
-                             samplenum, 0, nullptr, -samplerange, samplerange,
-                             (ImVec2) {200, 50}, 4);
+                          samplenum, 0, nullptr, -samplerange, samplerange,
+                          (ImVec2) {200, 50}, 4);
         ImGui_PopID();
     }
 }
@@ -865,15 +884,17 @@ void draw_audioview() {
 
     ImGui_Begin("DSP Audio Channels", &uistate.audioview, flags);
 
-    ImGui_SliderInt("Sample Length", &samplenum, 0, FIFO_MAX(g_dsp_chn_hist[0][0]));
+    ImGui_SliderInt("Sample Length", &samplenum, 0,
+                    FIFO_MAX(g_dsp_chn_hist[0][0]));
 
     ImGui_SliderFloat("Amplitude Range", &samplerange, 0, 1);
 
     ImGui_BeginChild("audioviewchild", (ImVec2) {0, -40}, 0, 0);
 
     ImGui_BeginTable("##audioview", 4,
-                 ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit |
-                     ImGuiTableFlags_BordersOuterV | ImGuiTableFlags_ScrollY);
+                     ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit |
+                         ImGuiTableFlags_BordersOuterV |
+                         ImGuiTableFlags_ScrollY);
 
     ImGui_TableSetupScrollFreeze(0, 1);
     ImGui_TableSetupColumn("##", 0);

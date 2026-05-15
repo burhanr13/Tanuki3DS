@@ -14,12 +14,18 @@ out vec2 texcoord0;
 out vec2 texcoord1;
 out vec2 texcoord2;
 out float texcoordw;
-out vec4 normquat;
+out vec3 normal;
+out vec3 tangent;
 out vec3 view;
 
 uniform float depthOffset;
 uniform float depthScale;
 uniform bool depthWBuffer;
+
+vec3 quatrot(vec4 q, vec3 v) {
+    return 2 * (q.w * cross(q.xyz, v) + q.xyz * dot(q.xyz, v)) +
+           (q.w * q.w - dot(q.xyz, q.xyz)) * v;
+}
 
 void main() {
     vec4 pos = a_pos;
@@ -35,6 +41,14 @@ void main() {
     texcoord1 = a_texcoord1;
     texcoord2 = a_texcoord2;
     texcoordw = a_texcoordw;
-    normquat = a_normquat;
+    
+    // pica200 uses the quaternion directly as an attribute
+    // and does special quaternion specific interpolation
+    // doing linear interpolation is not perfectly replicating this
+    // (especially seem in normal maps)
+    // so we use normal and tangent attributes instead which are
+    // interpolated properly
+    normal = normalize(quatrot(a_normquat, vec3(0,0,1)));
+    tangent = normalize(quatrot(a_normquat, vec3(1,0,0)));
     view = a_view;
 }

@@ -1,5 +1,4 @@
 - GPU
-    - proctex
     - cubemap
     - soft shadows
     - other geoshader modes
@@ -8,7 +7,6 @@
     - CSND
     - reverb
 - Services
-    - camera
     - IR/Circle pad pro
     - networking
 - Kernel

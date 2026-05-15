@@ -43,6 +43,7 @@ typedef struct _FBInfo {
     u32 width, height;
     u32 color_fmt;
     u32 color_Bpp;
+    u32 depth_fmt;
 
     bool shadowMap;
     bool dirty;
@@ -104,9 +105,23 @@ typedef struct _GPU {
     u16 fogLut[129];
     bool fogLutDirty;
 
+    u16 proctexMapLut[128][2];
+    bool proctexMapLutDirty;
+
+    u16 proctexNoiseLut[128];
+    bool proctexNoiseLutDirty;
+    
+    u32 proctexLut[256];
+    bool proctexLutDirty;
+
     LRUCache(FBInfo, FB_MAX) fbs;
     FBInfo* curfb;
     LRUCache(TexInfo, TEX_MAX) textures;
+    struct {
+        u32 offset;
+        u32 width;
+        u32 tex;
+    } proctex;
     LRUCache(ShaderJitBlock, VSH_MAX) vshaders_sw;
     LRUCache(VSHCacheEntry, VSH_MAX) vshaders_hw;
     LRUCache(FSHCacheEntry, FSH_MAX) fshaders;

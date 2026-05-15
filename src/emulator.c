@@ -30,6 +30,7 @@ void emulator_load_default_settings() {
     ctremu.safeShaderMul = true;
     ctremu.ubershader = false;
     ctremu.hashTextures = true;
+    ctremu.reinterpretTexture = true;
     ctremu.audiosync = true;
     ctremu.volume = 100;
     ctremu.audiomode = 1;
@@ -43,6 +44,7 @@ void emulator_load_default_settings() {
     g_jit_config.linking = true;
     ctremu.ignore_null = false;
     ctremu.micEnable = true;
+    ctremu.camEnable = true;
 
     ctremu.inputmap.kb.a = SDL_SCANCODE_L;
     ctremu.inputmap.kb.b = SDL_SCANCODE_K;

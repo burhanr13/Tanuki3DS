@@ -21,7 +21,8 @@ struct {
     SRV("cecd:u", cecd),     SRV("ldr:ro", ldr_ro),    SRV("nwm::UDS", nwm_uds),
     SRV("ir:USER", ir_user), SRV("am:app", am),        SRV("frd:u", frd),
     SRV("ptm:u", ptm),       SRV("ptm:play", ptm),     SRV("ptm:sysm", ptm),
-    SRV("boss:U", boss),     SRV("mic:u", mic)
+    SRV("boss:U", boss),     SRV("mic:u", mic),        SRV("cam:u", cam),
+    SRV("csnd:SND", csnd)
 #undef SRV
 };
 
@@ -78,6 +79,14 @@ void services_init(E3DS* s) {
     srvobj_init(&s->services.ir.connection_status.hdr, KOT_EVENT);
 
     srvobj_init(&s->services.mic.event.hdr, KOT_EVENT);
+
+    srvobj_init(&s->services.cam.recvEvent.hdr, KOT_EVENT);
+    srvobj_init(&s->services.cam.vsyncEvent.hdr, KOT_EVENT);
+    srvobj_init(&s->services.cam.errEvent.hdr, KOT_EVENT);
+
+    srvobj_init(&s->services.csnd.shmem.hdr, KOT_SHAREDMEM);
+    s->services.csnd.shmem.size = 0x4000;
+    sharedmem_alloc(s, &s->services.csnd.shmem);
 }
 
 DECL_PORT_ARG(stub, name) {

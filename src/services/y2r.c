@@ -105,6 +105,21 @@ DECL_PORT(y2r) {
             cmdbuf[1] = 0;
             break;
         }
+        case 0x0013: {
+            u32 buf = cmdbuf[1];
+            u32 sz = cmdbuf[2];
+            s16 unit = cmdbuf[3];
+            s16 stride = cmdbuf[4];
+            linfo("SetSendingYuv %08x %d %d %d", buf, sz, unit, stride);
+            s->services.y2r.srcY.addr = buf;
+            s->services.y2r.srcY.pitch = unit;
+            s->services.y2r.srcY.gap = stride;
+            s->services.y2r.srcY.size = sz;
+            s->services.y2r.srcU = s->services.y2r.srcV = s->services.y2r.srcY;
+            cmdbuf[0] = IPCHDR(1, 0);
+            cmdbuf[1] = 0;
+            break;
+        }
         case 0x0018: {
             u32 buf = cmdbuf[1];
             u32 sz = cmdbuf[2];
@@ -166,6 +181,16 @@ DECL_PORT(y2r) {
                     break;
                 default:
                     lwarnonce("unknown coefficient %d", coef);
+                    // just use the same coefficients for now
+                    s->services.y2r.coeffs.y_a = 298.082f / 256;
+                    s->services.y2r.coeffs.r_v = 408.583f / 256;
+                    s->services.y2r.coeffs.r_off = -222.921f / 256;
+                    s->services.y2r.coeffs.g_u = -100.291f / 256;
+                    s->services.y2r.coeffs.g_v = -208.120f / 256;
+                    s->services.y2r.coeffs.g_off = 135.576f / 256;
+                    s->services.y2r.coeffs.b_u = 516.412f / 256;
+                    s->services.y2r.coeffs.b_off = -276.836f / 256;
+                    break;
             }
             cmdbuf[0] = IPCHDR(1, 0);
             cmdbuf[1] = 0;
@@ -238,7 +263,7 @@ void y2r_do_conversion(E3DS* s) {
 
     if (y2r->srcY.addr == 0 || y2r->srcU.addr == 0 || y2r->srcV.addr == 0 ||
         y2r->dst.addr == 0) {
-        lwarn("null y2r buffers");
+        lwarnonce("null y2r buffers");
         return;
     }
 
@@ -246,12 +271,12 @@ void y2r_do_conversion(E3DS* s) {
 
     static const int dstfmtsize[] = {4, 3, 2, 2};
 
-    int ywidth = y2r->srcY.pitch + y2r->srcY.gap;
-    int uwidth = y2r->srcU.pitch + y2r->srcU.gap;
-    int vwidth = y2r->srcV.pitch + y2r->srcV.gap;
+    int ypitch = y2r->srcY.pitch + y2r->srcY.gap;
+    int upitch = y2r->srcU.pitch + y2r->srcU.gap;
+    int vpitch = y2r->srcV.pitch + y2r->srcV.gap;
     // these numbers seem to be for a row of tiles regardless of linear/block
     // mode
-    int dstwidth =
+    int dstpitch =
         (y2r->dst.pitch + y2r->dst.gap) / 8 / dstfmtsize[y2r->outputFmt & 3];
 
     u8* ydata = PTR(y2r->srcY.addr);
@@ -265,9 +290,14 @@ void y2r_do_conversion(E3DS* s) {
         for (int x = 0; x < y2r->width; x++) {
             switch (y2r->inputFmt) {
                 case 1: // yuv420 -> each 2x2 gets one u/v sample
-                    cy = ydata[y * ywidth + x] * (1 / 255.f);
-                    u = udata[(y / 2) * uwidth + (x / 2)] * (1 / 255.f);
-                    v = vdata[(y / 2) * vwidth + (x / 2)] * (1 / 255.f);
+                    cy = ydata[y * ypitch + x] * (1 / 255.f);
+                    u = udata[(y >> 1) * upitch + (x >> 1)] * (1 / 255.f);
+                    v = vdata[(y >> 1) * vpitch + (x >> 1)] * (1 / 255.f);
+                    break;
+                case 4: // yuv422 batch -> packed yu/yv for every 2x1 chunk
+                    cy = ydata[y * ypitch + 2 * x] * (1 / 255.f);
+                    u = ydata[(y & ~1) * ypitch + 2 * x + 1] * (1 / 255.f);
+                    v = ydata[(y | 1) * ypitch + 2 * x + 1] * (1 / 255.f);
                     break;
                 default:
                     lwarnonce("unknown input format %d", y2r->inputFmt);
@@ -284,8 +314,8 @@ void y2r_do_conversion(E3DS* s) {
             g = fminf(fmaxf(g, 0), 1);
             b = fminf(fmaxf(b, 0), 1);
 
-            int outidx = y2r->blockMode ? morton_swizzle(dstwidth, x, y)
-                                        : y * dstwidth + x;
+            int outidx = y2r->blockMode ? morton_swizzle(dstpitch, x, y)
+                                        : y * dstpitch + x;
             switch (y2r->outputFmt) {
                 case 0:
                     ((u32*) out)[outidx] = y2r->alpha | (u32) (b * 255) << 8 |

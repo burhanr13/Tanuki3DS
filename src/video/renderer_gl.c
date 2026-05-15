@@ -175,6 +175,10 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
         gpu->textures.d[i].tex = textures[i];
     }
 
+    glGenTextures(1, &gpu->proctex.tex);
+    glBindTexture(GL_TEXTURE_1D, gpu->proctex.tex);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
     glGenTextures(1, &state->lightluttex);
     glBindTexture(GL_TEXTURE_1D_ARRAY, state->lightluttex);
     glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -190,6 +194,27 @@ void renderer_gl_init(GLState* state, GPU* gpu) {
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_R16, countof(gpu->fogLut), 0, GL_RED,
                  GL_UNSIGNED_SHORT, nullptr);
+    glGenTextures(1, &state->proctexmaptex);
+    glBindTexture(GL_TEXTURE_1D, state->proctexmaptex);
+    glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_RG16, countof(gpu->proctexMapLut), 0,
+                 GL_RG, GL_UNSIGNED_SHORT, nullptr);
+    glGenTextures(1, &state->proctexnoisetex);
+    glBindTexture(GL_TEXTURE_1D, state->proctexnoisetex);
+    glTexParameteri(GL_TEXTURE_1D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_R16, countof(gpu->proctexNoiseLut), 0,
+                 GL_RED, GL_UNSIGNED_SHORT, nullptr);
+
+    glGenBuffers(1, &state->pbo);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, state->pbo);
+    glBufferData(GL_PIXEL_PACK_BUFFER,
+                 4 * 512 * ctremu.videoscale * 512 * ctremu.videoscale, nullptr,
+                 GL_STATIC_DRAW);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
 
 void renderer_gl_destroy(GLState* state, GPU* gpu) {
@@ -224,8 +249,12 @@ void renderer_gl_destroy(GLState* state, GPU* gpu) {
     for (int i = 0; i < TEX_MAX; i++) {
         glDeleteTextures(1, &gpu->textures.d[i].tex);
     }
+    glDeleteTextures(1, &gpu->proctex.tex);
     glDeleteTextures(1, &state->lightluttex);
     glDeleteTextures(1, &state->fogluttex);
+    glDeleteTextures(1, &state->proctexmaptex);
+    glDeleteTextures(1, &state->proctexnoisetex);
+    glDeleteBuffers(1, &state->pbo);
 }
 
 // call before emulating gpu drawing
@@ -306,10 +335,14 @@ static GLuint link_program(GLState* state, GLuint vs, GLuint fs) {
     }
     glUseProgram(prog);
     glUniform1i(glGetUniformLocation(prog, "tex0"), 0);
+    glUniform1i(glGetUniformLocation(prog, "tex0shadow"), 0);
     glUniform1i(glGetUniformLocation(prog, "tex1"), 1);
     glUniform1i(glGetUniformLocation(prog, "tex2"), 2);
+    glUniform1i(glGetUniformLocation(prog, "tex3"), 3);
     glUniform1i(glGetUniformLocation(prog, "lightLuts"), 4);
     glUniform1i(glGetUniformLocation(prog, "fogLut"), 5);
+    glUniform1i(glGetUniformLocation(prog, "proctexMapLut"), 6);
+    glUniform1i(glGetUniformLocation(prog, "proctexNoiseLut"), 7);
 
     if (vs != state->gpu_vs) {
         glUniformBlockBinding(prog,
@@ -330,7 +363,7 @@ static void update_cur_fb(GPU* gpu) {
     u32 h = gpu->regs.fb.dim.height + 1;
     // using the same fb (height does not matter if its big enough)
     if (gpu->curfb->color_paddr == (gpu->regs.fb.colorbuf_loc << 3) &&
-        gpu->curfb->width == w && gpu->curfb->height <= h)
+        gpu->curfb->width == w && h <= gpu->curfb->height)
         return;
 
     if (gpu->regs.fb.colorbuf_loc == 0) {
@@ -359,6 +392,7 @@ static void update_cur_fb(GPU* gpu) {
     curfb->depth_paddr = gpu->regs.fb.depthbuf_loc << 3;
     curfb->color_fmt = gpu->regs.fb.colorbuf_fmt.fmt;
     curfb->color_Bpp = gpu->regs.fb.colorbuf_fmt.size + 2;
+    curfb->depth_fmt = gpu->regs.fb.depthbuf_fmt & 3;
 
     linfo("drawing on fb %d at %x with depth buffer at %x", curfb - gpu->fbs.d,
           curfb->color_paddr, curfb->depth_paddr);
@@ -387,8 +421,6 @@ static void update_cur_fb(GPU* gpu) {
                      GL_UNSIGNED_INT_24_8, nullptr);
         // needed for the texture viewer
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_ZERO);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_2D, curfb->color_tex, 0);
@@ -509,7 +541,7 @@ void gpu_gl_texture_copy(GPU* gpu, u32 srcpaddr, u32 dstpaddr, u32 size,
 
         // need to handle more general cases at some point
 
-        if (srcgap == 0 || srcgap == dstgap) {
+        if (srcgap == 0 || srcgap == dstgap || srcpitch == dstpitch) {
             int yoff = srcpaddr - srcfb->color_paddr + dsttex->paddr - dstpaddr;
             yoff /= (int) (srcfb->width * srcfb->color_Bpp);
 
@@ -717,6 +749,7 @@ static const GLint texswizzle_lum_alpha[4] = {GL_GREEN, GL_GREEN, GL_GREEN,
                                               GL_RED};
 static const GLint texswizzle_luminance[4] = {GL_RED, GL_RED, GL_RED, GL_ONE};
 static const GLint texswizzle_alpha[4] = {GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
+static const GLint texswizzle_d24s8[4] = {GL_RED, GL_ALPHA, GL_BLUE, GL_GREEN};
 
 [[maybe_unused]] static const GLint texswizzle_dbg_red[4] = {GL_ONE, GL_ZERO,
                                                              GL_ZERO, GL_ALPHA};
@@ -742,6 +775,17 @@ static const GLenum texminfilter[4] = {
     GL_NEAREST_MIPMAP_NEAREST, GL_LINEAR_MIPMAP_NEAREST,
     GL_NEAREST_MIPMAP_LINEAR, GL_LINEAR_MIPMAP_LINEAR};
 static const GLenum texmagfilter[2] = {GL_NEAREST, GL_LINEAR};
+
+static const GLenum proctexfilter[8] = {
+    GL_NEAREST,
+    GL_LINEAR,
+    GL_NEAREST_MIPMAP_NEAREST,
+    GL_LINEAR_MIPMAP_NEAREST,
+    GL_NEAREST_MIPMAP_LINEAR,
+    GL_LINEAR_MIPMAP_LINEAR,
+    GL_NEAREST,
+    GL_NEAREST,
+};
 
 static const GLenum texwrap[4] = {
     GL_CLAMP_TO_EDGE,
@@ -886,7 +930,8 @@ static void create_texture(GPU* gpu, TexInfo* tex, TexUnitRegs* regs) {
     }
 }
 
-static void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
+static void load_texture(GPU* gpu, FragConfig* fcfg, int id, TexUnitRegs* regs,
+                         u32 fmt) {
     // make sure we are binding to the correct texture
     glActiveTexture(GL_TEXTURE0 + id);
 
@@ -951,20 +996,96 @@ static void load_texture(GPU* gpu, int id, TexUnitRegs* regs, u32 fmt) {
 
     // handle simple render to texture cases, but better ...?
     FBInfo* fb = LRU_find(gpu->fbs, tex->paddr);
+    // look for cases of reading a depth buffer as a texture
+    bool copyDepth = false;
+    bool copyDepthStencil = false;
+    if (!fb) {
+        for (int i = 0; i < FB_MAX; i++) {
+            auto t = &gpu->fbs.d[i];
+            if (t->depth_paddr == tex->paddr) {
+                // reinterpret d24s8 to rgba8888 or d24 as rgb888
+                if (tex->fmt == 1 && t->depth_fmt == 2) {
+                    fb = t;
+                    copyDepth = true;
+                    break;
+                } else if (tex->fmt == 0 && t->depth_fmt == 3) {
+                    // reading back both depth and stencil is a bit more work
+                    fb = t;
+                    copyDepthStencil = true;
+                    break;
+                } else {
+                    lwarnonce("unknown reinterpret depth %d to color %d",
+                              t->depth_fmt, tex->fmt);
+                }
+            }
+        }
+    }
     if (fb && fb->dirty) {
         // only read from a framebuffer if its been modified since the last time
         fb->dirty = false;
         linfo("rtt at %08x", fb->color_paddr);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, fb->fbo);
         glBindTexture(GL_TEXTURE_2D, tex->tex);
-        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
-                         (fb->height - tex->height) * ctremu.videoscale,
-                         tex->width * ctremu.videoscale,
-                         tex->height * ctremu.videoscale, 0);
         // no swizzling or mipmaps for rtt textures
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
         glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
                          texswizzle_default);
+        if (fb->shadowMap && regs->param.shadow) {
+            // the real data we need from a shadow map is the depth, we dont
+            // care about color
+            // so we copy the depth buffer into the texture so we can then
+            // bind it to a sampler2DShadow to sample from
+            // notably we need the full 24 bits of depth information
+            // so we need to use the depth format
+            // previously we copied the depth into the red color in the fs
+            // but that drops precision from 24 to 8 bit
+            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 0,
+                             (fb->height - tex->height) * ctremu.videoscale,
+                             tex->width * ctremu.videoscale,
+                             tex->height * ctremu.videoscale, 0);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
+                            GL_COMPARE_REF_TO_TEXTURE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
+        } else if (copyDepth) {
+            // the below only works for d24 -> rgb8
+            // reading a depth texture puts depth in r component
+            // games also seems to only read r component when reading back from
+            // depth texture, since r gives the top 8 bits of the 24bit depth
+            // so this can be emulated by just providing the original depth
+            // buffer
+            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 0,
+                             (fb->height - tex->height) * ctremu.videoscale,
+                             tex->width * ctremu.videoscale,
+                             tex->height * ctremu.videoscale, 0);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        } else if (copyDepthStencil) {
+            // on macos at least there is no way to read the stencil
+            // part of a texture except for reading back the raw data
+            // this is pretty slow so its a setting
+            if (ctremu.reinterpretTexture) {
+                glBindBuffer(GL_PIXEL_PACK_BUFFER, gpu->gl.pbo);
+                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gpu->gl.pbo);
+
+                glBindTexture(GL_TEXTURE_2D, fb->depth_tex);
+                glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_STENCIL,
+                              GL_UNSIGNED_INT_24_8, nullptr);
+                glBindTexture(GL_TEXTURE_2D, tex->tex);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                             tex->width * ctremu.videoscale,
+                             tex->height * ctremu.videoscale, 0, GL_RGBA,
+                             GL_UNSIGNED_INT_8_8_8_8_REV, nullptr);
+
+                glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+                glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA,
+                                 texswizzle_d24s8);
+            }
+        } else {
+            glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0,
+                             (fb->height - tex->height) * ctremu.videoscale,
+                             tex->width * ctremu.videoscale,
+                             tex->height * ctremu.videoscale, 0);
+        }
     }
 
     glTexParameteri(
@@ -1155,23 +1276,67 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     // so we do in vertex shader instead
 
     // textures
-    fcfg.tex2coord = gpu->regs.tex.config.tex2coord;
+    fcfg.texconfig.w = gpu->regs.tex.config.raw;
     if (gpu->regs.tex.config.tex0enable) {
-        load_texture(gpu, 0, &gpu->regs.tex.tex0, gpu->regs.tex.tex0_fmt);
+        load_texture(gpu, &fcfg, 0, &gpu->regs.tex.tex0,
+                     gpu->regs.tex.tex0_fmt);
+        fcfg.tex0type = gpu->regs.tex.tex0.param.type;
+        fcfg.shadowPerspective = !gpu->regs.tex.tex0_shadow.perspective;
+        fbuf.shadowBias = (float) gpu->regs.tex.tex0_shadow.bias / BIT(23);
+        fbuf.shadowMax = cvtf16(gpu->regs.fb.shadow.max);
+        fbuf.shadowRamp = cvtf16(gpu->regs.fb.shadow.ramp);
     }
     if (gpu->regs.tex.config.tex1enable) {
-        load_texture(gpu, 1, &gpu->regs.tex.tex1, gpu->regs.tex.tex1_fmt);
+        load_texture(gpu, &fcfg, 1, &gpu->regs.tex.tex1,
+                     gpu->regs.tex.tex1_fmt);
     }
     if (gpu->regs.tex.config.tex2enable) {
-        load_texture(gpu, 2, &gpu->regs.tex.tex2, gpu->regs.tex.tex2_fmt);
+        load_texture(gpu, &fcfg, 2, &gpu->regs.tex.tex2,
+                     gpu->regs.tex.tex2_fmt);
     }
 
-    if (gpu->regs.tex.tex0.param.type != 0) {
-        lwarnonce("unknown texture type %d", gpu->regs.tex.tex0.param.type);
+    if (gpu->regs.tex.config.tex3enable) {
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_1D, gpu->proctex.tex);
+        if (gpu->proctexLutDirty ||
+            gpu->proctex.width != gpu->regs.tex.tex3.paramH.width ||
+            gpu->proctex.offset != gpu->regs.tex.tex3.offset[0]) {
+            gpu->proctexLutDirty = false;
+            gpu->proctex.width = gpu->regs.tex.tex3.paramH.width;
+            gpu->proctex.offset = gpu->regs.tex.tex3.offset[0];
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, gpu->proctex.width, 0,
+                         GL_RGBA, GL_UNSIGNED_BYTE,
+                         &gpu->proctexLut[gpu->proctex.offset]);
+        }
+        // todo proctex mipmaps
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER,
+                        proctexfilter[gpu->regs.tex.tex3.paramH.minFilter]);
+        fcfg.proctex.w = gpu->regs.tex.tex3.paramL.w;
+
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_1D, gpu->gl.proctexmaptex);
+        if (gpu->proctexMapLutDirty) {
+            gpu->proctexMapLutDirty = false;
+            glTexSubImage1D(GL_TEXTURE_1D, 0, 0, countof(gpu->proctexMapLut),
+                            GL_RG, GL_UNSIGNED_SHORT, gpu->proctexMapLut);
+        }
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_1D, gpu->gl.proctexnoisetex);
+        if (gpu->proctexNoiseLutDirty) {
+            gpu->proctexNoiseLutDirty = false;
+            glTexSubImage1D(GL_TEXTURE_1D, 0, 0, countof(gpu->proctexNoiseLut),
+                            GL_RED, GL_UNSIGNED_SHORT, gpu->proctexNoiseLut);
+        }
+        fbuf.ptNoiseU.ampl =
+            (float) (s16) gpu->regs.tex.tex3.noise.ampU / BIT(12);
+        fbuf.ptNoiseU.phase = cvtf16(gpu->regs.tex.tex3.noise.phaseU);
+        fbuf.ptNoiseU.freq = cvtf16(gpu->regs.tex.tex3.noise.freqU);
+        fbuf.ptNoiseV.ampl =
+            (float) (s16) gpu->regs.tex.tex3.noise.ampV / BIT(12);
+        fbuf.ptNoiseV.phase = cvtf16(gpu->regs.tex.tex3.noise.phaseV);
+        fbuf.ptNoiseV.freq = cvtf16(gpu->regs.tex.tex3.noise.freqV);
     }
-    fcfg.tex0shadow = gpu->regs.tex.tex0.param.shadow;
-    fcfg.shadowPerspective = !gpu->regs.tex.tex0_shadow.perspective;
-    fbuf.shadowBias = (float) gpu->regs.tex.tex0_shadow.bias / BIT(23);
 
     // texenvs
     load_texenv(&fcfg, &fbuf, 0, &gpu->regs.tex.tev0);
@@ -1207,8 +1372,10 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
 
     // alpha test
     fcfg.alphatest = gpu->regs.fb.alpha_test.enable;
-    fcfg.alphafunc = gpu->regs.fb.alpha_test.func;
-    fbuf.alpharef = (float) gpu->regs.fb.alpha_test.ref / 255;
+    if (gpu->regs.fb.alpha_test.enable) {
+        fcfg.alphafunc = gpu->regs.fb.alpha_test.func;
+        fbuf.alpharef = (float) gpu->regs.fb.alpha_test.ref / 255;
+    }
 
     // stencil test
     if (gpu->regs.fb.stencil_test.enable) {
@@ -1269,43 +1436,48 @@ void gpu_gl_draw(GPU* gpu, bool elements, bool immediate) {
     }
 
     // lighting params
-    fcfg.numlights = gpu->regs.lighting.numlights + 1;
-    for (int i = 0; i < 8; i++) {
-        COPYRGB(fbuf.light[i].specular0, gpu->regs.lighting.light[i].specular0);
-        COPYRGB(fbuf.light[i].specular1, gpu->regs.lighting.light[i].specular1);
-        COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
-        COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
-        fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
-        fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
-        fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
-        fcfg.light[i].config.w = gpu->regs.lighting.light[i].config;
-        fbuf.light[i].spotdir[0] =
-            (float) gpu->regs.lighting.light[i].spotdir.x / BIT(11);
-        fbuf.light[i].spotdir[1] =
-            (float) gpu->regs.lighting.light[i].spotdir.y / BIT(11);
-        fbuf.light[i].spotdir[2] =
-            (float) gpu->regs.lighting.light[i].spotdir.z / BIT(11);
-        fbuf.light[i].attn_bias = cvtf20(gpu->regs.lighting.light[i].attn_bias);
-        fbuf.light[i].attn_scale =
-            cvtf20(gpu->regs.lighting.light[i].attn_scale);
-    }
-    COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
-    fcfg.lconfig0.w = gpu->regs.lighting.config0;
-    fcfg.lconfig1.w = gpu->regs.lighting.config1;
-    fcfg.llutAbs = gpu->regs.lighting.lutinputAbs;
-    fcfg.llutSel = gpu->regs.lighting.lutinputSel;
-    fcfg.llutScale = gpu->regs.lighting.lutinputScale;
-    fcfg.lightPerm = gpu->regs.lighting.permutation;
     fcfg.lightDisable = gpu->regs.lighting.disable;
+    if (!fcfg.lightDisable) {
+        fcfg.numlights = gpu->regs.lighting.numlights + 1;
+        for (int i = 0; i < 8; i++) {
+            COPYRGB(fbuf.light[i].specular0,
+                    gpu->regs.lighting.light[i].specular0);
+            COPYRGB(fbuf.light[i].specular1,
+                    gpu->regs.lighting.light[i].specular1);
+            COPYRGB(fbuf.light[i].diffuse, gpu->regs.lighting.light[i].diffuse);
+            COPYRGB(fbuf.light[i].ambient, gpu->regs.lighting.light[i].ambient);
+            fbuf.light[i].vec[0] = cvtf16(gpu->regs.lighting.light[i].vec.x);
+            fbuf.light[i].vec[1] = cvtf16(gpu->regs.lighting.light[i].vec.y);
+            fbuf.light[i].vec[2] = cvtf16(gpu->regs.lighting.light[i].vec.z);
+            fcfg.light[i].config.w = gpu->regs.lighting.light[i].config;
+            fbuf.light[i].spotdir[0] =
+                (float) gpu->regs.lighting.light[i].spotdir.x / BIT(11);
+            fbuf.light[i].spotdir[1] =
+                (float) gpu->regs.lighting.light[i].spotdir.y / BIT(11);
+            fbuf.light[i].spotdir[2] =
+                (float) gpu->regs.lighting.light[i].spotdir.z / BIT(11);
+            fbuf.light[i].attn_bias =
+                cvtf20(gpu->regs.lighting.light[i].attn_bias);
+            fbuf.light[i].attn_scale =
+                cvtf20(gpu->regs.lighting.light[i].attn_scale);
+        }
+        COPYRGB(fbuf.ambient_color, gpu->regs.lighting.ambient);
+        fcfg.lconfig0.w = gpu->regs.lighting.config0;
+        fcfg.lconfig1.w = gpu->regs.lighting.config1;
+        fcfg.llutAbs = gpu->regs.lighting.lutinputAbs;
+        fcfg.llutSel = gpu->regs.lighting.lutinputSel;
+        fcfg.llutScale = gpu->regs.lighting.lutinputScale;
+        fcfg.lightPerm = gpu->regs.lighting.permutation;
 
-    // light luts, use slot 4
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_1D_ARRAY, gpu->gl.lightluttex);
-    if (gpu->lightLutDirty) {
-        gpu->lightLutDirty = false;
-        glTexSubImage2D(GL_TEXTURE_1D_ARRAY, 0, 0, 0,
-                        countof(gpu->lightLuts[0]), countof(gpu->lightLuts),
-                        GL_RED, GL_UNSIGNED_SHORT, gpu->lightLuts);
+        // light luts, use slot 4
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_1D_ARRAY, gpu->gl.lightluttex);
+        if (gpu->lightLutDirty) {
+            gpu->lightLutDirty = false;
+            glTexSubImage2D(GL_TEXTURE_1D_ARRAY, 0, 0, 0,
+                            countof(gpu->lightLuts[0]), countof(gpu->lightLuts),
+                            GL_RED, GL_UNSIGNED_SHORT, gpu->lightLuts);
+        }
     }
 
     // fog lut, use slot 5

@@ -156,6 +156,8 @@ void gsp_handle_event(E3DS* s, u32 id) {
                               lastfb->fmt, sc);
         }
 
+        event_signal(s, &s->services.cam.vsyncEvent);
+
         update_fbinfos(s);
 
         s->frame_complete = true;

@@ -119,18 +119,21 @@ typedef union {
         } raster;
         union {
             struct {
-                struct {
-                    u32 tex0enable : 1;
-                    u32 tex1enable : 1;
-                    u32 tex2enable : 1;
-                    u32 : 5;
-                    u32 tex3coord : 2;
-                    u32 tex3enable : 1;
-                    u32 : 2;
-                    u32 tex2coord : 1;
-                    u32 : 2;
-                    u32 clearcache : 1;
-                    u32 : 15;
+                union {
+                    struct {
+                        u32 tex0enable : 1;
+                        u32 tex1enable : 1;
+                        u32 tex2enable : 1;
+                        u32 : 5;
+                        u32 tex3coord : 2;
+                        u32 tex3enable : 1;
+                        u32 : 2;
+                        u32 tex2coord : 1;
+                        u32 : 2;
+                        u32 clearcache : 1;
+                        u32 : 15;
+                    };
+                    u32 raw;
                 } config;
                 TexUnitRegs tex0;
                 u32 tex0_cubeaddr[5];
@@ -148,7 +151,48 @@ typedef union {
                 u32 _097[2];
                 TexUnitRegs tex2;
                 u32 tex2_fmt;
-                u32 _09f[0x21];
+                u32 _09f[9];
+                struct {
+                    union {
+                        u32 w;
+                        struct {
+                            u32 clampU : 3;
+                            u32 clampV : 3;
+                            u32 rgbCombiner : 4;
+                            u32 alphaCombiner : 4;
+                            u32 separateAlpha : 1;
+                            u32 noise : 1;
+                            u32 shiftU : 2;
+                            u32 shiftV : 2;
+                            u32 lodBiasL : 8;
+                            u32 : 4;
+                        };
+                    } paramL;
+                    struct {
+                        u16 ampU;
+                        u16 phaseU;
+                        u16 ampV;
+                        u16 phaseV;
+                        u16 freqU;
+                        u16 freqV;
+                    } noise;
+                    struct {
+                        u32 minFilter : 3;
+                        u32 lodMin : 4;
+                        u32 lodMax : 4;
+                        u32 width : 8;
+                        u32 lodBiasH : 8;
+                        u32 : 5;
+                    } paramH;
+                    u8 offset[8];
+                } tex3;
+                struct {
+                    u32 index : 8;
+                    u32 table : 4;
+                    u32 : 20;
+                } proctexLutIndex;
+                u32 proctexLutData[8];
+                u32 _0b8[8];
                 TexEnvRegs tev0;
                 TexEnvRegs tev1;
                 TexEnvRegs tev2;
@@ -264,6 +308,12 @@ typedef union {
                     u32 height : 12;
                     u32 : 8;
                 } dim;
+                u32 _11f;
+                u32 gas[16];
+                struct {
+                    u16 max;
+                    u16 ramp;
+                } shadow;
             };
             u32 w[0x40];
         } fb;

@@ -66,6 +66,7 @@ typedef struct {
     bool safeShaderMul;
     bool ubershader;
     bool hashTextures;
+    bool reinterpretTexture;
 
     int viewlayout;
     bool swapscreens;
@@ -78,6 +79,7 @@ typedef struct {
     float volume;
     int audiomode;
     bool micEnable;
+    bool camEnable;
 
     mat4 freecam_mtx;
     bool freecam_enable;

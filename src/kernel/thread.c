@@ -302,6 +302,7 @@ void event_signal(E3DS* s, KEvent* ev) {
     } else {
         KThread* thr = remove_highest_prio(&ev->waiting_thrds);
         if (thr) thread_wakeup(s, thr, &ev->hdr);
+        else ev->signal = true;
     }
     if (ev->callback) ev->callback(s);
 }
@@ -325,6 +326,7 @@ void timer_signal(E3DS* s, KTimer* tmr) {
     } else {
         KThread* thr = remove_highest_prio(&tmr->waiting_thrds);
         if (thr) thread_wakeup(s, thr, &tmr->hdr);
+        else tmr->signal = true;
     }
 
     if (tmr->repeat) {
@@ -396,13 +398,19 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
         }
         case KOT_EVENT: {
             auto event = (KEvent*) o;
-            if (event->signal) return false;
+            if (event->signal) {
+                if (!event->sticky) event->signal = false;
+                return false;
+            }
             klist_insert(&event->waiting_thrds, &t->hdr);
             return true;
         }
         case KOT_TIMER: {
             auto tmr = (KTimer*) o;
-            if (tmr->signal) return false;
+            if (tmr->signal) {
+                if (!tmr->sticky) tmr->signal = false;
+                return false;
+            }
             klist_insert(&tmr->waiting_thrds, &t->hdr);
             return true;
         }
@@ -432,6 +440,9 @@ bool sync_wait(E3DS* s, KThread* t, KObject* o) {
             klist_insert(&sem->waiting_thrds, &t->hdr);
             return true;
         }
+        case KOT_SESSION:
+            // supposedly this is always waited on
+            return true;
         default:
             t->ctx.r[0] = -1;
             lerror("cannot wait on this %d", o->type);
@@ -471,6 +482,8 @@ void sync_cancel(KThread* t, KObject* o) {
             klist_remove_key(&arb->waiting_thrds, &t->hdr);
             break;
         }
+        case KOT_SESSION:
+            break;
         default:
             lerror("unknown sync object %d", o->type);
             break;

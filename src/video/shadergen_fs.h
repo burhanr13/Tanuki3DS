@@ -60,9 +60,40 @@ typedef struct {
             u32 : 15;
         };
     } tev_buffer;
-    int tex2coord;
-    int tex0shadow;
+    union {
+        u32 w;
+        struct {
+            u32 tex0enable : 1;
+            u32 tex1enable : 1;
+            u32 tex2enable : 1;
+            u32 : 5;
+            u32 tex3coord : 2;
+            u32 tex3enable : 1;
+            u32 : 2;
+            u32 tex2coord : 1;
+            u32 : 2;
+            u32 clearcache : 1;
+            u32 : 15;
+        };
+    } texconfig;
+    int tex0type;
     int shadowPerspective;
+    union {
+        u32 w;
+        struct {
+            u32 clampU : 3;
+            u32 clampV : 3;
+            u32 rgbCombiner : 4;
+            u32 alphaCombiner : 4;
+            u32 separateAlpha : 1;
+            u32 noise : 1;
+            u32 shiftU : 2;
+            u32 shiftV : 2;
+            u32 lodBiasL : 8;
+            u32 : 4;
+        };
+    } proctex;
+    int _pad[3];
 
     struct {
         union {
@@ -129,6 +160,13 @@ typedef struct {
     float tev_buffer_color[4];
 
     struct {
+        float ampl;
+        float phase;
+        float freq;
+        float pad;
+    } ptNoiseU, ptNoiseV;
+
+    struct {
         float specular0[4];
         float specular1[4];
         float diffuse[4];
@@ -142,6 +180,8 @@ typedef struct {
     float ambient_color[4];
     float fog_color[4];
 
+    float shadowMax;
+    float shadowRamp;
     float shadowBias;
     float alpharef;
 } FragUniforms;
