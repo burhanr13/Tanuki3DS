@@ -13,20 +13,20 @@
 
 // #define JIT_DISASM
 
-#define reg_v r0
-#define reg_o r1
-#define reg_r 16 // v16-v31
-#define reg_c r2
-#define reg_i r3
-#define reg_b r4
-#define reg_ax r5
-#define reg_ay r6
-#define reg_al r7
-#define reg_cmpx r8
-#define reg_cmpy r9
-#define loopcount r10
-// r11-r17 : temp
-// v0-v7 : temp
+#define reg_v R0
+#define reg_o R1
+#define reg_r 16 // V16-V31
+#define reg_c R2
+#define reg_i R3
+#define reg_b R4
+#define reg_ax R5
+#define reg_ay R6
+#define reg_al R7
+#define reg_cmpx R8
+#define reg_cmpy R9
+#define loopcount R10
+// R11-R17 : temp
+// V0-V7 : temp
 
 ArmShaderJitBackend* shaderjit_arm_init() {
     return calloc(1, sizeof(ArmShaderJitBackend));
@@ -35,35 +35,35 @@ ArmShaderJitBackend* shaderjit_arm_init() {
 }
 
 static rasVReg readsrc(ArmShaderJitBackend* this, rasVReg dst, u32 n, u8 idx,
-                       u8 swizzle, bool neg) {
-    rasVReg src = v3;
+                       u8 swizzle, bool NEG) {
+    rasVReg src = V3;
     if (swizzle == 0b00'01'10'11) {
         src = dst;
     }
     if (n < 0x10) {
-        ldrq(src, (reg_v, 16 * n));
+        LDRQ(src, (reg_v, 16 * n));
     } else if (n < 0x20) {
         n -= 0x10;
-        src = VReg(reg_r + n);
+        src = VREG(reg_r + n);
     } else {
         n -= 0x20;
         if (idx == 0) {
-            ldrq(src, (reg_c, 16 * n));
+            LDRQ(src, (reg_c, 16 * n));
         } else {
-            movw(r11, n);
+            MOVW(R11, n);
             switch (idx) {
                 case 1:
-                    addw(r11, r11, reg_ax, sxtb());
+                    ADDW(R11, R11, reg_ax, SXTB());
                     break;
                 case 2:
-                    addw(r11, r11, reg_ay, sxtb());
+                    ADDW(R11, R11, reg_ay, SXTB());
                     break;
                 case 3:
-                    addw(r11, r11, reg_al, uxtb());
+                    ADDW(R11, R11, reg_al, UXTB());
                     break;
             }
-            andw(r11, r11, 0x7f);
-            ldrq(src, (reg_c, r11, uxtw(4)));
+            ANDW(R11, R11, 0x7f);
+            LDRQ(src, (reg_c, R11, UXTW(4)));
         }
     }
 
@@ -76,7 +76,7 @@ static rasVReg readsrc(ArmShaderJitBackend* this, rasVReg dst, u32 n, u8 idx,
             idxcount[swizzle & 3]++;
             swizzle >>= 2;
         }
-        // use dup to transfer the most repeated
+        // use DUP to transfer the most repeated
         // value
         // manually move each other one
         int maxidx;
@@ -88,22 +88,22 @@ static rasVReg readsrc(ArmShaderJitBackend* this, rasVReg dst, u32 n, u8 idx,
             }
         }
         if (maxcount > 1) {
-            dup4s(dst, src, maxidx);
+            DUP4S(dst, src, maxidx);
         } else {
             maxidx = -1;
         }
         for (int i = 0; i < 4; i++) {
             if (swizzleidx[i] != maxidx) {
-                movs(dst, i, src, swizzleidx[i]);
+                MOVS(dst, i, src, swizzleidx[i]);
             }
         }
-        if (neg) {
-            fneg4s(dst, dst);
+        if (NEG) {
+            FNEG4S(dst, dst);
         }
         return dst;
     } else {
-        if (neg) {
-            fneg4s(dst, src);
+        if (NEG) {
+            FNEG4S(dst, src);
             return dst;
         } else {
             return src;
@@ -111,17 +111,17 @@ static rasVReg readsrc(ArmShaderJitBackend* this, rasVReg dst, u32 n, u8 idx,
     }
 }
 
-// dest is either v0 or v16-v31
+// dest is either V0 or V16-V31
 static rasVReg getdest(int n, u8 mask) {
-    if (n >= 0x10 && mask == 0b1111) return VReg(reg_r + n - 0x10);
-    else return v0;
+    if (n >= 0x10 && mask == 0b1111) return VREG(reg_r + n - 0x10);
+    else return V0;
 }
 
-// the result will be in v0
+// the result will be in V0
 static void writedest(ArmShaderJitBackend* this, int n, u8 mask) {
     if (mask == 0b1111) {
         if (n < 0x10) {
-            strq(v0, (reg_o, 16 * n));
+            STRQ(V0, (reg_o, 16 * n));
         } else {
             // already handled by getdest
         }
@@ -131,105 +131,105 @@ static void writedest(ArmShaderJitBackend* this, int n, u8 mask) {
             // optimize storing single element mask to memory
             switch (mask) {
                 case BIT(3 - 0):
-                    strs(v0, (reg_o, 16 * n + 0));
+                    STRS(V0, (reg_o, 16 * n + 0));
                     return;
                 case BIT(3 - 1):
-                    movs(v0, 0, v0, 1);
-                    strs(v0, (reg_o, 16 * n + 4));
+                    MOVS(V0, 0, V0, 1);
+                    STRS(V0, (reg_o, 16 * n + 4));
                     return;
                 case BIT(3 - 2):
-                    movs(v0, 0, v0, 2);
-                    strs(v0, (reg_o, 16 * n + 8));
+                    MOVS(V0, 0, V0, 2);
+                    STRS(V0, (reg_o, 16 * n + 8));
                     return;
                 case BIT(3 - 3):
-                    movs(v0, 0, v0, 3);
-                    strs(v0, (reg_o, 16 * n + 12));
+                    MOVS(V0, 0, V0, 3);
+                    STRS(V0, (reg_o, 16 * n + 12));
                     return;
             }
         }
-        rasVReg dst = v3;
+        rasVReg dst = V3;
         if (n < 0x10) {
-            ldrq(v3, (reg_o, 16 * n));
+            LDRQ(V3, (reg_o, 16 * n));
         } else {
             n -= 0x10;
-            dst = VReg(reg_r + n);
+            dst = VREG(reg_r + n);
         }
         for (int i = 0; i < 4; i++) {
             if (mask & BIT(3 - i)) {
-                movs(dst, i, v0, i);
+                MOVS(dst, i, V0, i);
             }
         }
-        if (dst.idx == 3) strq(v3, (reg_o, 16 * n));
+        if (dst.idx == 3) STRQ(V3, (reg_o, 16 * n));
     }
 }
 
 static void compare(ArmShaderJitBackend* this, rasReg dst, u8 op) {
     switch (op) {
         case 0:
-            csetw(dst, eq);
+            CSETW(dst, EQ);
             break;
         case 1:
-            csetw(dst, ne);
+            CSETW(dst, NE);
             break;
         case 2:
-            csetw(dst, lt);
+            CSETW(dst, LT);
             break;
         case 3:
-            csetw(dst, le);
+            CSETW(dst, LE);
             break;
         case 4:
-            csetw(dst, gt);
+            CSETW(dst, GT);
             break;
         case 5:
-            csetw(dst, ge);
+            CSETW(dst, GE);
             break;
         default:
-            movw(dst, 1);
+            MOVW(dst, 1);
             break;
     }
 }
 
-// true: ne is true condition, false: eq is true condition
+// true: NE is true condition, false: EQ is true condition
 static bool condop(ArmShaderJitBackend* this, u32 op, bool refx, bool refy) {
     switch (op) {
         case 0:                 // OR
             if (refx && refy) { // x or y
-                orrw(r11, reg_cmpx, reg_cmpy);
-                tstw(r11, r11);
+                ORRW(R11, reg_cmpx, reg_cmpy);
+                TSTW(R11, R11);
                 return true;
-            } else if (refx && !refy) { // x or !y == !(!x and y)
-                bicsw(zr, reg_cmpy, reg_cmpx);
+            } else if (refx && !refy) { // x or !y == !(!x AND y)
+                BICSW(ZR, reg_cmpy, reg_cmpx);
                 return false;
-            } else if (!refx && refy) { // !x or y == !(x and !y)
-                bicsw(zr, reg_cmpx, reg_cmpy);
+            } else if (!refx && refy) { // !x or y == !(x AND !y)
+                BICSW(ZR, reg_cmpx, reg_cmpy);
                 return false;
-            } else { // !x or !y == !(x and y)
-                tstw(reg_cmpx, reg_cmpy);
+            } else { // !x or !y == !(x AND y)
+                TSTW(reg_cmpx, reg_cmpy);
                 return false;
             }
         case 1:                 // AND
-            if (refx && refy) { // x and y
-                tstw(reg_cmpx, reg_cmpy);
+            if (refx && refy) { // x AND y
+                TSTW(reg_cmpx, reg_cmpy);
                 return true;
-            } else if (refx && !refy) { // x and !y
-                bicsw(zr, reg_cmpx, reg_cmpy);
+            } else if (refx && !refy) { // x AND !y
+                BICSW(ZR, reg_cmpx, reg_cmpy);
                 return true;
-            } else if (!refx && refy) { // !x and y
-                bicsw(zr, reg_cmpy, reg_cmpx);
+            } else if (!refx && refy) { // !x AND y
+                BICSW(ZR, reg_cmpy, reg_cmpx);
                 return true;
-            } else { // !x and !y == !(x or y)
-                orrw(r11, reg_cmpx, reg_cmpy);
-                tstw(r11, r11);
+            } else { // !x AND !y == !(x or y)
+                ORRW(R11, reg_cmpx, reg_cmpy);
+                TSTW(R11, R11);
                 return false;
             }
         case 2:
-            tstw(reg_cmpx, reg_cmpx);
+            TSTW(reg_cmpx, reg_cmpx);
             return refx;
         case 3:
-            tstw(reg_cmpy, reg_cmpy);
+            TSTW(reg_cmpy, reg_cmpy);
             return refy;
         default:
-            tstw(zr, zr);
+            TSTW(ZR, ZR);
             return false;
     }
 }
@@ -237,18 +237,18 @@ static bool condop(ArmShaderJitBackend* this, u32 op, bool refx, bool refy) {
 // 0 * anything is 0 (ieee noncompliant)
 // this is important to emulate
 // zeros any lanes of src1 where src0 was 0
-// modified src2 always goes into v1
+// modified src2 always goes into V1
 static void setupMul(ArmShaderJitBackend* this, rasVReg src1, rasVReg src2) {
-    fcmeqz4s(v3, src1);
-    bic16b(v1, src2, v3);
+    FCMEQZ4S(V3, src1);
+    BIC16B(V1, src2, V3);
 }
 
 #define SRC(v, i, _fmt)                                                        \
     readsrc(this, v, instr.fmt##_fmt.src##i, instr.fmt##_fmt.idx,              \
             desc.src##i##swizzle, desc.src##i##neg)
-#define SRC1(fmt) SRC(v0, 1, fmt)
-#define SRC2(fmt) SRC(v1, 2, fmt)
-#define SRC3(fmt) SRC(v2, 3, fmt)
+#define SRC1(fmt) SRC(V0, 1, fmt)
+#define SRC2(fmt) SRC(V1, 2, fmt)
+#define SRC3(fmt) SRC(V2, 3, fmt)
 #define GETDST(_fmt) getdest(instr.fmt##_fmt.dest, desc.destmask)
 #define STRDST(_fmt) writedest(this, instr.fmt##_fmt.dest, desc.destmask)
 
@@ -262,7 +262,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
         L(this->jmplabels.d[pc]);
 
         if (pc == start && isfunction) {
-            push(lr, zr);
+            PUSH(LR, ZR);
         }
 
         PICAInstr instr = shu->code[pc++];
@@ -272,7 +272,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto src1 = SRC1(1);
                 auto src2 = SRC2(1);
                 auto dst = GETDST(1);
-                fadd4s(dst, src1, src2);
+                FADD4S(dst, src1, src2);
                 STRDST(1);
                 break;
             }
@@ -281,15 +281,15 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto src2 = SRC2(1);
                 auto dst = GETDST(1);
                 setupMul(this, src1, src2);
-                movs(v1, 3, zr); // set w to 0 to do a 3d dot product
-                fmul4s(dst, src1, v1);
+                MOVS(V1, 3, ZR); // set w to 0 to do a 3d dot product
+                FMUL4S(dst, src1, V1);
                 // risc moment
-                // s[0] <- s[1]+s[2] and s[1]<-s[2]+s[3]
+                // s[0] <- s[1]+s[2] AND s[1]<-s[2]+s[3]
                 // then s[0] <- s[0]+s[1]
-                faddp4s(dst, dst, dst);
-                faddps(dst, dst);
+                FADDP4S(dst, dst, dst);
+                FADDPS(dst, dst);
                 if (desc.destmask != BIT(3 - 0)) {
-                    dup4s(dst, dst, 0);
+                    DUP4S(dst, dst, 0);
                 }
                 STRDST(1);
                 break;
@@ -299,13 +299,13 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto src2 = SRC2(1);
                 auto dst = GETDST(1);
                 setupMul(this, src1, src2);
-                fmul4s(dst, src1, v1);
-                // i love not having horizontal add
-                faddp4s(dst, dst, dst);
-                faddps(dst, dst);
-                // only dup if writing to more than x
+                FMUL4S(dst, src1, V1);
+                // i love not having horizontal ADD
+                FADDP4S(dst, dst, dst);
+                FADDPS(dst, dst);
+                // only DUP if writing to more than x
                 if (desc.destmask != BIT(3 - 0)) {
-                    dup4s(dst, dst, 0);
+                    DUP4S(dst, dst, 0);
                 }
                 STRDST(1);
                 break;
@@ -322,18 +322,18 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 }
                 auto dst = GETDST(1);
 
-                fmovs(v3, 1.0f);
+                FMOVS(V3, 1.0f);
                 if (src1.idx != 0) {
-                    mov16b(v0, src1);
-                    src1 = v0; // need to move into v0 since modifying it
+                    MOV16B(V0, src1);
+                    src1 = V0; // need to move into V0 since modifying it
                 }
-                movs(src1, 3, v3, 0);
+                MOVS(src1, 3, V3, 0);
                 setupMul(this, src1, src2);
-                fmul4s(dst, src1, v1);
-                faddp4s(dst, dst, dst);
-                faddps(dst, dst);
+                FMUL4S(dst, src1, V1);
+                FADDP4S(dst, dst, dst);
+                FADDPS(dst, dst);
                 if (desc.destmask != BIT(3 - 0)) {
-                    dup4s(dst, dst, 0);
+                    DUP4S(dst, dst, 0);
                 }
                 STRDST(1);
                 break;
@@ -342,9 +342,9 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 this->usingex2 = true;
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                fmovs(v0, src);
-                bl(this->ex2func);
-                dup4s(dst, v0, 0);
+                FMOVS(V0, src);
+                BL(this->ex2func);
+                DUP4S(dst, V0, 0);
                 STRDST(1);
                 break;
             }
@@ -352,9 +352,9 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 this->usinglg2 = true;
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                fmovs(v0, src);
-                bl(this->lg2func);
-                dup4s(dst, v0, 0);
+                FMOVS(V0, src);
+                BL(this->lg2func);
+                DUP4S(dst, V0, 0);
                 STRDST(1);
                 break;
             }
@@ -363,14 +363,14 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto src2 = SRC2(1);
                 auto dst = GETDST(1);
                 setupMul(this, src1, src2);
-                fmul4s(dst, src1, v1);
+                FMUL4S(dst, src1, V1);
                 STRDST(1);
                 break;
             }
             case PICA_FLR: {
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                frintm4s(dst, src);
+                FRINTM4S(dst, src);
                 STRDST(1);
                 break;
             }
@@ -378,7 +378,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto src1 = SRC1(1);
                 auto src2 = SRC2(1);
                 auto dst = GETDST(1);
-                fmin4s(dst, src1, src2);
+                FMIN4S(dst, src1, src2);
                 STRDST(1);
                 break;
             }
@@ -386,16 +386,16 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto src1 = SRC1(1);
                 auto src2 = SRC2(1);
                 auto dst = GETDST(1);
-                fmax4s(dst, src1, src2);
+                FMAX4S(dst, src1, src2);
                 STRDST(1);
                 break;
             }
             case PICA_RCP: {
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                frecpes(dst, src);
+                FRECPES(dst, src);
                 if (desc.destmask != BIT(3 - 0)) {
-                    dup4s(dst, dst, 0);
+                    DUP4S(dst, dst, 0);
                 }
                 STRDST(1);
                 break;
@@ -403,9 +403,9 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             case PICA_RSQ: {
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
-                frsqrtes(dst, src);
+                FRSQRTES(dst, src);
                 if (desc.destmask != BIT(3 - 0)) {
-                    dup4s(dst, dst, 0);
+                    DUP4S(dst, dst, 0);
                 }
                 STRDST(1);
                 break;
@@ -422,10 +422,10 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 }
                 auto dst = GETDST(1);
 
-                fcmge4s(dst, src1, src2);
-                fmov4s(v1, 1.0f);
+                FCMGE4S(dst, src1, src2);
+                FMOV4S(V1, 1.0f);
                 // sets to 1.0f if the condition was true
-                and16b(dst, dst, v1);
+                AND16B(dst, dst, V1);
                 STRDST(1);
                 break;
             }
@@ -441,21 +441,21 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 }
                 auto dst = GETDST(1);
 
-                // lt is just gt with operands reversed
-                fcmgt4s(dst, src2, src1);
-                fmov4s(v1, 1.0f);
-                and16b(dst, dst, v1);
+                // LT is just GT with operands reversed
+                FCMGT4S(dst, src2, src1);
+                FMOV4S(V1, 1.0f);
+                AND16B(dst, dst, V1);
                 STRDST(1);
                 break;
             }
             case PICA_MOVA: {
                 auto src = SRC1(1);
-                fcvtzs2s(v0, src);
+                FCVTZS2S(V0, src);
                 if (desc.destmask & BIT(3 - 0)) {
-                    movs(reg_ax, v0, 0);
+                    MOVS(reg_ax, V0, 0);
                 }
                 if (desc.destmask & BIT(3 - 1)) {
-                    movs(reg_ay, v0, 1);
+                    MOVS(reg_ay, V0, 1);
                 }
                 break;
             }
@@ -463,7 +463,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto src = SRC1(1);
                 auto dst = GETDST(1);
                 if (src.idx != dst.idx) {
-                    mov16b(dst, src);
+                    MOV16B(dst, src);
                 }
                 STRDST(1);
                 break;
@@ -477,25 +477,25 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 // if this is not the final end, we just jump to the end label
                 if (farthestjmp < pc) return;
                 else {
-                    pop(lr, zr);
-                    ret();
+                    POP(LR, ZR);
+                    RET();
                     break;
                 }
             case PICA_CALL:
             case PICA_CALLC:
             case PICA_CALLU: {
-                Label(lelse);
+                LABEL(lelse);
                 if (instr.opcode == PICA_CALLU) {
-                    tbz(reg_b, instr.fmt3.c, lelse);
+                    TBZ(reg_b, instr.fmt3.c, lelse);
                 } else if (instr.opcode == PICA_CALLC) {
                     if (condop(this, instr.fmt2.op, instr.fmt2.refx,
                                instr.fmt2.refy)) {
-                        beq(lelse);
+                        BEQ(lelse);
                     } else {
-                        bne(lelse);
+                        BNE(lelse);
                     }
                 }
-                bl(this->jmplabels.d[instr.fmt2.dest]);
+                BL(this->jmplabels.d[instr.fmt2.dest]);
                 L(lelse);
 
                 bool found = false;
@@ -513,22 +513,22 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             }
             case PICA_IFU:
             case PICA_IFC: {
-                Label(lelse);
-                Label(lendif);
+                LABEL(lelse);
+                LABEL(lendif);
                 if (instr.opcode == PICA_IFU) {
-                    tbz(reg_b, instr.fmt3.c, lelse);
+                    TBZ(reg_b, instr.fmt3.c, lelse);
                 } else {
                     if (condop(this, instr.fmt2.op, instr.fmt2.refx,
                                instr.fmt2.refy)) {
-                        beq(lelse);
+                        BEQ(lelse);
                     } else {
-                        bne(lelse);
+                        BNE(lelse);
                     }
                 }
 
                 compileBlock(this, shu, pc, instr.fmt2.dest - pc, false);
                 if (instr.fmt2.num) {
-                    b(lendif);
+                    B(lendif);
                     L(lelse);
                     compileBlock(this, shu, instr.fmt2.dest, instr.fmt2.num,
                                  false);
@@ -541,23 +541,23 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 break;
             }
             case PICA_LOOP: {
-                Label(loop);
+                LABEL(loop);
 
-                push(loopcount, zr);
-                movw(loopcount, 0);
-                ldrb(reg_al, (reg_i, 4 * (instr.fmt3.c & 3) + 1));
+                PUSH(loopcount, ZR);
+                MOVW(loopcount, 0);
+                LDRB(reg_al, (reg_i, 4 * (instr.fmt3.c & 3) + 1));
                 L(loop);
 
                 compileBlock(this, shu, pc, instr.fmt3.dest + 1 - pc, false);
 
-                ldrw(r11, (reg_i, 4 * (instr.fmt3.c & 3)));
-                ubfxw(r12, r11, 16, 8);
-                addw(reg_al, reg_al, r12);
-                addw(loopcount, loopcount, 1);
-                cmpw(loopcount, r11, uxtb());
-                bls(loop);
+                LDRW(R11, (reg_i, 4 * (instr.fmt3.c & 3)));
+                UBFXW(R12, R11, 16, 8);
+                ADDW(reg_al, reg_al, R12);
+                ADDW(loopcount, loopcount, 1);
+                CMPW(loopcount, R11, UXTB());
+                BLS(loop);
 
-                pop(loopcount, zr);
+                POP(loopcount, ZR);
 
                 pc = instr.fmt3.dest + 1;
                 break;
@@ -566,18 +566,18 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             case PICA_JMPU: {
                 auto jmplab = this->jmplabels.d[instr.fmt3.dest];
                 if (instr.opcode == PICA_JMPU) {
-                    tstw(reg_b, BIT(instr.fmt3.c));
+                    TSTW(reg_b, BIT(instr.fmt3.c));
                     if (instr.fmt2.num & 1) {
-                        tbz(reg_b, instr.fmt3.c, jmplab);
+                        TBZ(reg_b, instr.fmt3.c, jmplab);
                     } else {
-                        tbnz(reg_b, instr.fmt3.c, jmplab);
+                        TBNZ(reg_b, instr.fmt3.c, jmplab);
                     }
                 } else {
                     if (condop(this, instr.fmt2.op, instr.fmt2.refx,
                                instr.fmt2.refy)) {
-                        bne(jmplab);
+                        BNE(jmplab);
                     } else {
-                        beq(jmplab);
+                        BEQ(jmplab);
                     }
                 }
 
@@ -588,11 +588,11 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             case PICA_CMP ... PICA_CMP + 1: {
                 auto src1 = SRC1(1c);
                 auto src2 = SRC2(1c);
-                fcmps(src1, src2);
+                FCMPS(src1, src2);
                 compare(this, reg_cmpx, instr.fmt1c.cmpx);
-                movs(v0, 0, src1, 1);
-                movs(v1, 0, src2, 1);
-                fcmps(v0, v1);
+                MOVS(V0, 0, src1, 1);
+                MOVS(V1, 0, src2, 1);
+                FCMPS(V0, V1);
                 compare(this, reg_cmpy, instr.fmt1c.cmpy);
                 break;
             }
@@ -611,9 +611,9 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 auto dst = GETDST(5);
 
                 setupMul(this, src1, src2);
-                if (src3.idx != 2) mov16b(v2, src3);
-                fmla4s(v2, src1, v1);
-                mov16b(dst, v2);
+                if (src3.idx != 2) MOV16B(V2, src3);
+                FMLA4S(V2, src1, V1);
+                MOV16B(dst, V2);
                 STRDST(5);
                 break;
             }
@@ -625,44 +625,44 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
 }
 
 static void compileEx2(ArmShaderJitBackend* this) {
-    // takes x in s0 and return in s0
+    // takes x in s0 AND return in s0
 
-    Label(end);
+    LABEL(end);
 
     // constants for getting good input to polynomials (found through testing)
     const float exthr = 0.535f;
 
     L(this->ex2func);
     // check nan
-    fcmps(v0, v0);
-    bne(end);
+    FCMPS(V0, V0);
+    BNE(end);
 
     // keep 1 somewhere
-    fmovs(v7, 1.f);
+    FMOVS(V7, 1.f);
 
     // x = n + r where n in Z, r in [0,1)
     // 2^x = 2^n * 2^r, 2^r will be in [1,2)
     // so it ends up just being a float
-    frintms(v1, v0);
-    fcvtmssw(r11, v0);
-    fsubs(v0, v0, v1);
-    // now n in w11 and r in s0
+    FRINTMS(V1, V0);
+    FCVTMSSW(R11, V0);
+    FSUBS(V0, V0, V1);
+    // now n in w11 AND r in s0
 
     // translate from [0, 1) -> [exthr-1, exthr)
-    movw(r17, F2I(exthr));
-    fmovw(v1, r17);
-    fcmps(v0, v1);
-    fsubs(v1, v0, v7);
-    fcsels(v0, v1, v0, hs);
+    MOVW(R17, F2I(exthr));
+    FMOVW(V1, R17);
+    FCMPS(V0, V1);
+    FSUBS(V1, V0, V7);
+    FCSELS(V0, V1, V0, HS);
 
     // make n into float exponent
-    addw(r11, r11, 127);
-    cmpw(r11, 0);
-    cselw(r11, zr, r11, lt);
-    movw(r12, 0xff);
-    cmpw(r11, r12);
-    cselw(r11, r12, r11, gt);
-    lslw(r11, r11, 23);
+    ADDW(R11, R11, 127);
+    CMPW(R11, 0);
+    CSELW(R11, ZR, R11, LT);
+    MOVW(R12, 0xff);
+    CMPW(R11, R12);
+    CSELW(R11, R12, R11, GT);
+    LSLW(R11, R11, 23);
 
     // 2^r = e^(r * ln2)
     // e^x ~= ((1/6 * x + 1/2) * x + 1) * x + 1
@@ -672,66 +672,66 @@ static void compileEx2(ArmShaderJitBackend* this) {
     // c3 is just 1
     // now 2^x ~= ((c0 * x + c1) * x + c2) * x + c3
 
-    movw(r17, F2I(c0));
-    fmovw(v1, r17);
-    movw(r17, F2I(c1));
-    fmovw(v5, r17);
-    movw(r17, F2I(c2));
-    fmovw(v6, r17);
-    fmadds(v1, v1, v0, v5);
-    fmadds(v1, v1, v0, v6);
-    fmadds(v1, v1, v0, v7);
+    MOVW(R17, F2I(c0));
+    FMOVW(V1, R17);
+    MOVW(R17, F2I(c1));
+    FMOVW(V5, R17);
+    MOVW(R17, F2I(c2));
+    FMOVW(V6, R17);
+    FMADDS(V1, V1, V0, V5);
+    FMADDS(V1, V1, V0, V6);
+    FMADDS(V1, V1, V0, V7);
 
-    // extract the mantissa and insert into the result
-    fmovw(r12, v1);
-    bfiw(r11, r12, 0, 23);
-    fmovw(v0, r11);
+    // EXTRACT the mantissa AND insert into the result
+    FMOVW(R12, V1);
+    BFIW(R11, R12, 0, 23);
+    FMOVW(V0, R11);
     L(end);
-    ret();
+    RET();
 }
 
 static void compileLg2(ArmShaderJitBackend* this) {
-    // takes x in s0 and return in s0
+    // takes x in s0 AND return in s0
 
     // constants for getting good input to polynomials (found through testing)
     const float lgthr = 1.35f;
 
-    Label(lnan);
-    Label(lninf);
+    LABEL(lnan);
+    LABEL(lninf);
 
     L(this->lg2func);
-    // check nan and 0
-    fcmps(v0, v0);
-    bne(lnan);
-    fcmpzs(v0);
-    beq(lninf);
+    // check nan AND 0
+    FCMPS(V0, V0);
+    BNE(lnan);
+    FCMPZS(V0);
+    BEQ(lninf);
 
-    // x = 2^n * r where n in Z and r in [1,2)
+    // x = 2^n * r where n in Z AND r in [1,2)
     // log2(x) = n + log2(r)
-    fmovw(r11, v0);
+    FMOVW(R11, V0);
     // check for negative number
-    tbnz(r11, 31, lnan);
+    TBNZ(R11, 31, lnan);
 
-    ubfxw(r12, r11, 23, 8);
-    subw(r12, r12, 127);
-    ubfxw(r11, r11, 0, 23);
-    orrw(r11, r11, 0x3f800000);
-    fmovw(v0, r11);
-    // now n in w12 and r in s0
+    UBFXW(R12, R11, 23, 8);
+    SUBW(R12, R12, 127);
+    UBFXW(R11, R11, 0, 23);
+    ORRW(R11, R11, 0x3f800000);
+    FMOVW(V0, R11);
+    // now n in w12 AND r in s0
 
     // translate from [1, 2) -> [lgthr/2, lgthr)
-    movw(r17, F2I(lgthr));
-    fmovw(v1, r17);
-    fcmps(v0, v1);
-    fmovs(v7, 0.5f);
-    fmuls(v1, v0, v7);
-    fcsels(v0, v1, v0, hs);
-    cincw(r12, r12, hs);
+    MOVW(R17, F2I(lgthr));
+    FMOVW(V1, R17);
+    FCMPS(V0, V1);
+    FMOVS(V7, 0.5f);
+    FMULS(V1, V0, V7);
+    FCSELS(V0, V1, V0, HS);
+    CINCW(R12, R12, HS);
 
     // log2(r) = ln(r)/ln2
     // log polynomial is for x-1
-    fmovs(v7, 1.f);
-    fsubs(v0, v0, v7);
+    FMOVS(V7, 1.f);
+    FSUBS(V0, V0, V7);
 
     // ln(x+1) ~= (((-1/4 * x + 1/3) * x - 1/2) * x + 1) * x
     const float c0 = -1 / (4 * M_LN2);
@@ -740,33 +740,33 @@ static void compileLg2(ArmShaderJitBackend* this) {
     const float c3 = 1 / M_LN2;
     // log2(x+1) ~= (((c0 * x + c1) * x + c2) * x + c3) * x
 
-    movw(r17, F2I(c0));
-    fmovw(v1, r17);
-    movw(r17, F2I(c1));
-    fmovw(v5, r17);
-    movw(r17, F2I(c2));
-    fmovw(v6, r17);
-    movw(r17, F2I(c3));
-    fmovw(v7, r17);
-    fmadds(v1, v1, v0, v5);
-    fmadds(v1, v1, v0, v6);
-    fmadds(v1, v1, v0, v7);
-    fmuls(v1, v1, v0);
+    MOVW(R17, F2I(c0));
+    FMOVW(V1, R17);
+    MOVW(R17, F2I(c1));
+    FMOVW(V5, R17);
+    MOVW(R17, F2I(c2));
+    FMOVW(V6, R17);
+    MOVW(R17, F2I(c3));
+    FMOVW(V7, R17);
+    FMADDS(V1, V1, V0, V5);
+    FMADDS(V1, V1, V0, V6);
+    FMADDS(V1, V1, V0, V7);
+    FMULS(V1, V1, V0);
 
     // res is n + log r
-    scvtfsw(v0, r12);
-    fadds(v0, v0, v1);
-    ret();
+    SCVTFSW(V0, R12);
+    FADDS(V0, V0, V1);
+    RET();
 
     // degenerate cases
     L(lnan);
-    movw(r17, F2I(NAN));
-    fmovw(v0, r17);
-    ret();
+    MOVW(R17, F2I(NAN));
+    FMOVW(V0, R17);
+    RET();
     L(lninf);
-    movw(r17, F2I(-INFINITY));
-    fmovw(v0, r17);
-    ret();
+    MOVW(R17, F2I(-INFINITY));
+    FMOVW(V0, R17);
+    RET();
 }
 
 static rasLabel compileWithEntry(ArmShaderJitBackend* this, ShaderUnit* shu,
@@ -775,26 +775,26 @@ static rasLabel compileWithEntry(ArmShaderJitBackend* this, ShaderUnit* shu,
     // while compiling previous entry points
     u32 callsStart = this->calls.size;
 
-    Label(entrylab);
+    LABEL(entrylab);
     L(entrylab);
-    push(lr, zr);
-    movx(r11, r0);
-    addx(reg_v, r11, offsetof(ShaderUnit, v));
-    addx(reg_o, r11, offsetof(ShaderUnit, o));
-    ldrx(reg_c, (r11, offsetof(ShaderUnit, c)));
-    ldrx(reg_i, (r11, offsetof(ShaderUnit, i)));
-    ldrh(reg_b, (r11, offsetof(ShaderUnit, b)));
+    PUSH(LR, ZR);
+    MOVX(R11, R0);
+    ADDX(reg_v, R11, offsetof(ShaderUnit, v));
+    ADDX(reg_o, R11, offsetof(ShaderUnit, o));
+    LDRX(reg_c, (R11, offsetof(ShaderUnit, c)));
+    LDRX(reg_i, (R11, offsetof(ShaderUnit, i)));
+    LDRH(reg_b, (R11, offsetof(ShaderUnit, b)));
 
     compileBlock(this, shu, entry, SHADER_CODE_SIZE, false);
 
-    pop(lr, zr);
-    ret();
+    POP(LR, ZR);
+    RET();
 
     for (int i = callsStart; i < this->calls.size; i++) {
         auto inst = this->calls.d[i];
         compileBlock(this, shu, inst.fmt2.dest, inst.fmt2.num, true);
-        pop(lr, zr);
-        ret();
+        POP(LR, ZR);
+        RET();
     }
 
     return entrylab;

@@ -9,7 +9,7 @@
 #include "arm/media.h"
 
 #define RAS_MACROS
-#define RAS_DEFAULT_SUFFIX w
+#define RAS_DEFAULT_SUFFIX W
 #define RAS_CTX_VAR backend->code
 #include <ras/ras.h>
 
@@ -43,7 +43,7 @@ static void print_hostregs(HostRegAllocation* hralloc) {
         int operand = getOpForReg(hralloc, i);
         if (operand >= 32) {
             operand -= 32;
-            printf("[sp, #0x%x]", 4 * operand);
+            printf("[SP, #0x%x]", 4 * operand);
         } else {
             printf("w%d", operand);
         }
@@ -74,31 +74,31 @@ static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
 
 #define GETOP(i) getOp(backend, i)
 
-#define CPU(m, ...) (r29, offsetof(ArmCore, m) __VA_OPT__(+) __VA_ARGS__)
+#define CPU(m, ...) (R29, offsetof(ArmCore, m) __VA_OPT__(+) __VA_ARGS__)
 
 #define LOADOP(i, flbk)                                                        \
     ({                                                                         \
         auto dst = flbk;                                                       \
         if (inst.imm##i) {                                                     \
-            mov(dst, inst.op##i);                                              \
+            MOV(dst, inst.op##i);                                              \
         } else {                                                               \
             int op = GETOP(inst.op##i);                                        \
             if (op >= 32) {                                                    \
                 op -= 32;                                                      \
-                ldr(dst, (sp, 4 * op));                                        \
+                LDR(dst, (SP, 4 * op));                                        \
             } else {                                                           \
-                dst = Reg(op);                                                 \
+                dst = REG(op);                                                 \
             }                                                                  \
         }                                                                      \
         dst;                                                                   \
     })
-#define LOADOP1() LOADOP(1, ip0)
-#define LOADOP2() LOADOP(2, ip1)
+#define LOADOP1() LOADOP(1, IP0)
+#define LOADOP2() LOADOP(2, IP1)
 
 #define MOVOP(i, dst)                                                          \
     ({                                                                         \
         auto src = LOADOP(i, dst);                                             \
-        if (src.idx != dst.idx) mov(dst, src);                                 \
+        if (src.idx != dst.idx) MOV(dst, src);                                 \
     })
 #define MOVOP1(dst) MOVOP(1, dst)
 #define MOVOP2(dst) MOVOP(2, dst)
@@ -106,14 +106,14 @@ static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
 #define DSTREG()                                                               \
     ({                                                                         \
         int op = GETOP(i);                                                     \
-        (op >= 32) ? ip0 : Reg(op);                                            \
+        (op >= 32) ? IP0 : REG(op);                                            \
     })
 #define STOREDST()                                                             \
     ({                                                                         \
         int op = GETOP(i);                                                     \
         if (op >= 32) {                                                        \
             op -= 32;                                                          \
-            str(ip0, (sp, 4 * op));                                            \
+            STR(IP0, (SP, 4 * op));                                            \
         }                                                                      \
     })
 
@@ -133,19 +133,19 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
     u32 jmptarget = -1;
 
     // callback address literal pool
-    Label(lld8);
-    Label(lld16);
-    Label(lld32);
-    Label(lst8);
-    Label(lst16);
-    Label(lst32);
-    Label(lldf32);
-    Label(lldf64);
-    Label(lstf32);
-    Label(lstf64);
+    LABEL(lld8);
+    LABEL(lld16);
+    LABEL(lld32);
+    LABEL(lst8);
+    LABEL(lst16);
+    LABEL(lst32);
+    LABEL(lldf32);
+    LABEL(lldf64);
+    LABEL(lstf32);
+    LABEL(lstf64);
 
     // label for END_LOOP (jump to the same the block)
-    Label(looplabel);
+    LABEL(looplabel);
 
     // labels for jump instructions
     rasLabel labels[g_jit_config.max_block_instrs];
@@ -165,23 +165,23 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
         switch (inst.opcode) {
             case IR_LOAD_REG: {
                 auto dst = DSTREG();
-                ldr(dst, CPU(r[inst.op1]));
+                LDR(dst, CPU(r[inst.op1]));
                 break;
             }
             case IR_STORE_REG: {
                 auto src = LOADOP2();
-                str(src, CPU(r[inst.op1]));
+                STR(src, CPU(r[inst.op1]));
                 break;
             }
             case IR_LOAD_REG_USR: {
                 auto dst = DSTREG();
                 int rd = inst.op1;
                 if (rd < 13) {
-                    ldr(dst, CPU(banked_r8_12[0][rd - 8]));
+                    LDR(dst, CPU(banked_r8_12[0][rd - 8]));
                 } else if (rd == 13) {
-                    ldr(dst, CPU(banked_sp[0]));
+                    LDR(dst, CPU(banked_sp[0]));
                 } else if (rd == 14) {
-                    ldr(dst, CPU(banked_lr[0]));
+                    LDR(dst, CPU(banked_lr[0]));
                 }
                 break;
             }
@@ -189,71 +189,71 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto src = LOADOP2();
                 int rd = inst.op1;
                 if (rd < 13) {
-                    str(src, CPU(banked_r8_12[0][rd - 8]));
+                    STR(src, CPU(banked_r8_12[0][rd - 8]));
                 } else if (rd == 13) {
-                    str(src, CPU(banked_sp[0]));
+                    STR(src, CPU(banked_sp[0]));
                 } else if (rd == 14) {
-                    str(src, CPU(banked_lr[0]));
+                    STR(src, CPU(banked_lr[0]));
                 }
                 break;
             }
             case IR_LOAD_FLAG: {
                 auto dst = DSTREG();
-                ldr(dst, CPU(cpsr));
-                ubfx(dst, dst, 31 - inst.op1, 1);
+                LDR(dst, CPU(cpsr));
+                UBFX(dst, dst, 31 - inst.op1, 1);
                 break;
             }
             case IR_STORE_FLAG: {
                 if (ir->code.d[i - 2].opcode != IR_STORE_FLAG) {
-                    mov(r0, 0);
+                    MOV(R0, 0);
                     flags_mask = 0;
                 }
                 if (inst.imm2) {
-                    if (inst.op2) orr(r0, r0, BIT(31 - inst.op1));
+                    if (inst.op2) ORR(R0, R0, BIT(31 - inst.op1));
                 } else {
                     auto src = LOADOP2();
-                    bfi(r0, src, 31 - inst.op1, 1);
+                    BFI(R0, src, 31 - inst.op1, 1);
                 }
                 flags_mask |= BIT(31 - inst.op1);
                 if (ir->code.d[i + 2].opcode != IR_STORE_FLAG) {
-                    ldr(r1, CPU(cpsr));
-                    and(r1, r1, ~flags_mask, r2);
-                    orr(r1, r1, r0);
-                    str(r1, CPU(cpsr));
+                    LDR(R1, CPU(cpsr));
+                    AND(R1, R1, ~flags_mask, R2);
+                    ORR(R1, R1, R0);
+                    STR(R1, CPU(cpsr));
                 }
                 break;
             }
             case IR_LOAD_CPSR: {
                 auto dst = DSTREG();
-                ldr(dst, CPU(cpsr));
+                LDR(dst, CPU(cpsr));
                 break;
             }
             case IR_STORE_CPSR: {
                 auto src = LOADOP2();
-                str(src, CPU(cpsr));
+                STR(src, CPU(cpsr));
                 break;
             }
             case IR_LOAD_SPSR: {
                 auto dst = DSTREG();
-                ldr(dst, CPU(spsr));
+                LDR(dst, CPU(spsr));
                 break;
             }
             case IR_STORE_SPSR: {
                 auto src = LOADOP2();
-                str(src, CPU(spsr));
+                STR(src, CPU(spsr));
                 break;
             }
             case IR_LOAD_THUMB: {
                 auto dst = DSTREG();
-                ldr(dst, CPU(cpsr));
-                ubfx(dst, dst, 5, 1);
+                LDR(dst, CPU(cpsr));
+                UBFX(dst, dst, 5, 1);
                 break;
             }
             case IR_STORE_THUMB: {
                 auto src = LOADOP2();
-                ldr(r0, CPU(cpsr));
-                bfi(r0, src, 5, 1);
-                str(r0, CPU(cpsr));
+                LDR(R0, CPU(cpsr));
+                BFI(R0, src, 5, 1);
+                STR(R0, CPU(cpsr));
                 break;
             }
             case IR_VFP_DATA_PROC: {
@@ -305,115 +305,115 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
             }
             case IR_CP15_READ: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                mov(r1, inst.op1);
-                movx(ip0, (uintptr_t) cpu->cp15_read);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOV(R1, inst.op1);
+                MOVX(IP0, (uintptr_t) cpu->cp15_read);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_CP15_WRITE: {
                 auto src = LOADOP2();
-                movx(r0, r29);
-                mov(r1, inst.op1);
-                mov(r2, src);
-                movx(ip0, (uintptr_t) cpu->cp15_write);
-                blr(ip0);
+                MOVX(R0, R29);
+                MOV(R1, inst.op1);
+                MOV(R2, src);
+                MOVX(IP0, (uintptr_t) cpu->cp15_write);
+                BLR(IP0);
                 break;
             }
             case IR_LOAD_MEM8: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                mov(r2, 0);
-                ldrlx(ip0, lld8);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOV(R2, 0);
+                LDRLX(IP0, lld8);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_LOAD_MEMS8: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                mov(r2, 1);
-                ldrlx(ip0, lld8);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOV(R2, 1);
+                LDRLX(IP0, lld8);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_LOAD_MEM16: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                mov(r2, 0);
-                ldrlx(ip0, lld16);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOV(R2, 0);
+                LDRLX(IP0, lld16);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_LOAD_MEMS16: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                mov(r2, 1);
-                ldrlx(ip0, lld16);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOV(R2, 1);
+                LDRLX(IP0, lld16);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_LOAD_MEM32: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                ldrlx(ip0, lld32);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                LDRLX(IP0, lld32);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_STORE_MEM8: {
-                movx(r0, r29);
-                MOVOP1(r1);
-                MOVOP2(r2);
-                ldrlx(ip0, lst8);
-                blr(ip0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOVOP2(R2);
+                LDRLX(IP0, lst8);
+                BLR(IP0);
                 break;
             }
             case IR_STORE_MEM16: {
-                movx(r0, r29);
-                MOVOP1(r1);
-                MOVOP2(r2);
-                ldrlx(ip0, lst16);
-                blr(ip0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOVOP2(R2);
+                LDRLX(IP0, lst16);
+                BLR(IP0);
                 break;
             }
             case IR_STORE_MEM32: {
-                movx(r0, r29);
-                MOVOP1(r1);
-                MOVOP2(r2);
-                ldrlx(ip0, lst32);
-                blr(ip0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOVOP2(R2);
+                LDRLX(IP0, lst32);
+                BLR(IP0);
                 break;
             }
             case IR_MOV: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                mov(dst, src);
+                MOV(dst, src);
                 break;
             }
             case IR_AND: {
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    ands(dst, src1, inst.op2, ip1);
+                    ANDS(dst, src1, inst.op2, IP1);
                 } else if (inst.imm1) {
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    ands(dst, src2, inst.op1, ip0);
+                    ANDS(dst, src2, inst.op1, IP0);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    ands(dst, src1, src2);
+                    ANDS(dst, src1, src2);
                 }
                 lastflags = i;
                 break;
@@ -422,16 +422,16 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    orr(dst, src1, inst.op2, ip1);
+                    ORR(dst, src1, inst.op2, IP1);
                 } else if (inst.imm1) {
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    orr(dst, src2, inst.op1, ip0);
+                    ORR(dst, src2, inst.op1, IP0);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    orr(dst, src1, src2);
+                    ORR(dst, src1, src2);
                 }
                 break;
             }
@@ -439,23 +439,23 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    eor(dst, src1, inst.op2, ip1);
+                    EOR(dst, src1, inst.op2, IP1);
                 } else if (inst.imm1) {
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    eor(dst, src2, inst.op1, ip0);
+                    EOR(dst, src2, inst.op1, IP0);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    eor(dst, src1, src2);
+                    EOR(dst, src1, src2);
                 }
                 break;
             }
             case IR_NOT: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                mvn(dst, src);
+                MVN(dst, src);
                 break;
             }
             case IR_LSL: {
@@ -463,20 +463,20 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto dst = DSTREG();
                 if (inst.imm2) {
                     if (inst.op2 >= 32) {
-                        mov(dst, 0);
+                        MOV(dst, 0);
                     } else {
-                        lsl(dst, src, inst.op2);
+                        LSL(dst, src, inst.op2);
                     }
                 } else {
-                    auto shift = LOADOP2();
-                    Label(lelse);
-                    Label(lendif);
-                    cmp(shift, 32);
-                    bhs(lelse);
-                    lsl(dst, src, shift);
-                    b(lendif);
+                    auto SHIFT = LOADOP2();
+                    LABEL(lelse);
+                    LABEL(lendif);
+                    CMP(SHIFT, 32);
+                    BHS(lelse);
+                    LSL(dst, src, SHIFT);
+                    B(lendif);
                     L(lelse);
-                    mov(dst, 0);
+                    MOV(dst, 0);
                     L(lendif);
 
                     lastflags = 0;
@@ -488,20 +488,20 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto dst = DSTREG();
                 if (inst.imm2) {
                     if (inst.op2 >= 32) {
-                        mov(dst, 0);
+                        MOV(dst, 0);
                     } else {
-                        lsr(dst, src, inst.op2);
+                        LSR(dst, src, inst.op2);
                     }
                 } else {
-                    auto shift = LOADOP2();
-                    Label(lelse);
-                    Label(lendif);
-                    cmp(shift, 32);
-                    bhs(lelse);
-                    lsr(dst, src, shift);
-                    b(lendif);
+                    auto SHIFT = LOADOP2();
+                    LABEL(lelse);
+                    LABEL(lendif);
+                    CMP(SHIFT, 32);
+                    BHS(lelse);
+                    LSR(dst, src, SHIFT);
+                    B(lendif);
                     L(lelse);
-                    mov(dst, 0);
+                    MOV(dst, 0);
                     L(lendif);
 
                     lastflags = 0;
@@ -513,20 +513,20 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto dst = DSTREG();
                 if (inst.imm2) {
                     if (inst.op2 >= 32) {
-                        asr(dst, src, 31);
+                        ASR(dst, src, 31);
                     } else {
-                        asr(dst, src, inst.op2);
+                        ASR(dst, src, inst.op2);
                     }
                 } else {
-                    auto shift = LOADOP2();
-                    Label(lelse);
-                    Label(lendif);
-                    cmp(shift, 32);
-                    bhs(lelse);
-                    asr(dst, src, shift);
-                    b(lendif);
+                    auto SHIFT = LOADOP2();
+                    LABEL(lelse);
+                    LABEL(lendif);
+                    CMP(SHIFT, 32);
+                    BHS(lelse);
+                    ASR(dst, src, SHIFT);
+                    B(lendif);
                     L(lelse);
-                    asr(dst, src, 31);
+                    ASR(dst, src, 31);
                     L(lendif);
 
                     lastflags = 0;
@@ -538,34 +538,34 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto src = LOADOP1();
                 auto dst = DSTREG();
                 if (inst.imm2) {
-                    ror(dst, src, inst.op2 % 32);
+                    ROR(dst, src, inst.op2 % 32);
                 } else {
-                    auto shift = LOADOP2();
-                    ror(dst, src, shift);
+                    auto SHIFT = LOADOP2();
+                    ROR(dst, src, SHIFT);
                 }
                 break;
             }
             case IR_RRC: {
                 auto src = LOADOP1();
                 auto dst = DSTREG();
-                cset(r0, cs);
-                extr(dst, r0, src, 1);
+                CSET(R0, CS);
+                EXTR(dst, R0, src, 1);
                 break;
             }
             case IR_ADD: {
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    adds(dst, src1, inst.op2, ip1);
+                    ADDS(dst, src1, inst.op2, IP1);
                 } else if (inst.imm1) {
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    adds(dst, src2, inst.op1, ip0);
+                    ADDS(dst, src2, inst.op1, IP0);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    adds(dst, src1, src2);
+                    ADDS(dst, src1, src2);
                 }
                 lastflags = i;
                 break;
@@ -574,12 +574,12 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 if (inst.imm2) {
                     auto src1 = LOADOP1();
                     auto dst = DSTREG();
-                    subs(dst, src1, inst.op2, ip1);
+                    SUBS(dst, src1, inst.op2, IP1);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    subs(dst, src1, src2);
+                    SUBS(dst, src1, src2);
                 }
                 lastflags = i;
                 break;
@@ -588,7 +588,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                adcs(dst, src1, src2);
+                ADCS(dst, src1, src2);
                 lastflags = i;
                 break;
             }
@@ -596,7 +596,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                sbcs(dst, src1, src2);
+                SBCS(dst, src1, src2);
                 lastflags = i;
                 break;
             }
@@ -607,19 +607,19 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
                     if (hinst.opcode == IR_SMULH) {
-                        smull(dst, src1, src2);
+                        SMULL(dst, src1, src2);
                     } else {
-                        umull(dst, src1, src2);
+                        UMULL(dst, src1, src2);
                     }
                     STOREDST();
                     i++;
                     auto dsth = DSTREG();
-                    lsrx(dsth, dst, 32);
+                    LSRX(dsth, dst, 32);
                 } else {
                     auto src1 = LOADOP1();
                     auto src2 = LOADOP2();
                     auto dst = DSTREG();
-                    mul(dst, src1, src2);
+                    MUL(dst, src1, src2);
                 }
                 break;
             }
@@ -627,181 +627,181 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                smull(dst, src1, src2);
-                lsrx(dst, dst, 32);
+                SMULL(dst, src1, src2);
+                LSRX(dst, dst, 32);
                 break;
             }
             case IR_UMULH: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                umull(dst, src1, src2);
-                lsrx(dst, dst, 32);
+                UMULL(dst, src1, src2);
+                LSRX(dst, dst, 32);
                 break;
             }
             case IR_SMULW: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                smull(dst, src1, src2);
-                lsrx(dst, dst, 16);
+                SMULL(dst, src1, src2);
+                LSRX(dst, dst, 16);
                 break;
             }
             case IR_CLZ: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                clz(dst, src);
+                CLZ(dst, src);
                 break;
             }
             case IR_REV: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                rev(dst, src);
+                REV(dst, src);
                 break;
             }
             case IR_REV16: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                rev16(dst, src);
+                REV16(dst, src);
                 break;
             }
             case IR_USAT: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                cmp(src, 0);
-                csel(dst, zr, src, lt);
-                mov(r0, MASK(inst.op1));
-                cmp(src, r0);
-                cmov(dst, r0, gt);
+                CMP(src, 0);
+                CSEL(dst, ZR, src, LT);
+                MOV(R0, MASK(inst.op1));
+                CMP(src, R0);
+                CMOV(dst, R0, GT);
                 break;
             }
             case IR_SSAT: {
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                mov(r0, ~MASK(inst.op1));
-                cmp(src, r0);
-                csel(dst, r0, src, lt);
-                mov(r0, MASK(inst.op1));
-                cmp(src, r0);
-                cmov(dst, r0, gt);
+                MOV(R0, ~MASK(inst.op1));
+                CMP(src, R0);
+                CSEL(dst, R0, src, LT);
+                MOV(R0, MASK(inst.op1));
+                CMP(src, R0);
+                CMOV(dst, R0, GT);
                 break;
             }
             case IR_MEDIA_UADD8: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                MOVOP2(r2);
-                movx(ip0, (uintptr_t) media_uadd8);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOVOP2(R2);
+                MOVX(IP0, (uintptr_t) media_uadd8);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_MEDIA_USUB8: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                MOVOP2(r2);
-                movx(ip0, (uintptr_t) media_usub8);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOVOP2(R2);
+                MOVX(IP0, (uintptr_t) media_usub8);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_MEDIA_UQADD8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                movs(v0, 0, src1);
-                movs(v1, 0, src2);
-                uqadd8b(v0, v0, v1);
-                movs(dst, v0, 0);
+                MOVS(V0, 0, src1);
+                MOVS(V1, 0, src2);
+                UQADD8B(V0, V0, V1);
+                MOVS(dst, V0, 0);
                 break;
             }
             case IR_MEDIA_UQSUB8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                movs(v0, 0, src1);
-                movs(v1, 0, src2);
-                uqsub8b(v0, v0, v1);
-                movs(dst, v0, 0);
+                MOVS(V0, 0, src1);
+                MOVS(V1, 0, src2);
+                UQSUB8B(V0, V0, V1);
+                MOVS(dst, V0, 0);
                 break;
             }
             case IR_MEDIA_UHADD8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                movs(v0, 0, src1);
-                movs(v1, 0, src2);
-                uhadd8b(v0, v0, v1);
-                movs(dst, v0, 0);
+                MOVS(V0, 0, src1);
+                MOVS(V1, 0, src2);
+                UHADD8B(V0, V0, V1);
+                MOVS(dst, V0, 0);
                 break;
             }
             case IR_MEDIA_SSUB8: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                MOVOP2(r2);
-                movx(ip0, (uintptr_t) media_ssub8);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOVOP2(R2);
+                MOVX(IP0, (uintptr_t) media_ssub8);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_MEDIA_QSUB8: {
                 auto src1 = LOADOP1();
                 auto src2 = LOADOP2();
                 auto dst = DSTREG();
-                movs(v0, 0, src1);
-                movs(v1, 0, src2);
-                sqsub8b(v0, v0, v1);
-                movs(dst, v0, 0);
+                MOVS(V0, 0, src1);
+                MOVS(V1, 0, src2);
+                SQSUB8B(V0, V0, V1);
+                MOVS(dst, V0, 0);
                 break;
             }
             case IR_MEDIA_SEL: {
                 auto dst = DSTREG();
-                movx(r0, r29);
-                MOVOP1(r1);
-                MOVOP2(r2);
-                movx(ip0, (uintptr_t) media_sel);
-                blr(ip0);
-                mov(dst, r0);
+                MOVX(R0, R29);
+                MOVOP1(R1);
+                MOVOP2(R2);
+                MOVX(IP0, (uintptr_t) media_sel);
+                BLR(IP0);
+                MOV(dst, R0);
                 break;
             }
             case IR_GETN: {
                 auto dst = DSTREG();
                 if (inst.imm2) {
-                    mov(dst, inst.op2 >> 31);
+                    MOV(dst, inst.op2 >> 31);
                 } else {
                     if (lastflags != inst.op2) {
                         auto src = LOADOP2();
-                        tst(src, src);
+                        TST(src, src);
                         lastflags = inst.op2;
                     }
-                    cset(dst, mi);
+                    CSET(dst, MI);
                 }
                 break;
             }
             case IR_GETZ: {
                 auto dst = DSTREG();
                 if (inst.imm2) {
-                    mov(dst, inst.op2 == 0);
+                    MOV(dst, inst.op2 == 0);
                 } else {
                     if (lastflags != inst.op2) {
                         auto src = LOADOP2();
-                        tst(src, src);
+                        TST(src, src);
                         lastflags = inst.op2;
                     }
-                    cset(dst, eq);
+                    CSET(dst, EQ);
                 }
                 break;
             }
             case IR_GETC: {
                 auto dst = DSTREG();
-                cset(dst, cs);
+                CSET(dst, CS);
                 break;
             }
             case IR_SETC: {
                 auto src = LOADOP2();
-                cmp(src, 1);
+                CMP(src, 1);
                 lastflags = 0;
                 break;
             }
@@ -809,84 +809,84 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 auto cond = LOADOP1();
                 auto src = LOADOP2();
                 auto dst = DSTREG();
-                cset(r0, cs);
-                tst(cond, cond);
-                csel(dst, r0, src, eq);
+                CSET(R0, CS);
+                TST(cond, cond);
+                CSEL(dst, R0, src, EQ);
                 lastflags = 0;
                 break;
             }
             case IR_GETV: {
                 auto dst = DSTREG();
-                cset(dst, vs);
+                CSET(dst, VS);
                 break;
             }
             case IR_PCMASK: {
                 auto src = LOADOP1();
                 auto dst = DSTREG();
-                lsl(dst, src, 1);
-                sub(dst, dst, 4);
+                LSL(dst, src, 1);
+                SUB(dst, dst, 4);
                 break;
             }
             case IR_JZ: {
                 jmptarget = inst.op2;
-                labels[nlabel++] = Lnew();
+                labels[nlabel++] = LNEW();
                 auto cond = LOADOP1();
-                cbz(cond, labels[nlabel - 1]);
+                CBZ(cond, labels[nlabel - 1]);
                 break;
             }
             case IR_JNZ: {
                 jmptarget = inst.op2;
-                labels[nlabel++] = Lnew();
+                labels[nlabel++] = LNEW();
                 auto cond = LOADOP1();
-                cbnz(cond, labels[nlabel - 1]);
+                CBNZ(cond, labels[nlabel - 1]);
                 break;
             }
             case IR_JELSE: {
                 jmptarget = inst.op2;
-                labels[nlabel++] = Lnew();
-                b(labels[nlabel - 1]);
+                labels[nlabel++] = LNEW();
+                B(labels[nlabel - 1]);
                 L(labels[nlabel - 2]);
                 break;
             }
             case IR_MODESWITCH: {
-                movx(r0, r29);
-                mov(r1, inst.op1);
-                movx(ip0, (uintptr_t) cpu_update_mode);
-                blr(ip0);
+                MOVX(R0, R29);
+                MOV(R1, inst.op1);
+                MOVX(IP0, (uintptr_t) cpu_update_mode);
+                BLR(IP0);
                 break;
             }
             case IR_EXCEPTION: {
                 switch (inst.op1) {
                     case E_SWI:
-                        movx(r0, r29);
-                        mov(r1, (ArmInstr) {inst.op2}.sw_intr.arg);
-                        movx(ip0, (uintptr_t) cpu->handle_svc);
-                        blr(ip0);
+                        MOVX(R0, R29);
+                        MOV(R1, (ArmInstr) {inst.op2}.sw_intr.arg);
+                        MOVX(IP0, (uintptr_t) cpu->handle_svc);
+                        BLR(IP0);
                         break;
                     case E_UND:
-                        movx(r0, r29);
-                        mov(r1, inst.op2);
-                        movx(ip0, (uintptr_t) cpu_undefined_fail);
-                        blr(ip0);
+                        MOVX(R0, R29);
+                        MOV(R1, inst.op2);
+                        MOVX(IP0, (uintptr_t) cpu_undefined_fail);
+                        BLR(IP0);
                         break;
                 }
                 break;
             }
             case IR_HALT: {
-                mov(r0, 1);
-                strb(r0, CPU(halt));
+                MOV(R0, 1);
+                STRB(R0, CPU(halt));
                 break;
             }
             case IR_BEGIN: {
 
-                push(fp, lr);
+                PUSH(FP, LR);
                 for (int i = 0; i < backend->hralloc.count[REG_SAVED]; i += 2) {
-                    push(Reg(SAVEDREGS_BASE + i), Reg(SAVEDREGS_BASE + i + 1));
+                    PUSH(REG(SAVEDREGS_BASE + i), REG(SAVEDREGS_BASE + i + 1));
                 }
                 int spdisp = SPDISP();
-                if (spdisp) subx(sp, sp, spdisp);
+                if (spdisp) SUBX(SP, SP, spdisp);
 
-                movx(r29, (uintptr_t) cpu);
+                MOVX(R29, (uintptr_t) cpu);
                 L(looplabel);
 
                 break;
@@ -896,40 +896,40 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
             case IR_END_LOOP: {
                 lastflags = 0;
 
-                ldrx(r0, CPU(cycles));
-                subx(r0, r0, inst.cycles);
-                strx(r0, CPU(cycles));
+                LDRX(R0, CPU(cycles));
+                SUBX(R0, R0, inst.cycles);
+                STRX(R0, CPU(cycles));
 
                 if (inst.opcode == IR_END_LOOP) {
-                    cmpx(r0, 0);
-                    bgt(looplabel);
+                    CMPX(R0, 0);
+                    BGT(looplabel);
                 }
 
                 int spdisp = SPDISP();
-                if (spdisp) addx(sp, sp, spdisp);
+                if (spdisp) ADDX(SP, SP, spdisp);
                 for (int i = (backend->hralloc.count[REG_SAVED] - 1) & ~1;
                      i >= 0; i -= 2) {
-                    pop(Reg(SAVEDREGS_BASE + i), Reg(SAVEDREGS_BASE + i + 1));
+                    POP(REG(SAVEDREGS_BASE + i), REG(SAVEDREGS_BASE + i + 1));
                 }
-                pop(fp, lr);
+                POP(FP, LR);
 
                 if (inst.opcode == IR_END_LINK) {
-                    Label(nolink);
-                    Label(linkaddr);
-                    cmpx(r0, 0);
-                    ble(nolink);
-                    ldrlx(ip0, linkaddr);
-                    br(ip0);
-                    align(8);
+                    LABEL(nolink);
+                    LABEL(linkaddr);
+                    CMPX(R0, 0);
+                    BLE(nolink);
+                    LDRLX(IP0, linkaddr);
+                    BR(IP0);
+                    ALIGN(8);
                     L(linkaddr);
-                    Label(linklabel);
+                    LABEL(linklabel);
                     ArmLinkPatch p = {linklabel, inst.op1, inst.op2};
                     Vec_push(backend->links, p);
-                    dword(linklabel);
+                    DWORD(linklabel);
                     L(nolink);
                 }
 
-                ret();
+                RET();
                 break;
             }
             default:
@@ -939,27 +939,27 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
         STOREDST();
     }
 
-    align(8);
+    ALIGN(8);
     L(lld8);
-    dword(Lnew(cpu->read8));
+    DWORD(LNEW(cpu->read8));
     L(lld16);
-    dword(Lnew(cpu->read16));
+    DWORD(LNEW(cpu->read16));
     L(lld32);
-    dword(Lnew(cpu->read32));
+    DWORD(LNEW(cpu->read32));
     L(lst8);
-    dword(Lnew(cpu->write8));
+    DWORD(LNEW(cpu->write8));
     L(lst16);
-    dword(Lnew(cpu->write16));
+    DWORD(LNEW(cpu->write16));
     L(lst32);
-    dword(Lnew(cpu->write32));
+    DWORD(LNEW(cpu->write32));
     L(lldf32);
-    dword(Lnew(cpu->readf32));
+    DWORD(LNEW(cpu->readf32));
     L(lldf64);
-    dword(Lnew(cpu->readf64));
+    DWORD(LNEW(cpu->readf64));
     L(lstf32);
-    dword(Lnew(cpu->writef32));
+    DWORD(LNEW(cpu->writef32));
     L(lstf64);
-    dword(Lnew(cpu->writef64));
+    DWORD(LNEW(cpu->writef64));
 
     return backend;
 }
@@ -982,37 +982,37 @@ static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
         case 0:
         case 1:
             if (dp) {
-                ldrd(v0, CPU(d[vd]));
-                ldrd(v1, CPU(d[vn]));
-                ldrd(v2, CPU(d[vm]));
+                LDRD(V0, CPU(d[vd]));
+                LDRD(V1, CPU(d[vn]));
+                LDRD(V2, CPU(d[vm]));
             } else {
-                ldrs(v0, CPU(s[vd]));
-                ldrs(v1, CPU(s[vn]));
-                ldrs(v2, CPU(s[vm]));
+                LDRS(V0, CPU(s[vd]));
+                LDRS(V1, CPU(s[vn]));
+                LDRS(V2, CPU(s[vm]));
             }
-            fpdataproc3source(dp, 0, 0, cpopc, cpopc ^ op, v0, v1, v2, v0);
+            FPDATAPROC3SOURCE(dp, 0, 0, cpopc, cpopc ^ op, V0, V1, V2, V0);
             if (dp) {
-                strd(v0, CPU(d[vd]));
+                STRD(V0, CPU(d[vd]));
             } else {
-                strs(v0, CPU(s[vd]));
+                STRS(V0, CPU(s[vd]));
             }
             break;
         case 2:
         case 3:
         case 8: {
             if (dp) {
-                ldrd(v1, CPU(d[vn]));
-                ldrd(v2, CPU(d[vm]));
+                LDRD(V1, CPU(d[vn]));
+                LDRD(V2, CPU(d[vm]));
             } else {
-                ldrs(v1, CPU(s[vn]));
-                ldrs(v2, CPU(s[vm]));
+                LDRS(V1, CPU(s[vn]));
+                LDRS(V2, CPU(s[vm]));
             }
             u32 opcode = cpopc == 8 ? 1 : cpopc == 2 ? op * 8 : 2 + op;
-            fpdataproc2source(dp, 0, 0, opcode, v0, v1, v2);
+            FPDATAPROC2SOURCE(dp, 0, 0, opcode, V0, V1, V2);
             if (dp) {
-                strd(v0, CPU(d[vd]));
+                STRD(V0, CPU(d[vd]));
             } else {
-                strs(v0, CPU(s[vd]));
+                STRS(V0, CPU(s[vd]));
             }
             break;
         }
@@ -1023,66 +1023,66 @@ static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
                 case 0:
                 case 1:
                     if (dp) {
-                        ldrd(v2, CPU(d[vm]));
+                        LDRD(V2, CPU(d[vm]));
                     } else {
-                        ldrs(v2, CPU(s[vm]));
+                        LDRS(V2, CPU(s[vm]));
                     }
-                    fpdataproc1source(dp, 0, 0, crn << 1 | op, v0, v2);
+                    FPDATAPROC1SOURCE(dp, 0, 0, crn << 1 | op, V0, V2);
                     if (dp) {
-                        strd(v0, CPU(d[vd]));
+                        STRD(V0, CPU(d[vd]));
                     } else {
-                        strs(v0, CPU(s[vd]));
+                        STRS(V0, CPU(s[vd]));
                     }
                     break;
                 case 4:
                 case 5:
                     if (dp) {
-                        ldrd(v0, CPU(d[vd]));
-                        ldrd(v2, CPU(d[vm]));
+                        LDRD(V0, CPU(d[vd]));
+                        LDRD(V2, CPU(d[vm]));
                     } else {
-                        ldrs(v0, CPU(s[vd]));
-                        ldrs(v2, CPU(s[vm]));
+                        LDRS(V0, CPU(s[vd]));
+                        LDRS(V2, CPU(s[vm]));
                     }
-                    fpcompare(dp, 0, 0, 0, (crn & 1) * 8, v0, v2);
-                    mrs(r0, nzcv);
-                    ldr(r1, CPU(fpscr));
-                    ubfx(r0, r0, 28, 4);
-                    bfi(r1, r0, 28, 4);
-                    str(r1, CPU(fpscr));
+                    FPCOMPARE(dp, 0, 0, 0, (crn & 1) * 8, V0, V2);
+                    MRS(R0, NZCV);
+                    LDR(R1, CPU(fpscr));
+                    UBFX(R0, R0, 28, 4);
+                    BFI(R1, R0, 28, 4);
+                    STR(R1, CPU(fpscr));
                     break;
                 case 7:
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
-                        ldrd(v0, CPU(d[vm]));
-                        fcvtsd(v0, v0);
-                        strs(v0, CPU(s[vd]));
+                        LDRD(V0, CPU(d[vm]));
+                        FCVTSD(V0, V0);
+                        STRS(V0, CPU(s[vd]));
                     } else {
                         vd = vd >> 1;
-                        ldrs(v0, CPU(s[vm]));
-                        fcvtds(v0, v0);
-                        strd(v0, CPU(d[vd]));
+                        LDRS(V0, CPU(s[vm]));
+                        FCVTDS(V0, V0);
+                        STRD(V0, CPU(d[vd]));
                     }
                     break;
                 case 8:
                     if (dp) vm = vm << 1 | (instr.cp_data_proc.cp & 1);
-                    ldr(r0, CPU(s[vm]));
-                    fpconvertintvr(0, dp, 0, 0, 2 + !op, v0, r0);
+                    LDR(R0, CPU(s[vm]));
+                    FPCONVERTINTVR(0, dp, 0, 0, 2 + !op, V0, R0);
                     if (dp) {
-                        strd(v0, CPU(d[vd]));
+                        STRD(V0, CPU(d[vd]));
                     } else {
-                        strs(v0, CPU(s[vd]));
+                        STRS(V0, CPU(s[vd]));
                     }
                     break;
                 case 12:
                 case 13:
                     if (dp) {
                         vd = vd << 1 | ((instr.cp_data_proc.cpopc >> 2) & 1);
-                        ldrd(v0, CPU(d[vm]));
+                        LDRD(V0, CPU(d[vm]));
                     } else {
-                        ldrs(v0, CPU(s[vm]));
+                        LDRS(V0, CPU(s[vm]));
                     }
-                    fpconvertintrv(0, dp, 0, 3, !(crn & 1), r0, v0);
-                    str(r0, CPU(s[vd]));
+                    FPCONVERTINTRV(0, dp, 0, 3, !(crn & 1), R0, V0);
+                    STR(R0, CPU(s[vd]));
                     if (!op) lwarnonce("unimpl rounding mode");
                     break;
             }
@@ -1104,35 +1104,35 @@ static void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr,
     u32 vd = instr.cp_data_trans.crd;
 
     if (rcount > 1) {
-        push(r19, zr);
-        mov(r19, addr);
-        addr = r19;
+        PUSH(R19, ZR);
+        MOV(R19, addr);
+        addr = R19;
     }
 
     if (instr.cp_data_trans.cpnum & 1) {
         for (int i = 0; i < rcount; i++) {
-            movx(r0, r29);
-            mov(r1, addr);
-            ldrlx(ip0, lldf64);
-            blr(ip0);
-            strd(v0, CPU(d[(vd + i) & 15]));
-            if (i < rcount - 1) add(addr, addr, 8);
+            MOVX(R0, R29);
+            MOV(R1, addr);
+            LDRLX(IP0, lldf64);
+            BLR(IP0);
+            STRD(V0, CPU(d[(vd + i) & 15]));
+            if (i < rcount - 1) ADD(addr, addr, 8);
         }
     } else {
         vd = vd << 1 | instr.cp_data_trans.n;
 
         for (int i = 0; i < rcount; i++) {
-            movx(r0, r29);
-            mov(r1, addr);
-            ldrlx(ip0, lldf32);
-            blr(ip0);
-            strs(v0, CPU(s[(vd + i) & 31]));
-            if (i < rcount - 1) add(addr, addr, 4);
+            MOVX(R0, R29);
+            MOV(R1, addr);
+            LDRLX(IP0, lldf32);
+            BLR(IP0);
+            STRS(V0, CPU(s[(vd + i) & 31]));
+            if (i < rcount - 1) ADD(addr, addr, 4);
         }
     }
 
     if (rcount > 1) {
-        pop(r19, zr);
+        POP(R19, ZR);
     }
 }
 
@@ -1149,35 +1149,35 @@ static void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr,
     u32 vd = instr.cp_data_trans.crd;
 
     if (rcount > 1) {
-        push(r19, zr);
-        mov(r19, addr);
-        addr = r19;
+        PUSH(R19, ZR);
+        MOV(R19, addr);
+        addr = R19;
     }
 
     if (instr.cp_data_trans.cpnum & 1) {
         for (int i = 0; i < rcount; i++) {
-            movx(r0, r29);
-            mov(r1, addr);
-            ldrd(v0, CPU(d[(vd + i) & 15]));
-            ldrlx(ip0, lstf64);
-            blr(ip0);
-            if (i < rcount - 1) add(addr, addr, 8);
+            MOVX(R0, R29);
+            MOV(R1, addr);
+            LDRD(V0, CPU(d[(vd + i) & 15]));
+            LDRLX(IP0, lstf64);
+            BLR(IP0);
+            if (i < rcount - 1) ADD(addr, addr, 8);
         }
     } else {
         vd = vd << 1 | instr.cp_data_trans.n;
 
         for (int i = 0; i < rcount; i++) {
-            movx(r0, r29);
-            mov(r1, addr);
-            ldrs(v0, CPU(s[(vd + i) & 31]));
-            ldrlx(ip0, lstf32);
-            blr(ip0);
-            if (i < rcount - 1) add(addr, addr, 4);
+            MOVX(R0, R29);
+            MOV(R1, addr);
+            LDRS(V0, CPU(s[(vd + i) & 31]));
+            LDRLX(IP0, lstf32);
+            BLR(IP0);
+            if (i < rcount - 1) ADD(addr, addr, 4);
         }
     }
 
     if (rcount > 1) {
-        pop(r19, zr);
+        POP(R19, ZR);
     }
 }
 
@@ -1185,10 +1185,10 @@ static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr,
                            rasReg dst) {
     if (instr.cp_reg_trans.cpopc == 7) {
         if (instr.cp_reg_trans.crn == 1) {
-            ldr(dst, CPU(fpscr));
+            LDR(dst, CPU(fpscr));
         } else {
             lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
-            mov(dst, 0);
+            MOV(dst, 0);
         }
         return;
     }
@@ -1197,14 +1197,14 @@ static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr,
     if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
     else vn |= instr.cp_reg_trans.cp >> 2;
 
-    ldr(dst, CPU(s[vn]));
+    LDR(dst, CPU(s[vn]));
 }
 
 static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
                             rasReg src) {
     if (instr.cp_reg_trans.cpopc == 7) {
         if (instr.cp_reg_trans.crn == 1) {
-            str(src, CPU(fpscr));
+            STR(src, CPU(fpscr));
         } else {
             lwarn("unknown vfp special reg %d", instr.cp_reg_trans.crn);
         }
@@ -1215,7 +1215,7 @@ static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
     if (instr.cp_reg_trans.cpnum & 1) vn |= instr.cp_reg_trans.cpopc & 1;
     else vn |= instr.cp_reg_trans.cp >> 2;
 
-    str(src, CPU(s[vn]));
+    STR(src, CPU(s[vn]));
 }
 
 static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
@@ -1223,17 +1223,17 @@ static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
         if (h) {
-            ldr(dst, CPU(d[vm], 4));
+            LDR(dst, CPU(d[vm], 4));
         } else {
-            ldr(dst, CPU(d[vm]));
+            LDR(dst, CPU(d[vm]));
         }
     } else {
         u32 vm = instr.cp_double_reg_trans.crm << 1 |
                  ((instr.cp_double_reg_trans.cp >> 1) & 1);
         if (h) {
-            ldr(dst, CPU(s[vm + 1]));
+            LDR(dst, CPU(s[vm + 1]));
         } else {
-            ldr(dst, CPU(s[vm]));
+            LDR(dst, CPU(s[vm]));
         }
     }
 }
@@ -1243,17 +1243,17 @@ static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
         if (h) {
-            str(src, CPU(d[vm], 4));
+            STR(src, CPU(d[vm], 4));
         } else {
-            str(src, CPU(d[vm]));
+            STR(src, CPU(d[vm]));
         }
     } else {
         u32 vm = instr.cp_double_reg_trans.crm << 1 |
                  ((instr.cp_double_reg_trans.cp >> 1) & 1);
         if (h) {
-            if (vm < 31) str(src, CPU(s[vm + 1]));
+            if (vm < 31) STR(src, CPU(s[vm + 1]));
         } else {
-            str(src, CPU(s[vm]));
+            STR(src, CPU(s[vm]));
         }
     }
 }

@@ -20,12 +20,12 @@ typedef uint32_t u32;
 typedef int64_t s64;
 typedef uint64_t u64;
 
-#define BIT(b) (1ull << (b))
-#define MASK(b) (BIT(b) - 1)
-#define ISNBITSU64(n, b) ((u64) (n) >> (b) == 0)
-#define ISNBITSS64(n, b)                                                       \
-    ((s64) (n) >> ((b) - 1) == 0 || (s64) (n) >> ((b) - 1) == -1)
-#define ISLOWBITS0(n, b) (((n) & MASK(b)) == 0)
+#define BIT(B) (1ull << (B))
+#define MASK(B) (BIT(B) - 1)
+#define ISNBITSU64(n, B) ((u64) (n) >> (B) == 0)
+#define ISNBITSS64(n, B)                                                       \
+    ((s64) (n) >> ((B) - 1) == 0 || (s64) (n) >> ((B) - 1) == -1)
+#define ISLOWBITS0(n, B) (((n) & MASK(B)) == 0)
 
 typedef enum {
     SYM_UNDEFINED,
@@ -90,9 +90,9 @@ typedef struct _rasBlock {
 char* rasErrorStrings[RAS_ERR_MAX] = {
     [RAS_OK] = "no error",
     [RAS_ERR_CODE_SIZE] = "ran out of space for code",
-    [RAS_ERR_BAD_R31] = "invalid use of zr/sp",
+    [RAS_ERR_BAD_R31] = "invalid use of ZR/SP",
     [RAS_ERR_BAD_IMM] = "immediate out of range",
-    [RAS_ERR_BAD_CONST] = "invalid constant operand (shift, extend, etc)",
+    [RAS_ERR_BAD_CONST] = "invalid constant operand (SHIFT, extend, etc)",
     [RAS_ERR_UNDEF_LABEL] = "undefined label",
     [RAS_ERR_BAD_LABEL] = "label out of range or misaligned",
 };
@@ -327,8 +327,8 @@ void rasEmitWord(rasBlock* ctx, u32 w) {
 }
 
 void rasEmitDword(rasBlock* ctx, u64 d) {
-    word(d);
-    word(d >> 32);
+    WORD(d);
+    WORD(d >> 32);
 }
 
 void rasAlign(rasBlock* ctx, size_t alignment) {
@@ -342,7 +342,7 @@ void rasAlign(rasBlock* ctx, size_t alignment) {
     }
     size_t cur = ctx->curr - ctx->code;
     size_t aligned = (cur + (alignment - 1)) & ~(alignment - 1);
-    for (int i = 0; i < aligned - cur; i++) word(0);
+    for (int i = 0; i < aligned - cur; i++) WORD(0);
 }
 
 bool rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n) {
@@ -351,7 +351,7 @@ bool rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n) {
 
     if (!sf) imm &= MASK(32);
 
-    // find the first one bit and rotation
+    // find the first one bit AND rotation
     u32 rot = 0;
     for (rot = 0; rot < sz; rot++) {
         if ((imm & BIT(rot)) && !(imm & BIT((rot - 1) & (sz - 1)))) {
@@ -429,23 +429,23 @@ void rasEmitPseudoAddSubImm(rasBlock* ctx, u32 sf, u32 op, u32 s, rasReg rd,
                             rasReg rn, u64 imm, rasReg rtmp) {
     if (!sf) imm = (s32) imm;
     if (ISNBITSU64(imm, 12)) {
-        addsub(sf, op, s, rd, rn, imm);
+        ADDSUB(sf, op, s, rd, rn, imm);
     } else if (ISNBITSU64(imm, 24) && ISLOWBITS0(imm, 12)) {
-        addsub(sf, op, s, rd, rn, imm >> 12, lsl(12));
+        ADDSUB(sf, op, s, rd, rn, imm >> 12, LSL(12));
     } else {
         imm = -imm;
         if (ISNBITSU64(imm, 12)) {
-            addsub(sf, !op, s, rd, rn, imm);
+            ADDSUB(sf, !op, s, rd, rn, imm);
         } else if (ISNBITSU64(imm, 24) && ISLOWBITS0(imm, 12)) {
-            addsub(sf, !op, s, rd, rn, imm >> 12, lsl(12));
+            ADDSUB(sf, !op, s, rd, rn, imm >> 12, LSL(12));
         } else {
             imm = -imm;
             if (sf) {
-                movx(rtmp, imm);
+                MOVX(rtmp, imm);
             } else {
-                movw(rtmp, imm);
+                MOVW(rtmp, imm);
             }
-            addsub(sf, op, s, rd, rn, rtmp);
+            ADDSUB(sf, op, s, rd, rn, rtmp);
         }
     }
 }
@@ -454,33 +454,33 @@ void rasEmitPseudoLogicalImm(rasBlock* ctx, u32 sf, u32 opc, rasReg rd,
                              rasReg rn, u64 imm, rasReg rtmp) {
     u32 immr, imms, n;
     if (rasGenerateLogicalImm(imm, sf, &immr, &imms, &n)) {
-        logical(sf, opc, 0, rd, rn, imm);
+        LOGICAL(sf, opc, 0, rd, rn, imm);
     } else {
         if (sf) {
-            movx(rtmp, imm);
+            MOVX(rtmp, imm);
         } else {
-            movw(rtmp, imm);
+            MOVW(rtmp, imm);
         }
-        logical(sf, opc, 0, rd, rn, rtmp);
+        LOGICAL(sf, opc, 0, rd, rn, rtmp);
     }
 }
 
 void rasEmitPseudoMovImm(rasBlock* ctx, u32 sf, rasReg rd, u64 imm) {
     if (imm == 0) {
         if (sf) {
-            movzx(rd, 0);
+            MOVZX(rd, 0);
         } else {
-            movzw(rd, 0);
+            MOVZW(rd, 0);
         }
         return;
     } else if (imm == ~0u && !sf) {
-        movnw(rd, 0);
+        MOVNW(rd, 0);
         return;
     } else if (imm == ~0ull) {
         if (sf) {
-            movnx(rd, 0);
+            MOVNX(rd, 0);
         } else {
-            movnw(rd, 0);
+            MOVNW(rd, 0);
         }
         return;
     }
@@ -488,9 +488,9 @@ void rasEmitPseudoMovImm(rasBlock* ctx, u32 sf, rasReg rd, u64 imm) {
     u32 immr, imms, n;
     if (rasGenerateLogicalImm(imm, sf, &immr, &imms, &n)) {
         if (sf) {
-            orrx(rd, zr, imm);
+            ORRX(rd, ZR, imm);
         } else {
-            orrw(rd, zr, imm);
+            ORRW(rd, ZR, imm);
         }
         return;
     }
@@ -506,16 +506,16 @@ void rasEmitPseudoMovImm(rasBlock* ctx, u32 sf, rasReg rd, u64 imm) {
         if (hw == MASK(16)) hw1s++;
     }
 
-    bool neg = hw1s > hw0s;
+    bool NEG = hw1s > hw0s;
     bool initial = true;
 
     for (int i = 0; i < sz; i++) {
         u16 hw = imm >> 16 * i;
-        if (hw != (neg ? MASK(16) : 0)) {
+        if (hw != (NEG ? MASK(16) : 0)) {
             u32 opc;
             if (initial) {
                 initial = false;
-                if (neg) {
+                if (NEG) {
                     opc = 0;
                     hw ^= MASK(16);
                 } else {
@@ -524,7 +524,7 @@ void rasEmitPseudoMovImm(rasBlock* ctx, u32 sf, rasReg rd, u64 imm) {
             } else {
                 opc = 3;
             }
-            movewide(sf, opc, rd, hw, lsl(16 * i));
+            MOVEWIDE(sf, opc, rd, hw, LSL(16 * i));
         }
     }
 }
@@ -532,15 +532,15 @@ void rasEmitPseudoMovImm(rasBlock* ctx, u32 sf, rasReg rd, u64 imm) {
 void rasEmitPseudoMovReg(rasBlock* ctx, u32 sf, rasReg rd, rasReg rm) {
     if (rd.isSp || rm.isSp) {
         if (sf) {
-            addx(rd, rm, 0);
+            ADDX(rd, rm, 0);
         } else {
-            addw(rd, rm, 0);
+            ADDW(rd, rm, 0);
         }
     } else {
         if (sf) {
-            orrx(rd, zr, rm);
+            ORRX(rd, ZR, rm);
         } else {
-            orrw(rd, zr, rm);
+            ORRW(rd, ZR, rm);
         }
     }
 }
@@ -550,40 +550,40 @@ void rasEmitPseudoShiftImm(rasBlock* ctx, u32 sf, u32 type, rasReg rd,
     if (sf) {
         switch (type) {
             case 0:
-                ubfizx(rd, rn, imm, 64 - imm);
+                UBFIZX(rd, rn, imm, 64 - imm);
                 break;
             case 1:
-                ubfxx(rd, rn, imm, 64 - imm);
+                UBFXX(rd, rn, imm, 64 - imm);
                 break;
             case 2:
-                sbfxx(rd, rn, imm, 64 - imm);
+                SBFXX(rd, rn, imm, 64 - imm);
                 break;
             case 3:
-                extrx(rd, rn, rn, imm);
+                EXTRX(rd, rn, rn, imm);
                 break;
         }
     } else {
         switch (type) {
             case 0:
-                ubfizw(rd, rn, imm, 32 - imm);
+                UBFIZW(rd, rn, imm, 32 - imm);
                 break;
             case 1:
-                ubfxw(rd, rn, imm, 32 - imm);
+                UBFXW(rd, rn, imm, 32 - imm);
                 break;
             case 2:
-                sbfxw(rd, rn, imm, 32 - imm);
+                SBFXW(rd, rn, imm, 32 - imm);
                 break;
             case 3:
-                extrw(rd, rn, rn, imm);
+                EXTRW(rd, rn, rn, imm);
                 break;
         }
     }
 }
 
 void rasEmitPseudoPCRelAddrLong(rasBlock* ctx, rasReg rd, rasLabel lab) {
-    adrp(rd, lab);
+    ADRP(rd, lab);
     rasAddPatch(ctx, RAS_PATCH_PGOFF12, lab);
-    addx(rd, rd, 0);
+    ADDX(rd, rd, 0);
 }
 
 #endif
