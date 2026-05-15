@@ -4,6 +4,8 @@
 #include <dirent.h>
 #include <unistd.h>
 
+#include <imgui/dcimgui.h>
+
 #include "arm/jit/jit.h"
 #include "cpu.h"
 #include "emulator.h"
@@ -57,55 +59,55 @@ void load_sysfile_dialog(char* dstfile) {
 }
 
 void setup_gui_theme() {
-    igGetStyle()->FontSizeBase = 15;
-    ImFontAtlas_AddFontDefaultVector(igGetIO()->Fonts, nullptr);
+    ImGui_GetStyle()->FontSizeBase = 15;
+    ImFontAtlas_AddFontDefaultVector(ImGui_GetIO()->Fonts, nullptr);
 
-    igGetStyle()->FrameBorderSize = 1;
-    igGetStyle()->FramePadding = (ImVec2) {5, 5};
-    igGetStyle()->FrameRounding = 5;
-    igGetStyle()->GrabRounding = 5;
-    igGetStyle()->ItemSpacing = (ImVec2) {5, 5};
-    igGetStyle()->ItemInnerSpacing = (ImVec2) {5, 5};
-    igGetStyle()->PopupRounding = 5;
-    igGetStyle()->PopupBorderSize = 1;
-    igGetStyle()->SeparatorTextAlign = (ImVec2) {0.5, 0.5};
-    igGetStyle()->WindowPadding = (ImVec2) {10, 10};
-    igGetStyle()->WindowRounding = 5;
-    igGetStyle()->WindowBorderSize = 1;
+    ImGui_GetStyle()->FrameBorderSize = 1;
+    ImGui_GetStyle()->FramePadding = (ImVec2) {5, 5};
+    ImGui_GetStyle()->FrameRounding = 5;
+    ImGui_GetStyle()->GrabRounding = 5;
+    ImGui_GetStyle()->ItemSpacing = (ImVec2) {5, 5};
+    ImGui_GetStyle()->ItemInnerSpacing = (ImVec2) {5, 5};
+    ImGui_GetStyle()->PopupRounding = 5;
+    ImGui_GetStyle()->PopupBorderSize = 1;
+    ImGui_GetStyle()->SeparatorTextAlign = (ImVec2) {0.5, 0.5};
+    ImGui_GetStyle()->WindowPadding = (ImVec2) {10, 10};
+    ImGui_GetStyle()->WindowRounding = 5;
+    ImGui_GetStyle()->WindowBorderSize = 1;
 
-    igStyleColorsDark(nullptr);
+    ImGui_StyleColorsDark(nullptr);
 }
 
 void draw_menubar() {
     if (!uistate.menubar) return;
 
-    if (igBeginMainMenuBar()) {
-        if (igBeginMenu("File", true)) {
-            if (igMenuItem("Open", "F2", false, true)) {
+    if (ImGui_BeginMainMenuBar()) {
+        if (ImGui_BeginMenu("File")) {
+            if (ImGui_MenuItemEx("Open", "F2", false, true)) {
                 load_rom_dialog();
             }
-            if (igBeginMenu("Open Recent", ctremu.history[0])) {
+            if (ImGui_BeginMenuEx("Open Recent", ctremu.history[0])) {
                 for (int i = 0; i < HISTORYLEN; i++) {
                     if (!ctremu.history[i]) break;
-                    if (igMenuItem(ctremu.history[i], nullptr, false, true)) {
+                    if (ImGui_MenuItem(ctremu.history[i])) {
                         emulator_set_rom(ctremu.history[i]);
                     }
                 }
-                igEndMenu();
+                ImGui_EndMenu();
             }
-            igSeparator();
+            ImGui_Separator();
 
-            if (igBeginMenu("Load System File", true)) {
-                if (igMenuItem("Shared Font", nullptr, false, true)) {
+            if (ImGui_BeginMenu("Load System File")) {
+                if (ImGui_MenuItem("Shared Font")) {
                     load_sysfile_dialog("font.bcfnt");
                 }
-                if (igMenuItem("Mii Data", nullptr, false, true)) {
+                if (ImGui_MenuItem("Mii Data")) {
                     load_sysfile_dialog("mii.app.romfs");
                 }
-                igEndMenu();
+                ImGui_EndMenu();
             }
 
-            if (igMenuItem("Open Tanuki3DS Folder", nullptr, false, true)) {
+            if (ImGui_MenuItem("Open Tanuki3DS Folder")) {
                 char* cwd = getcwd(nullptr, 0);
                 char* cmd;
                 asprintf(&cmd, OPEN_CMD " '%s'", cwd);
@@ -114,97 +116,97 @@ void draw_menubar() {
                 free(cmd);
             }
 
-            igSeparator();
-            if (igMenuItem("Exit", nullptr, false, true)) {
+            ImGui_Separator();
+            if (ImGui_MenuItem("Exit")) {
                 ctremu.running = false;
             }
-            igEndMenu();
+            ImGui_EndMenu();
         }
-        if (igBeginMenu("Emulation", ctremu.initialized)) {
-            if (igMenuItem("Reset", "F1", false, true)) {
+        if (ImGui_BeginMenuEx("Emulation", ctremu.initialized)) {
+            if (ImGui_MenuItemEx("Reset", "F1", false, true)) {
                 ctremu.pending_reset = true;
             }
-            igMenuItemP("Pause", "F5", &ctremu.pause, true);
-            if (igMenuItem("Stop", nullptr, false, true)) {
+            ImGui_MenuItemBoolPtr("Pause", "F5", &ctremu.pause, true);
+            if (ImGui_MenuItem("Stop")) {
                 emulator_set_rom(nullptr);
             }
-            igSeparator();
+            ImGui_Separator();
 
-            igMenuItemP("Fast Forward", "Tab", &ctremu.fastforward, true);
-            igMenuItemP("Mute", "F6", &ctremu.mute, true);
+            ImGui_MenuItemBoolPtr("Fast Forward", "Tab", &ctremu.fastforward, true);
+            ImGui_MenuItemBoolPtr("Mute", "F6", &ctremu.mute, true);
 
-            igSeparator();
+            ImGui_Separator();
 
-            if (igMenuItemP("Free Camera", "F7", &ctremu.freecam_enable,
+            if (ImGui_MenuItemBoolPtr("Free Camera", "F7", &ctremu.freecam_enable,
                             true)) {
                 glm_mat4_identity(ctremu.freecam_mtx);
                 renderer_gl_update_freecam(&ctremu.system.gpu.gl);
             }
 
-            igEndMenu();
+            ImGui_EndMenu();
         }
 
-        if (igBeginMenu("View", true)) {
-            if (igMenuItemP("Fullscreen", "F11", &ctremu.fullscreen, true)) {
+        if (ImGui_BeginMenu("View")) {
+            if (ImGui_MenuItemBoolPtr("Fullscreen", "F11", &ctremu.fullscreen, true)) {
                 SDL_SetWindowFullscreen(g_window, ctremu.fullscreen);
             }
-            if (igBeginMenu("Screen Layout", true)) {
-                if (igMenuItem("Vertical", nullptr,
+            if (ImGui_BeginMenu("Screen Layout")) {
+                if (ImGui_MenuItemEx("Vertical", nullptr,
                                ctremu.viewlayout == LAYOUT_DEFAULT, true)) {
                     ctremu.viewlayout = LAYOUT_DEFAULT;
                 }
-                if (igMenuItem("Horizontal", nullptr,
+                if (ImGui_MenuItemEx("Horizontal", nullptr,
                                ctremu.viewlayout == LAYOUT_HORIZONTAL, true)) {
                     ctremu.viewlayout = LAYOUT_HORIZONTAL;
                 }
-                if (igMenuItem("Large Screen", nullptr,
+                if (ImGui_MenuItemEx("Large Screen", nullptr,
                                ctremu.viewlayout == LAYOUT_LARGETOP, true)) {
                     ctremu.viewlayout = LAYOUT_LARGETOP;
                 }
-                igSeparator();
-                igMenuItemP("Swap Screens", "F9", &ctremu.swapscreens, true);
-                igEndMenu();
+                ImGui_Separator();
+                ImGui_MenuItemBoolPtr("Swap Screens", "F9", &ctremu.swapscreens, true);
+                ImGui_EndMenu();
             }
-            igSeparator();
+            ImGui_Separator();
 
-            if (igMenuItem("Settings", "F3", false, true)) {
+            if (ImGui_MenuItemEx("Settings", "F3", false, true)) {
                 uistate.settings = true;
             }
 
-            igSeparator();
+            ImGui_Separator();
 
-            if (igMenuItem("Texture Viewer", nullptr, false,
+            if (ImGui_MenuItemEx("Texture Viewer", nullptr, false,
                            ctremu.initialized)) {
                 uistate.textureview = true;
             }
 
-            if (igMenuItem("Audio Channels", nullptr, false,
+            if (ImGui_MenuItemEx("Audio Channels", nullptr, false,
                            ctremu.initialized)) {
                 uistate.audioview = true;
             }
 
-            igEndMenu();
+            ImGui_EndMenu();
         }
 
-        if (igBeginMenu("Debug", ctremu.initialized)) {
-            igMenuItemP("Verbose Log", nullptr, &g_infologs, true);
-            igMenuItemP("CPU Trace Log", nullptr, &g_cpulog, true);
-            igSeparator();
-            igMenuItemP("Wireframe", nullptr, &g_wireframe, true);
-            igEndMenu();
+        if (ImGui_BeginMenuEx("Debug", ctremu.initialized)) {
+            ImGui_MenuItemBoolPtr("Verbose Log", nullptr, &g_infologs, true);
+            ImGui_MenuItemBoolPtr("CPU Trace Log", nullptr, &g_cpulog, true);
+            ImGui_Separator();
+            ImGui_MenuItemBoolPtr("Wireframe", nullptr, &g_wireframe, true);
+            ImGui_EndMenu();
         }
 
-        if (igBeginMenu("About", true)) {
-            igTextLinkOpenURL("GitHub",
+        if (ImGui_BeginMenu("About")) {
+            ImGui_TextLinkOpenURLEx("GitHub",
                               "https://github.com/burhanr13/Tanuki3DS");
-            igTextLinkOpenURL("Discord", "https://discord.gg/6ya65fvD3g");
-            igEndMenu();
+            ImGui_TextLinkOpenURLEx("Discord", "https://discord.gg/6ya65fvD3g");
+            ImGui_EndMenu();
         }
 
-        igSpacing();
-        igTextDisabled("Esc to toggle menu bar");
+        ImGui_Spacing();
+        ImGui_TextDisabled("Esc to toggle menu bar");
 
-        igEndMainMenuBar();
+        ImGui_EndMainMenuBar();
     }
 }
 
@@ -309,121 +311,120 @@ void create_gamelist() {
 void draw_gamelist() {
     if (gamelist_refresh) create_gamelist();
 
-    igSetNextWindowViewport(igGetMainViewport()->ID);
-    igSetNextWindowPos(igGetMainViewport()->WorkPos, 0, (ImVec2) {});
-    igSetNextWindowSize(igGetMainViewport()->WorkSize, 0);
-    igBegin("game list", nullptr,
+    ImGui_SetNextWindowViewport(ImGui_GetMainViewport()->ID);
+    ImGui_SetNextWindowPos(ImGui_GetMainViewport()->WorkPos, 0);
+    ImGui_SetNextWindowSize(ImGui_GetMainViewport()->WorkSize, 0);
+    ImGui_Begin("game list", nullptr,
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
 
-    if (igButton("Select Game Folder...", (ImVec2) {})) {
+    if (ImGui_Button("Select Game Folder...")) {
         SDL_ShowOpenFolderDialog(game_dir_callback, nullptr, g_window, nullptr,
                                  false);
     }
-    igSameLine(0, -1);
+    ImGui_SameLine();
     if (ctremu.gamedir) {
-        igText("Current: %s", ctremu.gamedir);
+        ImGui_Text("Current: %s", ctremu.gamedir);
     } else {
-        igText("Current: [None]");
+        ImGui_Text("Current: [None]");
     }
-    igSameLine(0, -1);
-    if (igButton("Refresh", (ImVec2) {})) {
+    ImGui_SameLine();
+    if (ImGui_Button("Refresh")) {
         gamelist_refresh = true;
     }
 
-    igBeginChild("gamelist_child", (ImVec2) {}, 0, 0);
-    igBeginTable("gamelist", 5,
+    ImGui_BeginChild("gamelist_child", (ImVec2) {}, 0, 0);
+    ImGui_BeginTable("gamelist", 5,
                  ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp |
-                     ImGuiTableFlags_ScrollY,
-                 (ImVec2) {}, 0);
+                     ImGuiTableFlags_ScrollY);
 
-    igTableSetupScrollFreeze(0, 1);
-    igTableSetupColumn("Icon", ImGuiTableColumnFlags_WidthFixed, 50, 0);
-    igTableSetupColumn("Title", 0, 0, 0);
-    igTableSetupColumn("Publisher", 0, 0, 0);
-    igTableSetupColumn("Region", 0, 0, 0);
-    igTableSetupColumn("Size", 0, 0, 0);
-    igTableHeadersRow();
+    ImGui_TableSetupScrollFreeze(0, 1);
+    ImGui_TableSetupColumnEx("Icon", ImGuiTableColumnFlags_WidthFixed, 50, 0);
+    ImGui_TableSetupColumn("Title", 0);
+    ImGui_TableSetupColumn("Publisher", 0);
+    ImGui_TableSetupColumn("Region", 0);
+    ImGui_TableSetupColumn("Size", 0);
+    ImGui_TableHeadersRow();
 
     Vec_foreach(g, gamelist) {
-        igPushID_Str(g->filename);
-        igTableNextRow(0, 0);
-        igTableNextColumn();
-        if (igSelectable("##", false,
+        ImGui_PushID(g->filename);
+        ImGui_TableNextRow();
+        ImGui_TableNextColumn();
+        if (ImGui_SelectableEx("##", false,
                          ImGuiSelectableFlags_SpanAllColumns |
                              ImGuiSelectableFlags_AllowOverlap |
                              ImGuiSelectableFlags_AllowDoubleClick,
                          (ImVec2) {0, 48})) {
-            if (igIsMouseDoubleClicked_Nil(0)) emulator_set_rom(g->filename);
+            if (ImGui_IsMouseDoubleClicked(0)) emulator_set_rom(g->filename);
         }
-        igSameLine(0, -1);
-        igImage((ImTextureRef) {0, g->icontex}, (ImVec2) {48, 48},
-                (ImVec2) {0, 0}, (ImVec2) {1, 1});
-        igTableNextColumn();
-        igText("%s", g->gamename);
-        igTextDisabled("%s", strrchr(g->filename, '/') + 1);
-        igTableNextColumn();
-        igText("%s", g->publisher);
-        igTableNextColumn();
+        ImGui_SameLine();
+        ImGui_ImageEx((ImTextureRef) {0, g->icontex}, (ImVec2) {48, 48},
+                      (ImVec2) {0, 0}, (ImVec2) {1, 1});
+        ImGui_TableNextColumn();
+        ImGui_Text("%s", g->gamename);
+        ImGui_TextDisabled("%s", strrchr(g->filename, '/') + 1);
+        ImGui_TableNextColumn();
+        ImGui_Text("%s", g->publisher);
+        ImGui_TableNextColumn();
         static const char* regions[] = {
             "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
         };
         if ((g->region & 0x7f) == 0x7f) {
-            igText("Any");
+            ImGui_Text("Any");
         } else {
-            igText("%s", regions[__builtin_ctz(g->region)]);
+            ImGui_Text("%s", regions[__builtin_ctz(g->region)]);
         }
-        igTableNextColumn();
+        ImGui_TableNextColumn();
         if (g->size < BIT(20)) {
-            igText("%.1f KiB", (double) g->size / BIT(10));
+            ImGui_Text("%.1f KiB", (double) g->size / BIT(10));
         } else if (g->size < BIT(30)) {
-            igText("%.1f MiB", (double) g->size / BIT(20));
+            ImGui_Text("%.1f MiB", (double) g->size / BIT(20));
         } else {
-            igText("%.1f GiB", (double) g->size / BIT(30));
+            ImGui_Text("%.1f GiB", (double) g->size / BIT(30));
         }
-        igPopID();
+        ImGui_PopID();
     }
 
-    igEndTable();
-    igEndChild();
+    ImGui_EndTable();
+    ImGui_EndChild();
 
-    igEnd();
+    ImGui_End();
 }
 
 void draw_swkbd() {
-    if (ctremu.needs_swkbd) igOpenPopup_Str("Input Text", 0);
+    if (ctremu.needs_swkbd) ImGui_OpenPopup("Input Text", 0);
 
-    if (igBeginPopupModal("Input Text", nullptr,
+    if (ImGui_BeginPopupModal("Input Text", nullptr,
                           ImGuiWindowFlags_AlwaysAutoResize)) {
         static char buf[100];
-        if (igIsWindowAppearing()) {
+        if (ImGui_IsWindowAppearing()) {
             memset(buf, 0, sizeof buf);
-            igSetKeyboardFocusHere(0);
+            ImGui_SetKeyboardFocusHere();
         }
 
-        igInputText("##swkbd input", buf, sizeof buf, 0, nullptr, nullptr);
+        ImGui_InputText("##swkbd input", buf, sizeof buf, 0);
 
-        if (igButton("Ok", (ImVec2) {})) {
+        if (ImGui_Button("Ok")) {
             swkbd_resp(&ctremu.system, buf);
-            igCloseCurrentPopup();
+            ImGui_CloseCurrentPopup();
         }
-        igEndPopup();
+        ImGui_EndPopup();
     }
 }
 
 void config_input(char* name, int* val) {
-    igTableNextRow(0, 0);
-    igTableNextColumn();
-    igText(name);
-    igTableNextColumn();
+    ImGui_TableNextRow();
+    ImGui_TableNextColumn();
+    ImGui_Text("%s", name);
+    ImGui_TableNextColumn();
     if (uistate.waiting_key == val) {
-        igBeginDisabled(true);
-        igButton("Press Key...", (ImVec2) {150, 0});
-        igEndDisabled();
+        ImGui_BeginDisabled(true);
+        ImGui_ButtonEx("Press Key...", (ImVec2) {150, 0});
+        ImGui_EndDisabled();
     } else {
         char buf[100];
         snprintf(buf, sizeof buf, "%s##%s", SDL_GetScancodeName(*val), name);
-        if (igButton(buf, (ImVec2) {150, 0})) {
+        if (ImGui_ButtonEx(buf, (ImVec2) {150, 0})) {
             uistate.waiting_key = val;
         }
     }
@@ -445,79 +446,76 @@ void draw_settings() {
                                        "Input"};
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
-    if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    if (ImGui_GetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         flags |= ImGuiWindowFlags_NoTitleBar;
     }
 
-    igSetNextWindowClass(&(ImGuiWindowClass) {
+    ImGui_SetNextWindowClass(&(ImGuiWindowClass) {
         .ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge});
 
-    igSetNextWindowSize((ImVec2) {500, 400}, ImGuiCond_FirstUseEver);
+    ImGui_SetNextWindowSize((ImVec2) {500, 400}, ImGuiCond_FirstUseEver);
 
-    igBegin("Settings", &uistate.settings, flags);
+    ImGui_Begin("Settings", &uistate.settings, flags);
 
-    igPushStyleColor_Vec4(ImGuiCol_ChildBg,
-                          *igGetStyleColorVec4(ImGuiCol_FrameBg));
-    igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign, (ImVec2) {0.5, 0.5});
-    igBeginChild("sidebar", (ImVec2) {100, 0}, 0, 0);
-    igSeparator();
+    ImGui_PushStyleColorImVec4(ImGuiCol_ChildBg,
+                          *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
+    ImGui_PushStyleVarImVec2(ImGuiStyleVar_SelectableTextAlign, (ImVec2) {0.5, 0.5});
+    ImGui_BeginChild("sidebar", (ImVec2) {100, 0}, 0, 0);
+    ImGui_Separator();
     for (int i = 0; i < PANE_MAX; i++) {
-        if (igSelectable(pane_names[i], curPane == i, 0, (ImVec2) {})) {
+        if (ImGui_SelectableEx(pane_names[i], curPane == i, 0, (ImVec2) {})) {
             curPane = i;
         }
-        igSeparator();
+        ImGui_Separator();
     }
-    igEndChild();
-    igPopStyleVar(1);
-    igPopStyleColor(1);
+    ImGui_EndChild();
+    ImGui_PopStyleVar();
+    ImGui_PopStyleColor();
 
-    igSameLine(0, -1);
+    ImGui_SameLine();
 
-    igBeginChild("settings", (ImVec2) {},
+    ImGui_BeginChild("settings", (ImVec2) {},
                  ImGuiChildFlags_AlwaysUseWindowPadding, 0);
-    igBeginChild("settings pane", (ImVec2) {0, -40}, 0, 0);
+    ImGui_BeginChild("settings pane", (ImVec2) {0, -40}, 0, 0);
 
     switch (curPane) {
         case PANE_SYSTEM: {
-            igSeparatorText("System");
-            igInputText("Username", ctremu.username, sizeof ctremu.username, 0,
-                        nullptr, nullptr);
+            ImGui_SeparatorText("System");
+            ImGui_InputText("Username", ctremu.username, sizeof ctremu.username, 0);
             static const char* languages[] = {
                 "Japanese", "English",    "French",  "German",
                 "Italian",  "Spanish",    "Chinese", "Korean",
                 "Dutch",    "Portuguese", "Russian", "Taiwanese",
             };
-            igCombo("System Language", &ctremu.language, languages,
-                    countof(languages), 0);
+            ImGui_ComboChar("System Language", &ctremu.language, languages,
+                    countof(languages));
 
-            igCheckbox("Auto Detect Region", &ctremu.detectRegion);
-            igBeginDisabled(ctremu.detectRegion);
+            ImGui_Checkbox("Auto Detect Region", &ctremu.detectRegion);
+            ImGui_BeginDisabled(ctremu.detectRegion);
             static const char* regions[] = {
                 "JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN",
             };
-            igCombo("System Region", &ctremu.region, regions, countof(regions),
-                    0);
-            igEndDisabled();
+            ImGui_ComboChar("System Region", &ctremu.region, regions, countof(regions));
+            ImGui_EndDisabled();
 
             break;
         }
         case PANE_CPU: {
-            igSeparatorText("CPU JIT");
-            igBeginDisabled(ctremu.initialized);
-            igCheckbox("Use IR Interpreter", &g_jit_config.ir_interpret);
-            igSetNextItemWidth(200);
-            igInputInt("Maximum Block Instructions",
-                       &g_jit_config.max_block_instrs, 1, 1, 0);
-            igCheckbox("Enable Optimization", &g_jit_config.optimize);
-            igCheckbox("Enable Block Linking", &g_jit_config.linking);
-            igEndDisabled();
-            igSeparatorText("Memory");
-            igCheckbox("Ignore Invalid Access", &ctremu.ignore_null);
+            ImGui_SeparatorText("CPU JIT");
+            ImGui_BeginDisabled(ctremu.initialized);
+            ImGui_Checkbox("Use IR Interpreter", &g_jit_config.ir_interpret);
+            ImGui_SetNextItemWidth(200);
+            ImGui_InputInt("Maximum Block Instructions", &g_jit_config.max_block_instrs);
+            ImGui_Checkbox("Enable Optimization", &g_jit_config.optimize);
+            ImGui_Checkbox("Enable Block Linking", &g_jit_config.linking);
+            ImGui_EndDisabled();
+            ImGui_SeparatorText("Memory");
+            ImGui_Checkbox("Ignore Invalid Access", &ctremu.ignore_null);
             break;
         }
         case PANE_VIDEO: {
-            igSeparatorText("Video");
-            if (igCheckbox("VSync", &ctremu.vsync)) {
+            ImGui_SeparatorText("Video");
+            if (ImGui_Checkbox("VSync", &ctremu.vsync)) {
                 if (ctremu.vsync) {
                     if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
                 } else {
@@ -526,65 +524,63 @@ void draw_settings() {
             }
             static const char* layouts[] = {"Vertical", "Horizontal",
                                             "Large Screen"};
-            igSetNextItemWidth(150);
-            igCombo("Screen Layout", &ctremu.viewlayout, layouts,
-                    countof(layouts), 0);
-            igCheckbox("Swap Screens", &ctremu.swapscreens);
-            igSetNextItemWidth(150);
-            igInputFloat("Large Screen Ratio", &ctremu.largescreenratio, 1, 1,
-                         nullptr, 0);
+            ImGui_SetNextItemWidth(150);
+            ImGui_ComboChar("Screen Layout", &ctremu.viewlayout, layouts,
+                    countof(layouts));
+            ImGui_Checkbox("Swap Screens", &ctremu.swapscreens);
+            ImGui_SetNextItemWidth(150);
+            ImGui_InputFloat("Large Screen Ratio", &ctremu.largescreenratio);
 
-            igBeginDisabled(ctremu.initialized);
+            ImGui_BeginDisabled(ctremu.initialized);
             static const char* filters[] = {"Nearest", "Bilinear",
                                             "Sharp Bilinear"};
-            igSetNextItemWidth(150);
-            igCombo("Postprocessing Filter", &ctremu.outputfilter, filters,
-                    countof(filters), 0);
-            igEndDisabled();
+            ImGui_SetNextItemWidth(150);
+            ImGui_ComboChar("Postprocessing Filter", &ctremu.outputfilter, filters,
+                    countof(filters));
+            ImGui_EndDisabled();
 
-            igSeparatorText("GPU");
-            igBeginDisabled(ctremu.initialized);
-            igSetNextItemWidth(150);
-            igInputInt("Video Scale", &ctremu.videoscale, 1, 1, 0);
+            ImGui_SeparatorText("GPU");
+            ImGui_BeginDisabled(ctremu.initialized);
+            ImGui_SetNextItemWidth(150);
+            ImGui_InputInt("Video Scale", &ctremu.videoscale);
             if (ctremu.videoscale < 1) ctremu.videoscale = 1;
-            igSetNextItemWidth(150);
-            igInputInt("Software Vertex Shader Threads", &ctremu.vshthreads, 1,
-                       1, 0);
+            ImGui_SetNextItemWidth(150);
+            ImGui_InputInt("Software Vertex Shader Threads", &ctremu.vshthreads);
             if (ctremu.vshthreads < 0) ctremu.vshthreads = 0;
             if (ctremu.vshthreads > MAX_VSH_THREADS)
                 ctremu.vshthreads = MAX_VSH_THREADS;
-            igEndDisabled();
-            igCheckbox("Shader JIT", &ctremu.shaderjit);
-            igCheckbox("Hardware Vertex Shaders", &ctremu.hwvshaders);
-            igIndent(0);
-            igBeginDisabled(!ctremu.hwvshaders);
-            igCheckbox("Safe Multiplication", &ctremu.safeShaderMul);
-            igEndDisabled();
-            igUnindent(0);
-            // igCheckbox("Use Ubershader", &ctremu.ubershader);
-            igCheckbox("Hash Textures", &ctremu.hashTextures);
+            ImGui_EndDisabled();
+            ImGui_Checkbox("Shader JIT", &ctremu.shaderjit);
+            ImGui_Checkbox("Hardware Vertex Shaders", &ctremu.hwvshaders);
+            ImGui_Indent();
+            ImGui_BeginDisabled(!ctremu.hwvshaders);
+            ImGui_Checkbox("Safe Multiplication", &ctremu.safeShaderMul);
+            ImGui_EndDisabled();
+            ImGui_Unindent();
+            // ImGui_Checkbox("Use Ubershader", &ctremu.ubershader);
+            ImGui_Checkbox("Hash Textures", &ctremu.hashTextures);
             break;
         }
         case PANE_AUDIO: {
-            igSeparatorText("Audio");
-            igCheckbox("Audio Sync", &ctremu.audiosync);
-            igSliderFloat("Volume", &ctremu.volume, 0, 200, nullptr, 0);
+            ImGui_SeparatorText("Audio");
+            ImGui_Checkbox("Audio Sync", &ctremu.audiosync);
+            ImGui_SliderFloat("Volume", &ctremu.volume, 0, 200);
             static const char* audiomodes[] = {
                 "Mono",
                 "Stereo",
                 "Surround",
             };
-            igCombo("Audio Output Mode", &ctremu.audiomode, audiomodes,
-                    countof(audiomodes), 0);
-            igCheckbox("Enable Microphone", &ctremu.micEnable);
+            ImGui_ComboChar("Audio Output Mode", &ctremu.audiomode, audiomodes,
+                    countof(audiomodes));
+            ImGui_Checkbox("Enable Microphone", &ctremu.micEnable);
             break;
         }
         case PANE_INPUT: {
-            if (igBeginTabBar("input tabs", 0)) {
-                if (igBeginTabItem("Keyboard Input", nullptr, 0)) {
-                    igBeginChild("keyboard input panel", (ImVec2) {}, 0, 0);
-                    igBeginTable("input config", 2,
-                                 ImGuiTableFlags_BordersOuterV, (ImVec2) {}, 0);
+            if (ImGui_BeginTabBar("input tabs", 0)) {
+                if (ImGui_BeginTabItem("Keyboard Input", nullptr, 0)) {
+                    ImGui_BeginChild("keyboard input panel", (ImVec2) {}, 0, 0);
+                    ImGui_BeginTable("input config", 2,
+                                 ImGuiTableFlags_BordersOuterV);
                     config_input("A", &ctremu.inputmap.kb.a);
                     config_input("B", &ctremu.inputmap.kb.b);
                     config_input("X", &ctremu.inputmap.kb.x);
@@ -593,81 +589,80 @@ void draw_settings() {
                     config_input("R", &ctremu.inputmap.kb.r);
                     config_input("Start", &ctremu.inputmap.kb.start);
                     config_input("Select", &ctremu.inputmap.kb.select);
-                    igTableNextRow(0, 0);
+                    ImGui_TableNextRow();
                     config_input("D-Pad Left", &ctremu.inputmap.kb.dl);
                     config_input("D-Pad Right", &ctremu.inputmap.kb.dr);
                     config_input("D-Pad Up", &ctremu.inputmap.kb.du);
                     config_input("D-Pad Down", &ctremu.inputmap.kb.dd);
-                    igTableNextRow(0, 0);
+                    ImGui_TableNextRow();
                     config_input("Circle Pad Left", &ctremu.inputmap.kb.cl);
                     config_input("Circle Pad Right", &ctremu.inputmap.kb.cr);
                     config_input("Circle Pad Up", &ctremu.inputmap.kb.cu);
                     config_input("Circle Pad Down", &ctremu.inputmap.kb.cd);
                     config_input("Circle Pad Modifier",
                                  &ctremu.inputmap.kb.cmod);
-                    igEndTable();
-                    igSetNextItemWidth(200);
-                    igSliderFloat("Circle Pad Modifier Scale",
-                                  &ctremu.inputmap.kb.cmodscale, 0, 1, nullptr,
-                                  0);
-                    igEndChild();
-                    igEndTabItem();
+                    ImGui_EndTable();
+                    ImGui_SetNextItemWidth(200);
+                    ImGui_SliderFloat("Circle Pad Modifier Scale",
+                                  &ctremu.inputmap.kb.cmodscale, 0, 1);
+                    ImGui_EndChild();
+                    ImGui_EndTabItem();
                 }
 
-                if (igBeginTabItem("Freecam", nullptr,
+                if (ImGui_BeginTabItem("Freecam", nullptr,
                                    ImGuiTabItemFlags_None)) {
-                    igBeginChild("freecam input panel", (ImVec2) {}, 0, 0);
-                    igBeginTable("freecam config", 2,
-                                 ImGuiTableFlags_BordersOuterV, (ImVec2) {}, 0);
+                    ImGui_BeginChild("freecam input panel", (ImVec2) {}, 0, 0);
+                    ImGui_BeginTable("freecam config", 2,
+                                 ImGuiTableFlags_BordersOuterV);
                     config_input("Move Forward", &ctremu.inputmap.freecam.mf);
                     config_input("Move Backward", &ctremu.inputmap.freecam.mb);
                     config_input("Move Left", &ctremu.inputmap.freecam.ml);
                     config_input("Move Right", &ctremu.inputmap.freecam.mr);
                     config_input("Move Up", &ctremu.inputmap.freecam.mu);
                     config_input("Move Down", &ctremu.inputmap.freecam.md);
-                    igTableNextRow(0, 0);
+                    ImGui_TableNextRow();
                     config_input("Look Up", &ctremu.inputmap.freecam.lu);
                     config_input("Look Down", &ctremu.inputmap.freecam.ld);
                     config_input("Look Left", &ctremu.inputmap.freecam.ll);
                     config_input("Look Right", &ctremu.inputmap.freecam.lr);
                     config_input("Roll Left", &ctremu.inputmap.freecam.rl);
                     config_input("Roll Right", &ctremu.inputmap.freecam.rr);
-                    igTableNextRow(0, 0);
+                    ImGui_TableNextRow();
                     config_input("Slow Modifier",
                                  &ctremu.inputmap.freecam.slow_mod);
                     config_input("Fast Modifier",
                                  &ctremu.inputmap.freecam.fast_mod);
-                    igEndTable();
-                    igEndChild();
-                    igEndTabItem();
+                    ImGui_EndTable();
+                    ImGui_EndChild();
+                    ImGui_EndTabItem();
                 }
 
-                igEndTabBar();
+                ImGui_EndTabBar();
             }
             break;
         }
         case PANE_MAX:
             break;
     }
-    igEndChild();
+    ImGui_EndChild();
 
-    igSeparator();
+    ImGui_Separator();
 
-    igBeginDisabled(ctremu.initialized);
-    if (igButton("Reset All", (ImVec2) {})) {
+    ImGui_BeginDisabled(ctremu.initialized);
+    if (ImGui_Button("Reset All")) {
         emulator_load_default_settings();
     }
-    igEndDisabled();
+    ImGui_EndDisabled();
 
-    igSameLine(0, -1);
+    ImGui_SameLine();
 
-    if (igButton("Close", (ImVec2) {})) {
+    if (ImGui_Button("Close")) {
         uistate.settings = false;
     }
 
-    igEndChild();
+    ImGui_EndChild();
 
-    igEnd();
+    ImGui_End();
 }
 
 void draw_textureview() {
@@ -675,54 +670,54 @@ void draw_textureview() {
     if (!uistate.textureview) return;
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
-    if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    if (ImGui_GetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         flags |= ImGuiWindowFlags_NoTitleBar;
     }
 
-    igSetNextWindowClass(&(ImGuiWindowClass) {
+    ImGui_SetNextWindowClass(&(ImGuiWindowClass) {
         .ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge});
 
-    igSetNextWindowSize((ImVec2) {800, 700}, ImGuiCond_FirstUseEver);
+    ImGui_SetNextWindowSize((ImVec2) {800, 700}, ImGuiCond_FirstUseEver);
 
-    igBegin("GPU Texture Viewer", &uistate.textureview, flags);
+    ImGui_Begin("GPU Texture Viewer", &uistate.textureview, flags);
 
-    igBeginTabBar("##texturetabbar", 0);
+    ImGui_BeginTabBar("##texturetabbar", 0);
 
-    if (igBeginTabItem("Textures", nullptr, 0)) {
+    if (ImGui_BeginTabItem("Textures", nullptr, 0)) {
 
         static int curTex = 0;
 
         auto texcache = &ctremu.system.gpu.textures;
 
-        igPushStyleColor_Vec4(ImGuiCol_ChildBg,
-                              *igGetStyleColorVec4(ImGuiCol_FrameBg));
-        igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign,
+        ImGui_PushStyleColorImVec4(ImGuiCol_ChildBg,
+                              *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
+        ImGui_PushStyleVarImVec2(ImGuiStyleVar_SelectableTextAlign,
                             (ImVec2) {0.5, 0.5});
-        igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
+        ImGui_BeginChild("##list", (ImVec2) {200, 0}, 0, 0);
 
         for (int i = 0; i < TEX_MAX; i++) {
             char buf[100];
 
             if (texcache->d[i].key) {
                 sprintf(buf, "Texture %d", i);
-                igBeginDisabled(false);
+                ImGui_BeginDisabled(false);
             } else {
                 sprintf(buf, "[Empty]##%d", i);
-                igBeginDisabled(true);
+                ImGui_BeginDisabled(true);
             }
-            if (igSelectable(buf, curTex == i, 0, (ImVec2) {})) {
+            if (ImGui_SelectableEx(buf, curTex == i, 0, (ImVec2) {})) {
                 curTex = i;
             }
-            igEndDisabled();
+            ImGui_EndDisabled();
         }
 
-        igEndChild();
-        igPopStyleVar(1);
-        igPopStyleColor(1);
+        ImGui_EndChild();
+        ImGui_PopStyleVar();
+        ImGui_PopStyleColor();
 
-        igSameLine(0, -1);
+        ImGui_SameLine();
 
-        igBeginChild("##texture pane", (ImVec2) {},
+        ImGui_BeginChild("##texture pane", (ImVec2) {},
                      ImGuiChildFlags_AlwaysUseWindowPadding, 0);
 
         auto tex = &texcache->d[curTex];
@@ -737,7 +732,7 @@ void draw_textureview() {
                 w = (float) tex->width * 512 / tex->height;
             }
 
-            igImageWithBg((ImTextureRef) {0, tex->tex}, (ImVec2) {w, h},
+            ImGui_ImageWithBgEx((ImTextureRef) {0, tex->tex}, (ImVec2) {w, h},
                           (ImVec2) {0, 1}, (ImVec2) {1, 0},
                           (ImVec4) {0.25, 0.25, 0.25, 1},
                           (ImVec4) {1, 1, 1, 1});
@@ -745,50 +740,50 @@ void draw_textureview() {
                 "RGBA8888", "RGB888", "RGBA5551", "RGB565", "RGBA4444", "LA88",
                 "RG88",     "L8",     "A8",       "IA44",   "I4",       "A4",
                 "ETC1",     "ETC1A4", "???",      "???"};
-            igText("Addr: %#x  Size: %dx%d  Format: %s", tex->paddr, tex->width,
+            ImGui_Text("Addr: %#lx  Size: %dx%d  Format: %s", tex->paddr, tex->width,
                    tex->height, fmts[tex->fmt]);
-            igText("Hash: %016llx", tex->hash);
+            ImGui_Text("Hash: %016lx", tex->hash);
         }
-        igEndChild();
+        ImGui_EndChild();
 
-        igEndTabItem();
+        ImGui_EndTabItem();
     }
 
-    if (igBeginTabItem("Framebuffers", nullptr, 0)) {
+    if (ImGui_BeginTabItem("Framebuffers", nullptr, 0)) {
 
         static int curFb = 0;
 
         auto fbcache = &ctremu.system.gpu.fbs;
 
-        igPushStyleColor_Vec4(ImGuiCol_ChildBg,
-                              *igGetStyleColorVec4(ImGuiCol_FrameBg));
-        igPushStyleVar_Vec2(ImGuiStyleVar_SelectableTextAlign,
+        ImGui_PushStyleColorImVec4(ImGuiCol_ChildBg,
+                              *ImGui_GetStyleColorVec4(ImGuiCol_FrameBg));
+        ImGui_PushStyleVarImVec2(ImGuiStyleVar_SelectableTextAlign,
                             (ImVec2) {0.5, 0.5});
-        igBeginChild("##list", (ImVec2) {200, 0}, 0, 0);
+        ImGui_BeginChild("##list", (ImVec2) {200, 0}, 0, 0);
 
         for (int i = 0; i < FB_MAX; i++) {
             char buf[100];
 
             if (fbcache->d[i].key) {
                 sprintf(buf, "Framebuffer %d", i);
-                igBeginDisabled(false);
+                ImGui_BeginDisabled(false);
             } else {
                 sprintf(buf, "[Empty]##%d", i);
-                igBeginDisabled(true);
+                ImGui_BeginDisabled(true);
             }
-            if (igSelectable(buf, curFb == i, 0, (ImVec2) {})) {
+            if (ImGui_SelectableEx(buf, curFb == i, 0, (ImVec2) {})) {
                 curFb = i;
             }
-            igEndDisabled();
+            ImGui_EndDisabled();
         }
 
-        igEndChild();
-        igPopStyleVar(1);
-        igPopStyleColor(1);
+        ImGui_EndChild();
+        ImGui_PopStyleVar();
+        ImGui_PopStyleColor();
 
-        igSameLine(0, -1);
+        ImGui_SameLine();
 
-        igBeginChild("##fb pane", (ImVec2) {},
+        ImGui_BeginChild("##fb pane", (ImVec2) {},
                      ImGuiChildFlags_AlwaysUseWindowPadding, 0);
 
         auto fb = &fbcache->d[curFb];
@@ -805,17 +800,17 @@ void draw_textureview() {
             }
 
             static int bufselect;
-            igRadioButton_IntPtr("Color Buffer", &bufselect, 0);
-            igSameLine(0, -1);
-            igRadioButton_IntPtr("Depth Buffer", &bufselect, 1);
+            ImGui_RadioButtonIntPtr("Color Buffer", &bufselect, 0);
+            ImGui_SameLine();
+            ImGui_RadioButtonIntPtr("Depth Buffer", &bufselect, 1);
 
             if (bufselect == 0) {
-                igImageWithBg((ImTextureRef) {0, fb->color_tex},
+                ImGui_ImageWithBgEx((ImTextureRef) {0, fb->color_tex},
                               (ImVec2) {w, h}, (ImVec2) {0, 1}, (ImVec2) {1, 0},
                               (ImVec4) {0.25, 0.25, 0.25, 1},
                               (ImVec4) {1, 1, 1, 1});
             } else {
-                igImageWithBg((ImTextureRef) {0, fb->depth_tex},
+                ImGui_ImageWithBgEx((ImTextureRef) {0, fb->depth_tex},
                               (ImVec2) {w, h}, (ImVec2) {0, 1}, (ImVec2) {1, 0},
                               (ImVec4) {0.25, 0.25, 0.25, 1},
                               (ImVec4) {1, 1, 1, 1});
@@ -823,17 +818,17 @@ void draw_textureview() {
             static const char* fmts[] = {"RGBA8888", "RGB888",   "RGB565",
                                          "RGBA5551", "RGBA4444", "???",
                                          "???",      "???"};
-            igText("Color Addr: %#x  Size: %dx%d  Format: %s", fb->color_paddr,
+            ImGui_Text("Color Addr: %#lx  Size: %dx%d  Format: %s", fb->color_paddr,
                    fb->width, fb->height, fmts[fb->color_fmt]);
-            igText("Depth Addr: %#x", fb->depth_paddr);
+            ImGui_Text("Depth Addr: %#x", fb->depth_paddr);
         }
-        igEndChild();
+        ImGui_EndChild();
 
-        igEndTabItem();
+        ImGui_EndTabItem();
     }
-    igEndTabBar();
+    ImGui_EndTabBar();
 
-    igEnd();
+    ImGui_End();
 }
 
 int samplenum = 2000;
@@ -842,15 +837,15 @@ float samplerange = 0.25f;
 void plot_samples(DSPSampHist* wave) {
     float samples[FIFO_MAX(wave[0])];
     for (int i = 0; i < 2; i++) {
-        igPushID_Int(i);
-        igTableNextColumn();
+        ImGui_PushIDInt(i);
+        ImGui_TableNextColumn();
         FIFO_foreach_ring(it, wave[i]) {
             samples[it.i] = (float) *it.p / BIT(16);
         }
-        igPlotLines_FloatPtr("##", samples + countof(samples) - samplenum,
+        ImGui_PlotLinesEx("##", samples + countof(samples) - samplenum,
                              samplenum, 0, nullptr, -samplerange, samplerange,
                              (ImVec2) {200, 50}, 4);
-        igPopID();
+        ImGui_PopID();
     }
 }
 
@@ -859,79 +854,77 @@ void draw_audioview() {
     if (!uistate.audioview) return;
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
-    if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    if (ImGui_GetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         flags |= ImGuiWindowFlags_NoTitleBar;
     }
 
-    igSetNextWindowClass(&(ImGuiWindowClass) {
+    ImGui_SetNextWindowClass(&(ImGuiWindowClass) {
         .ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge});
 
-    igSetNextWindowSize((ImVec2) {650, 400}, ImGuiCond_FirstUseEver);
+    ImGui_SetNextWindowSize((ImVec2) {650, 400}, ImGuiCond_FirstUseEver);
 
-    igBegin("DSP Audio Channels", &uistate.audioview, flags);
+    ImGui_Begin("DSP Audio Channels", &uistate.audioview, flags);
 
-    igSliderInt("Sample Length", &samplenum, 0, FIFO_MAX(g_dsp_chn_hist[0][0]),
-                nullptr, 0);
+    ImGui_SliderInt("Sample Length", &samplenum, 0, FIFO_MAX(g_dsp_chn_hist[0][0]));
 
-    igSliderFloat("Amplitude Range", &samplerange, 0, 1, nullptr, 0);
+    ImGui_SliderFloat("Amplitude Range", &samplerange, 0, 1);
 
-    igBeginChild("audioviewchild", (ImVec2) {0, -40}, 0, 0);
+    ImGui_BeginChild("audioviewchild", (ImVec2) {0, -40}, 0, 0);
 
-    igBeginTable("##audioview", 4,
+    ImGui_BeginTable("##audioview", 4,
                  ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit |
-                     ImGuiTableFlags_BordersOuterV | ImGuiTableFlags_ScrollY,
-                 (ImVec2) {}, 0);
+                     ImGuiTableFlags_BordersOuterV | ImGuiTableFlags_ScrollY);
 
-    igTableSetupScrollFreeze(0, 1);
-    igTableSetupColumn("##", 0, 0, 0);
-    igTableSetupColumn("Left", 0, 0, 0);
-    igTableSetupColumn("Right", 0, 0, 0);
-    igTableSetupColumn("Disabled", 0, 0, 0);
-    igTableHeadersRow();
+    ImGui_TableSetupScrollFreeze(0, 1);
+    ImGui_TableSetupColumn("##", 0);
+    ImGui_TableSetupColumn("Left", 0);
+    ImGui_TableSetupColumn("Right", 0);
+    ImGui_TableSetupColumn("Disabled", 0);
+    ImGui_TableHeadersRow();
 
-    igTableNextRow(0, 0);
-    igTableNextColumn();
-    igText("Final Output");
-    igPushID_Int(-1);
+    ImGui_TableNextRow();
+    ImGui_TableNextColumn();
+    ImGui_Text("Final Output");
+    ImGui_PushIDInt(-1);
     plot_samples(g_dsp_hist);
-    igPopID();
-    igTableNextColumn();
+    ImGui_PopID();
+    ImGui_TableNextColumn();
 
-    igTableNextRow(0, 0);
+    ImGui_TableNextRow();
 
     for (int i = 0; i < DSP_CHANNELS; i++) {
-        igPushID_Int(i);
-        igTableNextRow(0, 0);
-        igTableNextColumn();
-        igText("Channel %d", i);
+        ImGui_PushIDInt(i);
+        ImGui_TableNextRow();
+        ImGui_TableNextColumn();
+        ImGui_Text("Channel %d", i);
         plot_samples(g_dsp_chn_hist[i]);
-        igTableNextColumn();
+        ImGui_TableNextColumn();
         bool dis = g_dsp_chn_disable & BIT(i);
         g_dsp_chn_disable &= ~BIT(i);
-        igCheckbox("##", &dis);
+        ImGui_Checkbox("##", &dis);
         g_dsp_chn_disable |= dis << i;
-        igPopID();
+        ImGui_PopID();
     }
 
-    igEndTable();
+    ImGui_EndTable();
 
-    igEndChild();
+    ImGui_EndChild();
 
-    igSeparator();
+    ImGui_Separator();
 
-    if (igButton("Enable All", (ImVec2) {})) {
+    if (ImGui_Button("Enable All")) {
         g_dsp_chn_disable = 0;
     }
-    igSameLine(0, -1);
-    if (igButton("Disable All", (ImVec2) {})) {
+    ImGui_SameLine();
+    if (ImGui_Button("Disable All")) {
         g_dsp_chn_disable = ~0;
     }
-    igSameLine(0, -1);
-    if (igButton("Close", (ImVec2) {})) {
+    ImGui_SameLine();
+    if (ImGui_Button("Close")) {
         uistate.audioview = false;
     }
 
-    igEnd();
+    ImGui_End();
 }
 
 void draw_gui() {

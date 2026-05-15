@@ -5,6 +5,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <imgui/dcimgui.h>
+#include <imgui/dcimgui_impl_opengl3.h>
+#include <imgui/dcimgui_impl_sdl3.h>
+
 #include "3ds.h"
 #include "emulator.h"
 #include "gui.h"
@@ -13,13 +17,6 @@
 #ifdef _WIN32
 #define realpath(a, b) _fullpath(b, a, 4096)
 #endif
-
-const char usage[] =
-    R"(ctremu [options] [romfile]
--h -- print help
--l -- enable info logging
--sN -- upscale by N
-)";
 
 SDL_Window* g_window;
 
@@ -48,11 +45,6 @@ void read_args(int argc, char** argv) {
             case 'l':
                 g_infologs = true;
                 break;
-            case '?':
-            case 'h':
-            default:
-                eprintf(usage);
-                exit(0);
         }
     }
     argc -= optind;
@@ -63,7 +55,7 @@ void read_args(int argc, char** argv) {
 }
 
 void hotkey_press(SDL_Keycode key) {
-    if (igGetIO()->WantCaptureKeyboard) return;
+    if (ImGui_GetIO()->WantCaptureKeyboard) return;
     switch (key) {
         case SDLK_F5:
             ctremu.pause = !ctremu.pause;
@@ -112,7 +104,7 @@ void hotkey_press(SDL_Keycode key) {
 }
 
 void update_input() {
-    if (igGetIO()->WantCaptureKeyboard || igGetIO()->WantCaptureMouse) return;
+    if (ImGui_GetIO()->WantCaptureKeyboard || ImGui_GetIO()->WantCaptureMouse) return;
 
     const bool* keys = SDL_GetKeyboardState(nullptr);
 
@@ -425,12 +417,12 @@ int main(int argc, char** argv) {
     SDL_ResumeAudioStreamDevice(g_audio);
     ctremu.audio_cb = audio_callback;
 
-    igCreateContext(nullptr);
-    igGetIO()->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    igGetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    igGetIO()->ConfigViewportsNoDecoration = false;
-    ImGui_ImplSDL3_InitForOpenGL(g_window, glcontext);
-    ImGui_ImplOpenGL3_Init(nullptr);
+    ImGui_CreateContext(nullptr);
+    ImGui_GetIO()->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    ImGui_GetIO()->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    ImGui_GetIO()->ConfigViewportsNoDecoration = false;
+    cImGui_ImplSDL3_InitForOpenGL(g_window, glcontext);
+    cImGui_ImplOpenGL3_Init();
 
     setup_gui_theme();
 
@@ -510,7 +502,7 @@ int main(int argc, char** argv) {
                     emulator_set_rom(e.drop.data);
                     break;
             }
-            if (forward_imgui) ImGui_ImplSDL3_ProcessEvent(&e);
+            if (forward_imgui) cImGui_ImplSDL3_ProcessEvent(&e);
         }
 
         if (!ctremu.initialized) ctremu.pause = true;
@@ -539,9 +531,9 @@ int main(int argc, char** argv) {
             glClear(GL_COLOR_BUFFER_BIT);
         }
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        igNewFrame();
+        cImGui_ImplOpenGL3_NewFrame();
+        cImGui_ImplSDL3_NewFrame();
+        ImGui_NewFrame();
 
         draw_menubar();
 
@@ -549,12 +541,12 @@ int main(int argc, char** argv) {
 
         draw_gui();
 
-        igRender();
-        ImGui_ImplOpenGL3_RenderDrawData(igGetDrawData());
+        ImGui_Render();
+        cImGui_ImplOpenGL3_RenderDrawData(ImGui_GetDrawData());
 
-        if (igGetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-            igUpdatePlatformWindows();
-            igRenderPlatformWindowsDefault(nullptr, nullptr);
+        if (ImGui_GetIO()->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            ImGui_UpdatePlatformWindows();
+            ImGui_RenderPlatformWindowsDefault();
             SDL_GL_MakeCurrent(g_window, glcontext);
         }
 
@@ -610,9 +602,9 @@ int main(int argc, char** argv) {
         prev_frame_time = SDL_GetTicksNS();
     }
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    igDestroyContext(nullptr);
+    cImGui_ImplOpenGL3_Shutdown();
+    cImGui_ImplSDL3_Shutdown();
+    ImGui_DestroyContext(nullptr);
 
     if (g_audio_input) SDL_DestroyAudioStream(g_audio_input);
     SDL_DestroyAudioStream(g_audio);
