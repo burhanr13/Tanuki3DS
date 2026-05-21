@@ -15,6 +15,10 @@ typedef struct _rasBlock rasBlock;
 
 typedef struct _rasSymbol* rasLabel;
 
+enum {
+    RAS_FLAG_AUTOGROW = 1 << 0,
+};
+
 typedef enum {
     RAS_OK,
     RAS_ERR_CODE_SIZE,
@@ -49,11 +53,10 @@ typedef void (*rasErrorCallback)(rasError, void*);
 
 void rasSetErrorCallback(rasErrorCallback cb, void* userdata);
 
-rasBlock* rasCreate(size_t initialSize);
+rasBlock* rasCreate(size_t initialSize, int flags);
 void rasDestroy(rasBlock* ctx);
 
 void rasReady(rasBlock* ctx);
-void rasUnready(rasBlock* ctx);
 void* rasGetCode(rasBlock* ctx);
 size_t rasGetSize(rasBlock* ctx);
 

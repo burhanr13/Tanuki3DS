@@ -1,12 +1,19 @@
 #include "ras.h"
 
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
 #include <sys/mman.h>
+#ifndef MAP_JIT
+#define MAP_JIT 0
+#endif
+#endif
 
 typedef int8_t s8;
 typedef uint8_t u8;
@@ -79,6 +86,7 @@ typedef struct _rasBlock {
     size_t size;
 
     size_t initialSize;
+    int flags;
 
     LISTNODE(rasSymbol) symbols;
     LISTNODE(rasPatch) patches;
@@ -101,43 +109,34 @@ rasErrorCallback errorCallback = NULL;
 void* errorUserdata = NULL;
 
 static void* jit_alloc(size_t size) {
-#ifdef RAS_USE_RWX
-    int prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+#ifdef _WIN32
+    void* ptr = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE,
+                             PAGE_EXECUTE_READWRITE);
+    if (!ptr) {
+        fprintf(stderr, "VirtualAlloc failed\n");
+        abort();
+    }
 #else
-    int prot = PROT_READ | PROT_WRITE;
-#endif
     // try to map near the static code
-    void* ptr =
-        mmap(rasErrorStrings, size, prot, MAP_PRIVATE | MAP_ANON, -1, 0);
+    void* ptr = mmap(rasErrorStrings, size, PROT_READ | PROT_WRITE | PROT_EXEC,
+                     MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0);
     if (ptr == MAP_FAILED) {
         perror("mmap");
         abort();
     }
+#ifdef __APPLE__
+    pthread_jit_write_protect_np(0);
+#endif
+#endif
     return ptr;
 }
 
-enum Perm {
-    RW,
-    RX,
-    RWX,
-};
-
-static void jit_protect(void* code, size_t size, enum Perm perm) {
-    switch (perm) {
-        case RW: mprotect(code, size, PROT_READ | PROT_WRITE); break;
-        case RX: mprotect(code, size, PROT_READ | PROT_EXEC); break;
-        case RWX:
-            mprotect(code, size, PROT_READ | PROT_WRITE | PROT_EXEC);
-            break;
-    }
-}
-
 static void jit_free(void* code, size_t size) {
+#ifdef _WIN32
+    VirtualFree(code, 0, MEM_RELEASE);
+#else
     munmap(code, size);
-}
-
-static void jit_clearcache(void* code, size_t size) {
-    __builtin___clear_cache(code, code + size);
+#endif
 }
 
 void rasSetErrorCallback(rasErrorCallback cb, void* userdata) {
@@ -145,7 +144,7 @@ void rasSetErrorCallback(rasErrorCallback cb, void* userdata) {
     errorUserdata = userdata;
 }
 
-rasBlock* rasCreate(size_t initialSize) {
+rasBlock* rasCreate(size_t initialSize, int flags) {
     rasBlock* ctx = calloc(1, sizeof *ctx);
 
     ctx->code = jit_alloc(initialSize);
@@ -276,15 +275,11 @@ void rasApplyAllPatches(rasBlock* ctx) {
 void rasReady(rasBlock* ctx) {
     rasApplyAllPatches(ctx);
 
-#ifndef RAS_USE_RWX
-    jit_protect(ctx->code, ctx->size, RX);
+#ifdef __APPLE__
+    pthread_jit_write_protect_np(1);
 #endif
-    jit_clearcache(ctx->code, ctx->size);
-}
-
-void rasUnready(rasBlock* ctx) {
-#ifndef RAS_USE_RWX
-    jit_protect(ctx->code, ctx->size, RW);
+#ifdef __aarch64__
+    __builtin___clear_cache(ctx->code, ctx->code + ctx->size);
 #endif
 }
 
@@ -307,7 +302,6 @@ void rasAssert(bool condition, rasError err) {
     }
 }
 
-#ifdef RAS_AUTOGROW
 static void ras_grow(rasBlock* ctx) {
     u8* oldCode = ctx->code;
     size_t oldSize = ctx->size;
@@ -317,14 +311,13 @@ static void ras_grow(rasBlock* ctx) {
     memcpy(ctx->code, oldCode, oldSize);
     jit_free(oldCode, oldSize);
 }
-#endif
 
 void rasEmit8(rasBlock* ctx, u8 b) {
-#ifdef RAS_AUTOGROW
-    if (ctx->curr == ctx->code + ctx->size) ras_grow(ctx);
-#else
-    rasAssert(ctx->curr != ctx->code + ctx->size, RAS_ERR_CODE_SIZE);
-#endif
+    if (ctx->flags & RAS_FLAG_AUTOGROW) {
+        if (ctx->curr == ctx->code + ctx->size) ras_grow(ctx);
+    } else {
+        rasAssert(ctx->curr != ctx->code + ctx->size, RAS_ERR_CODE_SIZE);
+    }
     *ctx->curr++ = b;
 }
 
@@ -334,11 +327,11 @@ void rasEmit16(rasBlock* ctx, u16 h) {
 }
 
 void rasEmit32(rasBlock* ctx, u32 w) {
-#ifdef RAS_AUTOGROW
-    if (ctx->curr + 4 > ctx->code + ctx->size) ras_grow(ctx);
-#else
-    rasAssert(ctx->curr + 4 <= ctx->code + ctx->size, RAS_ERR_CODE_SIZE);
-#endif
+    if (ctx->flags & RAS_FLAG_AUTOGROW) {
+        if (ctx->curr + 4 > ctx->code + ctx->size) ras_grow(ctx);
+    } else {
+        rasAssert(ctx->curr + 4 <= ctx->code + ctx->size, RAS_ERR_CODE_SIZE);
+    }
     *(u32*) ctx->curr = w;
     ctx->curr += 4;
 }
