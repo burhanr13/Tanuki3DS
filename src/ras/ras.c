@@ -1,10 +1,7 @@
-#ifndef __RAS_IMPL_H
-#define __RAS_IMPL_H
-
 #include "ras.h"
-#include "ras_macros.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,15 +33,16 @@ typedef enum {
 typedef struct _rasSymbol {
     rasSymbolType type;
     union {
-        size_t intOffset; // in words
+        size_t intOffset;
         void* extAddr;
     };
 } rasSymbol;
 
 typedef struct _rasPatch {
     rasPatchType type;
-    size_t offset; // in words
+    size_t offset;
     rasLabel sym;
+    int addend;
 } rasPatch;
 
 #define LISTNODELEN 64
@@ -76,9 +74,9 @@ typedef struct _rasPatch {
 
 typedef struct _rasBlock {
 
-    u32* code;
-    u32* curr;
-    size_t size; // in words
+    u8* code;
+    u8* curr;
+    size_t size;
 
     size_t initialSize;
 
@@ -91,8 +89,10 @@ char* rasErrorStrings[RAS_ERR_MAX] = {
     [RAS_OK] = "no error",
     [RAS_ERR_CODE_SIZE] = "ran out of space for code",
     [RAS_ERR_BAD_R31] = "invalid use of ZR/SP",
+    [RAS_ERR_BAD_RH] = "invalid use of high byte register",
     [RAS_ERR_BAD_IMM] = "immediate out of range",
-    [RAS_ERR_BAD_CONST] = "invalid constant operand (SHIFT, extend, etc)",
+    [RAS_ERR_BAD_CONST] = "invalid constant operand",
+    [RAS_ERR_BAD_ADDR] = "invalid addressing mode",
     [RAS_ERR_UNDEF_LABEL] = "undefined label",
     [RAS_ERR_BAD_LABEL] = "label out of range or misaligned",
 };
@@ -124,12 +124,8 @@ enum Perm {
 
 static void jit_protect(void* code, size_t size, enum Perm perm) {
     switch (perm) {
-        case RW:
-            mprotect(code, size, PROT_READ | PROT_WRITE);
-            break;
-        case RX:
-            mprotect(code, size, PROT_READ | PROT_EXEC);
-            break;
+        case RW: mprotect(code, size, PROT_READ | PROT_WRITE); break;
+        case RX: mprotect(code, size, PROT_READ | PROT_EXEC); break;
         case RWX:
             mprotect(code, size, PROT_READ | PROT_WRITE | PROT_EXEC);
             break;
@@ -154,7 +150,7 @@ rasBlock* rasCreate(size_t initialSize) {
 
     ctx->code = jit_alloc(initialSize);
     ctx->curr = ctx->code;
-    ctx->size = initialSize / 4;
+    ctx->size = initialSize;
 
     ctx->initialSize = initialSize;
 
@@ -165,7 +161,7 @@ rasBlock* rasCreate(size_t initialSize) {
 }
 
 void rasDestroy(rasBlock* ctx) {
-    jit_free(ctx->code, 4 * ctx->size);
+    jit_free(ctx->code, ctx->size);
 
     free(ctx);
 }
@@ -190,35 +186,43 @@ rasLabel rasDefineLabelExternal(rasLabel l, void* addr) {
 
 void* rasGetLabelAddr(rasBlock* ctx, rasLabel l) {
     switch (l->type) {
-        case SYM_INTERNAL:
-            return ctx->code + l->intOffset;
-        case SYM_EXTERNAL:
-            return l->extAddr;
+        case SYM_INTERNAL: return ctx->code + l->intOffset;
+        case SYM_EXTERNAL: return l->extAddr;
         case SYM_UNDEFINED:
-        default:
-            return NULL;
+        default: return NULL;
     }
 }
 
-void rasAddPatch(rasBlock* ctx, rasPatchType type, rasLabel l) {
+void rasAddPatchEx(rasBlock* ctx, rasPatchType type, rasLabel l, int addend) {
     rasPatch* p = LISTNEXT(ctx->patches);
     p->type = type;
     p->offset = ctx->curr - ctx->code;
     p->sym = l;
+    p->addend = addend;
 }
 
 void rasApplyPatch(rasBlock* ctx, rasPatch p) {
-    void* patchaddr = &ctx->code[p.offset];
+    void* patchaddr = ctx->code + p.offset;
     void* symaddr = rasGetLabelAddr(ctx, p.sym);
     rasAssert(symaddr != NULL, RAS_ERR_UNDEF_LABEL);
 
-    ptrdiff_t reladdr = symaddr - patchaddr;
+    ptrdiff_t reladdr = symaddr + p.addend - patchaddr;
 
     u32* patchinst = patchaddr;
 
     switch (p.type) {
         case RAS_PATCH_ABS64: {
             *(void**) patchaddr = symaddr;
+            break;
+        }
+        case RAS_PATCH_REL8: {
+            rasAssert(ISNBITSS64(reladdr, 8), RAS_ERR_BAD_LABEL);
+            *(s8*) patchaddr = reladdr;
+            break;
+        }
+        case RAS_PATCH_REL32: {
+            rasAssert(ISNBITSS64(reladdr, 32), RAS_ERR_BAD_LABEL);
+            *(s32*) patchaddr = reladdr;
             break;
         }
         case RAS_PATCH_REL26: {
@@ -273,14 +277,14 @@ void rasReady(rasBlock* ctx) {
     rasApplyAllPatches(ctx);
 
 #ifndef RAS_USE_RWX
-    jit_protect(ctx->code, 4 * ctx->size, RX);
+    jit_protect(ctx->code, ctx->size, RX);
 #endif
-    jit_clearcache(ctx->code, 4 * ctx->size);
+    jit_clearcache(ctx->code, ctx->size);
 }
 
 void rasUnready(rasBlock* ctx) {
 #ifndef RAS_USE_RWX
-    jit_protect(ctx->code, 4 * ctx->size, RW);
+    jit_protect(ctx->code, ctx->size, RW);
 #endif
 }
 
@@ -289,11 +293,10 @@ void* rasGetCode(rasBlock* ctx) {
 }
 
 size_t rasGetSize(rasBlock* ctx) {
-    return (ctx->curr - ctx->code) * 4;
+    return ctx->curr - ctx->code;
 }
 
 void rasAssert(bool condition, rasError err) {
-#ifndef RAS_NO_CHECKS
     if (!condition) {
         if (errorCallback) {
             errorCallback(err, errorUserdata);
@@ -302,38 +305,50 @@ void rasAssert(bool condition, rasError err) {
             abort();
         }
     }
-#endif
 }
 
 #ifdef RAS_AUTOGROW
 static void ras_grow(rasBlock* ctx) {
-    u32* oldCode = ctx->code;
+    u8* oldCode = ctx->code;
     size_t oldSize = ctx->size;
     ctx->size *= 2;
-    ctx->code = jit_alloc(4 * ctx->size);
+    ctx->code = jit_alloc(ctx->size);
     ctx->curr = ctx->code + oldSize;
-    memcpy(ctx->code, oldCode, 4 * oldSize);
-    jit_free(oldCode, 4 * oldSize);
+    memcpy(ctx->code, oldCode, oldSize);
+    jit_free(oldCode, oldSize);
 }
 #endif
 
-void rasEmitWord(rasBlock* ctx, u32 w) {
+void rasEmit8(rasBlock* ctx, u8 b) {
 #ifdef RAS_AUTOGROW
     if (ctx->curr == ctx->code + ctx->size) ras_grow(ctx);
 #else
     rasAssert(ctx->curr != ctx->code + ctx->size, RAS_ERR_CODE_SIZE);
 #endif
-    *ctx->curr++ = w;
+    *ctx->curr++ = b;
 }
 
-void rasEmitDword(rasBlock* ctx, u64 d) {
-    WORD(d);
-    WORD(d >> 32);
+void rasEmit16(rasBlock* ctx, u16 h) {
+    rasEmit8(ctx, h);
+    rasEmit8(ctx, h >> 8);
+}
+
+void rasEmit32(rasBlock* ctx, u32 w) {
+#ifdef RAS_AUTOGROW
+    if (ctx->curr + 4 > ctx->code + ctx->size) ras_grow(ctx);
+#else
+    rasAssert(ctx->curr + 4 <= ctx->code + ctx->size, RAS_ERR_CODE_SIZE);
+#endif
+    *(u32*) ctx->curr = w;
+    ctx->curr += 4;
+}
+
+void rasEmit64(rasBlock* ctx, u64 d) {
+    rasEmit32(ctx, d);
+    rasEmit32(ctx, d >> 32);
 }
 
 void rasAlign(rasBlock* ctx, size_t alignment) {
-    if (alignment & 3) return;
-    alignment >>= 2;
     for (int i = 0; i < 64; i++) {
         if (alignment & BIT(i)) {
             if (alignment != BIT(i)) return;
@@ -342,248 +357,5 @@ void rasAlign(rasBlock* ctx, size_t alignment) {
     }
     size_t cur = ctx->curr - ctx->code;
     size_t aligned = (cur + (alignment - 1)) & ~(alignment - 1);
-    for (int i = 0; i < aligned - cur; i++) WORD(0);
+    ctx->curr += aligned - cur;
 }
-
-bool rasGenerateLogicalImm(u64 imm, u32 sf, u32* immr, u32* imms, u32* n) {
-    if (!imm || !~imm) return false;
-    u32 sz = sf ? 64 : 32;
-
-    if (!sf) imm &= MASK(32);
-
-    // find the first one bit AND rotation
-    u32 rot = 0;
-    for (rot = 0; rot < sz; rot++) {
-        if ((imm & BIT(rot)) && !(imm & BIT((rot - 1) & (sz - 1)))) {
-            if (rot) imm = (imm >> rot) | (imm << (sz - rot));
-            break;
-        }
-    }
-
-    // find the pattern size of ones followed by zeros
-    u32 ones = 0;
-    for (int i = 0; i < sz; i++) {
-        if (!(imm & BIT(i))) break;
-        ones++;
-    }
-    if (ones == sz) return false;
-    u32 zeros = 0;
-    for (int i = ones; i < sz; i++) {
-        if ((imm & BIT(i))) break;
-        zeros++;
-    }
-
-    // check pattern size is power of 2
-    u32 ptnsz = ones + zeros;
-    u32 ptnszbits = 0;
-    for (int i = 0; i < 6; i++) {
-        if ((ptnsz & BIT(i))) break;
-        ptnszbits++;
-    }
-    if (ptnsz != BIT(ptnszbits)) return false;
-
-    // correct rotation to right rotation
-    *immr = ptnsz - *immr;
-
-    // verify pattern is correct
-    for (int i = 0; i < sz >> ptnszbits; i++) {
-        if ((imm & MASK(ptnsz)) != ((imm >> i * ptnsz) & MASK(ptnsz)))
-            return false;
-    }
-
-    // calculate final result
-    if (ptnszbits == 6) {
-        *imms = ones - 1;
-        *n = 1;
-    } else {
-        *imms = MASK(6) - MASK(ptnszbits + 1) + ones - 1;
-        *n = 0;
-    }
-    if (rot) {
-        rot &= MASK(ptnszbits);
-        rot = ptnsz - rot;
-    }
-    *immr = rot;
-
-    return true;
-}
-
-bool rasGenerateFPImm(float fimm, u8* imm8) {
-    u32 imm = ((union {
-                  float f;
-                  u32 u;
-              }) {fimm})
-                  .u;
-    u32 sgn = imm >> 31;
-    u32 exp = (imm >> 23) & 0xff;
-    u32 mant = imm & MASK(23);
-    if (!ISLOWBITS0(mant, 19)) return 0;
-    mant >>= 19;
-    if (!(exp >> 2 == 0x1f || exp >> 2 == 0x20)) return 0;
-    exp &= 7;
-    *imm8 = sgn << 7 | exp << 4 | mant;
-    return 1;
-}
-
-void rasEmitPseudoAddSubImm(rasBlock* ctx, u32 sf, u32 op, u32 s, rasReg rd,
-                            rasReg rn, u64 imm, rasReg rtmp) {
-    if (!sf) imm = (s32) imm;
-    if (ISNBITSU64(imm, 12)) {
-        ADDSUB(sf, op, s, rd, rn, imm);
-    } else if (ISNBITSU64(imm, 24) && ISLOWBITS0(imm, 12)) {
-        ADDSUB(sf, op, s, rd, rn, imm >> 12, LSL(12));
-    } else {
-        imm = -imm;
-        if (ISNBITSU64(imm, 12)) {
-            ADDSUB(sf, !op, s, rd, rn, imm);
-        } else if (ISNBITSU64(imm, 24) && ISLOWBITS0(imm, 12)) {
-            ADDSUB(sf, !op, s, rd, rn, imm >> 12, LSL(12));
-        } else {
-            imm = -imm;
-            if (sf) {
-                MOVX(rtmp, imm);
-            } else {
-                MOVW(rtmp, imm);
-            }
-            ADDSUB(sf, op, s, rd, rn, rtmp);
-        }
-    }
-}
-
-void rasEmitPseudoLogicalImm(rasBlock* ctx, u32 sf, u32 opc, rasReg rd,
-                             rasReg rn, u64 imm, rasReg rtmp) {
-    u32 immr, imms, n;
-    if (rasGenerateLogicalImm(imm, sf, &immr, &imms, &n)) {
-        LOGICAL(sf, opc, 0, rd, rn, imm);
-    } else {
-        if (sf) {
-            MOVX(rtmp, imm);
-        } else {
-            MOVW(rtmp, imm);
-        }
-        LOGICAL(sf, opc, 0, rd, rn, rtmp);
-    }
-}
-
-void rasEmitPseudoMovImm(rasBlock* ctx, u32 sf, rasReg rd, u64 imm) {
-    if (imm == 0) {
-        if (sf) {
-            MOVZX(rd, 0);
-        } else {
-            MOVZW(rd, 0);
-        }
-        return;
-    } else if (imm == ~0u && !sf) {
-        MOVNW(rd, 0);
-        return;
-    } else if (imm == ~0ull) {
-        if (sf) {
-            MOVNX(rd, 0);
-        } else {
-            MOVNW(rd, 0);
-        }
-        return;
-    }
-
-    u32 immr, imms, n;
-    if (rasGenerateLogicalImm(imm, sf, &immr, &imms, &n)) {
-        if (sf) {
-            ORRX(rd, ZR, imm);
-        } else {
-            ORRW(rd, ZR, imm);
-        }
-        return;
-    }
-
-    int hw0s = 0;
-    int hw1s = 0;
-
-    int sz = sf ? 4 : 2;
-
-    for (int i = 0; i < sz; i++) {
-        u16 hw = imm >> 16 * i;
-        if (hw == 0) hw0s++;
-        if (hw == MASK(16)) hw1s++;
-    }
-
-    bool NEG = hw1s > hw0s;
-    bool initial = true;
-
-    for (int i = 0; i < sz; i++) {
-        u16 hw = imm >> 16 * i;
-        if (hw != (NEG ? MASK(16) : 0)) {
-            u32 opc;
-            if (initial) {
-                initial = false;
-                if (NEG) {
-                    opc = 0;
-                    hw ^= MASK(16);
-                } else {
-                    opc = 2;
-                }
-            } else {
-                opc = 3;
-            }
-            MOVEWIDE(sf, opc, rd, hw, LSL(16 * i));
-        }
-    }
-}
-
-void rasEmitPseudoMovReg(rasBlock* ctx, u32 sf, rasReg rd, rasReg rm) {
-    if (rd.isSp || rm.isSp) {
-        if (sf) {
-            ADDX(rd, rm, 0);
-        } else {
-            ADDW(rd, rm, 0);
-        }
-    } else {
-        if (sf) {
-            ORRX(rd, ZR, rm);
-        } else {
-            ORRW(rd, ZR, rm);
-        }
-    }
-}
-
-void rasEmitPseudoShiftImm(rasBlock* ctx, u32 sf, u32 type, rasReg rd,
-                           rasReg rn, u32 imm) {
-    if (sf) {
-        switch (type) {
-            case 0:
-                UBFIZX(rd, rn, imm, 64 - imm);
-                break;
-            case 1:
-                UBFXX(rd, rn, imm, 64 - imm);
-                break;
-            case 2:
-                SBFXX(rd, rn, imm, 64 - imm);
-                break;
-            case 3:
-                EXTRX(rd, rn, rn, imm);
-                break;
-        }
-    } else {
-        switch (type) {
-            case 0:
-                UBFIZW(rd, rn, imm, 32 - imm);
-                break;
-            case 1:
-                UBFXW(rd, rn, imm, 32 - imm);
-                break;
-            case 2:
-                SBFXW(rd, rn, imm, 32 - imm);
-                break;
-            case 3:
-                EXTRW(rd, rn, rn, imm);
-                break;
-        }
-    }
-}
-
-void rasEmitPseudoPCRelAddrLong(rasBlock* ctx, rasReg rd, rasLabel lab) {
-    ADRP(rd, lab);
-    rasAddPatch(ctx, RAS_PATCH_PGOFF12, lab);
-    ADDX(rd, rd, 0);
-}
-
-#endif

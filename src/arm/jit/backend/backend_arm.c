@@ -8,10 +8,9 @@
 
 #include "arm/media.h"
 
-#define RAS_MACROS
 #define RAS_DEFAULT_SUFFIX W
 #define RAS_CTX_VAR backend->code
-#include <ras/ras.h>
+#include <ras/ras_a64.h>
 
 #define TEMPREGS_BASE 3
 #define TEMPREGS_COUNT 13
@@ -43,7 +42,7 @@ static void print_hostregs(HostRegAllocation* hralloc) {
         int operand = getOpForReg(hralloc, i);
         if (operand >= 32) {
             operand -= 32;
-            printf("[SP, #0x%x]", 4 * operand);
+            printf("[sp, #0x%x]", 4 * operand);
         } else {
             printf("w%d", operand);
         }
@@ -61,16 +60,16 @@ static int getOp(ArmCodeBackend* backend, int i) {
 
 static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr);
 static void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr,
-                              rasReg addr, rasLabel lldf32, rasLabel lldf64);
+                              rasA64Reg addr, rasLabel lldf32, rasLabel lldf64);
 static void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr,
-                               rasReg addr, rasLabel lstf32, rasLabel lstf64);
-static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasReg dst);
+                               rasA64Reg addr, rasLabel lstf32, rasLabel lstf64);
+static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr, rasA64Reg dst);
 static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
-                            rasReg src);
+                            rasA64Reg src);
 static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
-                             rasReg dst, bool h);
+                             rasA64Reg dst, bool h);
 static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
-                              rasReg src, bool h);
+                              rasA64Reg src, bool h);
 
 #define GETOP(i) getOp(backend, i)
 
@@ -87,7 +86,7 @@ static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
                 op -= 32;                                                      \
                 LDR(dst, (SP, 4 * op));                                        \
             } else {                                                           \
-                dst = REG(op);                                                 \
+                dst = R(op);                                                 \
             }                                                                  \
         }                                                                      \
         dst;                                                                   \
@@ -106,7 +105,7 @@ static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
 #define DSTREG()                                                               \
     ({                                                                         \
         int op = GETOP(i);                                                     \
-        (op >= 32) ? IP0 : REG(op);                                            \
+        (op >= 32) ? IP0 : R(op);                                            \
     })
 #define STOREDST()                                                             \
     ({                                                                         \
@@ -468,17 +467,10 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                         LSL(dst, src, inst.op2);
                     }
                 } else {
-                    auto SHIFT = LOADOP2();
-                    LABEL(lelse);
-                    LABEL(lendif);
-                    CMP(SHIFT, 32);
-                    BHS(lelse);
-                    LSL(dst, src, SHIFT);
-                    B(lendif);
-                    L(lelse);
-                    MOV(dst, 0);
-                    L(lendif);
-
+                    auto shift = LOADOP2();
+                    CMP(shift, 32);
+                    LSL(dst, src, shift);
+                    CMOV(dst, ZR, HS);
                     lastflags = 0;
                 }
                 break;
@@ -493,17 +485,11 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                         LSR(dst, src, inst.op2);
                     }
                 } else {
-                    auto SHIFT = LOADOP2();
-                    LABEL(lelse);
-                    LABEL(lendif);
-                    CMP(SHIFT, 32);
-                    BHS(lelse);
-                    LSR(dst, src, SHIFT);
-                    B(lendif);
-                    L(lelse);
-                    MOV(dst, 0);
-                    L(lendif);
-
+                    auto shift = LOADOP2();
+                    CMP(shift, 32);
+                    LSR(dst, src, shift);
+                    CMOV(dst, ZR, HS);
+                    lastflags = 0;
                     lastflags = 0;
                 }
                 break;
@@ -518,17 +504,11 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                         ASR(dst, src, inst.op2);
                     }
                 } else {
-                    auto SHIFT = LOADOP2();
-                    LABEL(lelse);
-                    LABEL(lendif);
-                    CMP(SHIFT, 32);
-                    BHS(lelse);
-                    ASR(dst, src, SHIFT);
-                    B(lendif);
-                    L(lelse);
-                    ASR(dst, src, 31);
-                    L(lendif);
-
+                    auto shift = LOADOP2();
+                    CMP(shift, 32);
+                    ASR(R0, src, 31);
+                    ASR(dst, src, shift);
+                    CMOV(dst, R0, HS);
                     lastflags = 0;
                 }
                 break;
@@ -540,8 +520,8 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 if (inst.imm2) {
                     ROR(dst, src, inst.op2 % 32);
                 } else {
-                    auto SHIFT = LOADOP2();
-                    ROR(dst, src, SHIFT);
+                    auto shift = LOADOP2();
+                    ROR(dst, src, shift);
                 }
                 break;
             }
@@ -881,7 +861,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
 
                 PUSH(FP, LR);
                 for (int i = 0; i < backend->hralloc.count[REG_SAVED]; i += 2) {
-                    PUSH(REG(SAVEDREGS_BASE + i), REG(SAVEDREGS_BASE + i + 1));
+                    PUSH(R(SAVEDREGS_BASE + i), R(SAVEDREGS_BASE + i + 1));
                 }
                 int spdisp = SPDISP();
                 if (spdisp) SUBX(SP, SP, spdisp);
@@ -909,7 +889,7 @@ ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 if (spdisp) ADDX(SP, SP, spdisp);
                 for (int i = (backend->hralloc.count[REG_SAVED] - 1) & ~1;
                      i >= 0; i -= 2) {
-                    POP(REG(SAVEDREGS_BASE + i), REG(SAVEDREGS_BASE + i + 1));
+                    POP(R(SAVEDREGS_BASE + i), R(SAVEDREGS_BASE + i + 1));
                 }
                 POP(FP, LR);
 
@@ -1092,7 +1072,7 @@ static void compileVFPDataProc(ArmCodeBackend* backend, ArmInstr instr) {
 }
 
 static void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr,
-                              rasReg addr, rasLabel lldf32, rasLabel lldf64) {
+                              rasA64Reg addr, rasLabel lldf32, rasLabel lldf64) {
     u32 rcount;
     if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
         rcount = 1;
@@ -1137,7 +1117,7 @@ static void compileVFPLoadMem(ArmCodeBackend* backend, ArmInstr instr,
 }
 
 static void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr,
-                               rasReg addr, rasLabel lstf32, rasLabel lstf64) {
+                               rasA64Reg addr, rasLabel lstf32, rasLabel lstf64) {
     u32 rcount;
     if (instr.cp_data_trans.p && !instr.cp_data_trans.w) {
         rcount = 1;
@@ -1182,7 +1162,7 @@ static void compileVFPStoreMem(ArmCodeBackend* backend, ArmInstr instr,
 }
 
 static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr,
-                           rasReg dst) {
+                           rasA64Reg dst) {
     if (instr.cp_reg_trans.cpopc == 7) {
         if (instr.cp_reg_trans.crn == 1) {
             LDR(dst, CPU(fpscr));
@@ -1201,7 +1181,7 @@ static void compileVFPRead(ArmCodeBackend* backend, ArmInstr instr,
 }
 
 static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
-                            rasReg src) {
+                            rasA64Reg src) {
     if (instr.cp_reg_trans.cpopc == 7) {
         if (instr.cp_reg_trans.crn == 1) {
             STR(src, CPU(fpscr));
@@ -1219,7 +1199,7 @@ static void compileVFPWrite(ArmCodeBackend* backend, ArmInstr instr,
 }
 
 static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
-                             rasReg dst, bool h) {
+                             rasA64Reg dst, bool h) {
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
         if (h) {
@@ -1239,7 +1219,7 @@ static void compileVFPRead64(ArmCodeBackend* backend, ArmInstr instr,
 }
 
 static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
-                              rasReg src, bool h) {
+                              rasA64Reg src, bool h) {
     if (instr.cp_double_reg_trans.cpnum & 1) {
         u32 vm = instr.cp_double_reg_trans.crm;
         if (h) {

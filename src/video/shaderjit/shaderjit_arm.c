@@ -7,9 +7,8 @@
 #endif
 #include <math.h>
 
-#define RAS_MACROS
 #define RAS_CTX_VAR this->code
-#include <ras/ras.h>
+#include <ras/ras_a64.h>
 
 // #define JIT_DISASM
 
@@ -34,9 +33,9 @@ ArmShaderJitBackend* shaderjit_arm_init() {
     // for a new entrypoint
 }
 
-static rasVReg readsrc(ArmShaderJitBackend* this, rasVReg dst, u32 n, u8 idx,
-                       u8 swizzle, bool NEG) {
-    rasVReg src = V3;
+static rasA64VReg readsrc(ArmShaderJitBackend* this, rasA64VReg dst, u32 n, u8 idx,
+                       u8 swizzle, bool neg) {
+    rasA64VReg src = V3;
     if (swizzle == 0b00'01'10'11) {
         src = dst;
     }
@@ -44,7 +43,7 @@ static rasVReg readsrc(ArmShaderJitBackend* this, rasVReg dst, u32 n, u8 idx,
         LDRQ(src, (reg_v, 16 * n));
     } else if (n < 0x20) {
         n -= 0x10;
-        src = VREG(reg_r + n);
+        src = V(reg_r + n);
     } else {
         n -= 0x20;
         if (idx == 0) {
@@ -97,12 +96,12 @@ static rasVReg readsrc(ArmShaderJitBackend* this, rasVReg dst, u32 n, u8 idx,
                 MOVS(dst, i, src, swizzleidx[i]);
             }
         }
-        if (NEG) {
+        if (neg) {
             FNEG4S(dst, dst);
         }
         return dst;
     } else {
-        if (NEG) {
+        if (neg) {
             FNEG4S(dst, src);
             return dst;
         } else {
@@ -112,8 +111,8 @@ static rasVReg readsrc(ArmShaderJitBackend* this, rasVReg dst, u32 n, u8 idx,
 }
 
 // dest is either V0 or V16-V31
-static rasVReg getdest(int n, u8 mask) {
-    if (n >= 0x10 && mask == 0b1111) return VREG(reg_r + n - 0x10);
+static rasA64VReg getdest(int n, u8 mask) {
+    if (n >= 0x10 && mask == 0b1111) return V(reg_r + n - 0x10);
     else return V0;
 }
 
@@ -147,12 +146,12 @@ static void writedest(ArmShaderJitBackend* this, int n, u8 mask) {
                     return;
             }
         }
-        rasVReg dst = V3;
+        rasA64VReg dst = V3;
         if (n < 0x10) {
             LDRQ(V3, (reg_o, 16 * n));
         } else {
             n -= 0x10;
-            dst = VREG(reg_r + n);
+            dst = V(reg_r + n);
         }
         for (int i = 0; i < 4; i++) {
             if (mask & BIT(3 - i)) {
@@ -163,7 +162,7 @@ static void writedest(ArmShaderJitBackend* this, int n, u8 mask) {
     }
 }
 
-static void compare(ArmShaderJitBackend* this, rasReg dst, u8 op) {
+static void compare(ArmShaderJitBackend* this, rasA64Reg dst, u8 op) {
     switch (op) {
         case 0:
             CSETW(dst, EQ);
@@ -197,24 +196,24 @@ static bool condop(ArmShaderJitBackend* this, u32 op, bool refx, bool refy) {
                 ORRW(R11, reg_cmpx, reg_cmpy);
                 TSTW(R11, R11);
                 return true;
-            } else if (refx && !refy) { // x or !y == !(!x AND y)
+            } else if (refx && !refy) { // x or !y == !(!x and y)
                 BICSW(ZR, reg_cmpy, reg_cmpx);
                 return false;
-            } else if (!refx && refy) { // !x or y == !(x AND !y)
+            } else if (!refx && refy) { // !x or y == !(x and !y)
                 BICSW(ZR, reg_cmpx, reg_cmpy);
                 return false;
-            } else { // !x or !y == !(x AND y)
+            } else { // !x or !y == !(x and y)
                 TSTW(reg_cmpx, reg_cmpy);
                 return false;
             }
         case 1:                 // AND
-            if (refx && refy) { // x AND y
+            if (refx && refy) { // x and y
                 TSTW(reg_cmpx, reg_cmpy);
                 return true;
-            } else if (refx && !refy) { // x AND !y
+            } else if (refx && !refy) { // x and !y
                 BICSW(ZR, reg_cmpx, reg_cmpy);
                 return true;
-            } else if (!refx && refy) { // !x AND y
+            } else if (!refx && refy) { // !x and y
                 BICSW(ZR, reg_cmpy, reg_cmpx);
                 return true;
             } else { // !x AND !y == !(x or y)
@@ -238,7 +237,7 @@ static bool condop(ArmShaderJitBackend* this, u32 op, bool refx, bool refy) {
 // this is important to emulate
 // zeros any lanes of src1 where src0 was 0
 // modified src2 always goes into V1
-static void setupMul(ArmShaderJitBackend* this, rasVReg src1, rasVReg src2) {
+static void setupMul(ArmShaderJitBackend* this, rasA64VReg src1, rasA64VReg src2) {
     FCMEQZ4S(V3, src1);
     BIC16B(V1, src2, V3);
 }
@@ -312,7 +311,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             }
             case PICA_DPH:
             case PICA_DPHI: {
-                rasVReg src1, src2;
+                rasA64VReg src1, src2;
                 if (instr.opcode == PICA_DPH) {
                     src1 = SRC1(1);
                     src2 = SRC2(1);
@@ -412,7 +411,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             }
             case PICA_SGE:
             case PICA_SGEI: {
-                rasVReg src1, src2;
+                rasA64VReg src1, src2;
                 if (instr.opcode == PICA_SGE) {
                     src1 = SRC1(1);
                     src2 = SRC2(1);
@@ -431,7 +430,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
             }
             case PICA_SLT:
             case PICA_SLTI: {
-                rasVReg src1, src2;
+                rasA64VReg src1, src2;
                 if (instr.opcode == PICA_SLT) {
                     src1 = SRC1(1);
                     src2 = SRC2(1);
@@ -600,7 +599,7 @@ static void compileBlock(ArmShaderJitBackend* this, ShaderUnit* shu, u32 start,
                 desc = shu->opdescs[instr.fmt5.desc];
 
                 auto src1 = SRC1(5);
-                rasVReg src2, src3;
+                rasA64VReg src2, src3;
                 if (instr.fmt5.opcode & 1) {
                     src2 = SRC2(5);
                     src3 = SRC3(5);
