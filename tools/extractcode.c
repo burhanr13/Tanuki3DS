@@ -51,9 +51,10 @@ int main(int argc, char** argv) {
     char* ext = strrchr(filename, '.');
     if (!ext) return -1;
 
-    char* outfile = malloc(strlen(filename) + 2);
-    strcpy(outfile, filename);
-    strcpy(outfile + (ext - filename), ".code");
+    int baselen = ext - filename;
+    char* outfile = malloc(baselen + 6);
+    memcpy(outfile, filename, baselen);
+    memcpy(outfile + baselen, ".code", 6);
 
     FILE* fp = fopen(filename, "rb");
     if (!fp) return -1;
