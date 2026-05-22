@@ -31,6 +31,8 @@
                           MKOP(op1)),                                          \
         rasX64Mem: __EMIT(OpRM, sz, op << 3 | 2, __FORCE(rasX64Reg, op1),      \
                           MKOP(op2)),                                          \
+        rasX64Op: __EMIT(OpRM, sz, op << 3 | 2, __FORCE(rasX64Reg, op1),       \
+                         MKOP(op2)),                                           \
         default: __EMIT(OpMI, sz, 0x80, op, MKOP(op1), __FORCE_IMM(op2)))
 
 #define ADD(sz, op1, op2) ALU(sz, 0, op1, op2)
@@ -88,6 +90,11 @@
                               __FORCE(rasX64Xmm, op1), MKOP(op2)),             \
             default: __EMIT(OpRM, sz, 0x8a, __FORCE(rasX64Reg, op1),           \
                             MKOP(op2))),                                       \
+        rasX64Op: _Generic(op1,                                                \
+            rasX64Xmm: __EMIT(OpVM, 1, sz == 3, 0x0f6e,                        \
+                              __FORCE(rasX64Xmm, op1), MKOP(op2)),             \
+            default: __EMIT(OpRM, sz, 0x8a, __FORCE(rasX64Reg, op1),           \
+                            MKOP(op2))),                                       \
         default: _Generic(op1,                                                 \
             rasX64Reg: __EMIT(OpOI, sz, sz ? 0xb8 : 0xb0,                      \
                               __FORCE(rasX64Reg, op1), __FORCE_IMM(op2)),      \
@@ -101,6 +108,7 @@
     _Generic(op2,                                                              \
         rasX64Reg: __EMIT(OpRM, sz, 0x84, __FORCE(rasX64Reg, op2), MKOP(op1)), \
         rasX64Mem: __EMIT(OpRM, sz, 0x84, __FORCE(rasX64Reg, op1), MKOP(op2)), \
+        rasX64Op: __EMIT(OpRM, sz, 0x84, __FORCE(rasX64Reg, op1), MKOP(op2)),  \
         default: __EMIT(OpMI, sz, 0xf6, 0, MKOP(op1), __FORCE_IMM(op2)))
 #define TESTB(op1, op2) TEST(0, op1, op2)
 #define TESTW(op1, op2) TEST(1, op1, op2)
@@ -486,7 +494,9 @@
         rasX64Xmm: __EMIT(OpVM, pfx, 0, opcMV, __FORCE(rasX64Xmm, op2),        \
                           MKOPV(op1)),                                         \
         rasX64Mem: __EMIT(OpVM, pfx, 0, opcVM, __FORCE(rasX64Xmm, op1),        \
-                          MKOPV(op2)))
+                          MKOPV(op2)),                                         \
+        rasX64Op: __EMIT(OpVM, pfx, 0, opcVM, __FORCE(rasX64Xmm, op1),         \
+                         MKOPV(op2)))
 #define MOVUPS(op1, op2) __MOVV(0, 0x0f10, 0x0f11, op1, op2)
 #define MOVUPD(op1, op2) __MOVV(1, 0x0f10, 0x0f11, op1, op2)
 #define MOVSS(op1, op2) __MOVV(2, 0x0f10, 0x0f11, op1, op2)
@@ -624,7 +634,6 @@
 #define CMPNLTSD(op1, op2) CMPSD(op1, op2, 5)
 #define CMPNLESD(op1, op2) CMPSD(op1, op2, 6)
 #define CMPORDSD(op1, op2) CMPSD(op1, op2, 7)
-
 
 #define R(n) ((rasX64Reg) {n})
 #define RAX R(0)

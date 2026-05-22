@@ -1,26 +1,32 @@
 #ifndef BACKEND_X86_H
 #define BACKEND_X86_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <ras/ras.h>
 
-#include "arm/arm_core.h"
-#include "arm/jit/ir.h"
 #include "arm/jit/jit.h"
 #include "arm/jit/register_allocator.h"
-#include "arm/media.h"
-#include "arm/vfp.h"
+#include "common.h"
 
-void* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
+typedef struct {
+    rasLabel lab;
+    u32 attrs, addr;
+} X86LinkPatch;
+
+typedef struct {
+    rasBlock* code;
+
+    RegAllocation* regalloc;
+    HostRegAllocation hralloc;
+    ArmCore* cpu;
+
+    Vec(X86LinkPatch) links;
+} X86CodeBackend;
+
+X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                                 ArmCore* cpu);
-JITFunc backend_x86_get_code(void* backend);
+JITFunc backend_x86_get_code(X86CodeBackend* backend);
 void backend_x86_patch_links(JITBlock* block);
-void backend_x86_free(void* backend);
-void backend_x86_disassemble(void* backend);
-
-#ifdef __cplusplus
-}
-#endif
+void backend_x86_free(X86CodeBackend* backend);
+void backend_x86_disassemble(X86CodeBackend* backend);
 
 #endif
