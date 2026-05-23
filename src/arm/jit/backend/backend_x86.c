@@ -478,7 +478,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                 break;
             }
             case IR_LOAD_MEM16: {
-                xor_(ARG3, ARG3);
+                XORD(ARG3, ARG3);
                 if (inst.imm1) {
                     MOVD(ARG2, inst.op1);
                 } else {
