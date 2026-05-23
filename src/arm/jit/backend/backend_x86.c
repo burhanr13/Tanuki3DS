@@ -455,7 +455,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     MOVD(ARG2, inst.op1);
                 } else {
                     auto src = GETOP(inst.op1);
-                    if (src != ARG2) MOVD(ARG2, src);
+                    if (src.isMem || src.r.idx != ARG2.idx) MOVD(ARG2, src);
                 }
                 MOVQ(ARG1, RBX);
                 MOVQ(RAX, (uintptr_t) cpu->read8);
@@ -469,7 +469,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     MOVD(ARG2, inst.op1);
                 } else {
                     auto src = GETOP(inst.op1);
-                    if (src != ARG2) MOVD(ARG2, src);
+                    if (src.isMem || src.r.idx != ARG2.idx) MOVD(ARG2, src);
                 }
                 MOVQ(ARG1, RBX);
                 MOVQ(RAX, (u64) cpu->read8);
@@ -483,7 +483,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     MOVD(ARG2, inst.op1);
                 } else {
                     auto src = GETOP(inst.op1);
-                    if (src != ARG2) MOVD(ARG2, src);
+                    if (src.isMem || src.r.idx != ARG2.idx) MOVD(ARG2, src);
                 }
                 MOVQ(ARG1, RBX);
                 MOVQ(RAX, (u64) cpu->read16);
@@ -497,7 +497,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     MOVD(ARG2, inst.op1);
                 } else {
                     auto src = GETOP(inst.op1);
-                    if (src != ARG2) MOVD(ARG2, src);
+                    if (src.isMem || src.r.idx != ARG2.idx) MOVD(ARG2, src);
                 }
                 MOVQ(ARG1, RBX);
                 MOVQ(RAX, (u64) cpu->read16);
@@ -510,7 +510,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     MOVD(ARG2, inst.op1);
                 } else {
                     auto src = GETOP(inst.op1);
-                    if (src != ARG2) MOVD(ARG2, src);
+                    if (src.isMem || src.r.idx != ARG2.idx) MOVD(ARG2, src);
                 }
                 MOVQ(ARG1, RBX);
                 MOVQ(RAX, (u64) cpu->read32);
@@ -528,7 +528,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     MOVD(ARG2, inst.op1);
                 } else {
                     auto src = GETOP(inst.op1);
-                    if (src != ARG2) MOVD(ARG2, src);
+                    if (src.isMem || src.r.idx != ARG2.idx) MOVD(ARG2, src);
                 }
                 MOVQ(ARG1, RBX);
                 MOVQ(RAX, (u64) cpu->write8);
@@ -545,7 +545,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     MOVD(ARG2, inst.op1);
                 } else {
                     auto src = GETOP(inst.op1);
-                    if (src != ARG2) MOVD(ARG2, src);
+                    if (src.isMem || src.r.idx != ARG2.idx) MOVD(ARG2, src);
                 }
                 MOVQ(ARG1, RBX);
                 MOVQ(RAX, (u64) cpu->write16);
@@ -562,7 +562,7 @@ X86CodeBackend* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
                     MOVD(ARG2, inst.op1);
                 } else {
                     auto src = GETOP(inst.op1);
-                    if (src != ARG2) MOVD(ARG2, src);
+                    if (src.isMem || src.r.idx != ARG2.idx) MOVD(ARG2, src);
                 }
                 MOVQ(ARG1, RBX);
                 MOVQ(RAX, (u64) cpu->write32);

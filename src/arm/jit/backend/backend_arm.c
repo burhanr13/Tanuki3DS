@@ -119,7 +119,7 @@ static void compileVFPWrite64(ArmCodeBackend* backend, ArmInstr instr,
 ArmCodeBackend* backend_arm_generate_code(IRBlock* ir, RegAllocation* regalloc,
                                           ArmCore* cpu) {
     ArmCodeBackend* backend = calloc(1, sizeof *backend);
-    backend->code = rasCreate(16384);
+    backend->code = rasCreate(16384, 0);
     backend->cpu = cpu;
     backend->regalloc = regalloc;
 

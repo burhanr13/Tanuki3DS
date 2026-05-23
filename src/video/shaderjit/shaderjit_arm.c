@@ -810,7 +810,7 @@ ShaderJitFunc shaderjit_arm_get_code(ArmShaderJitBackend* this,
     int i = Vec_push(this->entrypoints, e);
 
     if (this->code) rasDestroy(this->code);
-    this->code = rasCreate(16384);
+    this->code = rasCreate(16384, 0);
 
     Vec_resize(this->jmplabels, SHADER_CODE_SIZE);
     for (int i = 0; i < SHADER_CODE_SIZE; i++) {
