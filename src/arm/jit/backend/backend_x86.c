@@ -93,17 +93,19 @@ static void compileVFPWrite64(X86CodeBackend* this, ArmInstr instr,
 
 #define OP(op, dest, src)                                                      \
     ({                                                                         \
-        if (MKOP(src).isMem && MKOP(dest).isMem) {                             \
-            MOVD(RDX, src);                                                    \
-            op(dest, RDX);                                                     \
-        } else if (MKOP(src).isMem) op(MKOP(dest).r, src);                     \
-        else op(dest, MKOP(src).r);                                            \
+        auto d = MKOP(dest);                                                   \
+        auto s = MKOP(src);                                                    \
+        if (s.isMem && d.isMem) {                                              \
+            MOVD(RDX, s);                                                      \
+            op(d, RDX);                                                        \
+        } else if (s.isMem) op(d.r, src);                                      \
+        else op(d, s.r);                                                       \
     })
 
 #define LOAD(addr)                                                             \
     ({                                                                         \
         auto dest = GETOP(i);                                                  \
-        OP(MOVD, dest, MKOP(addr));                                            \
+        OP(MOVD, dest, addr);                                                  \
     })
 
 #define STORE(addr)                                                            \
@@ -112,7 +114,7 @@ static void compileVFPWrite64(X86CodeBackend* this, ArmInstr instr,
             MOVD(addr, inst.op2);                                              \
         } else {                                                               \
             auto src = GETOP(inst.op2);                                        \
-            OP(MOVD, MKOP(addr), src);                                         \
+            OP(MOVD, addr, src);                                               \
         }                                                                      \
     })
 
