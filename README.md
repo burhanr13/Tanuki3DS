@@ -86,8 +86,7 @@ You need the following dependencies installed to build:
 - fdk-aac
 - capstone
 
-To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23. You can configure compilers by running `./configure.sh CC=... CXX=...` before running `make`. To compile on Windows, you need to install Msys2 and mingw-w64 and compile within the mingw-w64 shell.
-
+To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23. You can configure compilers by running `./configure.sh CC=... CXX=...` before running `make`. To compile on Windows, you need to compile within msys2.
 
 ## Compatibility
 
