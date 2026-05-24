@@ -18,11 +18,11 @@ If you want to ask questions or discuss the emulator, join our discord:
 
 You can download a stable release from the releases tab, or the latest build below:
 
-| Platform | Download |
-| -------- | -------- |
-| Linux | [Binary](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-binary.zip) <br> [AppImage](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-appimage.zip) |
-| MacOS | [x86_64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) <br> [arm64 App](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) |
-| Windows | [Executable](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-windows.zip) |
+| Platform | Download (x86_64) | Download (arm64) |
+| -------- | -------- | ------- |
+| Linux | [Binary](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-binary.zip) <br> [AppImage](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-appimage.zip) | [Binary](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-arm-binary.zip) <br> [AppImage](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-linux-arm-appimage.zip) |
+| MacOS | [App Bundle](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-x86_64.zip) | [App Bundle](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-macos-arm64.zip) |
+| Windows | [Executable](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-windows.zip) | [Executable](https://nightly.link/burhanr13/Tanuki3DS/workflows/ci/master/Tanuki3DS-windows-arm.zip) |
 
 ## Usage
 On launching the app you can use the UI to open a game or drop its file onto the window. The supported formats are:
