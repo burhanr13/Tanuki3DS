@@ -14,8 +14,7 @@ jobs:
     - name: install dependencies
       run: |
         sudo apt update
-        sudo apt install clang-19 libxxhash-dev libxbyak-dev \
-        libcglm-dev libfdk-aac-dev
+        sudo apt install clang-19 libxxhash-dev libcglm-dev libfdk-aac-dev
         # SDL build dependencies
         sudo apt-get install build-essential git make \
         pkg-config cmake ninja-build gnome-desktop-testing libasound2-dev libpulse-dev \
@@ -95,7 +94,7 @@ jobs:
     - name: install dependencies
       run: |
         brew update
-        brew install coreutils sdl3 xxhash xbyak cglm fdk-aac
+        brew install coreutils sdl3 xxhash cglm fdk-aac
     - name: build
       run: make -j$(nproc) USER=1
 
@@ -153,9 +152,6 @@ jobs:
         pacman -Sy
         pacman --noconfirm -S make \
         mingw-w64-x86_64-{clang,lld,sdl3,xxhash,cglm,fdk-aac}
-        git clone https://github.com/herumi/xbyak.git
-        cd xbyak
-        make install
     - name: build
       run: make -j$(nproc) USER=1
     - name: add icon

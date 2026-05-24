@@ -85,7 +85,6 @@ You need the following dependencies installed to build:
 - cglm
 - fdk-aac
 - capstone
-- xbyak (x86_64 only)
 
 To build use `make`. You can pass some options to make, `USER=1` to compile a user build with lto, and `DEBUG=1` for unoptimized build with debug symbols. You need a compiler which supports C23. You can configure compilers by running `./configure.sh CC=... CXX=...` before running `make`. To compile on Windows, you need to install Msys2 and mingw-w64 and compile within the mingw-w64 shell.
 
