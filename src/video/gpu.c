@@ -484,6 +484,7 @@ void vtx_loader_imm_setup(GPU* gpu, AttrConfig cfg) {
 
 void load_vtx(GPU* gpu, AttrConfig cfg, int i, fvec4* dst) {
     u32 nattrs = gpu->regs.geom.vsh_num_attr + 1;
+    if (nattrs > 12) nattrs = 12;
     for (int a = 0; a < nattrs; a++) {
         void* vtx = cfg[a].base + i * cfg[a].stride;
         int pa = (gpu->regs.vsh.permutation >> 4 * a) & 0xf;
@@ -694,8 +695,10 @@ void gpu_run_gsh(GPU* gpu, ShaderUnit* gsh, bool elements, int basevert,
                     idx = ((u8*) indexbuf)[idx] - basevert;
                 }
             }
+            if (idx < 0 || idx >= nverts) continue;
             for (int i = 0; i < vshoutct; i++) {
                 int attr = v * vshoutct + i;
+                if (attr >= 8) continue;
                 attr = (gpu->regs.gsh.permutation >> 4 * attr) & 0xf;
                 memcpy(gsh->v[attr], vshout[idx][i], sizeof(fvec4));
             }
