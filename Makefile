@@ -27,7 +27,7 @@ ifeq ($(shell uname),Darwin)
 else ifeq ($(OS),Windows_NT)
 	LIBDIRS += /$(MSYSTEM)/lib
 	# we need all this garbage to static link on windows
-	LIBS += -lucrt -limm32 -lole32 -loleaut32 -lsetupapi -lversion -lwinmm -luuid
+	LIBS += -lucrt -lpthread -limm32 -lole32 -loleaut32 -lsetupapi -lversion -lwinmm -luuid
 else ifeq ($(shell uname),Linux)
 	LIBS += -lm
 endif
