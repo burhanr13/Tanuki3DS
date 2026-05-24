@@ -25,6 +25,7 @@ ifeq ($(shell uname),Darwin)
 	CPPFLAGS += -isystem $(shell brew --prefix)/include
 	LIBDIRS := $(shell brew --prefix)/lib $(LIBDIRS)
 else ifeq ($(OS),Windows_NT)
+	LIBDIRS += /$(MSYSTEM)/lib
 	# we need all this garbage to static link on windows
 	LIBS += -lucrt -limm32 -lole32 -loleaut32 -lsetupapi -lversion -lwinmm -luuid
 else ifeq ($(shell uname),Linux)
@@ -54,7 +55,6 @@ vpath %.a $(LIBDIRS)
 .LIBPATTERNS := lib%.a
 
 ifeq ($(OS),Windows_NT)
-	LIBDIRS += /clang64/lib
 	LDFLAGS += -mwindows -static -Wl,--stack,8388608
 endif
 

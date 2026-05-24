@@ -155,7 +155,7 @@ jobs:
         pacman --noconfirm -S make \
         mingw-w64-clang-x86_64-{clang,sdl3,xxhash,cglm,fdk-aac}
     - name: build
-      run: make -d -j$(nproc) USER=1
+      run: make -j$(nproc) USER=1
     - name: add icon
       run: |
         pacman --noconfirm -S mingw-w64-clang-x86_64-imagemagick
