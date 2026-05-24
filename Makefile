@@ -54,7 +54,7 @@ vpath %.a $(LIBDIRS)
 .LIBPATTERNS := lib%.a
 
 ifeq ($(OS),Windows_NT)
-	LIBDIRS += /$(MSYSTEM)/lib
+	LIBDIRS += /clang64/lib
 	LDFLAGS += -mwindows -static -Wl,--stack,8388608
 endif
 
