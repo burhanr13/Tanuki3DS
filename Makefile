@@ -1,16 +1,13 @@
 TARGET_EXEC := ctremu
 
 CC := clang
-CXX := clang++
 
 -include config.mk
 
 BUILD_DIR := build
 SRC_DIR := src
 
-CSTD := -std=gnu23
-CXXSTD := -std=gnu++23
-CFLAGS := -Wall -Wimplicit-fallthrough
+CFLAGS := -std=gnu23 -Wall -Wimplicit-fallthrough
 CFLAGS_RELEASE := -O3
 CFLAGS_DEBUG := -g -fsanitize=address
 
@@ -58,7 +55,7 @@ ifeq ($(OS),Windows_NT)
 	LDFLAGS += -mwindows -static -Wl,--stack,8388608
 endif
 
-SRCS := $(shell find $(SRC_DIR) -name '*.c' -or -name '*.cpp') 
+SRCS := $(shell find $(SRC_DIR) -name '*.c') 
 SRCS := $(SRCS:$(SRC_DIR)/%=%)
 
 BUILD_ROOT := $(BUILD_DIR)
@@ -71,7 +68,7 @@ else
 	CFLAGS += $(CFLAGS_RELEASE)
 endif
 
-OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
+OBJS := $(SRCS:%.c=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
 $(BUILD_ROOT)/$(TARGET_EXEC): $(OBJS) $(STATIC_LIBS)
@@ -79,15 +76,10 @@ $(BUILD_ROOT)/$(TARGET_EXEC): $(OBJS) $(STATIC_LIBS)
 	@$(CC) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
 	@echo done
 
-$(BUILD_DIR)/%.c.o: $(SRC_DIR)/%.c
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	@echo $<
-	@$(CC) $(CPPFLAGS) $(CSTD) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/%.cpp.o: $(SRC_DIR)/%.cpp
-	@mkdir -p $(dir $@)
-	@echo $<
-	@$(CXX) $(CPPFLAGS) $(CXXSTD) $(CFLAGS) -fno-threadsafe-statics -fno-exceptions -c $< -o $@
+	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
